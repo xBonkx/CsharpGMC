@@ -134,6 +134,20 @@ public static partial class SqlServerActs
     public static Schema31Sections ReadSectionsSchema31Test(string connectionString,long actId)
     {
         using var conn=OpenSchema31WriteTest(connectionString);
+        return ReadSectionsCore(conn,actId);
+    }
+
+    public static Schema31Sections ReadSections(string connectionString,long actId)
+    {
+        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            throw new InvalidOperationException("Штатная запись разбивки v31 пока не разрешена.");
+        RequirePilotWrite(connectionString);
+        using var conn=SqlServerDatabase.Open(connectionString);
+        return ReadSectionsCore(conn,actId);
+    }
+
+    private static Schema31Sections ReadSectionsCore(SqlConnection conn,long actId)
+    {
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);
         var rev=SqlServerDatabase.LockRevision(conn,tx)
             ??throw new InvalidOperationException("Нет meta.rev.");
@@ -149,6 +163,22 @@ public static partial class SqlServerActs
         long actId,KsActAllocation.SectionAmounts amounts,string expectedRevision)
     {
         using var conn=OpenSchema31WriteTest(connectionString);
+        return SaveSectionsCore(conn,actId,amounts,expectedRevision);
+    }
+
+    public static SqlServerDatabase.SaveResult SaveSections(string connectionString,long actId,
+        KsActAllocation.SectionAmounts amounts,string expectedRevision)
+    {
+        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            return SqlServerDatabase.SaveResult.Fail("Штатная запись разбивки v31 пока не разрешена.",expectedRevision);
+        RequirePilotWrite(connectionString);
+        using var conn=SqlServerDatabase.Open(connectionString);
+        return SaveSectionsCore(conn,actId,amounts,expectedRevision);
+    }
+
+    private static SqlServerDatabase.SaveResult SaveSectionsCore(SqlConnection conn,long actId,
+        KsActAllocation.SectionAmounts amounts,string expectedRevision)
+    {
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);
         var rev=SqlServerDatabase.LockRevision(conn,tx);
         if(rev is null||!string.Equals(rev,expectedRevision,StringComparison.Ordinal))

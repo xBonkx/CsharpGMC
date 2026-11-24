@@ -143,6 +143,8 @@
                     <Button Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}" Click="BarMore_Click">
                         <Button.ContextMenu>
                             <ContextMenu>
+                                <MenuItem x:Name="ActDiscountMenuItem" Header="Корректировка итога КС…" Click="ActDiscount_Click" Visibility="Collapsed"/>
+                                <MenuItem x:Name="SectionAmountsMenuItem" Header="СМР и транспорт по разделам…" Click="SectionAmounts_Click" Visibility="Collapsed"/>
                                 <MenuItem x:Name="IssuedMenuItem" Header="Сдать то, что выдано на объект (из «Закупок»)"
                                           Click="FillIssued_Click"/>
                                 <MenuItem x:Name="RestAllMenuItem"

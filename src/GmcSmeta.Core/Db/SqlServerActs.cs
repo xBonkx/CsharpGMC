@@ -726,6 +726,13 @@ public static partial class SqlServerActs
         if (charges is not null && ((smrMode == "pos") != (charges.Smr is null)))
             return SqlServerDatabase.SaveResult.Fail("Режим расчёта СМР изменился. Обновите КС.", rev);
 
+        if(charges is not null&&SqlSchemaCompatibility.HasPreviewColumns(conn))
+        {
+            using var manual=new SqlCommand("SELECT section_amounts_json FROM dbo.acts WHERE id=@id",conn,tx);
+            manual.Parameters.Add("@id",SqlDbType.BigInt).Value=actId;
+            if(!string.IsNullOrEmpty(Convert.ToString(manual.ExecuteScalar(),CultureInfo.InvariantCulture)))
+                return SqlServerDatabase.SaveResult.Fail("Сначала отредактируйте ручную разбивку СМР/транспорта по разделам; пакет не меняет её автоматически.",rev);
+        }
         foreach (var (positionId, qty) in changes)
         {
             if (!PositionBelongsToContract(conn, tx, positionId, contractId))
@@ -1030,7 +1037,7 @@ public static partial class SqlServerActs
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
-        return ToggleSignedCore(conn,actId,signed,expectedRevision,false);
+        return ToggleSignedCore(conn,actId,signed,expectedRevision,SqlSchemaCompatibility.HasPreviewColumns(conn));
     }
 
     public static SqlServerDatabase.SaveResult ToggleSignedSchema31Test(string connectionString, long actId,

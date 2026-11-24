@@ -17,7 +17,8 @@ public static partial class SqlServerActs
         DateTime PeriodFrom, DateTime PeriodTo, bool Signed, bool ContractLocked,
         decimal Smr, decimal Transport, decimal Pnr, bool SmrBySystem, string SmrMode,
         string DsNo = "", string DsDate = "", string DsExtra = "", string SectionAmountsJson = "",
-        decimal DiscountPercent = 0m, bool DiscountOverride = false, long ManualTotalCents = -1);
+        decimal DiscountPercent = 0m, bool DiscountOverride = false, long ManualTotalCents = -1,
+        bool SupportsAdjustment = false);
 
     public sealed record ActDraftEdit(
         string Number, DateTime Date, DateTime PeriodFrom, DateTime PeriodTo,
@@ -38,14 +39,17 @@ public static partial class SqlServerActs
             "a.signed,c.locked,ISNULL(a.smr_amount,0),ISNULL(a.transport_amount,0)," +
             "ISNULL(a.pnr_amount,0),ISNULL(a.smr_by_system,0),ISNULL(c.smr_mode,N'')," +
             "ISNULL(a.ds_no,N''),ISNULL(a.ds_date,N''),ISNULL(a.ds_extra,N'')" +
-            (schema31 ? ",a.section_amounts_json,a.discount_percent,a.discount_override,a.manual_total_cents " : " ") +
-            "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id WHERE a.id=@id",conn);
+            (schema31 ? ",a.section_amounts_json,a.discount_percent,a.discount_override,a.manual_total_cents,c.form,o.name,t.rules " : " ") +
+            "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id "+
+            (schema31 ? "JOIN dbo.objects o ON o.id=c.object_id LEFT JOIN dbo.tags t ON t.[key]=c.form " : "")+
+            "WHERE a.id=@id",conn);
         cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=actId;
         using var r=cmd.ExecuteReader();
         if (!r.Read()) throw new InvalidOperationException("Акт не найден.");
         decimal D(int i) => r.IsDBNull(i) ? 0m :
             Money.FromDouble(Convert.ToDouble(r.GetValue(i),CultureInfo.InvariantCulture));
         var date = r.IsDBNull(3) ? DateTime.Today : r.GetDateTime(3);
+        string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
         return new ActDetails(
             Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),Convert.ToInt64(r.GetValue(1),CultureInfo.InvariantCulture),r.IsDBNull(2) ? "" : r.GetString(2),
             date,r.IsDBNull(4) ? date : r.GetDateTime(4),
@@ -60,7 +64,9 @@ public static partial class SqlServerActs
             schema31 && !r.IsDBNull(16) ? r.GetString(16) : "",
             schema31 ? DiscountPolicy.ReadPercent(r, 17) : 0m,
             schema31 && !r.IsDBNull(18) && Convert.ToBoolean(r.GetValue(18)),
-            schema31 && !r.IsDBNull(19) ? Convert.ToInt64(r.GetValue(19)) : -1L);
+            schema31 && !r.IsDBNull(19) ? Convert.ToInt64(r.GetValue(19)) : -1L,
+            schema31 && DiscountPolicy.SupportsDiscount(KsFinancialPolicy.HasRule(S(22),"vat_top"),
+                KsFinancialPolicy.HasRule(S(22),"ks_dns"),S(20),S(21)));
     }
 
     /// <summary>Validate before opening a SQL transaction; includes Python's date normalization.</summary>
@@ -103,9 +109,12 @@ public static partial class SqlServerActs
         long contractId;
         bool signed,locked;
         string smrMode;
-        decimal oldSmr;
+        decimal oldSmr,oldTransport=0m;
+        bool oldBySystem=false,manualSections=false;
+        var schema31=SqlSchemaCompatibility.HasPreviewColumns(conn);
         using (var read=new SqlCommand(
             "SELECT a.contract_id,a.signed,c.locked,ISNULL(c.smr_mode,N''),ISNULL(a.smr_amount,0) " +
+            (schema31?",a.transport_amount,a.smr_by_system,a.section_amounts_json ":"")+
             "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id WHERE a.id=@id",conn,tx))
         {
             read.Parameters.Add("@id",SqlDbType.BigInt).Value=actId;
@@ -116,11 +125,20 @@ public static partial class SqlServerActs
             locked=r.GetBoolean(2);
             smrMode=r.IsDBNull(3) ? "" : r.GetString(3);
             oldSmr=Money.FromDouble(Convert.ToDouble(r.GetValue(4),CultureInfo.InvariantCulture));
+            if(schema31)
+            {
+                oldTransport=Money.FromDouble(Convert.ToDouble(r.GetValue(5),CultureInfo.InvariantCulture));
+                oldBySystem=Convert.ToBoolean(r.GetValue(6));
+                manualSections=!r.IsDBNull(7)&&!string.IsNullOrEmpty(r.GetString(7));
+            }
         }
         if (signed || locked)
             return SqlServerDatabase.SaveResult.Fail("Подписанный акт или заблокированный договор изменять нельзя.",rev);
         if (smrMode=="pos" && edit.Smr!=oldSmr)
             return SqlServerDatabase.SaveResult.Fail("СМР «по позициям» вычисляются по строкам, ручной ввод запрещён.",rev);
+
+        if(manualSections&&(edit.Smr!=oldSmr||edit.Transport!=oldTransport||edit.SmrBySystem!=oldBySystem))
+            return SqlServerDatabase.SaveResult.Fail("Суммы с ручной разбивкой меняются через «СМР и транспорт по разделам».",rev);
 
         using (var update=new SqlCommand(
             "UPDATE dbo.acts SET number=@number,[date]=@date,period_from=@from,period_to=@to," +

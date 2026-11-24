@@ -441,10 +441,15 @@ public partial class ActsEditorView : UserControl
             ClearButton.IsEnabled = !_signed;
             IssuedMenuItem.IsEnabled = !_signed;
             RestAllMenuItem.IsEnabled = !_signed;
-            SmrInput.IsEnabled = !_signed && !_contractLocked && !_isPosSmr;
-            TrInput.IsEnabled = !_signed && !_contractLocked;
+            var manualSections=!string.IsNullOrEmpty(_details?.SectionAmountsJson);
+            SmrInput.IsEnabled = !_signed && !_contractLocked && !_isPosSmr && !manualSections;
+            TrInput.IsEnabled = !_signed && !_contractLocked && !manualSections;
             PnrInput.IsEnabled = !_signed && !_contractLocked;
-            SmrBySystemCheck.IsEnabled = !_signed && !_contractLocked;
+            SmrBySystemCheck.IsEnabled = !_signed && !_contractLocked && !manualSections;
+            var adjustmentAvailable=SqlSchemaCompatibility.OrdinarySchema31Enabled&&_details?.SupportsAdjustment==true;
+            ActDiscountMenuItem.Visibility=SectionAmountsMenuItem.Visibility=adjustmentAvailable?Visibility.Visible:Visibility.Collapsed;
+            ActDiscountMenuItem.IsEnabled=SectionAmountsMenuItem.IsEnabled=adjustmentAvailable&&!_signed&&!_contractLocked;
+            RestAllMenuItem.IsEnabled=!_signed&&!_contractLocked&&!manualSections;
 
             BuildGrid();
             FillTiles();
@@ -1607,6 +1612,7 @@ public partial class ActsEditorView : UserControl
         var current = Current;
         var totals = _totals;
         if (_building || ActWritePending || current is null || current.Signed || _contractLocked || totals is null || _details is null) return;
+        if(kind!=ActChargeKind.Pnr&&!string.IsNullOrEmpty(_details.SectionAmountsJson))return;
         var input = kind switch
         {
             ActChargeKind.Smr => SmrInput,
@@ -1687,6 +1693,7 @@ public partial class ActsEditorView : UserControl
     {
         var current = Current;
         if (_building || ActWritePending || current is null || current.Signed || _contractLocked || _details is null) return;
+        if(!string.IsNullOrEmpty(_details.SectionAmountsJson))return;
         var value = SmrBySystemCheck.IsChecked == true;
         if (value == _details.SmrBySystem) return;
         try

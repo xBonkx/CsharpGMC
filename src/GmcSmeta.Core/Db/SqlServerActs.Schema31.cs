@@ -49,6 +49,22 @@ public static partial class SqlServerActs
         string connectionString, long actId, string mode, decimal? value, string expectedRevision)
     {
         using var conn = OpenSchema31WriteTest(connectionString);
+        return SaveDiscountCore(conn,actId,mode,value,expectedRevision);
+    }
+
+    public static SqlServerDatabase.SaveResult SaveDiscount(string connectionString,long actId,
+        string mode,decimal? value,string expectedRevision)
+    {
+        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            return SqlServerDatabase.SaveResult.Fail("Штатная запись скидок v31 пока не разрешена.",expectedRevision);
+        RequirePilotWrite(connectionString);
+        using var conn=SqlServerDatabase.Open(connectionString);
+        return SaveDiscountCore(conn,actId,mode,value,expectedRevision);
+    }
+
+    private static SqlServerDatabase.SaveResult SaveDiscountCore(SqlConnection conn,long actId,
+        string mode,decimal? value,string expectedRevision)
+    {
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = SqlServerDatabase.LockRevision(conn, tx);
         if (rev is null || !string.Equals(rev, expectedRevision, StringComparison.Ordinal))
