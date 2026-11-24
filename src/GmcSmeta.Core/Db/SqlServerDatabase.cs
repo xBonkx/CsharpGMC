@@ -26,10 +26,7 @@ public static partial class SqlServerDatabase
         public static SaveResult Fail(string error, string revision) => new(false, error, revision);
     }
 
-    /// <summary>Проверенные строки подключения: schema_version спрашивается у базы только один раз
-    /// на строку за жизнь процесса (каждое Open() иначе тратит лишний round-trip — см.
-    /// csharp/docs/PERFORMANCE_OPEN_20261122.md, пункт P4). Миграция схемы = перезапуск приложения.</summary>
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> SchemaVerified = new();
+    // Revalidate schema on each logical open. A release can change it during the lifetime of a client.
 
     public static SqlConnection Open(string connectionString)
     {
@@ -51,7 +48,6 @@ public static partial class SqlServerDatabase
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database);
-            if (!preview && SchemaVerified.ContainsKey(builder.ConnectionString)) return conn;
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
@@ -67,7 +63,6 @@ public static partial class SqlServerDatabase
             else
             {
                 SqlSchemaCompatibility.Validate(version, conn.Database, null, false, builder.DataSource);
-                SchemaVerified.TryAdd(builder.ConnectionString, 0);
             }
             return conn;
         }
@@ -119,7 +114,6 @@ public static partial class SqlServerDatabase
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database);
             token.ThrowIfCancellationRequested();
-            if (!preview && SchemaVerified.ContainsKey(builder.ConnectionString)) return conn;
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
@@ -137,7 +131,6 @@ public static partial class SqlServerDatabase
             {
                 SqlSchemaCompatibility.Validate(version, conn.Database, null, false, builder.DataSource);
                 token.ThrowIfCancellationRequested();
-                SchemaVerified.TryAdd(builder.ConnectionString, 0);
             }
             token.ThrowIfCancellationRequested();
             return conn;
