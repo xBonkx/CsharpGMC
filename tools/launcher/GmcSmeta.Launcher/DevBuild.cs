@@ -183,10 +183,7 @@ internal static class DevBuild
                     catch (InvalidOperationException) { return true; }
                 })) return;
 
-                ui.Warn("Программа не закрылась сама. Закройте её окно и нажмите Enter.");
-                Console.Write("  После закрытия нажмите Enter (Ctrl+C — отмена): ");
-                if (Console.ReadLine() is null)
-                    throw new InvalidOperationException("Закройте окно программы и запустите лаунчер снова.");
+                throw new InvalidOperationException("Программа не закрылась. Сохраните изменения, закройте её окно и повторите запуск.");
             }
             finally
             {
@@ -221,7 +218,7 @@ internal static class DevBuild
             throw new InvalidOperationException($"{fileName} не завершился за {timeout.TotalMinutes:0} мин.");
         }
         if (showOutput)
-            Console.WriteLine(Indent(output.ToString()));
+            ui.Info(Indent(output.ToString()));
         else
         {
             var problems = output.ToString().Split('\n')
@@ -230,7 +227,7 @@ internal static class DevBuild
                     || line.Contains("ошибка", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (problems.Count > 0)
-                Console.WriteLine(Indent(string.Join(Environment.NewLine, problems)));
+                ui.Info(Indent(string.Join(Environment.NewLine, problems)));
         }
         if (process.ExitCode != 0)
             throw new InvalidOperationException(

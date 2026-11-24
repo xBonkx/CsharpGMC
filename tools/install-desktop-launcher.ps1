@@ -73,6 +73,20 @@ try {
                     Write-Host "Ярлык: $linkPath"
                 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) }
             }
+            # Explicit graphical update without restarting the running application.
+            foreach ($folder in @($programs, $desktop) | Select-Object -Unique) {
+                if ([string]::IsNullOrWhiteSpace($folder)) { continue }
+                $linkPath = Join-Path $folder 'ГМЦ-Смета C# (проверить обновления).lnk'
+                $link = $shell.CreateShortcut($linkPath)
+                try {
+                    $link.TargetPath = $DestinationPath
+                    $link.Arguments = '--update-only'
+                    $link.WorkingDirectory = $destinationDir
+                    $link.IconLocation = "$DestinationPath,0"
+                    $link.Description = 'ГМЦ-Смета C# — графический центр обновлений'
+                    $link.Save()
+                } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) }
+            }
             # Separate fast shortcut, including when the updating EXE is already on the desktop.
             foreach ($folder in @($programs, $desktop) | Select-Object -Unique) {
                 if ([string]::IsNullOrWhiteSpace($folder)) { continue }
