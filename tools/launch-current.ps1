@@ -1,4 +1,4 @@
-# Build and launch the CURRENT WPF sources, not artifacts/clone-preview (an old binary).
+﻿# Build and launch the CURRENT WPF sources, not artifacts/clone-preview (an old binary).
 # Right-click -> Run with PowerShell, or run: powershell -ExecutionPolicy Bypass -File .\tools\launch-current.ps1
 param([switch]$SqlServer)
 $ErrorActionPreference = 'Stop'

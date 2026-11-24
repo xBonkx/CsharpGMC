@@ -1,4 +1,4 @@
-# Read actual PE icon resources without executing the application.
+﻿# Read actual PE icon resources without executing the application.
 [CmdletBinding()]
 param([Parameter(Mandatory = $true)][string[]]$ExePaths)
 $ErrorActionPreference = 'Stop'

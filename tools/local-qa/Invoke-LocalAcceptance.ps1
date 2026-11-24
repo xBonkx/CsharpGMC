@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 P0 #55: local-only recorder. NO SQL mutations. The optional SQL probe is read-only,
 uses integrated auth, and requires an exact expected @@SERVERNAME and Pilot DB.

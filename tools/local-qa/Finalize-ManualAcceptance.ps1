@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 # Validate manually witnessed GUI+SQL cases without forging PASS.
 [CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$RunDirectory)
