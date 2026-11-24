@@ -1,0 +1,328 @@
+<UserControl x:Class="GmcSmeta.App.ActsEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Background="Transparent"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <!-- Right side of the KS tab (ks_view.py): header row, action bar, the act
+         grid with «В этом акте», footer line and the summary tiles. -->
+    <UserControl.Resources>
+        <Style x:Key="KsToolToggle" TargetType="ToggleButton" BasedOn="{StaticResource PythonToolToggle}"/>
+        <Style x:Key="KsTileInput" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#D0D7E2"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style x:Key="KsNowCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+            <Setter Property="Background" Value="{Binding NowCellBack}"/>
+            <Setter Property="Foreground" Value="{Binding NowCellFore}"/>
+            <Setter Property="FontWeight" Value="{Binding NowCellWeight}"/>
+            <Setter Property="ToolTip" Value="{Binding NowToolTip}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/>
+                    <Setter Property="Foreground" Value="{Binding NowCellFore}"/>
+                </Trigger>
+                <Trigger Property="IsEditing" Value="True">
+                    <Setter Property="Background" Value="#FFFFFF"/>
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="KsLeftCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+            <Setter Property="Foreground" Value="{Binding LeftCellFore}"/>
+            <Setter Property="ToolTip" Value="{Binding LeftToolTip}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="{Binding LeftCellFore}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="KsNameCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+            <Setter Property="ToolTip" Value="{Binding NameToolTip}"/>
+        </Style>
+        <DataTemplate x:Key="KsTileTemplate">
+            <Border Style="{StaticResource PythonTile}" MinWidth="150" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PythonTileLabel}" Text="{Binding Caption}"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Caption}"/>
+                    <TextBlock x:Name="ValueText" Style="{StaticResource PythonTileValue}" Text="{Binding Value}"
+                               Margin="0,2,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Accent}" Value="True">
+                    <Setter TargetName="ValueText" Property="Foreground" Value="White"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid x:Name="EditorRoot">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- шапка в одну строку: «Акты», «КС-2 № … от …», «Свойства акта…», «Компактно» ·
+                 «Подписан (не менять)», «Сохранить КС-2 и КС-3», «Ещё» -->
+            <DockPanel Grid.Row="0" LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ToggleButton x:Name="ListToggle" Content="Акты" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
+                                  IsChecked="True" Checked="ListToggle_Changed" Unchecked="ListToggle_Changed"
+                                  ToolTip="Показать / скрыть список актов слева"/>
+                    <ComboBox x:Name="ActCombo" Width="240" Margin="10,0,0,0" Visibility="Collapsed"
+                              SelectionChanged="Act_Changed" ToolTip="Акт документа"/>
+                    <TextBlock x:Name="ActCaption" Margin="10,0,0,0" VerticalAlignment="Center"
+                               FontSize="{StaticResource UiH2Size}" FontWeight="Bold" Foreground="#0F172A"
+                               Cursor="Hand" MouseLeftButtonDown="ActCaption_Click"
+                               ToolTip="Двойной щелчок — свойства акта"/>
+                    <Button x:Name="PropsButton" Content="Свойства акта…" ContentTemplate="{StaticResource IconLabelEdit}" Style="{StaticResource PythonToolbarButton}"
+                            Margin="8,0,0,0" Click="Props_Click" ToolTip="Номер, дата, период, доп. соглашение"/>
+                    <ToggleButton x:Name="CompactToggle" Content="Компактно" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
+                                  Margin="6,0,0,0" Checked="Compact_Changed" Unchecked="Compact_Changed"
+                                  ToolTip="Свернуть шапку и освободить место для таблицы"/>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox x:Name="SignedCheck" Content="Подписан (не менять)" Margin="0,0,10,0"
+                              VerticalAlignment="Center" Checked="Signed_Changed" Unchecked="Signed_Changed"
+                              ToolTip="Перед подписанием выполняется проверка объёмов, цен, позиций вне КП и выдачи"/>
+                    <Button x:Name="SaveButton" Content="Сохранить КС-2 и КС-3" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarPrimary}"
+                            Click="ExportAct_Click" ToolTip="Excel (с листом КС-3) или PDF этого акта"/>
+                    <Button x:Name="MoreButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}"
+                            Margin="6,0,0,0" Click="HeaderMore_Click">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
+                                          ToolTip="Объёмы сверх КП, цены, строки вне сметы и выдача материалов"/>
+                                <Separator/>
+                                <MenuItem Header="Ведомость объёмов работ (ВОР) по этому акту…" Click="ExportVor_Click"/>
+                                <MenuItem Header="Сохранить все акты в один Excel…" Click="ExportAll_Click"/>
+                                <MenuItem Header="Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…" Click="ExportGroup_Click"/>
+                                <Separator/>
+                                <MenuItem x:Name="ExtraMenuItem" Header="Добавить позицию вне сметы…" Click="AddExtra_Click"/>
+                                <Separator/>
+                                <MenuItem Header="Удалить акт…" Foreground="#DC2626" Click="DeleteAct_Click"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- период и ДС под шапкой -->
+            <TextBlock Grid.Row="1" x:Name="ActSub" Foreground="#64748B" Margin="0,5,0,0"
+                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+
+            <!-- панель над таблицей: закрыть/разделы/убрать, «Ещё», справа фильтры и поиск -->
+            <DockPanel Grid.Row="2" Margin="0,5,0,0" LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button x:Name="FillRestButton" Content="Закрыть выделенное" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarMain}"
+                            Margin="0,0,2,0" Click="FillRest_Click"
+                            ToolTip="Вписать в акт весь остаток по смете для выделенных строк (можно выделить систему)"/>
+                    <Button Content="Закрыть разделы…" ContentTemplate="{StaticResource IconLabelLayers}" Style="{StaticResource PythonToolbarButton}" Margin="0,0,2,0"
+                            Click="CloseSections_Click"
+                            ToolTip="Отметить разделы (системы) и вписать в акт весь их остаток — 100 %"/>
+                    <Button x:Name="ClearButton" Content="Убрать выделенное" ContentTemplate="{StaticResource IconLabelX}" Style="{StaticResource PythonToolbarButton}"
+                            Margin="0,0,2,0" Click="ClearSelected_Click" ToolTip="Убрать выделенные строки из этого акта"/>
+                    <Button Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}" Click="BarMore_Click">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem x:Name="IssuedMenuItem" Header="Сдать то, что выдано на объект (из «Закупок»)"
+                                          Click="FillIssued_Click"/>
+                                <MenuItem x:Name="RestAllMenuItem"
+                                          Header="Сдать весь остаток по договору (закрыть на 100 %)…"
+                                          Click="FillAllRest_Click"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <ToggleButton x:Name="OnlyActToggle" Content="В акте" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
+                                  Margin="0,0,2,0" Checked="Filter_Changed" Unchecked="Filter_Changed"
+                                  ToolTip="Показать только строки этого акта"/>
+                    <ToggleButton x:Name="OnlyRestToggle" Content="Остатки" ContentTemplate="{StaticResource IconLabelSearch}" Style="{StaticResource KsToolToggle}"
+                                  Margin="0,0,2,0" Checked="Filter_Changed" Unchecked="Filter_Changed"
+                                  ToolTip="Только остатки: скрыть строки, полностью закрытые прошлыми актами"/>
+                    <ToggleButton x:Name="TilesToggle" Content="Итоги" ContentTemplate="{StaticResource IconLabelLayers}" Style="{StaticResource KsToolToggle}"
+                                  IsChecked="True" Margin="0,0,2,0" Checked="Tiles_Changed" Unchecked="Tiles_Changed"
+                                  ToolTip="Показать / свернуть плашки итогов внизу"/>
+                    <Grid Width="200">
+                        <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" VerticalContentAlignment="Center" Padding="30,5,8,5"
+                                 TextChanged="Search_Changed"/>
+                        <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
+                        <TextBlock x:Name="SearchHint" Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,0,0"
+                                   VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    </Grid>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- грид строк акта: № · Наименование · Ед. · По смете · Сдано ранее · В этом акте ·
+                 Остаток · Выдано на объект · Цена · Сумма в акте -->
+            <DataGrid local:TableColumnMenu.Key="ks-editor" Grid.Row="3" x:Name="ActGrid" Margin="0,5,0,0" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
+                      MinRowHeight="24"
+                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="All"
+                      HorizontalGridLinesBrush="#E4E8EF" RowHeaderWidth="0"
+                      Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1"
+                      SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
+                      BeginningEdit="ActGrid_BeginningEdit" PreparingCellForEdit="ActGrid_PreparingCellForEdit"
+                      CellEditEnding="ActGrid_CellEditEnding" SelectionChanged="ActGrid_SelectionChanged"
+                      MouseDoubleClick="ActGrid_DoubleClick" ContextMenuOpening="ActGrid_ContextMenuOpening">
+                <DataGrid.Resources>
+                    <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
+                </DataGrid.Resources>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+                        <Setter Property="Background" Value="White"/>
+                        <Style.Triggers>
+                            <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger>
+                            <DataTrigger Binding="{Binding IsSection}" Value="True">
+                                <Setter Property="Background" Value="{Binding RowBack}"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsSection}" Value="False"/>
+                                    <Condition Binding="{Binding InAct}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Background" Value="#ECFDF3"/>
+                            </MultiDataTrigger>
+                            <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="64" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True"
+                                        CellStyle="{StaticResource KsNameCell}" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                    <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="По смете" Binding="{Binding QtyByKp}" Width="80" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Сдано ранее" Binding="{Binding Before}" Width="92" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="В этом акте" Binding="{Binding Now}" Width="96"
+                                        CellStyle="{StaticResource KsNowCell}" EditingElementStyle="{StaticResource CompactCostCenterEditor}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Остаток" Binding="{Binding Left}" Width="80" IsReadOnly="True"
+                                        CellStyle="{StaticResource KsLeftCell}"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Выдано на объект" Binding="{Binding Issued}" Width="132" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="100" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                    <DataGridTextColumn Header="Сумма в акте" Binding="{Binding Amount}" Width="120" IsReadOnly="True"
+                                        ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- итоги одной строкой (когда плитки свернуты) + объём выделенного -->
+            <Grid Grid.Row="4" Margin="2,6,0,0">
+                <TextBlock x:Name="TotLine" Foreground="#64748B" TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
+                <TextBlock x:Name="SelectionQty" Foreground="#64748B" HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+
+            <!-- плитки итогов акта (SizePolicy.Ignored в Python: сжимаются, не уводят окно) -->
+            <UniformGrid Grid.Row="5" x:Name="TilesPanel" Columns="4" Margin="0,5,-10,0"
+                         SizeChanged="TilesPanel_SizeChanged">
+                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Материалы в акте"
+                                   TextWrapping="Wrap" ToolTip="Материалы в акте"/>
+                        <TextBlock x:Name="MatValue" Style="{StaticResource PythonTileValue}" Text="0,00"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="SmrTile">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="СМР в акте, ₽"/>
+                        <TextBox x:Name="SmrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
+                                 LostFocus="SmrInput_Commit" KeyDown="TileInput_KeyDown"/>
+                        <TextBlock x:Name="SmrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <CheckBox x:Name="SmrBySystemCheck" Content="СМР по системам" Margin="0,4,0,0"
+                                  Checked="SmrBySystem_Changed" Unchecked="SmrBySystem_Changed"
+                                  ToolTip="В КС-2 строка «СМР:» под каждой системой (как в актах по Анне)"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="TrTile"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Транспорт в акте, ₽"/>
+                        <TextBox x:Name="TrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
+                                 LostFocus="TrInput_Commit" KeyDown="TileInput_KeyDown"/>
+                        <TextBlock x:Name="TrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="PnrTile"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Пусконаладка в акте, ₽"/>
+                        <TextBox x:Name="PnrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
+                                 LostFocus="PnrInput_Commit" KeyDown="TileInput_KeyDown"/>
+                        <TextBlock x:Name="PnrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
+                                   TextWrapping="Wrap" Margin="0,2,0,0"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTileAccent}" Margin="0,0,10,8">
+                    <StackPanel>
+                        <TextBlock x:Name="TotalCaption" Style="{StaticResource PythonTileLabel}"
+                                   Foreground="#DDE7FF" Text="ИТОГО по акту с НДС"
+                                   TextWrapping="Wrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <TextBlock x:Name="TotalValue" Style="{StaticResource PythonTileValue}" Foreground="White"
+                                   Text="0,00" Margin="0,2,0,0" TextWrapping="Wrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8">
+                    <StackPanel>
+                        <TextBlock x:Name="DoneCaption" Style="{StaticResource PythonTileLabel}"
+                                   Text="Сдано по договору (подписано)" TextWrapping="Wrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <TextBlock x:Name="DoneValue" Style="{StaticResource PythonTileValue}" Text="0%"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+        </Grid>
+
+        <!-- «Актов по этому документу ещё нет» -->
+        <Border x:Name="EmptyPanel" Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1"
+                CornerRadius="12" Visibility="Collapsed">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="560">
+                <TextBlock x:Name="EmptyTitle" Text="Актов по этому документу ещё нет" FontSize="{StaticResource UiH1Size}"
+                           FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="EmptyDescription" Text="Нажмите «Новый акт», отметьте, что сдаёте, впишите СМР — и сохраните КС-2 и КС-3."
+                           Foreground="#64748B" TextWrapping="Wrap" HorizontalAlignment="Center"
+                           Margin="0,10,0,0" TextAlignment="Center"/>
+                <Button x:Name="RetryActButton" Content="Повторить загрузку" Visibility="Collapsed"
+                        Style="{StaticResource PythonToolbarButton}" Click="RetryAct_Click"
+                        HorizontalAlignment="Center" Margin="0,12,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

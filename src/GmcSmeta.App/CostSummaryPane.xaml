@@ -1,0 +1,270 @@
+<UserControl x:Class="GmcSmeta.App.CostSummaryPane"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <Grid Margin="22,18,22,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="CaptionText" FontWeight="Bold" FontSize="{StaticResource UiH2Size}" TextWrapping="Wrap"/>
+        <TabControl x:Name="CostTabs" Grid.Row="1" Margin="0,10,0,0" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource PythonSecondaryTab}">
+
+        <TabItem Header="Материалы">
+            <Grid Margin="4,8,4,6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <WrapPanel Margin="0,0,0,8">
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Наценка выделенным…" Click="MaterialsMarkup_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Закуп из справочника" Click="CatalogFill_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Поставщик…" Click="MaterialSupplier_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Пометки…" Click="MaterialNote_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить…" Click="MaterialClear_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт Excel" Click="MaterialsExport_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Транспорт…" Click="Transport_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Цвет…" Click="MaterialColor_Click" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CostViewMode" Width="170" Margin="6,0,6,0" SelectedIndex="0"
+                              SelectionChanged="MaterialsView_Changed">
+                        <ComboBoxItem Tag="kp" Content="По системам"/>
+                        <ComboBoxItem Tag="same" Content="Одинаковые вместе"/>
+                        <ComboBoxItem Tag="sup" Content="По поставщикам"/>
+                        <ComboBoxItem Tag="sup_same" Content="Поставщик + одинаковые"/>
+                    </ComboBox>
+                    <ComboBox x:Name="CostSortMode" Width="170" Margin="0,0,6,0" SelectedIndex="0"
+                              SelectionChanged="MaterialsView_Changed">
+                        <ComboBoxItem Tag="kp" Content="Как в КП"/>
+                        <ComboBoxItem Tag="name" Content="По названию"/>
+                        <ComboBoxItem Tag="cost_up" Content="Закуп по возрастанию"/>
+                        <ComboBoxItem Tag="cost_down" Content="Закуп по убыванию"/>
+                        <ComboBoxItem Tag="costsum" Content="По сумме закупа"/>
+                        <ComboBoxItem Tag="markup" Content="По наценке"/>
+                        <ComboBoxItem Tag="color" Content="По цвету"/>
+                    </ComboBox>
+                    <CheckBox x:Name="MaterialMissingCost" Content="Без закупа" Margin="0,0,7,0"
+                              VerticalAlignment="Center" Checked="MaterialsView_Changed" Unchecked="MaterialsView_Changed"/>
+                    <CheckBox x:Name="MaterialMissingPrice" Content="Без цены" Margin="0,0,8,0"
+                              VerticalAlignment="Center" Checked="MaterialsView_Changed" Unchecked="MaterialsView_Changed"/>
+                    <TextBox x:Name="MaterialSearch" Width="170" VerticalContentAlignment="Center"
+                             ToolTip="Поиск по наименованию и поставщику"
+                             TextChanged="MaterialsSearch_Changed"/>
+                </WrapPanel>
+                <DataGrid local:TableColumnMenu.Key="cost-materials" x:Name="MaterialsGrid" Grid.Row="1" Background="White"
+                          ColumnHeaderStyle="{StaticResource ReportGridHeader}"
+                          CellStyle="{StaticResource PythonGridCell}" RowHeight="24"
+                          AutoGenerateColumns="False" SelectionUnit="FullRow" SelectionMode="Extended"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                          BeginningEdit="SummaryGrid_BeginningEdit" CellEditEnding="SummaryGrid_CellEditEnding">
+                    <DataGrid.Resources>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource PythonGridEditor}"/>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="300" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="44" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty}" Width="70" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Мат: розн. за ед." Binding="{Binding UPrice, Mode=TwoWay}" Width="115"/>
+                        <DataGridTextColumn Header="Мат: розница" Binding="{Binding MSell}" Width="115" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Мат: закуп за ед." Binding="{Binding UCost, Mode=TwoWay}" Width="115"/>
+                        <DataGridTextColumn Header="Мат: закуп" Binding="{Binding MCost}" Width="115" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Наценка %" Binding="{Binding MatMarkupPct}" Width="100" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Мат: маржа" Binding="{Binding MatMargin}" Width="115" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="140"/>
+                        <DataGridTextColumn Header="Пометки" Binding="{Binding CostNote}" Width="170" IsReadOnly="True"/>
+                    </DataGrid.Columns>
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+                            <Setter Property="Background" Value="{Binding RowBackground}"/>
+                        </Style>
+                    </DataGrid.RowStyle>
+                </DataGrid>
+            </Grid>
+        </TabItem>
+        <TabItem Header="СМР">
+            <Grid Margin="4,8,4,6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="3*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <WrapPanel Margin="0,0,0,8">
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Наценка выделенным…" Click="WorkMarkup_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Розница из закупа…" Click="WorkFillEmpty_Click" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить закуп" Click="WorkClearCost_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить розницу" Click="WorkClearSell_Click" Margin="0,0,12,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт СМР Excel" Click="SmrExport_Click" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="SmrModeCaption" VerticalAlignment="Center" Foreground="#64748B"/>
+                    <ComboBox x:Name="SmrModePicker" Width="160" Margin="10,0,5,0">
+                        <ComboBoxItem Tag="sum" Content="Сумма"/>
+                        <ComboBoxItem Tag="pos" Content="По позициям"/>
+                        <ComboBoxItem Tag="percent" Content="Процент"/>
+                        <ComboBoxItem Tag="systems" Content="По системам"/>
+                    </ComboBox>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Сменить режим" Click="SmrModeSwitch_Click"/>
+                </WrapPanel>
+                <DataGrid local:TableColumnMenu.Key="smr-work" x:Name="SmrWorkGrid" Grid.Row="1" Background="White"
+                          ColumnHeaderStyle="{StaticResource ReportGridHeader}"
+                          CellStyle="{StaticResource PythonGridCell}" RowHeight="24"
+                          AutoGenerateColumns="False" SelectionUnit="FullRow" SelectionMode="Extended"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                          PreviewKeyDown="SmrWorkGrid_PreviewKeyDown"
+                          BeginningEdit="SummaryGrid_BeginningEdit" CellEditEnding="SummaryGrid_CellEditEnding">
+                    <DataGrid.Resources>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource PythonGridEditor}"/>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*"
+                                            IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="55" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty}" Width="75" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Работы: закуп за ед." Binding="{Binding UWcost, Mode=TwoWay}" Width="130"/>
+                        <DataGridTextColumn Header="Работы: закуп" Binding="{Binding WCost}" Width="125" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Работы: розн. за ед." Binding="{Binding UWsell, Mode=TwoWay}" Width="130"/>
+                        <DataGridTextColumn Header="Работы: розница" Binding="{Binding WSell}" Width="125" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="Работы: маржа" Binding="{Binding WorkMargin}" Width="125" IsReadOnly="True"/>
+                        <DataGridTextColumn Header="СМР: наценка" Binding="{Binding MarkupPct}" Width="110" IsReadOnly="True"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <DockPanel Grid.Row="2" Margin="0,8,0,6">
+                    <TextBlock Text="Прочие затраты на монтаж: аренда, техника, субподряд…" FontWeight="SemiBold"
+                               VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource PythonToolbarMain}" Content="Добавить затрату" Click="ExpenseAdd_Click" Margin="6,0"/>
+                        <Button Style="{StaticResource PythonToolbarMain}" Content="Удалить выделенные" Click="ExpenseDelete_Click" Margin="6,0"/>
+                    </StackPanel>
+                </DockPanel>
+                <DataGrid local:TableColumnMenu.Key="smr-expenses" x:Name="SmrExpenseGrid" Grid.Row="3" Background="White"
+                          ColumnHeaderStyle="{StaticResource ReportGridHeader}"
+                          CellStyle="{StaticResource PythonGridCell}" RowHeight="24"
+                          AutoGenerateColumns="False" SelectionUnit="FullRow" SelectionMode="Extended"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          PreviewKeyDown="SmrExpenseGrid_PreviewKeyDown"
+                          BeginningEdit="ExpenseGrid_BeginningEdit" CellEditEnding="ExpenseGrid_CellEditEnding">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Дата" Binding="{Binding Date, Mode=TwoWay}" Width="120"/>
+                        <DataGridTextColumn Header="Статья" Binding="{Binding Kind, Mode=TwoWay}" Width="200"/>
+                        <DataGridTextColumn Header="Кому" Binding="{Binding Who, Mode=TwoWay}" Width="210"/>
+                        <DataGridTextColumn Header="Сумма" Binding="{Binding Amount, Mode=TwoWay}" Width="150"/>
+                        <DataGridTextColumn Header="Пометка" Binding="{Binding Note, Mode=TwoWay}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </TabItem>
+        <TabItem Header="Сводная">
+        <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <WrapPanel Margin="0,0,0,8">
+            <TextBlock Text="Без закупочных цен: " Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <CheckBox x:Name="FilterNoPrice" Style="{StaticResource PythonFilterChip}" Content="Мат: без цены" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="FilterNoCost" Style="{StaticResource PythonFilterChip}" Content="Мат: без закупа" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="FilterNowSell" Style="{StaticResource PythonFilterChip}" Content="Работы: без розницы" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="FilterNowCost" Style="{StaticResource PythonFilterChip}" Content="Работы: без закупа" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,16,0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="FilterCountText" Foreground="#B45309" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Button x:Name="MarkupButton" Style="{StaticResource PythonToolbarMain}" Content="Наценка на СМР…" Click="Markup_Click"
+                    Margin="6,0,0,0" ToolTip="Применить наценку к выбранным позициям, либо ко всем"/>
+        </WrapPanel>
+        <DataGrid local:TableColumnMenu.Key="cost-summary" CellStyle="{StaticResource PythonGridCell}" ColumnHeaderStyle="{StaticResource ReportGridHeader}" RowHeight="24"
+                  EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="SummaryGrid" Grid.Row="1" Margin="0,0,0,0"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
+                  SelectionMode="Extended" SelectionUnit="FullRow" AlternatingRowBackground="#FFFFFF"
+                  BeginningEdit="SummaryGrid_BeginningEdit" CellEditEnding="SummaryGrid_CellEditEnding" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.Resources>
+                <Style TargetType="TextBox" BasedOn="{StaticResource PythonGridEditor}"/>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="300" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="44" IsReadOnly="True" ElementStyle="{StaticResource ReportGridCenter}"/>
+                <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty, Mode=TwoWay}" Width="66" ElementStyle="{StaticResource ReportGridCenter}"/>
+                <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="110"/>
+                <DataGridTextColumn Header="Мат: закуп за ед." Binding="{Binding UCost, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
+                <DataGridTextColumn Header="Мат: розн. за ед." Binding="{Binding UPrice, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
+                <DataGridTextColumn Header="Мат: закуп" Binding="{Binding MCost}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
+                <DataGridTextColumn Header="Мат: розница" Binding="{Binding MSell}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
+                <DataGridTextColumn Header="Мат: маржа" Binding="{Binding MatMargin}" Width="82" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMarginHeader}"/>
+                <DataGridTextColumn Header="Работы: закуп за ед." Binding="{Binding UWcost, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridWorksHeader}"/>
+                <DataGridTextColumn Header="Работы: розн. за ед." Binding="{Binding UWsell, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridWorksHeader}"/>
+                <DataGridTextColumn Header="Работы: закуп" Binding="{Binding WCost}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridWorksHeader}"/>
+                <DataGridTextColumn Header="Работы: розница" Binding="{Binding WSell}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridWorksHeader}"/>
+                <DataGridTextColumn Header="Работы: маржа" Binding="{Binding WorkMargin}" Width="82" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMarginHeader}"/>
+                <DataGridTextColumn Header="Итого: закуп" Binding="{Binding TotalCost}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridTotalsHeader}"/>
+                <DataGridTextColumn Header="Итого: розница" Binding="{Binding TotalSell}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridTotalsHeader}"/>
+                <DataGridTextColumn Header="Итого: маржа" Binding="{Binding TotalMargin}" Width="92" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMarginHeader}"/>
+                <DataGridTextColumn Header="СМР: наценка" Binding="{Binding MarkupPct}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMarginHeader}"/>
+            </DataGrid.Columns>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+                    <Setter Property="Background" Value="{Binding RowBackground}"/>
+                </Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+        </Grid>
+        </TabItem>
+        <TabItem Header="Итоги">
+            <Grid Margin="0,8,0,8" MaxWidth="1060" HorizontalAlignment="Left">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <UniformGrid Columns="3">
+                    <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Себестоимость — всего" Style="{StaticResource PythonTileLabel}"/>
+                            <TextBlock x:Name="TotCostValue" Style="{StaticResource PythonTileValue}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Margin="0,0,10,0" Style="{StaticResource PythonTileAccent}">
+                        <StackPanel>
+                            <TextBlock x:Name="TotSellCaption" Text="Розница — всего" Style="{StaticResource PythonTileLabel}" Foreground="#DBEAFE"/>
+                            <TextBlock x:Name="TotSellValue" Foreground="White" Style="{StaticResource PythonTileValue}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource PythonTile}">
+                        <StackPanel>
+                            <TextBlock Text="Маржа" Style="{StaticResource PythonTileLabel}"/>
+                            <TextBlock x:Name="TotMarginValue" Style="{StaticResource PythonTileValue}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Border Grid.Row="1" Margin="0,12,0,0" Style="{StaticResource PythonTile}" Padding="1,1,1,6" MinHeight="0">
+                    <DataGrid local:TableColumnMenu.Key="cost-totals" x:Name="TotalsGrid" CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsArticleRow}"
+                              ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="34" FontSize="14" ColumnHeaderHeight="36"
+                              EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderThickness="0"
+                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                              CanUserReorderColumns="False" HeadersVisibility="Column" GridLinesVisibility="None" RowHeaderWidth="0"
+                              SelectionMode="Single" SelectionUnit="Cell" AlternationCount="2"
+                              BeginningEdit="TotalsGrid_BeginningEdit" CellEditEnding="TotalsGrid_CellEditEnding"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" VirtualizingPanel.VirtualizationMode="Recycling">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Статья" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource TotalsArticleText}"/>
+                            <DataGridTextColumn Header="Себестоимость (нам)" Binding="{Binding Cost, Mode=TwoWay}" Width="190" CellStyle="{StaticResource TotalsCostCell}" ElementStyle="{StaticResource TotalsArticleMoney}" EditingElementStyle="{StaticResource TotalsArticleEditor}"/>
+                            <DataGridTextColumn Header="Розница (клиенту)" Binding="{Binding Sell, Mode=TwoWay}" Width="190" CellStyle="{StaticResource TotalsSellCell}" ElementStyle="{StaticResource TotalsArticleMoney}" EditingElementStyle="{StaticResource TotalsArticleEditor}"/>
+                            <DataGridTextColumn Header="Маржа" Binding="{Binding Margin}" Width="160" IsReadOnly="True" ElementStyle="{StaticResource TotalsArticleMargin}"/>
+                            <DataGridTextColumn Header="Маржа, %" Binding="{Binding MarginPct}" Width="100" IsReadOnly="True" ElementStyle="{StaticResource TotalsArticleMargin}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+        </TabItem>
+        </TabControl>
+        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+            <Button x:Name="RetryCostButton" DockPanel.Dock="Right" Content="Повторить загрузку"
+                    Style="{StaticResource PythonToolbarButton}" Click="RetryCost_Click"
+                    Visibility="Collapsed" Margin="8,0,0,0"/>
+            <TextBlock x:Name="FooterText" Foreground="#64748B" TextWrapping="Wrap"/>
+        </DockPanel>
+    </Grid>
+</UserControl>

@@ -1,0 +1,59 @@
+name: C# SQL Server - build and safe unit tests
+
+on:
+  workflow_dispatch:
+
+# Large migration blocks can create many short commits. Build only the newest
+# revision on each branch; canceled intermediate runs are not acceptance checks.
+concurrency:
+  group: csharp-wpf-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build WPF + CLI, test offline SQL parser
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore GmcSmeta.slnx
+
+      - name: Build entire solution
+        run: dotnet build GmcSmeta.slnx --configuration Release --no-restore
+
+      # Test only SQL Server-specific pure unit tests: no working database or SQL credentials.
+      - name: Build remote SQL LAN benchmark (no database connection)
+        run: dotnet build tools/RemoteSqlBench/RemoteSqlBench.csproj --configuration Release --nologo
+
+      - name: Compile KS SQL Pilot checks (no database connection)
+        run: dotnet build tools/KsPilotChecks/KsPilotChecks.csproj --configuration Release --nologo
+
+      - name: Run SQL Server offline unit tests
+        # Полный офлайн-набор (986 кейсов, ~3 с) вместо белого списка неймспейсов,
+        # который переставал ловить новые тесты и устарал.
+        run: dotnet test tests/GmcSmeta.Core.Tests/GmcSmeta.Core.Tests.csproj --configuration Release --no-build --nologo
+
+      - name: Publish single-file Windows desktop launcher
+        run: dotnet publish tools/launcher/GmcSmeta.Launcher/GmcSmeta.Launcher.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -o "$env:RUNNER_TEMP\gmc-launcher" --nologo
+
+      - name: Upload downloadable desktop launcher
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMC-Smeta-Launcher-win-x64
+          path: ${{ runner.temp }}/gmc-launcher/GmcSmeta.Launcher.exe
+          if-no-files-found: error
+          retention-days: 30

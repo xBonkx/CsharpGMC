@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>GMC-Smeta-Next</AssemblyName>
+    <RootNamespace>GmcSmeta.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" Link="Assets\app.ico" />
+    <InternalsVisibleTo Include="GmcSmeta.App.Checks" />
+    <EmbeddedResource Include="Assets\templates\ks_dns_template.xlsx" LogicalName="GmcSmeta.App.Templates.ks_dns_template.xlsx" />
+    <EmbeddedResource Include="Assets\templates\ks_r4_template.xlsx" LogicalName="GmcSmeta.App.Templates.ks_r4_template.xlsx" />
+    <EmbeddedResource Include="Assets\templates\vor_template.xlsx" LogicalName="GmcSmeta.App.Templates.vor_template.xlsx" />
+    <EmbeddedResource Include="Assets\templates\vor_dns_template.xlsx" LogicalName="GmcSmeta.App.Templates.vor_dns_template.xlsx" />
+    <EmbeddedResource Include="Assets\templates\vor_r4_template.xlsx" LogicalName="GmcSmeta.App.Templates.vor_r4_template.xlsx" />
+    <EmbeddedResource Include="Assets\templates\pto\aosr.xlsx" LogicalName="GmcSmeta.App.Templates.pto.aosr.xlsx" />
+    <EmbeddedResource Include="Assets\templates\pto\registry.xlsx" LogicalName="GmcSmeta.App.Templates.pto.registry.xlsx" />
+    <EmbeddedResource Include="Assets\templates\orders\*.docx" LogicalName="GmcSmeta.App.OrderTemplates.%(Filename)%(Extension)" />
+    <ProjectReference Include="..\GmcSmeta.Core\GmcSmeta.Core.csproj" />
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="ExcelDataReader" Version="3.7.0" />
+    <PackageReference Include="PDFsharp-WPF" Version="6.2.4" />
+  </ItemGroup>
+
+</Project>

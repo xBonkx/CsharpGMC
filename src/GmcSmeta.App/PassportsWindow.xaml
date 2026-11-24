@@ -1,0 +1,136 @@
+<Window x:Class="GmcSmeta.App.PassportsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Title="Паспорта вентиляции" Width="970" Height="850" MinWidth="660" MinHeight="590"
+        WindowStartupLocation="CenterOwner" Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Closing="Window_Closing" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Одна строка — одна система. Ctrl+V вставляет таблицу из Excel с выбранной ячейки. Фактические замеры не вычисляются автоматически."
+                       Foreground="#64748B" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ArchiveLabel" Margin="0,4,0,8" Foreground="#64748B" TextTrimming="CharacterEllipsis"/>
+            <WrapPanel>
+                <Button Content="Добавить" ContentTemplate="{StaticResource IconLabelPlus}" Padding="11,6" Margin="0,0,7,5" Click="Add_Click"/>
+                <Button Content="Список систем…" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelList}" Click="Batch_Click"/>
+                <Button Content="Копировать" ContentTemplate="{StaticResource IconLabelCopy}" Padding="11,6" Margin="0,0,7,5" Click="Duplicate_Click"/>
+                <Button Content="Удалить" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelTrash}" Click="Delete_Click"/>
+                <Button Content="Выбрать архив PDF…" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelFile}" Click="Root_Click"/>
+                <Button Content="Ранее созданные PDF…" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click"/>
+            </WrapPanel>
+        </StackPanel>
+        <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Style="{StaticResource PrimaryButton}" Content="Сохранить" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click"/>
+            <Button Content="PDF выбранных" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportSelected_Click"/>
+            <Button Content="PDF всех" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportAll_Click"/>
+            <Button Content="Закрыть" Padding="14,8" Click="Close_Click"/>
+        </WrapPanel>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="185"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DataGrid local:TableColumnMenu.Key="passports" Grid.Row="0" x:Name="PassportList" AutoGenerateColumns="False" CanUserAddRows="False"
+                      HeadersVisibility="Column" IsReadOnly="True" SelectionUnit="FullRow"
+                      SelectionMode="Extended" MinRowHeight="24" GridLinesVisibility="All"
+                      Background="White" SelectionChanged="PassportList_SelectionChanged" Style="{StaticResource DocumentTable}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Система" Width="125" Binding="{Binding System}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                    <DataGridTextColumn Header="Назначение" Width="*" Binding="{Binding Purpose}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                    <DataGridTextColumn Header="Точек" Width="70" Binding="{Binding PointsCount}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn Header="Измерения" Width="140" Binding="{Binding MeasurementStatus}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#CFD6E3"
+                          ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"/>
+            <TabControl Grid.Row="2" x:Name="EditorTabs" Background="White" Style="{StaticResource PythonTabbedPane}">
+                <TabItem Header="Общее">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid Margin="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="206"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Система" Margin="0,8"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="SystemBox" Margin="0,2,0,8"
+                                     TextChanged="System_Changed"/>
+                            <TextBlock Grid.Row="1" Text="Назначение" Margin="0,8"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="PurposeBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="2" Text="Объект" Margin="0,8"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" x:Name="ObjectBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="3" Text="Адрес" Margin="0,8"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="AddressBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="4" Text="Наладочная организация" Margin="0,8"/>
+                            <TextBox Grid.Row="4" Grid.Column="1" x:Name="OrganizationBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="5" Text="Зона / цех" Margin="0,8"/>
+                            <TextBox Grid.Row="5" Grid.Column="1" x:Name="ZoneBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="6" Text="Оборудование расположено" Margin="0,8"/>
+                            <TextBox Grid.Row="6" Grid.Column="1" x:Name="LocationBox" Margin="0,2,0,8"/>
+                            <TextBlock Grid.Row="7" Text="Дата" Margin="0,8"/>
+                            <TextBox Grid.Row="7" Grid.Column="1" x:Name="DateBox" Margin="0,2,0,8"/>
+                            <Button Grid.Row="8" Grid.Column="1" HorizontalAlignment="Left" Padding="12,7"
+                                    Margin="0,10,0,0" Content="Реквизиты текущего паспорта → всем системам"
+                                    Click="ApplyCommon_Click"/>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="Оборудование">
+                    <DockPanel Margin="12">
+                        <TextBlock DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#64748B" Margin="0,8,0,0"
+                                   Text="Модели и параметры запоминаются при сохранении. Подача вентилятора Е.1.1 рассчитывается из Е.2. Е.1.7 всегда остаётся пустой."/>
+                        <StackPanel DockPanel.Dock="Bottom">
+                            <TextBox x:Name="EquipmentNotes" Margin="0,7,0,7"
+                                     ToolTip="Примечания к оборудованию"/>
+                            <CheckBox x:Name="FilterCheck" Content="Фильтр установлен" Margin="0,0,0,5"/>
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Top">
+                            <DockPanel Margin="0,0,0,8">
+                                <Button Content="Подставить" DockPanel.Dock="Right" Click="Catalogue_Click"
+                                        Margin="8,0,0,0" Padding="12,5"/>
+                                <ComboBox x:Name="CatalogueBox" MinWidth="130"/>
+                            </DockPanel>
+                            <ComboBox x:Name="SectionCombo" Margin="0,0,0,8" SelectionChanged="Section_Changed"/>
+                        </StackPanel>
+                        <DataGrid local:TableColumnMenu.Key="passport-equipment" local:TableColumnMenu.Protect="Параметр" x:Name="EquipmentGrid" AutoGenerateColumns="False"
+                                  HeadersVisibility="Column" CanUserAddRows="False"
+                                  BeginningEdit="Equipment_BeginningEdit" MinRowHeight="24"
+                                  GridLinesVisibility="All" Background="White" Style="{StaticResource DocumentTable}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Параметр" Width="2*" IsReadOnly="True" Binding="{Binding Parameter}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                                <DataGridTextColumn Header="По проекту" Width="*" Binding="{Binding Project, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                                <DataGridTextColumn Header="Фактически" Width="*" Binding="{Binding Actual, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </TabItem>
+                <TabItem Header="Расходы Е.2">
+                    <DockPanel Margin="12">
+                        <TextBlock DockPanel.Dock="Bottom" x:Name="TotalsLabel"
+                                   Margin="0,8,0,0" Foreground="#334155" FontWeight="SemiBold"/>
+                        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <Button Content="Добавить точку" Padding="12,6" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelPlus}" Click="AddPoint_Click"/>
+                            <Button Content="Удалить точку" Padding="12,6" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelTrash}" Click="DeletePoint_Click"/>
+                            <TextBlock Text="Вставка Excel: Ctrl+V с выбранной ячейки" Foreground="#64748B" VerticalAlignment="Center"/>
+                        </WrapPanel>
+                        <DataGrid local:TableColumnMenu.Key="passport-points" x:Name="PointsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                                  HeadersVisibility="Column" SelectionUnit="CellOrRowHeader"
+                                  MinRowHeight="24" Background="White" GridLinesVisibility="All"
+                                  PreviewKeyDown="Points_KeyDown" CellEditEnding="Points_CellEditEnding" Style="{StaticResource DocumentTable}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Участок / Сечение" Width="1.1*" Binding="{Binding Section, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                                <DataGridTextColumn Header="Помещение" Width="1.8*" Binding="{Binding Room, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                                <DataGridTextColumn Header="По проекту, м³/ч" Width="1*" Binding="{Binding Project, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}" EditingElementStyle="{StaticResource DocumentNumericEditor}"/>
+                                <DataGridTextColumn Header="Фактический, м³/ч" Width="1*" Binding="{Binding Actual, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}" EditingElementStyle="{StaticResource DocumentNumericEditor}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,449 @@
+<UserControl x:Class="GmcSmeta.App.ProcurementPane"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <UserControl.Resources>
+        <Style x:Key="ProcurementCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}"/>
+        <Style x:Key="ProcurementOrange" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Background" Value="#F97316"/>
+            <Setter Property="BorderBrush" Value="#F97316"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#EA580C"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ProcurementGroupSelect" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#DCE8FA"/></Trigger></Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid Margin="24,6,24,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <!-- Python proc_view.py: chips and filters, then an action row. -->
+        <Grid x:Name="ProcurementFilterLayout" SizeChanged="ProcurementFilterLayout_SizeChanged">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <WrapPanel x:Name="ProcurementChips" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+                <RadioButton x:Name="ProcFilterAll" Content="Все" Tag="all"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked" IsChecked="True"/>
+                <RadioButton x:Name="ProcFilterNone" Content="Не заказано" Tag="none"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterWork" Content="В работе" Tag="work"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterLate" Content="Просрочено" Tag="late"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterShop" Content="Цех" Tag="shop"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterStock" Content="На складе" Tag="stock"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterIssued" Content="Выдано" Tag="issued"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                <RadioButton x:Name="ProcFilterProblem" Content="Проблемы" Tag="problem"
+                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
+                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+            </WrapPanel>
+            <Grid x:Name="ProcurementFilterTail" Grid.Column="1" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <ToggleButton x:Name="ProcurementSystemToggle" Content="Все системы  ▾"
+                              Height="32" MinWidth="140" MaxWidth="220" Padding="9,3"
+                              Background="White" Foreground="#334155" BorderBrush="#CBD5E1"
+                              ToolTip="Показать одну или несколько систем (родитель включает подразделы)"
+                              VerticalAlignment="Center" Margin="0,0,8,4"/>
+                <Popup PlacementTarget="{Binding ElementName=ProcurementSystemToggle}"
+                       Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                       IsOpen="{Binding IsChecked, ElementName=ProcurementSystemToggle, Mode=TwoWay}">
+                    <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1"
+                            CornerRadius="8" Padding="12" Width="320">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.18"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" Content="Сбросить"
+                                        Click="ProcurementSystemsClear_Click"
+                                        Style="{StaticResource PythonToolbarButton}"/>
+                                <TextBlock Text="Системы договора" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Foreground="#334155"/>
+                            </DockPanel>
+                            <TextBox x:Name="ProcurementSystemSearch" Height="28" Margin="0,0,0,8"
+                                     Padding="7,3" ToolTip="Поиск систем по названию"
+                                     TextChanged="ProcurementSystemSearch_TextChanged"/>
+                            <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="ProcurementSystemItems">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Label}" Tag="{Binding Id}"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Checked="ProcurementSystem_CheckChanged"
+                                                      Unchecked="ProcurementSystem_CheckChanged"
+                                                      Padding="3" Margin="0,2,0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock Text="Если ничего не выбрано — видны все системы."
+                                       FontSize="{StaticResource UiCaptionSize}" Foreground="#64748B"
+                                       TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+                </StackPanel>
+                <ComboBox x:Name="ProcurementSupplierFilter" Grid.Column="1" Width="140" Height="32"
+                          Margin="0,0,8,4" VerticalContentAlignment="Center" DisplayMemberPath="Label"
+                          SelectionChanged="ProcurementSupplier_Changed"
+                          ToolTip="Все поставщики, не указан или конкретный поставщик"/>
+                <Grid Grid.Column="2" MinWidth="100" Margin="0,0,0,4">
+                    <TextBox x:Name="ProcurementSearchBox" Style="{StaticResource PythonSearch}" Height="32"
+                             Padding="30,5,8,5" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
+                             ToolTip="Поиск по названию, системе, поставщику, заявке и счёту"/>
+                    <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
+                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,8,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False">
+                        <TextBlock.Style><Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=ProcurementSearchBox}" Value="">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger></Style.Triggers>
+                        </Style></TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Grid>
+        </Grid>
+        <DockPanel Grid.Row="1" Margin="0,6,0,6" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="Заявка поставщику" ContentTemplate="{StaticResource IconLabelFile}" Style="{StaticResource ProcurementOrange}"
+                        Margin="0,0,2,4" Click="ProcurementSupplierRequest_Click"/>
+                <Button Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="0,0,0,4" Click="ProcurementMore_Click"/>
+            </StackPanel>
+            <WrapPanel VerticalAlignment="Center">
+                <TextBlock x:Name="ProcurementSelectionText" Text="Выделите строки →" Foreground="#64748B"
+                           VerticalAlignment="Center" Margin="0,0,14,4"/>
+                <Button x:Name="ProcurementSupplierButton" Content="Поставщик…" ContentTemplate="{StaticResource IconLabelBuilding}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="0,0,2,4" Click="ProcurementBulkSupplier_Click" IsEnabled="False"/>
+                <Button x:Name="ProcurementStatusButton" Content="Статус…" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="0,0,16,4" Click="ProcurementStatusMenu_Click" IsEnabled="False"/>
+                <Button Content="Группировка" ContentTemplate="{StaticResource IconLabelLayers}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="0,0,2,4" Click="ProcurementGroupMenu_Click"/>
+                <Button Content="Сортировка" ContentTemplate="{StaticResource IconLabelSort}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="0,0,2,4" Click="ProcurementSortMenu_Click"/>
+            </WrapPanel>
+        </DockPanel>
+        <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="24" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="BuyGrid" Grid.Row="2" Margin="0,0,0,0"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0" CanUserSortColumns="False"
+                  SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2"
+                  BeginningEdit="BuyGrid_BeginningEdit" CellEditEnding="BuyGrid_CellEditEnding"
+                  ContextMenuOpening="BuyGrid_ContextMenuOpening"
+                  SelectionChanged="BuyGrid_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
+            <DataGrid.Resources>
+                <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
+            </DataGrid.Resources>
+            <DataGrid.ContextMenu>
+                <ContextMenu x:Name="MovementMenu"/>
+            </DataGrid.ContextMenu>
+            <!-- Real DataGrid grouping preserves the original editable SQL rows.
+                 Group headings select their physical children, not synthetic IDs. -->
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="{x:Type GroupItem}">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                        <StackPanel>
+                                            <Grid MinHeight="24" Background="#F1F4F9">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <ToggleButton x:Name="GroupToggle" IsChecked="True" Cursor="Hand"
+                                                              Loaded="ProcurementGroupToggle_Loaded" Click="ProcurementGroupToggle_Click" DataContextChanged="ProcurementGroupToggle_DataContextChanged"
+                                                              ToolTip="Свернуть или развернуть систему" Background="Transparent"
+                                                              BorderThickness="0" Padding="0" MinWidth="0" MinHeight="0">
+                                                    <ToggleButton.Template>
+                                                        <ControlTemplate TargetType="ToggleButton">
+                                                            <Border Background="Transparent"><Viewbox Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path x:Name="Chevron" Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="#475569"/></Canvas></Viewbox></Border>
+                                                            <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="False"><Setter TargetName="Chevron" Property="Data" Value="{StaticResource GlyphChevronRight}"/></Trigger></ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </ToggleButton.Template>
+                                                </ToggleButton>
+                                                <TextBlock Grid.Column="1" Text="{Binding Items[0].GroupDisplayNumber}" FontWeight="Bold"
+                                                           VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                <Button Grid.Column="2" Tag="{Binding}" Content="{Binding Items[0].GroupTitle}"
+                                                        Style="{StaticResource ProcurementGroupSelect}" Click="ProcurementSelectGroup_Click"
+                                                        ToolTip="Выбрать все позиции этой системы или группы"/>
+                                            </Grid>
+                                            <ItemsPresenter x:Name="GroupRows"/>
+                                        </StackPanel>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger SourceName="GroupToggle" Property="IsChecked" Value="False">
+                                                <Setter TargetName="GroupRows" Property="Visibility" Value="Collapsed"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="64" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="190" IsReadOnly="True" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <DockPanel LastChildFill="True" ToolTip="{Binding NameTooltip}">
+                                <TextBlock DockPanel.Dock="Left" Text="⚠" Foreground="#B45309" Margin="0,0,4,0" VerticalAlignment="Center">
+                                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers><DataTrigger Binding="{Binding HasProblem}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                    </Style></TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Name}" TextTrimming="None" TextWrapping="Wrap" VerticalAlignment="Center">
+                                    <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
+                                        <Style.Triggers><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1D4ED8"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
+                                    </Style></TextBlock.Style>
+                                </TextBlock>
+                            </DockPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="120" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource CompactCostHeader}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="5" Padding="6,1" Margin="0" HorizontalAlignment="Left"
+                                    BorderThickness="1" MinHeight="18" ToolTip="{Binding StatusLabel}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#F1F4F9"/><Setter Property="BorderBrush" Value="#D0D7E2"/>
+                                        <Setter Property="TextElement.Foreground" Value="#475569"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Не заказано">
+                                                <Setter Property="Background" Value="#FEE2E2"/>
+                                                <Setter Property="BorderBrush" Value="#FECACA"/>
+                                                <Setter Property="TextElement.Foreground" Value="#B91C1C"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Не заказываем">
+                                                <Setter Property="Background" Value="#F4F4F5"/>
+                                                <Setter Property="TextElement.Foreground" Value="#71717A"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="0 по КП">
+                                                <Setter Property="Background" Value="#F4F4F5"/>
+                                                <Setter Property="TextElement.Foreground" Value="#A1A1AA"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="По факту">
+                                                <Setter Property="Background" Value="#F1F5F9"/>
+                                                <Setter Property="TextElement.Foreground" Value="#475569"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Заказано">
+                                                <Setter Property="Background" Value="#EFF6FF"/>
+                                                <Setter Property="TextElement.Foreground" Value="#1D4ED8"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Заявка в цех">
+                                                <Setter Property="Background" Value="#EEF2FF"/>
+                                                <Setter Property="TextElement.Foreground" Value="#4338CA"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="В изготовлении">
+                                                <Setter Property="Background" Value="#FAE8FF"/>
+                                                <Setter Property="TextElement.Foreground" Value="#A21CAF"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Счёт">
+                                                <Setter Property="Background" Value="#FEF9C3"/>
+                                                <Setter Property="TextElement.Foreground" Value="#854D0E"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Оплачено">
+                                                <Setter Property="Background" Value="#F3E8FF"/>
+                                                <Setter Property="TextElement.Foreground" Value="#7E22CE"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Пришло частично">
+                                                <Setter Property="Background" Value="#FFEDD5"/>
+                                                <Setter Property="TextElement.Foreground" Value="#C2410C"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="На складе">
+                                                <Setter Property="Background" Value="#E0F2FE"/>
+                                                <Setter Property="TextElement.Foreground" Value="#0369A1"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Выдано частично">
+                                                <Setter Property="Background" Value="#ECFCCB"/>
+                                                <Setter Property="TextElement.Foreground" Value="#4D7C0F"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Выдано">
+                                                <Setter Property="Background" Value="#DCFCE7"/>
+                                                <Setter Property="TextElement.Foreground" Value="#15803D"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding StatusLabel}" FontSize="{StaticResource UiCaptionSize}"
+                                           FontWeight="Normal" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox SelectedValue="{Binding StageChoice, Mode=OneWay}"
+                                      ItemsSource="{Binding StageOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                      SelectedValuePath="Code" DisplayMemberPath="Label" MinWidth="0" MinHeight="0" Padding="4,0" VerticalContentAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Заявка / счёт" Width="130" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                    <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding OrderCaption}" ToolTip="{Binding OrderCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding OrderRef, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Ожидаем" Width="86" HeaderStyle="{StaticResource CompactCostHeader}">
+                    <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                        <Border CornerRadius="5" Padding="4,1" Margin="0" HorizontalAlignment="Center" ToolTip="{Binding DueDate}">
+                            <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ExpectedState}" Value="late"><Setter Property="Background" Value="#FEE2E2"/><Setter Property="TextElement.Foreground" Value="#B91C1C"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding ExpectedState}" Value="soon"><Setter Property="Background" Value="#FEF3C7"/><Setter Property="TextElement.Foreground" Value="#B45309"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding ExpectedState}" Value="ok"><Setter Property="Background" Value="#EEF2F7"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding ExpectedState}" Value="done"><Setter Property="Background" Value="#F4F4F5"/><Setter Property="TextElement.Foreground" Value="#94A3B8"/></DataTrigger>
+                                </Style.Triggers>
+                            </Style></Border.Style>
+                            <TextBlock Text="{Binding ExpectedCaption}" VerticalAlignment="Center" FontSize="{StaticResource UiCaptionSize}"/>
+                        </Border>
+                    </DataTemplate></DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding DueDate, Mode=OneWay}" Style="{StaticResource CompactCostCenterEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Пришло" Binding="{Binding Received}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="Выдано" Binding="{Binding Issued}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="Дата выдачи" Binding="{Binding IssueDateText}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTemplateColumn Header="Примечание / замена" Width="200" MinWidth="100" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                    <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding NoteCaption}" ToolTip="{Binding NoteCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding Note, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn x:Name="ProcCostColumn" Header="Наша цена" Binding="{Binding CostPrice, Mode=TwoWay}" Width="90" Visibility="Collapsed" ElementStyle="{StaticResource CompactCostMoney}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+                <DataGridTextColumn x:Name="ProcPriceColumn" Header="Цена клиенту" Binding="{Binding Price}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+                <DataGridTextColumn x:Name="ProcMarginColumn" Header="Маржа" Binding="{Binding MarginText}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+            </DataGrid.Columns>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+                    <Setter Property="MinHeight" Value="23"/>
+                    <Setter Property="Background" Value="White"/>
+                    <Style.Triggers>
+                        <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger>
+                        <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger>
+                        <DataTrigger Binding="{Binding IsSub}" Value="True"><Setter Property="FontStyle" Value="Italic"/></DataTrigger>
+                        <DataTrigger Binding="{Binding OutOfKp}" Value="True"><Setter Property="FontStyle" Value="Italic"/></DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+        <!-- Python procurement: movement history for the selected real position. -->
+        <Expander x:Name="MovementHistoryExpander" Grid.Row="3"
+                  Header="Движение и замена — выберите позицию"
+                  Margin="0,7,0,0" IsExpanded="False"
+                  Expanded="MovementHistory_Expanded" Collapsed="MovementHistory_Collapsed"
+                  Background="Transparent" BorderBrush="Transparent" BorderThickness="0">
+            <Grid Margin="0,7,0,4">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                <DockPanel Margin="0,0,0,6" LastChildFill="True">
+                    <Button x:Name="MovementEditButton" DockPanel.Dock="Right"
+                            Content="Изменить движение" Margin="6,0,0,0"
+                            Click="MovementEdit_Click" IsEnabled="False"
+                            Style="{StaticResource PythonToolbarButton}"
+                            ToolTip="Редактировать только самостоятельные движения; выдачи по ведомости защищены"/>
+                    <Button x:Name="MovementDeleteButton" DockPanel.Dock="Right"
+                            Content="Удалить выбранное движение"
+                            Click="MovementDelete_Click" IsEnabled="False"
+                            Style="{StaticResource PythonToolbarButton}"
+                            ToolTip="Выдачи по ведомости можно отменить только на вкладке «Выдача»"/>
+                    <TextBlock x:Name="MovementDetailsText"
+                               Text="Выберите одну строку закупки для просмотра истории."
+                               Foreground="#475569" TextWrapping="Wrap"
+                               VerticalAlignment="Center"/>
+                </DockPanel>
+                <DataGrid local:TableColumnMenu.Key="procurement-history" CellStyle="{StaticResource CompactCostCell}" x:Name="MovementHistoryGrid" Height="155"
+                          ColumnHeaderStyle="{StaticResource CompactCostHeader}"
+                          Background="White" BorderBrush="#E4E8EF"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" RowHeaderWidth="0"
+                          SelectionMode="Single" SelectionUnit="FullRow"
+                          SelectionChanged="MovementHistory_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+            <DataGrid.Resources>
+                <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
+            </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Дата" Width="95"
+                                            Binding="{Binding Date, StringFormat={}{0:dd.MM.yyyy}}" HeaderStyle="{StaticResource CompactCostHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                        <DataGridTextColumn Header="Операция" Width="165"
+                                            Binding="{Binding KindLabel}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                        <DataGridTextColumn Header="Кол-во" Width="80"
+                                            Binding="{Binding Qty, StringFormat={}{0:0.###}}" HeaderStyle="{StaticResource CompactCostHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                        <DataGridTextColumn Header="Документ" Width="150"
+                                            Binding="{Binding Document}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                        <DataGridTextColumn Header="Примечание" Width="*"
+                                            Binding="{Binding Note}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                        <DataGridTextColumn Header="Кто" Width="115"
+                                            Binding="{Binding User}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock Text="Движения, связанные с ведомостями, удаляются только через вкладку «Выдача»."
+                           Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
+                           Margin="0,5,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <TextBlock Text="Замена (на что заменили)" Foreground="#64748B" FontWeight="SemiBold"/>
+                    <TextBox x:Name="ReplacementDetail" Margin="0,4,0,8" IsEnabled="False"/>
+                    <TextBlock Text="Ответственный" Foreground="#64748B" FontWeight="SemiBold"/>
+                    <TextBox x:Name="ResponsibleDetail" Margin="0,4,0,8" IsEnabled="False"/>
+                    <CheckBox x:Name="DirectDetail" Content="Сразу на объект (минуя склад)" IsEnabled="False" Margin="0,0,0,6"/>
+                    <Button x:Name="SaveDetailButton" Content="Сохранить изменения" IsEnabled="False"
+                            HorizontalAlignment="Left" Style="{StaticResource PythonToolbarButton}" Click="ProcurementSaveDetails_Click"/>
+                </StackPanel>
+            </Grid>
+        </Expander>
+        <TextBlock x:Name="FooterText" Grid.Row="4" Foreground="#64748B" Margin="2,4,0,0" TextWrapping="Wrap">
+            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/>
+                <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
+            </Style></TextBlock.Style>
+        </TextBlock>
+    </Grid>
+</UserControl>

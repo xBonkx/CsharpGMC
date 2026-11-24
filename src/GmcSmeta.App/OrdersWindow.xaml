@@ -1,0 +1,86 @@
+<Window x:Class="GmcSmeta.App.OrdersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Приказы на объект" Width="820" Height="790" MinWidth="690" MinHeight="600"
+        WindowStartupLocation="CenterOwner" FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        Background="#F4F6FA" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <DockPanel Margin="22,18,22,16">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock Text="Приказы на объект" FontSize="23" FontWeight="SemiBold"
+                       Foreground="#1F2937"/>
+            <TextBlock x:Name="ObjectName" Margin="0,4,0,0" Foreground="#64748B"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="MakeButton" Content="Сформировать приказы" ContentTemplate="{StaticResource IconLabelFile}" Click="Make_Click"
+                    Padding="16,8" Background="#F97316" Foreground="White"
+                    BorderBrush="#F97316" FontWeight="SemiBold" Margin="0,0,10,0"/>
+            <Button Content="Закрыть" Click="Close_Click" Padding="14,8"/>
+        </WrapPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="165"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="Ответственный" HorizontalAlignment="Right"
+                               Margin="0,8,14,0"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="PersonBox" Height="32"
+                              DisplayMemberPath="Fio" SelectionChanged="Person_Changed"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="InflectionPreview"
+                               Margin="0,4,0,11" TextWrapping="Wrap" Foreground="#64748B"/>
+                    <TextBlock Grid.Row="2" Text="Дата приказов" HorizontalAlignment="Right"
+                               Margin="0,8,14,0"/>
+                    <DatePicker Grid.Row="2" Grid.Column="1" x:Name="DayPicker"
+                                SelectedDateChanged="Date_Changed" Height="32" HorizontalAlignment="Left"/>
+                    <TextBlock Grid.Row="3" Text="Номер первого" HorizontalAlignment="Right"
+                               Margin="0,8,14,0"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="NumberBox" Height="32"
+                             Padding="7,5" ToolTip="Следующим приказам автоматически назначатся номера …-02, …-03"/>
+                    <TextBlock Grid.Row="4" Text="Договор подряда" HorizontalAlignment="Right"
+                               Margin="0,8,14,0"/>
+                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="ContractBox" Height="32"
+                             Padding="7,5"/>
+                    <TextBlock Grid.Row="5" Text="Объект" HorizontalAlignment="Right"
+                               Margin="0,8,14,0"/>
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="SiteBox" Height="68"
+                             Padding="7,5" AcceptsReturn="True" TextWrapping="Wrap"/>
+                </Grid>
+                <TextBlock Text="КАКИЕ ПРИКАЗЫ" FontWeight="SemiBold" Foreground="#475569"
+                           Margin="0,18,0,8"/>
+                <ItemsControl x:Name="TemplateList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Margin="2,4" Content="{Binding Title}"
+                                IsChecked="{Binding Checked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <WrapPanel Margin="0,10,0,8">
+                    <Button Content="Папка шаблонов" Click="Templates_Click" ContentTemplate="{StaticResource IconLabelFile}"
+                            Padding="10,6" Margin="0,0,8,0"/>
+                    <Button Content="Выбрать папку выдачи…" Click="OutputFolder_Click"
+                            Padding="10,6" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="FolderInfo" TextWrapping="Wrap" VerticalAlignment="Center"
+                               Foreground="#64748B" MaxWidth="420"/>
+                </WrapPanel>
+                <TextBlock x:Name="StatusInfo" TextWrapping="Wrap" Foreground="#64748B"
+                           Margin="0,6,0,8"/>
+                <TextBlock Text="ИСТОРИЯ ПРИКАЗОВ ЭТОГО ОБЪЕКТА" FontWeight="SemiBold"
+                           Foreground="#475569" Margin="0,14,0,7"/>
+                <ListBox x:Name="OrderHistory" Height="120" DisplayMemberPath="Label"/>
+                <Button Content="Открыть ранее созданные" Click="OpenHistory_Click"
+                        HorizontalAlignment="Left" Padding="10,6" Margin="0,7,0,4"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

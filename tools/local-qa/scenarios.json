@@ -1,0 +1,227 @@
+[
+  {
+    "id": "WF-01",
+    "area": "5 tabs",
+    "severity": "P0",
+    "steps": "Open a synthetic main contract; visit Estimate > Costs > Procurement > Shipments > KS; revisit each.",
+    "expected": "Exactly 5 distinct live panes; no nested popup; no missing controls; each reloaded SQL snapshot.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-02",
+    "area": "Estimate",
+    "severity": "P0",
+    "steps": "Edit a retail price; commit cell; immediately switch to Costs before Save status completes; return; reopen contract.",
+    "expected": "Value is either verified by independent SQL readback or visibly unsaved; no silent loss/duplicate edit.",
+    "relatedIssue": "#56",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-03",
+    "area": "Estimate",
+    "severity": "P0",
+    "steps": "Edit a fresh cell then press Ctrl+Z and Ctrl+Y outside the TextBox editor; independently re-read SQL after each.",
+    "expected": "Undo and redo agree with authoritative SQL; editor TextBox Ctrl+Z remains local.",
+    "relatedIssue": "#56",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-04",
+    "area": "Estimate",
+    "severity": "P1",
+    "steps": "Use Insert, Shift+Insert, Ctrl+Shift+Insert, Ctrl+Alt+Insert, Ctrl+D, Delete, Backspace, Ctrl+M and Alt+Up/Down.",
+    "expected": "Matching Python structure semantics, focus, confirmation and row ordering; no accidental removal of linked data.",
+    "relatedIssue": "#59",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-05",
+    "area": "Estimate",
+    "severity": "P0",
+    "steps": "Lock synthetic contract with a signed act; attempt retail edit, structural delete and Undo.",
+    "expected": "All forbidden changes rejected; original value, signed lines, history and revision remain intact.",
+    "relatedIssue": "#59",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-06",
+    "area": "Estimate",
+    "severity": "P1",
+    "steps": "Search with Ctrl+F; change view/filter/column width; move to Procurement and back; close and reopen.",
+    "expected": "Selection/focus and transient filter policy match Python; persisted column settings survive restart.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-07",
+    "area": "Costs",
+    "severity": "P0",
+    "steps": "Edit manually entered purchase and retail units; change view; compare row and summary totals.",
+    "expected": "Manual prices retained; SQL money readback matches expected decimal rounding; no hidden overwrite.",
+    "relatedIssue": "#57",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-08",
+    "area": "Costs",
+    "severity": "P0",
+    "steps": "Change transport and SMR mode; navigate to KS and back; compare materials/work/markup.",
+    "expected": "No silent mode conversion; refused unsafe transition does not mutate persisted monetary values.",
+    "relatedIssue": "#57",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-09",
+    "area": "Procurement",
+    "severity": "P0",
+    "steps": "Filter by supplier, category, system and search; bulk-assign supplier and stage; reopen.",
+    "expected": "Batch operation applied once only to selected contract rows; global revision/log and filters consistent.",
+    "relatedIssue": "#64",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-10",
+    "area": "Procurement",
+    "severity": "P0",
+    "steps": "Record order/receipt movement; inspect movement history; revisit costs and issuance.",
+    "expected": "Quantities and status reflected in independent SQL, no duplicate movements on navigation.",
+    "relatedIssue": "#64",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-11",
+    "area": "Procurement",
+    "severity": "P0",
+    "steps": "Create out-of-KP purchase and linked DS on synthetic contract; check totals and cancel.",
+    "expected": "Out-of-KP goods not billed in original KP/KS until intended DS conversion; no wrong FK.",
+    "relatedIssue": "#64",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-12",
+    "area": "Shipments",
+    "severity": "P0",
+    "steps": "Create shipment, add eligible synthetic rows, recipient, issuer; export Excel/PDF and reopen.",
+    "expected": "Document and SQL totals agree, no unexpected posted quantities.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-13",
+    "area": "Shipments",
+    "severity": "P0",
+    "steps": "Post issuance, try to edit a posted quantity, delete posted list, reopen from second client.",
+    "expected": "Posted rows remain immutable until explicit supported reversal; no negative stock or duplicate issue.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-14",
+    "area": "KS",
+    "severity": "P0",
+    "steps": "Create draft KS-2; add 2 rows and extra position; save/readback; inspect KS-3.",
+    "expected": "Act-line amounts and totals match SQL and document; remaining quantities correct.",
+    "relatedIssue": "#60",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-15",
+    "area": "KS",
+    "severity": "P0",
+    "steps": "Sign synthetic KS; change underlying estimate price, act qty and delete act; repeat through another client.",
+    "expected": "Signed act snapshot immutable; incorrect edit rejected without changing meta.rev or history.",
+    "relatedIssue": "#60",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-16",
+    "area": "KS",
+    "severity": "P0",
+    "steps": "Export KS-2/KS-3 with group/systems/PNR and compare XLSX/PDF against Python golden.",
+    "expected": "Money within kopeck and document fields/shape verified; do not infer PASS from creation.",
+    "relatedIssue": "#60",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-17",
+    "area": "Navigation",
+    "severity": "P0",
+    "steps": "Object > KP > convert to main contract > create DS > archive > create remainder; reopen all nodes.",
+    "expected": "Correct IDs, links, cards, permissions and archival visibility; no orphaned documents.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-18",
+    "area": "Navigation",
+    "severity": "P1",
+    "steps": "Switch objects and documents with active filter and keyboard focus; use Ctrl+B, Ctrl+N, F2.",
+    "expected": "Consistent selection and focus; no cross-object writes; shortcuts do not leak across tabs.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-19",
+    "area": "Concurrency",
+    "severity": "P0",
+    "steps": "Two live Windows clients edit same contract, same/different cells and supplier/status sequentially.",
+    "expected": "Revision conflict visible; no lost update, deadlock or swallowed SQL rejection.",
+    "relatedIssue": "#72",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-20",
+    "area": "Concurrency",
+    "severity": "P0",
+    "steps": "Simulate disconnect/unknown COMMIT in disposable Pilot; reopen/readback before any retry.",
+    "expected": "No blind reapply; reconciliation uses server snapshot/operation identity.",
+    "relatedIssue": "#56",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-21",
+    "area": "Load",
+    "severity": "P1",
+    "steps": "On synthetic 300-line contract, edit, scroll and open all five panes.",
+    "expected": "Baseline UI p50/p95/p99, screenshots and SQL proof captured.",
+    "relatedIssue": "#55",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-22",
+    "area": "Load",
+    "severity": "P0",
+    "steps": "On synthetic 2500-line contract, edit, scroll, batch procurement, switch tabs, reopen.",
+    "expected": "No frozen dispatcher or data corruption; record p50/p95/p99; compare against baseline.",
+    "relatedIssue": "#72",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-23",
+    "area": "Load",
+    "severity": "P0",
+    "steps": "On synthetic 10000-line contract, filter, undo, navigate, two-client readback, reopen.",
+    "expected": "All persisted data intact; measure latency/memory; no unexplained truncation.",
+    "relatedIssue": "#72",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-24",
+    "area": "Restart",
+    "severity": "P0",
+    "steps": "Close WPF with pending write, launch again with same synthetic Pilot and saved user settings.",
+    "expected": "Unsaved warning respected; independently committed data visible; no phantom success.",
+    "relatedIssue": "#56",
+    "status": "SKIP"
+  },
+  {
+    "id": "WF-25",
+    "area": "Documents",
+    "severity": "P1",
+    "steps": "Produce Excel/PDF from procurement, issuance and KS; inspect generated files with synthetic identifiers.",
+    "expected": "No real templates/archives touched; generated documents correspond to SQL snapshots.",
+    "relatedIssue": "#60",
+    "status": "SKIP"
+  }
+]

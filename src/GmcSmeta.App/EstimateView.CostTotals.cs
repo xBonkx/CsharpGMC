@@ -1,0 +1,291 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
+using GmcSmeta.Core;
+using GmcSmeta.Core.Db;
+
+namespace GmcSmeta.App;
+
+/// <summary>
+/// Вкладка «Итоги» КП — перенос python\smeta\ui\cost_totals_view.py: итоговые цифры
+/// документа перед выдачей. Статьи: Материалы и СМР (монтаж) — из строк (как «Сводная»),
+/// ПНР/Транспортные/Расходные материалы/Прочие расходы/Непредвиденные — реквизиты
+/// договора; расходные/прочие/непредвиденные входят в себестоимость и уменьшают маржу.
+/// «Маржа, %» = (розница − себестоимость) / себестоимость × 100; при нулевой
+/// себестоимости процент не показывается. Для «НДС сверху» — строки «НДС X% (сверху)»
+/// и «ИТОГО с НДС». Вписываемые ячейки подсвечены #FFF7E6; записи через
+/// SqlServerCostTotals.SaveTotalsField (смр_amount вводится как ИТОГ СМР).
+/// </summary>
+public partial class EstimateView
+{
+    // ------------------------------------------------------------------ model
+    /// <summary>Строка «Итогов» — статья или итог (cost_totals_view._show).</summary>
+    public sealed class TotalsRow
+    {
+        public string Kind { get; init; } = "line";   // line | total | vat | grand
+        public string Key { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string NameTip { get; init; } = "";
+        public string CostText { get; init; } = "";
+        public string SellText { get; init; } = "";
+        public string MarginText { get; init; } = "";
+        public string PctText { get; init; } = "";
+        public bool MarginNeg { get; init; }
+        public bool CostEditable { get; init; }
+        public bool SellEditable { get; init; }
+        public string CostRaw { get; init; } = "";
+        public string SellRaw { get; init; } = "";
+        public string SellTip { get; init; } = "";
+        public bool IsSubtotal => Kind == "total";
+        public bool IsBold => Kind is "total" or "grand";
+
+    }
+
+    // ------------------------------------------------------------------ state
+    private CostTotalsData? _costTotalsData;
+    private bool _totalsLoading;
+    private bool _totalsBusy;
+    private int _totalsLoadVersion;
+
+    // ------------------------------------------------------------------ load
+    private void InvalidateCostTotals()
+    {
+        _totalsLoadVersion++;
+        _costTotalsData = null;
+        _totalsLoading = false;
+        if (TotalsGrid is not null) TotalsGrid.ItemsSource = null;
+    }
+
+    private async Task LoadCostTotalsAsync(bool force = false)
+    {
+        if (_estimate is null || TotalsGrid is null) return;
+        if (_totalsLoading) return;
+        if (!force && _costTotalsData is not null) return;
+        _totalsLoading = true;
+        var version = ++_totalsLoadVersion;
+        try
+        {
+            var data = await Task.Run(() => SqlServerCostTotals.Totals(_sqlConnectionString, _contractId));
+            if (version != _totalsLoadVersion) return;
+            _costTotalsData = data;
+            TotalsShow();
+        }
+        catch (Exception ex)
+        {
+            if (version == _totalsLoadVersion)
+                SetStatus("Итоги: ошибка загрузки — " + ex.Message, true);
+        }
+        finally
+        {
+            if (version == _totalsLoadVersion) _totalsLoading = false;
+        }
+    }
+
+    // ------------------------------------------------------------------ show
+    private static string TotalsMoney(decimal? v) => v is decimal value && value != 0m ? Money.Format(value) : "";
+
+    private static string TotalsPct(decimal cost, decimal sell) =>
+        cost != 0m ? ((sell - cost) / cost * 100m).ToString("0.0", Ru).Replace('.', ',') + "%" : "";
+
+    /// <summary>Маржа строки (cost_totals_view._margin_cells): «−закуп», «—», сумма и %.</summary>
+    private static (string MarginText, string PctText, bool Neg) TotalsMargin(decimal? cost, decimal? sell)
+    {
+        if (sell is null)
+        {
+            // только себестоимость: она уменьшает маржу всей работы
+            return cost is decimal c && c != 0m ? ("−" + Money.Format(c), "", true) : ("", "", false);
+        }
+        if (cost is null or 0m)
+        {
+            // наш расход ещё не вписан: маржи нет
+            return (sell.Value != 0m ? "—" : "", "", false);
+        }
+        var margin = sell.Value - cost.Value;
+        return (Money.Format(margin), TotalsPct(cost.Value, sell.Value), margin < 0m);
+    }
+
+    private void TotalsShow()
+    {
+        var d = _costTotalsData;
+        if (d is null || TotalsGrid is null) return;
+        var rows = new List<TotalsRow>();
+        decimal costSum = 0m, sellSum = 0m;
+
+        foreach (var line in d.Lines)
+        {
+            var nameTip = line.Key == "mat" && d.NoCost > 0
+                ? line.Name + $"   (закуп не указан у {d.NoCost} поз.)" : line.Name;
+            var sellTip = line.Key == "smr"
+                ? line.SellEditable
+                    ? "Итог СМР с учётом строк монтажа"
+                    : "Ручной ввод доступен в режиме «Суммой, ₽» для незаблокированной сметы " +
+                      "с самостоятельным итогом СМР"
+                : "";
+            var (marginText, pctText, neg) = TotalsMargin(line.Cost, line.Sell);
+            rows.Add(new TotalsRow
+            {
+                Kind = "line", Key = line.Key, Name = line.Name, NameTip = nameTip,
+                CostText = TotalsMoney(line.Cost),
+                CostRaw = line.CostEditable && line.Cost is decimal c ? NumberText.QtyText(c) : "",
+                SellText = line.Sell is null ? "—" : TotalsMoney(line.Sell),
+                SellRaw = line.SellEditable && line.Sell is decimal s ? NumberText.QtyText(s) : "",
+                SellTip = sellTip,
+                MarginText = marginText, PctText = pctText, MarginNeg = neg,
+                CostEditable = line.CostEditable, SellEditable = line.SellEditable,
+            });
+            costSum += line.Cost ?? 0m;
+            sellSum += line.Sell ?? 0m;
+        }
+
+        // ИТОГО (+ строки НДС сверху для «ДНС» и им подобных)
+        var (totalMargin, totalPct, totalNeg) = TotalsMargin(costSum, sellSum);
+        rows.Add(new TotalsRow
+        {
+            Kind = "total", Key = "total",
+            Name = "ИТОГО" + (d.VatTop ? " (без НДС)" : ""),
+            CostText = Money.Format(costSum), SellText = Money.Format(sellSum),
+            MarginText = totalMargin, PctText = totalPct, MarginNeg = totalNeg,
+        });
+        if (d.VatTop)
+        {
+            rows.Add(new TotalsRow
+            {
+                Kind = "vat", Key = "vat",
+                Name = $"НДС {d.VatRate:0.##}% (сверху)", SellText = Money.Format(d.Vat),
+            });
+            rows.Add(new TotalsRow
+            {
+                Kind = "grand", Key = "grand", Name = "ИТОГО с НДС", SellText = Money.Format(d.Total),
+            });
+        }
+        TotalsGrid.ItemsSource = new ObservableCollection<TotalsRow>(rows);
+
+        // плитки (cost_totals_view._show)
+        TotalsTileCostValue.Text = Money.Format(costSum);
+        TotalsTileSellCaption.Text = d.VatTop ? "Розница — всего с НДС" : "Розница — всего";
+        TotalsTileSellValue.Text = Money.Format(d.VatTop ? d.Total : sellSum);
+        var marg = sellSum - costSum;
+        var pct = TotalsPct(costSum, sellSum);
+        TotalsTileMarginValue.Text = pct.Length > 0
+            ? $"{Money.Format(marg)}  ·  {pct}"
+            : sellSum != 0m ? Money.Format(marg) : "—";
+        TotalsTileMarginValue.Foreground = marg < 0m
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626"))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0F172A"));
+    }
+
+    // ------------------------------------------------------------------ editing
+    private void TotalsGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+    {
+        if (e.Row.Item is not TotalsRow row)
+        {
+            e.Cancel = true;
+            return;
+        }
+        var column = e.Column.SortMemberPath ?? "";
+        if (column == "cost")
+        {
+            if (!row.CostEditable) e.Cancel = true;
+            return;
+        }
+        if (column == "sell")
+        {
+            if (!row.SellEditable)
+            {
+                if (row.Key is "pnr" or "trans" or "smr")
+                    SetStatus("Смета подписана — сумму клиенту здесь не поменять", true);
+                e.Cancel = true;
+            }
+            return;
+        }
+        e.Cancel = true;
+    }
+
+    private void TotalsGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
+    {
+        var editor = MaterialsEditorTextBox(e.EditingElement);
+        if (editor is null) return;
+        RoutedEventHandler onLoaded = (_, _) => { editor.Focus(); editor.SelectAll(); };
+        editor.Loaded += onLoaded;
+        Dispatcher.BeginInvoke(() =>
+        {
+            editor.Focus();
+            editor.SelectAll();
+            editor.Loaded -= onLoaded;
+        }, DispatcherPriority.Background);
+    }
+
+    private void TotalsGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (_totalsBusy) return;
+        if (e.EditAction != DataGridEditAction.Commit) return;
+        if (e.Row.Item is not TotalsRow row) return;
+        var editor = MaterialsEditorTextBox(e.EditingElement);
+        if (editor is null) return;
+        var column = e.Column.SortMemberPath ?? "";
+        var text = editor.Text.Trim().Replace("₽", "").Trim();
+        if (column is not ("cost" or "sell")) return;
+
+        var field = column == "cost"
+            ? row.Key switch
+            {
+                "pnr" => "pnr_cost",
+                "trans" => "transport_cost",
+                "consumables" => "consumables_cost",
+                "other" => "other_cost",
+                "reserve" => "reserve_cost",
+                _ => "",
+            }
+            : row.Key switch
+            {
+                "smr" => "smr_amount",
+                "pnr" => "pnr_amount",
+                "trans" => "transport_amount",
+                _ => "",
+            };
+        if (field.Length == 0) return;
+
+        var value = text.Length == 0 ? (decimal?)null : NumberText.Parse(text);
+        if (text.Length > 0 && value is null)
+        {
+            SetStatus("Недопустимое число: " + text, true);
+            e.Cancel = true;
+            return;
+        }
+        // суммы клиенту не бывают «неизвестны» (cost_totals_view._changed)
+        if (value is null && field is "pnr_amount" or "transport_amount")
+            value = 0m;
+        _totalsBusy = true;
+        _ = TotalsCommitAsync(field, value, row);
+    }
+
+    private async Task TotalsCommitAsync(string field, decimal? value, TotalsRow row)
+    {
+        try
+        {
+            if (_serverConflict)
+            {
+                SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
+                return;
+            }
+            if (!await SaveTotalsFieldAsync(field, value, "Итог"))
+            {
+                await LoadCostTotalsAsync(force: true);
+                return;
+            }
+            await LoadCostTotalsAsync(force: true);
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Итоги: ошибка сохранения — " + ex.Message, true);
+            await LoadCostTotalsAsync(force: true);
+        }
+        finally
+        {
+            _totalsBusy = false;
+        }
+    }
+}

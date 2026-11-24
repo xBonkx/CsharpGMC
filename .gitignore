@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+artifacts/
+tools/launcher/publish/
+
+# Local databases and parity fixtures
+/db/
+*.db
+*.db-shm
+*.db-wal
+*.mdf
+*.ldf
+*.bak
+
+# IDE / editor
+.vs/
+.serena/
+*.user
+
+# Test and preview artifacts
+TestResults/
+.preview/
+.preview-*.log
+_shots/
+/_screen_now.png

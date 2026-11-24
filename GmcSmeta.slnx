@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GmcSmeta.App/GmcSmeta.App.csproj" />
+    <Project Path="src/GmcSmeta.Cli/GmcSmeta.Cli.csproj" />
+    <Project Path="src/GmcSmeta.Core/GmcSmeta.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GmcSmeta.Core.Tests/GmcSmeta.Core.Tests.csproj" />
+    <Project Path="tests/GmcSmeta.Export.Checks/GmcSmeta.Export.Checks.csproj" />
+  </Folder>
+</Solution>

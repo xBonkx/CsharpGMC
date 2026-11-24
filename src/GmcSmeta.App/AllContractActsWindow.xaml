@@ -1,0 +1,125 @@
+<Window x:Class="GmcSmeta.App.AllContractActsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Title="Все КС договора" Width="1240" Height="760" MinWidth="900" MinHeight="520"
+        WindowStartupLocation="CenterOwner" Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <!-- «Все КС договора» (ks_view.b_contract_acts): общий список актов всех
+         приложений и ДС договора с группами КС-3 (ks3_key). -->
+    <Window.Resources>
+        <Style x:Key="KsCard" TargetType="Border" BasedOn="{StaticResource PythonTile}">
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <HierarchicalDataTemplate DataType="{x:Type local:Ks3GroupVm}" ItemsSource="{Binding Acts}">
+            <DockPanel>
+                <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="#264875" Margin="3,0,10,0"/>
+                <TextBlock Text="{Binding Amount}" Foreground="#475569"/>
+            </DockPanel>
+        </HierarchicalDataTemplate>
+        <DataTemplate DataType="{x:Type local:Ks2RowVm}">
+            <StackPanel Margin="4,3">
+                <TextBlock Text="{Binding Title}" Foreground="#0F172A" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Caption}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
+            </StackPanel>
+        </DataTemplate>
+        <Style TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="True"/>
+            <Setter Property="Padding" Value="4,5"/>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="24,10,24,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,9">
+            <TextBlock x:Name="ScopeTitle" Foreground="#64748B" VerticalAlignment="Center"
+                       Margin="0,0,14,0" TextTrimming="CharacterEllipsis"
+                       MaxWidth="420" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            <Button Content="Открыть выбранную КС-2" ContentTemplate="{StaticResource IconLabelFile}" Style="{StaticResource PythonToolbarMain}"
+                    x:Name="OpenSelectedButton" Click="OpenSelected_Click" IsEnabled="False" Margin="0,0,7,0"/>
+            <Button Content="Общая КС-3 / Excel…" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
+                    x:Name="OpenKs3Button" Click="OpenKs3_Click" IsEnabled="False" Margin="0,0,7,0"/>
+            <Button Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Style="{StaticResource PythonToolbarButton}" Click="Refresh_Click"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,9">
+            <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Width="260" Height="32"
+                     VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
+                     ToolTip="Найти акт или приложение…"/>
+            <ComboBox x:Name="ActsStatusFilter" Margin="8,0,0,0" MinWidth="150"
+                      SelectionChanged="ActsStatusFilter_Changed" SelectedIndex="0">
+                <ComboBoxItem Content="Все статусы" Tag="all"/>
+                <ComboBoxItem Content="Черновики" Tag="draft"/>
+                <ComboBoxItem Content="Подписанные" Tag="signed"/>
+            </ComboBox>
+            <TextBlock x:Name="OverviewStatus" Foreground="#64748B" VerticalAlignment="Center" Margin="14,0,0,0"
+                       TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="White" BorderBrush="#E4E8EF"
+                    BorderThickness="1" CornerRadius="12" Padding="9" Margin="0,0,9,0">
+                <TreeView x:Name="ActsTree" BorderThickness="0" Background="Transparent"
+                          SelectedItemChanged="ActsTree_SelectedItemChanged"
+                          MouseDoubleClick="ActsTree_DoubleClick"/>
+            </Border>
+            <Border Grid.Column="1" Background="#FFFFFF" BorderBrush="#E4E8EF"
+                    BorderThickness="1" CornerRadius="12" Padding="16">
+                <DockPanel>
+                    <UniformGrid DockPanel.Dock="Top" Columns="4" Margin="0,0,0,13">
+                        <Border Style="{StaticResource KsCard}" Background="#F0F5FE">
+                            <StackPanel>
+                                <TextBlock Text="Всего КС-2" Foreground="#476A98"/>
+                                <TextBlock x:Name="TotalActsText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KsCard}" Background="#F0FBF5">
+                            <StackPanel>
+                                <TextBlock Text="Подписано, ₽" Foreground="#166534"/>
+                                <TextBlock x:Name="SignedAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KsCard}" Background="#FFF9EE">
+                            <StackPanel>
+                                <TextBlock Text="На подготовке, ₽" Foreground="#92400E"/>
+                                <TextBlock x:Name="DraftAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource KsCard}" Background="#F4EFFD">
+                            <StackPanel>
+                                <TextBlock Text="Всего по актам, ₽" Foreground="#6941C6"/>
+                                <TextBlock x:Name="ActsAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                    <DataGrid local:TableColumnMenu.Key="all-contract-acts" CellStyle="{StaticResource CompactCostCell}" x:Name="ActListGrid" RowStyle="{StaticResource KsReportRow}" AlternationCount="2"
+                              AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
+                              MinRowHeight="24" EnableRowVirtualization="True"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
+                              SelectionChanged="ActListGrid_SelectionChanged"
+                              MouseDoubleClick="ActListGrid_DoubleClick"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Акт" Binding="{Binding Title}" Width="140" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                            <DataGridTextColumn Header="Приложение / ДС" Binding="{Binding Source}" Width="200" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                            <DataGridTextColumn Header="Дата" Binding="{Binding Date}" Width="92" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn Header="Период" Binding="{Binding Period}" Width="190" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn Header="Строки" Binding="{Binding Count}" Width="65" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn Header="Сумма, ₽" Binding="{Binding Amount}"
+                                                Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="125" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,658 @@
+using System.ComponentModel;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using GmcSmeta.Core;
+using GmcSmeta.Core.Db;
+using GmcSmeta.Core.Domain;
+
+namespace GmcSmeta.App;
+
+/// <summary>Строка списка актов слева (ks_view act_list): «КС-2 № … от …» и сумма,
+/// подписанные — зелёным.</summary>
+public sealed record KsActListVm(long Id, string Title, string Caption, bool Signed)
+{
+    public System.Windows.Media.Brush Fore => Signed
+        ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x16, 0x65, 0x34))
+        : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x0F, 0x17, 0x2A));
+}
+
+/// <summary>Строка сводной (acts.summary_rows): раздел или позиция с объёмами по актам.</summary>
+public sealed class KsSummaryVm
+{
+    public bool IsTop { get; init; }
+    public bool IsSub { get; init; }
+    public string Num { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Unit { get; init; } = "";
+    public string Qty { get; init; } = "";
+    public string Done { get; init; } = "";
+    public string Left { get; init; } = "";
+    public string LeftSum { get; init; } = "";
+    public string Issued { get; init; } = "";
+    public bool FullyClosed { get; init; }
+    public long PositionId { get; init; }
+    public decimal LeftRaw { get; init; }
+    public IReadOnlyDictionary<long, decimal> PerAct { get; init; } =
+        new Dictionary<long, decimal>();
+}
+
+/// <summary>Строка «Вне подписанной сметы» (acts.extra_rows) или её итоги.</summary>
+public sealed class KsExtraVm
+{
+    public string System { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Unit { get; init; } = "";
+    public string SignedQty { get; init; } = "";
+    public string DraftQty { get; init; } = "";
+    public string Price { get; init; } = "";
+    public string Amount { get; init; } = "";
+    public string ActStatus { get; init; } = "";
+    public bool Bold { get; init; }
+    public bool Muted { get; init; }
+    public bool IsChild { get; init; }
+}
+
+public sealed class KsActValueConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not IReadOnlyDictionary<long, decimal> source ||
+            parameter is not long actId || !source.TryGetValue(actId, out var quantity) ||
+            quantity == 0m) return "";
+        return quantity.ToString("0.###", CultureInfo.GetCultureInfo("ru-RU"));
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
+/// Вкладка договора «КС-2 / КС-3» (ks_view.py): слева список актов документа,
+/// справа редактор акта; второй режим — «Сводная по выполнению» с разделом
+/// «Вне подписанной сметы» и плитками прогресса договора. Запись идёт только
+/// через редактор (ActsEditorView), дублирующего пути записи нет.
+/// </summary>
+public partial class ContractActsWorkspace : UserControl
+{
+    private static readonly CultureInfo Ru = CultureInfo.GetCultureInfo("ru-RU");
+    private const string KsHintText =
+        "Нажмите «Новый акт», выделите строки или систему и нажмите «Закрыть выделенное» " +
+        "(или правой кнопкой мыши) — или впишите количество двойным щелчком в «В этом акте». " +
+        "Внизу впишите СМР за этот акт. Потом «Сохранить КС-2 и КС-3».";
+    private readonly KsActValueConverter _qtyConverter = new();
+    private readonly EstimateUiSettings _uiSettings = EstimateUiSettings.Load();
+    private string _connectionString = "";
+    private string _title = "";
+    private int _contractId;
+    private int _summaryVersion;
+    private bool _bound;
+    private bool _syncingList;
+    internal bool HasCacheActivity => EmbeddedEditor.HasCacheActivity;
+    private IReadOnlyList<SqlServerActs.ExtraRow> _extras = Array.Empty<SqlServerActs.ExtraRow>();
+    private ContractTotals? _totals;
+    private List<SqlServerActs.ActInfo> _acts = new();
+    private List<SqlServerActs.ActInfo> _summaryActs = new();
+    private SqlServerActs.SummaryData? _summary;
+
+    public ContractActsWorkspace()
+    {
+        InitializeComponent();
+        HintText.Text = KsHintText;
+        HintBar.Visibility = _uiSettings.KsHintHidden ? Visibility.Collapsed : Visibility.Visible;
+        EmbeddedEditor.ActsChanged += Editor_ActsChanged;
+        EmbeddedEditor.ListToggleChanged += Editor_ListToggleChanged;
+        EmbeddedEditor.CompactChanged += Editor_CompactChanged;
+        Unloaded += (_, _) => InvalidateSummary();
+        Loaded += (_, _) =>
+        {
+            if (_bound && SummaryPage.Visibility == Visibility.Visible && _summary is null)
+                _ = RefreshSummaryAsync();
+        };
+    }
+
+    public void Bind(string connectionString, int contractId, string title)
+    {
+        if (_bound && _contractId == contractId && _connectionString == connectionString)
+        {
+            EmbeddedEditor.RefreshFromServer();
+            return;
+        }
+        InvalidateSummary();
+        _bound = true;
+        _connectionString = connectionString;
+        _contractId = contractId;
+        _title = title;
+        EmbeddedEditor.Bind(_connectionString, contractId, title);
+        EmbeddedEditor.ShowActSelector(false);
+        EmbeddedEditor.ShowListToggle(true);
+        ListToggleApply(_uiSettings.KsListOpen, save: false);
+        ShowMode("acts");
+    }
+
+    private void Editor_ActsChanged(object? sender, EventArgs e) => RefreshActList();
+
+    private void Editor_ListToggleChanged(object? sender, bool open) => ListToggleApply(open);
+
+    private void ListToggleApply(bool open, bool save = true)
+    {
+        LeftColumn.Width = open ? new GridLength(250) : new GridLength(0);
+        LeftBox.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        if (save)
+        {
+            _uiSettings.KsListOpen = open;
+            _uiSettings.Save();
+        }
+    }
+
+    private void Editor_CompactChanged(object? sender, bool compact)
+    {
+        ModeBarPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        HintBar.Visibility = compact || _uiSettings.KsHintHidden
+            ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void HintClose_Click(object sender, RoutedEventArgs e)
+    {
+        HintBar.Visibility = Visibility.Collapsed;
+        _uiSettings.KsHintHidden = true;
+        _uiSettings.Save();
+    }
+
+    /// <summary>Меню «Показать подсказки снова»: вернуть подсказку КС, если вкладка не компактная.</summary>
+    internal void ShowHintsAgain()
+    {
+        _uiSettings.KsHintHidden = false;
+        _uiSettings.Save();
+        // Компактный режим прячет подсказку независимо от настройки (Editor_CompactChanged).
+        if (EmbeddedEditor.CompactToggle.IsChecked != true)
+            HintBar.Visibility = Visibility.Visible;
+    }
+
+
+    // ------------------------------------------------------------------ список актов
+
+    private void RefreshActList()
+    {
+        if (!_bound) return;
+        // The editor and list use exactly the same snapshot and selected ID.
+        // No second synchronous SQL read while handling a selection event.
+        _acts = EmbeddedEditor.ActsSnapshot.ToList();
+        var selectedId = EmbeddedEditor.SelectedActId;
+        var items = _acts.Select(a => new KsActListVm(a.Id,
+                $"КС-2 № {a.Number}" + (a.Date == default ? "" : $" от {a.Date:dd.MM.yyyy}"),
+                $"{Money.Format(a.Total)} ₽" + (a.Signed ? "   ✓ подписан" : ""),
+                a.Signed)).ToList();
+        _syncingList = true;
+        try
+        {
+            if (ActList.ItemsSource is not List<KsActListVm> existing || !existing.SequenceEqual(items))
+                ActList.ItemsSource = items;
+            ActList.SelectedItem = (ActList.ItemsSource as List<KsActListVm>)
+                ?.FirstOrDefault(item => item.Id == selectedId);
+        }
+        finally { _syncingList = false; }
+    }
+
+    private void ActList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingList) return;
+        if (ActList.SelectedItem is KsActListVm item && item.Id != EmbeddedEditor.SelectedActId)
+            EmbeddedEditor.SelectAct(item.Id);
+    }
+
+    private void NewAct_Click(object sender, RoutedEventArgs e) => EmbeddedEditor.CreateAct();
+
+    private void Requisites_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_bound) return;
+        var dlg = new KsRequisitesWindow(_connectionString, _contractId);
+        var owner = Window.GetWindow(this);
+        if (owner is not null) dlg.Owner = owner;
+        dlg.ShowDialog();
+    }
+
+    private void ContractActs_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_bound) return;
+        try
+        {
+            var window = new AllContractActsWindow(_connectionString, _contractId, _title);
+            var owner = Window.GetWindow(this);
+            if (owner is not null) window.Owner = owner;
+            window.ShowDialog();
+            EmbeddedEditor.RefreshFromServer();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceError("AllContractActsWindow: {0}", ex);
+            MessageBox.Show("Не удалось открыть все КС договора:\n" + ex.Message,
+                "КС-2 / КС-3", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // ------------------------------------------------------------------ режимы
+
+    private void ActsMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (ActsPage is null) return;
+        ShowMode("acts");
+    }
+
+    private void ProgressMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (ActsPage is null) return;
+        ShowMode("progress");
+    }
+
+    private void ShowMode(string mode)
+    {
+        var progress = mode == "progress";
+        ActsPage.Visibility = progress ? Visibility.Collapsed : Visibility.Visible;
+        SummaryPage.Visibility = progress ? Visibility.Visible : Visibility.Collapsed;
+        SummaryBarPanel.Visibility = progress ? Visibility.Visible : Visibility.Collapsed;
+        if (progress && _bound && IsLoaded) _ = RefreshSummaryAsync();
+        else if (!progress) InvalidateSummary();
+    }
+
+    // ------------------------------------------------------------------ сводная
+
+    private void InvalidateSummary()
+    {
+        ++_summaryVersion;
+        _summary = null;
+        _totals = null;
+        _extras = Array.Empty<SqlServerActs.ExtraRow>();
+        _summaryActs.Clear();
+        if (SummaryGrid is not null) SummaryGrid.ItemsSource = null;
+    }
+
+    private async Task RefreshSummaryAsync()
+    {
+        if (!_bound || !IsLoaded) return;
+        InvalidateSummary();
+        var version = _summaryVersion;
+        var connectionString = _connectionString;
+        var contractId = _contractId;
+        try
+        {
+            var (summary, extras, totals) = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(connectionString);
+                for (var attempt = 0; attempt < 2; attempt++)
+                {
+                    var before = SqlServerDatabase.Revision(conn);
+                    var sheet = SqlServerActs.SummarySheet(conn, contractId);
+                    var extra = SqlServerActs.ExtraRows(conn, contractId);
+                    var totals = Totals.ReadOne(conn, contractId);
+                    if (!string.IsNullOrEmpty(before) && before == SqlServerDatabase.Revision(conn))
+                        return (sheet, extra, totals);
+                }
+                throw new InvalidOperationException("Данные КС изменились во время чтения. Повторите загрузку.");
+            });
+            if (version != _summaryVersion || !IsLoaded || contractId != _contractId ||
+                connectionString != _connectionString || SummaryPage.Visibility != Visibility.Visible) return;
+            _summary = summary;
+            _extras = extras;
+            _totals = totals;
+            _summaryActs = summary.Acts.ToList();
+            BuildSummaryColumns();
+            FillSummaryTiles();
+            ApplySummaryFilter();
+        }
+        catch (Exception ex)
+        {
+            if (version != _summaryVersion || !IsLoaded) return;
+            InvalidateSummary();
+            MessageBox.Show(Window.GetWindow(this), "Ошибка сводной: " + ex.Message,
+                "Сводная по выполнению", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void BuildSummaryColumns()
+    {
+        while (SummaryGrid.Columns.Count > 4)
+            SummaryGrid.Columns.RemoveAt(4);
+        foreach (var act in _summaryActs.OrderBy(a => a.Date).ThenBy(a => a.Id))
+        {
+            // заголовок столбца — только номер акта (дата — в заголовке листа сводной)
+            SummaryGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "№ " + act.Number,
+                Binding = new Binding(nameof(KsSummaryVm.PerAct))
+                {
+                    Converter = _qtyConverter,
+                    ConverterParameter = act.Id,
+                },
+                Width = new DataGridLength(110),
+                IsReadOnly = true,
+                ElementStyle = (Style)FindResource("CompactCostCenter"),
+                HeaderStyle = (Style)FindResource("KsQuantityHeader"),
+            });
+        }
+        AddTextColumn("Сдано всего", nameof(KsSummaryVm.Done), 96);
+        AddTextColumn("Остаток", nameof(KsSummaryVm.Left), 84);
+        AddTextColumn("Остаток, ₽", nameof(KsSummaryVm.LeftSum), 110, right: true);
+        AddTextColumn("Выдано на объект", nameof(KsSummaryVm.Issued), 110);
+    }
+
+    private void AddTextColumn(string header, string property, double width, bool right = false)
+    {
+        SummaryGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = header,
+            Binding = new Binding(property),
+            Width = new DataGridLength(width),
+            IsReadOnly = true,
+            ElementStyle = (Style)FindResource(right ? "CompactCostMoney" : "CompactCostCenter"),
+            HeaderStyle = (Style)FindResource(right ? "KsMoneyHeader" : "KsQuantityHeader"),
+        });
+    }
+
+    private static string QtyText(decimal v) => v == decimal.Truncate(v)
+        ? v.ToString("0", CultureInfo.CurrentCulture)
+        : v.ToString("0.###", CultureInfo.CurrentCulture);
+
+    private List<KsSummaryVm> BuildSummaryRows(bool onlyRest)
+    {
+        var rows = new List<KsSummaryVm>();
+        var summary = _summary;
+        if (summary is null) return rows;
+        // видимость позиций и разделов при «Только остатки» (ks_view._filter_summary_rest):
+        // скрытая позиция прячет и её раздел, если видимых позиций в нём не осталось
+        var visibleBySystem = new Dictionary<long, int>();
+        foreach (var (system, sectionHeader) in summary.Systems)
+        {
+            if (sectionHeader)
+                continue;
+            visibleBySystem[system.SystemId] = summary.Positions
+                .Where(p => p.SystemId == system.SystemId)
+                .Count(p => !onlyRest || Math.Abs(p.Left) > 0.000001m);
+        }
+        foreach (var (system, sectionHeader) in summary.Systems)
+        {
+            if (sectionHeader)
+            {
+                var childVisible = summary.Systems.Any(s =>
+                    !s.SectionHeader && s.System.ParentId == system.SystemId &&
+                    visibleBySystem.GetValueOrDefault(s.System.SystemId) > 0);
+                if (childVisible)
+                    rows.Add(new KsSummaryVm { IsTop = true, Name = system.Name });
+                continue;
+            }
+            if (visibleBySystem.GetValueOrDefault(system.SystemId) == 0)
+                continue;
+            rows.Add(new KsSummaryVm
+            {
+                IsTop = !system.IsSub,
+                IsSub = system.IsSub,
+                Name = (system.IsSub ? "      ↳  " : "") + system.Name,
+            });
+            foreach (var p in summary.Positions.Where(p => p.SystemId == system.SystemId))
+            {
+                if (onlyRest && Math.Abs(p.Left) <= 0.000001m)
+                    continue;
+                rows.Add(new KsSummaryVm
+                {
+                    PositionId = p.PositionId,
+                    Num = p.NumText,
+                    Name = p.Name,
+                    Unit = p.Unit,
+                    Qty = QtyText(p.QtyByKp),
+                    Done = p.Done == 0m ? "" : QtyText(p.Done),
+                    Left = Math.Abs(p.Left) > 0.000000001m ? QtyText(p.Left) : "—",
+                    LeftSum = Math.Abs(p.LeftSum) > 0.005m ? Money.Format(p.LeftSum) : "",
+                    Issued = p.Issued == 0m ? "" : QtyText(p.Issued),
+                    FullyClosed = Math.Abs(p.Left) <= 0.000001m,
+                    LeftRaw = p.Left,
+                    PerAct = p.PerAct,
+                });
+            }
+        }
+        return rows;
+    }
+
+    private void ApplySummaryFilter()
+    {
+        if (SummaryGrid is null) return;
+        SummaryGrid.ItemsSource = BuildSummaryRows(SummaryRestOnly.IsChecked == true);
+        BuildExtra();
+    }
+
+    private void SummaryRest_Changed(object sender, RoutedEventArgs e) => ApplySummaryFilter();
+
+    private void FillSummaryTiles()
+    {
+        var totals = _totals;
+        var acts = _summaryActs;
+        if (totals is null) return;
+        // прогресс по договору (acts.contract_progress): «Сдано» = только подписанные
+        var matClosed = acts.Sum(a => a.Materials);
+        var smrClosed = acts.Sum(a => a.Smr);
+        var signed = acts.Where(a => a.Signed).Sum(a => a.Total);
+        var pending = acts.Where(a => !a.Signed).Sum(a => a.Total);
+        var total = totals.Total;
+        decimal Pct(decimal part, decimal whole) =>
+            whole == 0m ? 0m : decimal.Round(part / whole * 100m, 0, MidpointRounding.ToEven);
+        SumMatValue.Text = $"{Money.Format(matClosed)}  ·  {Pct(matClosed, totals.Materials):0}%";
+        SumSmrValue.Text = $"{Money.Format(smrClosed)}  ·  {Pct(smrClosed, totals.Smr):0}%";
+        SumTotalValue.Text = $"{Money.Format(signed)}  ·  {Pct(signed, total):0}%";
+        SumTotalCaption.Text = "Всего сдано";
+        SumPendingValue.Text = Money.Format(pending);
+        var drafts = acts.Where(a => !a.Signed)
+            .Select(a => $"КС-2 №{a.Number}: {Money.Format(a.Total)} ₽").ToList();
+        SumPendingValue.ToolTip = drafts.Count > 0 ? string.Join("\n", drafts) : "Нет неподписанных актов";
+
+        // суммы вне сметы показываются отдельно, плитки договора — только по смете
+        var extraSigned = decimal.Round(_extras.Sum(r => r.SignedSum), 2);
+        var extraDraft = decimal.Round(_extras.Sum(r => r.DraftSum), 2);
+        var contractSigned = decimal.Round(signed - extraSigned, 2);
+        var contractLeft = decimal.Round(total - contractSigned - pending, 2);
+        SumTotalCaption.Text = "Сдано по договору";
+        SumTotalValue.Text = $"{Money.Format(contractSigned)}  ·  " +
+            $"{(total == 0m ? 0m : decimal.Round(contractSigned / total * 100m, 0, MidpointRounding.ToEven)):0}%";
+        SumLeftValue.Text = Money.Format(contractLeft);
+        SumExtraCaption.Text = "Вне сметы (подписано)";
+        SumExtraValue.Text = Money.Format(extraSigned);
+        SumExtraValue.ToolTip = $"Черновики: {Money.Format(extraDraft)}";
+        SumAllValue.Text = Money.Format(signed);
+        SumAllValue.ToolTip = $"По договору {Money.Format(contractSigned)} + вне сметы {Money.Format(extraSigned)}; " +
+            $"черновики {Money.Format(pending)}";
+        ExtrasTilesPanel.Visibility = _extras.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void BuildExtra()
+    {
+        var rows = new List<KsExtraVm>();
+        var extras = _extras;
+        foreach (var r in extras)
+        {
+            var price = r.Price is decimal p ? Money.Format(p)
+                : (r.Lines.Count > 0 ? "разные" : "");
+            rows.Add(new KsExtraVm
+            {
+                System = r.System,
+                Name = r.Name,
+                Unit = r.Unit,
+                SignedQty = r.SignedQty == 0m ? "" : QtyText(r.SignedQty),
+                DraftQty = r.DraftQty == 0m ? "" : QtyText(r.DraftQty),
+                Price = price,
+                Amount = Money.Format(r.Amount),
+                ActStatus = string.Join(", ", r.Acts),
+            });
+            if (r.Lines.Count > 1)
+            {
+                foreach (var line in r.Lines)
+                    rows.Add(new KsExtraVm
+                    {
+                        Unit = r.Unit,
+                        SignedQty = line.Signed && line.Qty != 0m ? QtyText(line.Qty) : "",
+                        DraftQty = !line.Signed && line.Qty != 0m ? QtyText(line.Qty) : "",
+                        Price = Money.Format(line.Price),
+                        Amount = Money.Format(line.Amount),
+                        ActStatus = line.Act,
+                        Muted = !line.Signed,
+                        IsChild = true,
+                    });
+            }
+        }
+        var totals = _totals;
+        if (rows.Count > 0 && totals is not null)
+        {
+            var signedSum = decimal.Round(extras.Sum(r => r.SignedSum), 2);
+            var draftSum = decimal.Round(extras.Sum(r => r.DraftSum), 2);
+            var signed = _summaryActs.Where(a => a.Signed).Sum(a => a.Total);
+            var pending = _summaryActs.Where(a => !a.Signed).Sum(a => a.Total);
+            rows.Add(new KsExtraVm
+            {
+                Name = "Итого вне сметы",
+                Amount = Money.Format(decimal.Round(signedSum + draftSum, 2)),
+                ActStatus = $"подписано {Money.Format(signedSum)} · черновики {Money.Format(draftSum)}",
+                Bold = true,
+            });
+            rows.Add(new KsExtraVm
+            {
+                Name = "Всего с учётом вне сметы",
+                Amount = Money.Format(signed),
+                ActStatus = $"черновики {Money.Format(pending)}",
+                Bold = true,
+            });
+        }
+        ExtraBox.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ExtraGrid.ItemsSource = rows;
+    }
+
+    /// <summary>«Сохранить сводную в Excel» (export_summary_excel): позиция × акты,
+    /// итоги материалов, СМР и сумм актов.</summary>
+    private void SummaryExport_Click(object sender, RoutedEventArgs e)
+    {
+        var summary = _summary;
+        var totals = _totals;
+        if (summary is null || totals is null || _summaryActs.Count == 0)
+        {
+            MessageBox.Show(Window.GetWindow(this), "Сначала откройте сводную: нет данных.",
+                "Сводная в Excel", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var acts = _summaryActs.OrderBy(a => a.Date).ThenBy(a => a.Id).ToList();
+        XlsxExport.Save(Window.GetWindow(this), "Сводная — " + _title, sheet =>
+        {
+            var matClosed = acts.Sum(a => a.Materials);
+            var smrClosed = acts.Sum(a => a.Smr);
+            var signed = acts.Where(a => a.Signed).Sum(a => a.Total);
+            var headers = new List<string> { "№", "Наименование", "Ед.", "По смете", "Цена", "Сумма по смете" };
+            headers.AddRange(acts.Select(a => "№ " + a.Number));
+            headers.AddRange(new[] { "Сдано всего", "Сдано, руб.", "Остаток", "Остаток, руб.", "Выдано на объект" });
+            sheet.Cell(1, 1).Value = _title + " — сводная по выполнению";
+            sheet.Cell(1, 1).Style.Font.Bold = true;
+            sheet.Cell(1, 1).Style.Font.FontSize = 14;
+            sheet.Cell(2, 1).Value = $"на {DateTime.Today:dd.MM.yyyy}";
+            sheet.Cell(3, 1).Value =
+                $"Материалы: сдано {Money.Format(matClosed)} из {Money.Format(totals.Materials)} " +
+                $"({PctOf(matClosed, totals.Materials):0.0}%)   ·   СМР: {Money.Format(smrClosed)} из " +
+                $"{Money.Format(totals.Smr)} ({PctOf(smrClosed, totals.Smr):0.0}%)   ·   Всего: " +
+                $"{Money.Format(signed)} из {Money.Format(totals.Total)} ({PctOf(signed, totals.Total):0.0}%)";
+            XlsxExport.Header(sheet, 5, headers);
+            int index = 6;
+            var first = index;
+            var doneSumByAct = new Dictionary<long, decimal>();
+            foreach (var row in VisibleSummaryRows(summary))
+            {
+                if (row.IsSection)
+                {
+                    sheet.Cell(index, 2).Value = row.Name;
+                    sheet.Range(index, 1, index, headers.Count).Style.Font.Bold = true;
+                    sheet.Range(index, 1, index, headers.Count).Style.Fill.BackgroundColor =
+                        ClosedXML.Excel.XLColor.FromHtml("#EEF2F7");
+                    index++;
+                    continue;
+                }
+                sheet.Cell(index, 1).Value = row.Num;
+                sheet.Cell(index, 2).Value = row.Name;
+                sheet.Cell(index, 3).Value = row.Unit;
+                sheet.Cell(index, 4).Value = (double)row.QtyRaw;
+                sheet.Cell(index, 5).Value = (double)row.PriceRaw;
+                sheet.Cell(index, 6).Value = (double)(row.QtyRaw * row.PriceRaw);
+                for (var i = 0; i < acts.Count; i++)
+                    if (row.PerAct.TryGetValue(acts[i].Id, out var q) && q != 0m)
+                        sheet.Cell(index, 7 + i).Value = (double)q;
+                var offset = 7 + acts.Count;
+                sheet.Cell(index, offset).Value = (double)row.DoneRaw;
+                sheet.Cell(index, offset + 1).Value = (double)row.DoneSumRaw;
+                sheet.Cell(index, offset + 2).Value = (double)row.LeftRaw;
+                sheet.Cell(index, offset + 3).Value = (double)row.LeftSumRaw;
+                sheet.Cell(index, offset + 4).Value = (double)row.IssuedRaw;
+                sheet.Range(index, 4, index, offset + 4).Style.NumberFormat.Format = "#,##0.###";
+                sheet.Cell(index, 5).Style.NumberFormat.Format = "#,##0.00";
+                sheet.Cell(index, 6).Style.NumberFormat.Format = "#,##0.00";
+                sheet.Cell(index, offset + 1).Style.NumberFormat.Format = "#,##0.00";
+                sheet.Cell(index, offset + 3).Style.NumberFormat.Format = "#,##0.00";
+                if (row.FullyClosed)
+                    sheet.Range(index, 1, index, headers.Count).Style.Fill.BackgroundColor =
+                        ClosedXML.Excel.XLColor.FromHtml("#DCFCE7");
+                foreach (var act in acts)
+                    if (row.PerAct.TryGetValue(act.Id, out var q))
+                        doneSumByAct[act.Id] = doneSumByAct.GetValueOrDefault(act.Id) + q * row.PriceRaw;
+                index++;
+            }
+            var last = index - 1;
+            // как в Python export_summary_excel: Сдано, руб. = 8+n, Остаток, руб. = 10+n
+            sheet.Cell(index, 2).Value = "ИТОГО материалы";
+            sheet.Cell(index, 6).Value = (double)VisibleSummaryRows(summary)
+                .Where(r => !r.IsSection).Sum(r => r.QtyRaw * r.PriceRaw);
+            sheet.Cell(index, 8 + acts.Count).Value = (double)VisibleSummaryRows(summary)
+                .Where(r => !r.IsSection).Sum(r => r.DoneSumRaw);
+            sheet.Cell(index, 10 + acts.Count).Value = (double)VisibleSummaryRows(summary)
+                .Where(r => !r.IsSection).Sum(r => r.LeftSumRaw);
+            sheet.Range(index, 2, index, headers.Count).Style.Font.Bold = true;
+            sheet.Range(index, 6, index, 6).Style.NumberFormat.Format = "#,##0.00";
+            sheet.Cell(index, 8 + acts.Count).Style.NumberFormat.Format = "#,##0.00";
+            sheet.Cell(index, 10 + acts.Count).Style.NumberFormat.Format = "#,##0.00";
+            index++;
+            sheet.Cell(index, 2).Value = "СМР";
+            sheet.Cell(index, 6).Value = (double)totals.Smr;
+            for (var i = 0; i < acts.Count; i++)
+                sheet.Cell(index, 7 + i).Value = (double)acts[i].Smr;
+            sheet.Cell(index, 8 + acts.Count).Value = (double)smrClosed;
+            sheet.Cell(index, 10 + acts.Count).Value = (double)(totals.Smr - smrClosed);
+            sheet.Range(index, 2, index, headers.Count).Style.Font.Bold = true;
+            sheet.Range(index, 6, index, 6).Style.NumberFormat.Format = "#,##0.00";
+            sheet.Cell(index, 8 + acts.Count).Style.NumberFormat.Format = "#,##0.00";
+            sheet.Cell(index, 10 + acts.Count).Style.NumberFormat.Format = "#,##0.00";
+            index++;
+            sheet.Cell(index, 2).Value = "Сумма акта (с НДС)";
+            for (var i = 0; i < acts.Count; i++)
+            {
+                sheet.Cell(index, 7 + i).Value = (double)acts[i].Total;
+                sheet.Cell(index, 7 + i).Style.Font.Bold = true;
+                sheet.Cell(index, 7 + i).Style.NumberFormat.Format = "#,##0.00";
+            }
+            sheet.Range(index, 2, index, headers.Count).Style.Font.Bold = true;
+            sheet.SheetView.FreezeRows(5);
+            sheet.SheetView.FreezeColumns(2);
+        });
+    }
+
+    private static decimal PctOf(decimal part, decimal whole) =>
+        whole == 0m ? 0m : part / whole * 100m;
+
+    private sealed record SummaryExportRow(
+        bool IsSection, string Num, string Name, string Unit,
+        decimal QtyRaw, decimal PriceRaw, decimal DoneRaw, decimal DoneSumRaw,
+        decimal LeftRaw, decimal LeftSumRaw, decimal IssuedRaw, bool FullyClosed,
+        IReadOnlyDictionary<long, decimal> PerAct);
+
+    private IEnumerable<SummaryExportRow> VisibleSummaryRows(SqlServerActs.SummaryData summary)
+    {
+        foreach (var (system, sectionHeader) in summary.Systems)
+        {
+            yield return new SummaryExportRow(true, "", sectionHeader
+                ? system.Name : (system.IsSub ? "      ↳  " : "") + system.Name, "", 0m, 0m, 0m, 0m, 0m, 0m, 0m,
+                false, new Dictionary<long, decimal>());
+            foreach (var p in summary.Positions.Where(p => p.SystemId == system.SystemId))
+                yield return new SummaryExportRow(false, p.NumText, p.Name, p.Unit,
+                    p.QtyByKp, p.Price, p.Done, p.DoneSum, p.Left, p.LeftSum, p.Issued,
+                    Math.Abs(p.Left) <= 0.000001m, p.PerAct);
+        }
+    }
+}

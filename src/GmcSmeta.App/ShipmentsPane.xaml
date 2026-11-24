@@ -1,0 +1,247 @@
+<UserControl x:Class="GmcSmeta.App.ShipmentsPane"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <Grid Margin="24,6,24,14">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Button x:Name="NewShipmentButton" Content="Новая ведомость" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewShipment_Click"
+                    Style="{StaticResource PythonToolbarPrimary}" HorizontalAlignment="Stretch"/>
+            <TextBlock Grid.Row="1" Text="Ведомости объекта" FontWeight="SemiBold" Margin="0,8,0,6"/>
+            <ListBox x:Name="ShipmentCombo" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0"
+                     HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Shipment_Changed">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Margin" Value="0,0,2,6"/>
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Card" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="9" Padding="10,7,8,7">
+                                <ContentPresenter HorizontalAlignment="Stretch"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="#F1F4F9"/></Trigger>
+                                <Trigger Property="IsSelected" Value="True"><Setter TargetName="Card" Property="Background" Value="#E8F0FE"/><Setter TargetName="Card" Property="BorderBrush" Value="#2563EB"/></Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="#2563EB"/></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate></Setter.Value></Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate><DataTemplate>
+                    <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Details}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+        <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <!-- All original actions remain accessible when the contract pane narrows. -->
+        <WrapPanel Grid.Row="0" VerticalAlignment="Center">
+            <TextBlock x:Name="CaptionText" FontWeight="Bold" FontSize="{StaticResource UiH2Size}"
+                       MaxWidth="320" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,14,6"/>
+            <Button x:Name="DeleteShipmentButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Click="ShipmentMore_Click"
+                    Margin="0,0,8,6" ToolTip="Дополнительные действия с ведомостью" Style="{StaticResource PythonToolbarButton}"/>
+            <Button x:Name="EditFixedButton" Content="Изменить" Style="{StaticResource PythonToolbarButton}"
+                    Click="EditFixed_Click" Margin="0,0,8,6" Visibility="Collapsed"/>
+            <Button x:Name="FinishFixedButton" Content="Готово" Style="{StaticResource PythonToolbarPrimary}"
+                    Click="FinishFixed_Click" Margin="0,0,8,6" Visibility="Collapsed"/>
+            <Button x:Name="ExportExcelButton" Style="{StaticResource PythonToolbarButton}" Content="Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click"
+                    Margin="0,0,8,6" ToolTip="Ведомость выдачи в Excel"/>
+            <Button x:Name="ExportPdfButton" Style="{StaticResource PythonToolbarButton}" Content="PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportPdf_Click"
+                    Margin="0,0,8,6" ToolTip="Ведомость выдачи в PDF"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Click="Refresh_Click"
+                    Margin="0,0,0,6" ToolTip="Перечитать ведомость из SQL Server"/>
+        </WrapPanel>
+        <!-- Python ship_view.py: 4 steps using the existing shipment actions. -->
+        <Border Grid.Row="1" Margin="0,4,0,0" Background="White" BorderBrush="#E4E8EF"
+                BorderThickness="1" CornerRadius="10" Padding="12,8">
+            <WrapPanel Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MinWidth="178" Margin="0,0,10,0">
+                    <Border Width="25" Height="25" CornerRadius="13" Background="#E8F0FE">
+                        <TextBlock Text="1" Foreground="#1E40AF"
+                                   FontWeight="Bold" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Добавьте позиции" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="8,0,8,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MinWidth="178" Margin="0,0,10,0">
+                    <Border Width="25" Height="25" CornerRadius="13" Background="#E8F0FE">
+                        <TextBlock Text="2" Foreground="#1E40AF"
+                                   FontWeight="Bold" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Укажите получателя" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="8,0,8,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MinWidth="178" Margin="0,0,10,0">
+                    <Border Width="25" Height="25" CornerRadius="13" Background="#E8F0FE">
+                        <TextBlock Text="3" Foreground="#1E40AF"
+                                   FontWeight="Bold" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Экспортируйте в Excel" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="8,0,8,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" MinWidth="178" Margin="0,0,10,0">
+                    <Border Width="25" Height="25" CornerRadius="13" Background="#E7F6EC">
+                        <TextBlock Text="4" Foreground="#15803D"
+                                   FontWeight="Bold" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Зафиксируйте выдачу" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+        <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+            <!-- Labels stay with their input even when a second row is needed. -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
+                <TextBlock Text="№:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBox x:Name="NumberBox" Width="84" Height="32" MaxLength="32" KeyDown="Header_KeyDown"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
+                <TextBlock Text="Дата:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <DatePicker x:Name="DateBox" Width="142" Height="32" SelectedDateFormat="Short"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
+                <TextBlock Text="Получатель:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBox x:Name="RecipientBox" Width="200" Height="32"
+                         MaxLength="255" KeyDown="Header_KeyDown"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
+                <TextBlock Text="Выдал:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBox x:Name="IssuedByBox" Width="160" Height="32"
+                         MaxLength="255" KeyDown="Header_KeyDown"/>
+            </StackPanel>
+            <Button x:Name="SaveHeaderButton" Content="Сохранить реквизиты" Style="{StaticResource PythonToolbarButton}"
+                    Click="SaveHeader_Click" Margin="0,0,14,6"/>
+            <CheckBox x:Name="FixedCheck" Content="Ведомость выдана (фиксация)" Margin="0,0,16,6"
+                      VerticalAlignment="Center" Checked="Fixed_Changed" Unchecked="Fixed_Changed"/>
+        </WrapPanel>
+        <WrapPanel Grid.Row="3" Margin="0,2,0,6" VerticalAlignment="Center">
+            <Button x:Name="StockRowsButton" Content="Что на складе" ContentTemplate="{StaticResource IconLabelCheck}" Click="StockRows_Click"
+                    Margin="0,0,4,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Добавить выделенные или все отфильтрованные позиции, не больше остатка по смете"/>
+            <Button x:Name="AddRowsButton" Content="Добавить остаток" ContentTemplate="{StaticResource IconLabelUpload}" Click="AddRows_Click"
+                    Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Добавить выделенные или все отфильтрованные позиции: со склада или остаток, если склада нет"/>
+            <Button x:Name="RemoveRowsButton" Content="Убрать из ведомости" ContentTemplate="{StaticResource IconLabelTrash}" Click="RemoveRows_Click"
+                    Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Убрать выделенные позиции из текущей ведомости"/>
+            <ComboBox x:Name="RowFilter" Width="146" Margin="0,0,6,4" SelectionChanged="RowFilter_Changed">
+                <ComboBoxItem Content="Все строки" IsSelected="True"/>
+                <ComboBoxItem Content="Можно выдать"/>
+                <ComboBoxItem Content="В ведомости"/>
+            </ComboBox>
+            <ComboBox x:Name="DocumentFilter" Width="205" Margin="0,0,6,4"
+                      DisplayMemberPath="Title" SelectionChanged="RowFilter_Changed"
+                      ToolTip="Показать позиции одного договора или дополнительного соглашения" Visibility="Collapsed"/>
+            <TextBox x:Name="RowSearch" Width="180" Margin="0,0,0,4" TextChanged="RowSearch_Changed"
+                     ToolTip="Поиск по названию позиции или системы"/>
+        </WrapPanel>
+        <DataGrid local:TableColumnMenu.Key="shipments" CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="24" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="LinesGrid" Grid.Row="4" Margin="0,2,0,0"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
+                  SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2" CanUserSortColumns="False" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                  BeginningEdit="LinesGrid_BeginningEdit" CellEditEnding="LinesGrid_CellEditEnding" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+            <DataGrid.Resources>
+                <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
+                <Style x:Key="ShipmentNameText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSub}" Value="True">
+                            <Setter Property="FontStyle" Value="Italic"/>
+                            <Setter Property="Margin" Value="14,0,0,0"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+                <Style x:Key="ShipmentUnitText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostCenter}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSub}" Value="True">
+                            <Setter Property="FontStyle" Value="Italic"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.Resources>
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="GroupItem">
+                            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem">
+                                <Expander IsExpanded="True" Margin="0" HorizontalContentAlignment="Stretch"
+                                          Loaded="SystemGroup_Loaded" DataContextChanged="SystemGroup_DataContextChanged"
+                                          Expanded="SystemGroup_ExpansionChanged" Collapsed="SystemGroup_ExpansionChanged">
+                                    <Expander.Header>
+                                        <DockPanel LastChildFill="True">
+                                            <Button DockPanel.Dock="Right" Content="Выбрать систему" Click="SelectSystem_Click"
+                                                    Style="{StaticResource PythonToolbarButton}" Padding="6,2" MinHeight="24"
+                                                    ToolTip="Выбрать все видимые позиции этой системы для массового действия"/>
+                                            <TextBlock Text="{Binding Name.Label}" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                       VerticalAlignment="Center" Margin="4,2"/>
+                                        </DockPanel>
+                                    </Expander.Header>
+                                    <ItemsPresenter/>
+                                </Expander>
+                            </ControlTemplate></Setter.Value></Setter>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Выдать" Width="62" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                        <CheckBox IsChecked="{Binding InShipment, Mode=OneWay}" IsEnabled="{Binding CanChange}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" Click="MarkRow_Click"
+                                  AutomationProperties.Name="Включить позицию в ведомость"/>
+                    </DataTemplate></DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource ShipmentNameText}" HeaderStyle="{StaticResource CompactCostTextHeader}"/>
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="46" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="105" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="105" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+                <DataGridTextColumn x:Name="QtyColumn" Header="Выдать сейчас ✎"
+                                    Binding="{Binding Qty, Mode=TwoWay}" Width="138"
+                                    ElementStyle="{StaticResource CompactCostCenter}" EditingElementStyle="{StaticResource CompactCostCenterEditor}"
+                                    CellStyle="{StaticResource ShipmentQuantityCell}" HeaderStyle="{StaticResource ShipmentQuantityHeader}"/>
+                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="116" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+            </DataGrid.Columns>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+        <TextBlock x:Name="FooterText" Grid.Row="5" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <UniformGrid Grid.Row="6" Columns="3" Margin="0,10,0,0">
+            <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
+                <TextBlock Text="В этой ведомости" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="LinesTile" Style="{StaticResource PythonTileValue}"/>
+            </StackPanel></Border>
+            <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
+                <TextBlock Text="Больше, чем на складе" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
+                <TextBlock x:Name="OverTile" Style="{StaticResource PythonTileValue}"/>
+            </StackPanel></Border>
+            <Border Style="{StaticResource PythonTileAccent}"><StackPanel>
+                <TextBlock Text="По всему объекту" Foreground="#DBEAFE" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="TotalTile" Foreground="White" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
+            </StackPanel></Border>
+        </UniformGrid>
+        </Grid>
+    </Grid>
+</UserControl>

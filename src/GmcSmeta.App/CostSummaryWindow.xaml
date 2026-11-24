@@ -1,0 +1,8 @@
+<Window x:Class="GmcSmeta.App.CostSummaryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Себестоимость — сводная" Width="1420" Height="760" MinWidth="1000" MinHeight="480"
+        WindowStartupLocation="CenterOwner" Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}">
+    <ContentControl x:Name="InlinePaneHost"/>
+</Window>

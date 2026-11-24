@@ -1,0 +1,76 @@
+<Window x:Class="GmcSmeta.App.RateTransferDialog" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Title="Скопировать расценки" Width="1180" Height="690" MinWidth="960" MinHeight="520"
+        WindowStartupLocation="CenterOwner" Background="#F4F6FA"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}">
+    <Grid Margin="22,18,22,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="TargetText" FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}" TextWrapping="Wrap"/>
+        <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Из" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="SourceCombo" Grid.Column="1" SelectionChanged="Source_Changed"/>
+            <TextBox x:Name="SourceSearch" Style="{StaticResource PythonSearch}" Grid.Column="2" Width="220" Margin="10,0,0,0"
+                     TextChanged="Search_Changed" ToolTip="Поиск КП"/>
+            <CheckBox x:Name="AllObjects" Style="{StaticResource PythonFilterChip}" Grid.Column="3" Content="Все объекты" Margin="10,0,0,0"
+                      Checked="Source_Changed" Unchecked="Source_Changed"/>
+        </Grid>
+        <WrapPanel Grid.Row="2" Margin="0,10,0,0">
+            <CheckBox x:Name="SmrCheck" Style="{StaticResource PythonFilterChip}" Content="СМР" IsChecked="True" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,12,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="MaterialsCheck" Style="{StaticResource PythonFilterChip}" Content="Материалы" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,12,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="OverwriteCheck" Content="Заменять заполненные цены" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,20,0" VerticalAlignment="Center"/>
+            <Button x:Name="CheckButton" Content="Проверить совпадения" Click="Check_Click" FontWeight="SemiBold" Padding="12,4" Style="{StaticResource PrimaryButton}"/>
+        </WrapPanel>
+        <DataGrid local:TableColumnMenu.Key="rate-transfer" local:TableColumnMenu.Protect="Позиция из источника|Позиция в смете|Результат" MinRowHeight="30"
+                 
+                  EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalGridLinesBrush="#E4E8EF"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" x:Name="PreviewGrid" Grid.Row="3" Margin="0,10,0,0"
+                  AutoGenerateColumns="False" IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
+                  SelectionMode="Single" SelectionUnit="FullRow" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" Style="{StaticResource DocumentTable}">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="✓" Binding="{Binding Included, Mode=TwoWay}" Width="34"/>
+                <DataGridTextColumn Header="Позиция из источника" Binding="{Binding SourceLabel}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                <DataGridTextColumn Header="Позиция в смете" Binding="{Binding TargetLabel}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                <DataGridTextColumn Header="Цена сейчас" Binding="{Binding CurrentPrice}" Width="138" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridBeforeHeader}"/>
+                <DataGridTextColumn Header="Цена из источника" Binding="{Binding SourcePrice}" Width="138" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridAfterHeader}"/>
+                <DataGridTextColumn Header="Результат" Binding="{Binding ResultText}" Width="170" IsReadOnly="True" ElementStyle="{StaticResource CompactCostReview}" HeaderStyle="{StaticResource KsTextHeader}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <WrapPanel Grid.Row="4" Margin="0,10,0,0">
+            <CheckBox x:Name="OnlyReviewCheck" Style="{StaticResource PythonFilterChip}" Content="Требуют решения" Checked="Refresh_Changed" Unchecked="Refresh_Changed" VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button x:Name="ChooseButton" Style="{StaticResource PythonToolbarButton}" Content="Выбрать позицию…" Click="Choose_Click" IsEnabled="False" Margin="0,0,8,0"/>
+            <Button x:Name="ZeroButton" Style="{StaticResource PythonToolbarButton}" Content="Заполнить нулевую цену" Click="Zero_Click" IsEnabled="False"/>
+        </WrapPanel>
+        <TextBlock x:Name="InfoText" Grid.Row="5" Foreground="#64748B" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <Grid Grid.Row="6" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" IsCancel="True" Padding="18,6" Margin="0,0,8,0"/>
+            <Button x:Name="ApplyButton" Grid.Column="2" Content="Скопировать" IsEnabled="False"
+                    Click="Apply_Click" Padding="18,6" Style="{StaticResource PrimaryButton}" FontWeight="SemiBold"/>
+        </Grid>
+    </Grid>
+</Window>

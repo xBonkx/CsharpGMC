@@ -1,0 +1,246 @@
+<UserControl x:Class="GmcSmeta.App.ContractActsWorkspace"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}"
+        FontSize="{StaticResource UiBodySize}">
+    <!-- Вкладка договора «КС-2 / КС-3» (ks_view.py): режимы «Акты (КС-2, КС-3)» и
+         «Сводная по выполнению», слева список актов документа, справа редактор акта;
+         сводная — по позициям и актам с разделом «Вне подписанной сметы». -->
+    <UserControl.Resources>
+        <DataTemplate x:Key="KsActListTemplate">
+            <StackPanel Margin="2,6">
+                <TextBlock Text="{Binding Title}" Foreground="{Binding Fore}"
+                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding Title}"/>
+                <TextBlock Text="{Binding Caption}" Foreground="{Binding Fore}"
+                           FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
+            </StackPanel>
+        </DataTemplate>
+        <Style x:Key="KsSummaryRow" TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger>
+                <DataTrigger Binding="{Binding IsSub}" Value="True">
+                    <Setter Property="Background" Value="#E8F5FC"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsTop}" Value="True">
+                    <Setter Property="Background" Value="#F1F4F9"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsTop}" Value="False"/>
+                        <Condition Binding="{Binding IsSub}" Value="False"/>
+                        <Condition Binding="{Binding FullyClosed}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="#ECFDF3"/>
+                </MultiDataTrigger>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="24,6,24,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- режимы вкладки + кнопки; справа — фильтры сводной -->
+        <DockPanel Grid.Row="0" x:Name="ModeBarPanel" LastChildFill="False" Margin="0,0,0,6">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                <RadioButton x:Name="ActsMode" GroupName="KsWorkspaceMode" Content="Акты (КС-2, КС-3)"
+                             Style="{StaticResource ObjectSubTab}" IsChecked="True"
+                             Checked="ActsMode_Checked"/>
+                <RadioButton x:Name="ProgressMode" GroupName="KsWorkspaceMode" Content="Сводная по выполнению"
+                             Style="{StaticResource ObjectSubTab}" Checked="ProgressMode_Checked"/>
+                <Button Content="Реквизиты для КС…" ContentTemplate="{StaticResource IconLabelBuilding}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="12,0,0,0" Click="Requisites_Click"
+                        ToolTip="Заказчик, объект, подписанты — один раз на объект"/>
+                <Button Content="Все КС договора" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}"
+                        Margin="7,0,0,0" Click="ContractActs_Click"
+                        ToolTip="Общий список актов всех приложений и ДС"/>
+            </StackPanel>
+            <StackPanel x:Name="SummaryBarPanel" DockPanel.Dock="Right" Orientation="Horizontal"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                <CheckBox x:Name="SummaryRestOnly" Content="Только остатки" VerticalAlignment="Center"
+                          Margin="0,0,10,0" Checked="SummaryRest_Changed" Unchecked="SummaryRest_Changed"
+                          ToolTip="Скрыть позиции, закрытые полностью"/>
+                <Button Content="Сохранить сводную в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
+                        Click="SummaryExport_Click"
+                        ToolTip="Сводная по выполнению: по позициям и актам"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- подсказка вкладки (Python HintBar «ks») -->
+        <Border Grid.Row="1" x:Name="HintBar" Background="#E8F0FE" CornerRadius="8"
+                Padding="12,6,6,6" Margin="0,0,0,6" Visibility="Collapsed">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="⚠" Foreground="#2563EB" FontSize="16"
+                           VerticalAlignment="Top" Margin="0,0,8,0"/>
+                <Button DockPanel.Dock="Right" Content="Понятно" Click="HintClose_Click"
+                        Foreground="#1E40AF" Background="Transparent" BorderThickness="0"
+                        Cursor="Hand" VerticalAlignment="Top" Padding="6,2"/>
+                <TextBlock x:Name="HintText" Foreground="#1E40AF" TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="2" x:Name="ActsPage">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftColumn" Width="250"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <DockPanel Grid.Column="0" x:Name="LeftBox" Margin="0,0,12,0" LastChildFill="True">
+                <Button DockPanel.Dock="Top" Content="Новый акт" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PythonToolbarPrimary}"
+                        Click="NewAct_Click" Height="32" Margin="0,0,0,6"
+                        ToolTip="Номер и период поставятся сами"/>
+                <Border Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12">
+                    <ListBox x:Name="ActList" BorderThickness="0" Background="Transparent"
+                             ItemTemplate="{StaticResource KsActListTemplate}"
+                             SelectionChanged="ActList_SelectionChanged"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                </Border>
+            </DockPanel>
+            <local:ActsEditorView Grid.Column="1" x:Name="EmbeddedEditor"/>
+        </Grid>
+
+        <!-- «Сводная по выполнению» + «Вне подписанной сметы» -->
+        <Grid Grid.Row="2" x:Name="SummaryPage" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#E1E7F0" BorderThickness="1"
+                    CornerRadius="10" Padding="1">
+                <DataGrid local:TableColumnMenu.Key="contract-acts-summary" CellStyle="{StaticResource CompactCostCell}" x:Name="SummaryGrid"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
+                          MinRowHeight="24" EnableRowVirtualization="True"
+                          GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
+                          VerticalGridLinesBrush="#E4E8EF" RowStyle="{StaticResource KsSummaryRow}" AlternationCount="2"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="56" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                        <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                        <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48"
+                                            ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="84"
+                                            ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+            <StackPanel Grid.Row="1" x:Name="ExtraBox" Margin="0,10,0,0" Visibility="Collapsed">
+                <TextBlock Text="Вне подписанной сметы" FontSize="{StaticResource UiH2Size}"
+                           FontWeight="SemiBold" Foreground="#0F172A" Margin="2,0,0,6"/>
+                <Border Background="#FFFFFF" BorderBrush="#E1E7F0" BorderThickness="1"
+                        CornerRadius="10" Padding="1">
+                    <DataGrid local:TableColumnMenu.Key="contract-acts-extra" CellStyle="{StaticResource CompactCostCell}" x:Name="ExtraGrid"
+                              AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
+                              MinRowHeight="24" MinHeight="90" MaxHeight="240"
+                              GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
+                              VerticalGridLinesBrush="#E4E8EF"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
+                                <Setter Property="Background" Value="#FFFFFF"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Bold}" Value="True">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Background" Value="#F7F9FC"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Muted}" Value="True">
+                                        <Setter Property="Foreground" Value="#64748B"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Система" Binding="{Binding System}" Width="160" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                            <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                            <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50"
+                                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                            <DataGridTextColumn Header="Подписано" Binding="{Binding SignedQty}" Width="90"
+                                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                            <DataGridTextColumn Header="Черновики" Binding="{Binding DraftQty}" Width="90"
+                                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                            <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="110"
+                                                ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn Header="Сумма" Binding="{Binding Amount}" Width="120"
+                                                ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn Header="Акт / статус" Binding="{Binding ActStatus}" Width="190"
+                                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </StackPanel>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+                <Border Style="{StaticResource PythonTile}" MinWidth="170" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Материалы сдано"/>
+                        <TextBlock x:Name="SumMatValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" MinWidth="170" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="СМР сдано"/>
+                        <TextBlock x:Name="SumSmrValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTileAccent}" MinWidth="190" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock x:Name="SumTotalCaption" Style="{StaticResource PythonTileLabel}"
+                                   Foreground="#DDE7FF" Text="Всего сдано"/>
+                        <TextBlock x:Name="SumTotalValue" Style="{StaticResource PythonTileValue}"
+                                   Foreground="White" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" MinWidth="170" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock x:Name="SumPendingCaption" Style="{StaticResource PythonTileLabel}" Text="На сдаче"/>
+                        <TextBlock x:Name="SumPendingValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" MinWidth="190" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Осталось сдать"/>
+                        <TextBlock x:Name="SumLeftValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,2"
+                        x:Name="ExtrasTilesPanel" Visibility="Collapsed">
+                <Border Style="{StaticResource PythonTile}" MinWidth="190" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock x:Name="SumExtraCaption" Style="{StaticResource PythonTileLabel}"
+                                   Text="Вне сметы (подписано)"/>
+                        <TextBlock x:Name="SumExtraValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PythonTile}" MinWidth="210" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Всего с учётом вне сметы"/>
+                        <TextBlock x:Name="SumAllValue" Style="{StaticResource PythonTileValue}" Text="—"
+                                   Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,64 @@
+using System.Windows;
+using System.Windows.Input;
+
+namespace GmcSmeta.App;
+
+/// <summary>
+/// Второе подтверждение удаления (перенос ConfirmDeleteDialog): красная кнопка включается
+/// только ответом на маленький вопрос, каждый раз другой — чтобы не нажималось по привычке.
+/// </summary>
+public partial class ConfirmDeleteDialog : Window
+{
+    private readonly string _answer;
+
+    public ConfirmDeleteDialog(string name, IReadOnlyList<string> details, string what = "объект")
+    {
+        InitializeComponent();
+        Title = what == "объект" ? "Удаление объекта" : "Удаление документа";
+        HeadingText.Text = $"Удалить {what} навсегда?";
+        NameText.Text = "«" + name.Trim() + "»";
+        DetailsText.Text = details.Count > 0
+            ? "Вместе с ним удалится:\n• " + string.Join("\n• ", details)
+            : "Объект пустой.";
+        var (question, answer) = Challenge();
+        QuestionText.Text = question;
+        _answer = answer;
+        Loaded += (_, _) => AnswerBox.Focus();
+    }
+
+    private static (string Question, string Answer) Challenge()
+    {
+        // dialogs._challenge: ответ только цифрами — без раскладок, тире и кавычек.
+        switch (Random.Shared.Next(3))
+        {
+            case 0:
+                var a = Random.Shared.Next(2, 10);
+                var b = Random.Shared.Next(2, 10);
+                return ($"Сколько будет {a} + {b}?", (a + b).ToString());
+            case 1:
+                var x = Random.Shared.Next(11, 99);
+                var y = Random.Shared.Next(11, 99);
+                while (y == x) y = Random.Shared.Next(11, 99);
+                return ($"Какое число больше: {x} или {y}?", Math.Max(x, y).ToString());
+            default:
+                var n = Random.Shared.Next(10, 100);
+                return ($"Впишите число {n}:", n.ToString());
+        }
+    }
+
+    private void AnswerBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
+        DeleteButton.IsEnabled = AnswerBox.Text.Trim() == _answer;
+
+    private void AnswerBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        // returnPressed: Enter подтверждает только при правильном ответе.
+        if (e.Key == Key.Enter && DeleteButton.IsEnabled)
+        {
+            DialogResult = true;
+            e.Handled = true;
+        }
+    }
+
+    private void Delete_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+    private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+}

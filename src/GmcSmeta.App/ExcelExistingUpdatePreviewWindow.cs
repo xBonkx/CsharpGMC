@@ -1,0 +1,392 @@
+using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
+using GmcSmeta.Core.Db;
+using GmcSmeta.Core.Domain;
+
+namespace GmcSmeta.App;
+
+/// <summary>Explicit, non-destructive diff approval. The window never writes to SQL Server.</summary>
+internal sealed class ExcelExistingUpdatePreviewWindow : Window
+{
+    private sealed record ContractChoice(long Id, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record BlockChoice(ExcelImportBlock Block)
+    {
+        public override string ToString() =>
+            Block.Sheet + " / " + Block.FirstRow + "–" + Block.LastRow +
+            " (" + Block.PositionCount + " поз.)";
+    }
+
+    private sealed record MappingChoice(ExcelExistingDbRow Row)
+    {
+        public override string ToString() =>
+            "SQL ID " + Row.Id + " | " + Row.SectionPath +
+            " | родитель: " + (Row.ParentName.Length == 0 ? "—" : Row.ParentName) +
+            " | " + Row.Name + " / " + Row.Unit +
+            " | объём " + Row.Quantity + " | сохранённая цена " + Row.Price;
+    }
+
+    private readonly string _connectionString;
+    private readonly string _filePath;
+    private readonly string _parsedFingerprint;
+    private readonly bool _hasMissingFormulaCache;
+    private readonly ComboBox _contracts = new() { MinWidth = 300 };
+    private readonly ComboBox _blocks = new() { MinWidth = 300 };
+    private readonly Button _compare = new() { Content = "Сравнить", MinWidth = 100 };
+    private readonly Button _resolve = new() { Content = "Сопоставить 1:1…", MinWidth = 155, IsEnabled = false };
+    private readonly Button _confirm = new()
+    {
+        Content = "Применить выбранные изменения", MinWidth = 220,
+        IsEnabled = false
+    };
+    private readonly TextBlock _summary = new()
+    {
+        TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8)
+    };
+    private readonly ObservableCollection<ExcelExistingDifference> _rows = new();
+    private readonly DataGrid _grid = new()
+    {
+        AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false,
+        CanUserDeleteRows = false, SelectionMode = DataGridSelectionMode.Single,
+        EnableRowVirtualization = true, EnableColumnVirtualization = true
+    };
+
+    public ExcelExistingUpdatePlan? Plan { get; private set; }
+
+    public ExcelExistingUpdatePreviewWindow(Window owner, ExcelImportResult imported,
+        IEnumerable<DocRow> docs, long? objectId, string connectionString, string filePath, string parsedFingerprint)
+    {
+        Owner = owner;
+        _connectionString = connectionString;
+        _filePath = filePath;
+        _parsedFingerprint = parsedFingerprint;
+        _hasMissingFormulaCache = HasMissingFormulaCache(imported);
+        Title = "Безопасное обновление существующей сметы из Excel";
+        Width = 1330;
+        Height = 760;
+        MinWidth = 960;
+        MinHeight = 560;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+        foreach (var doc in docs.Where(x => !objectId.HasValue || x.ObjectId == objectId.Value))
+            _contracts.Items.Add(new ContractChoice(doc.Id, doc.Title));
+        if (_contracts.Items.Count > 0) _contracts.SelectedIndex = 0;
+        foreach (var block in imported.Blocks)
+            _blocks.Items.Add(new BlockChoice(block));
+        if (_blocks.Items.Count > 0) _blocks.SelectedIndex = 0;
+
+        WorkspaceWindowUi.ApplyChrome(this);
+        WorkspaceWindowUi.StyleTable(_grid);
+        WorkspaceWindowUi.StyleButton(_compare, icon: "IconLabelSearch");
+        WorkspaceWindowUi.StyleButton(_resolve, icon: "IconLabelEdit");
+        WorkspaceWindowUi.StyleButton(_confirm, primary: true, icon: "IconLabelCheck");
+        var layout = new DockPanel { Margin = new Thickness(14) };
+        Content = layout;
+        var header = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        DockPanel.SetDock(header, Dock.Top);
+        layout.Children.Add(header);
+        header.Children.Add(new TextBlock
+        {
+            Text = "Excel → существующее КП. Ручные цены, формулы, примечания, КС и ДС не перезаписываются.",
+            FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap
+        });
+
+        var controls = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        controls.Children.Add(Caption("Документ:"));
+        controls.Children.Add(_contracts);
+        controls.Children.Add(Caption("Блок Excel:"));
+        controls.Children.Add(_blocks);
+        _compare.Margin = new Thickness(10, 0, 0, 0);
+        controls.Children.Add(_compare);
+        header.Children.Add(controls);
+
+        if (imported.Notes.Count != 0)
+            header.Children.Add(new TextBlock
+            {
+                Text = string.Join("; ", imported.Notes),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brushes.DarkGoldenrod, Margin = new Thickness(0, 8, 0, 0)
+            });
+        header.Children.Add(_summary);
+        _summary.Text = "Выбери документ и блок Excel, затем нажми «Сравнить». Никаких изменений до подтверждения.";
+
+        var footer = new WrapPanel { Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Right };
+        DockPanel.SetDock(footer, Dock.Bottom);
+        layout.Children.Add(footer);
+        var cancel = new Button { Content = "Отмена", MinWidth = 100, Margin = new Thickness(8, 0, 0, 0) };
+        cancel.Click += (_, _) => { DialogResult = false; };
+        WorkspaceWindowUi.StyleButton(cancel);
+        _confirm.Click += Confirm;
+        var safe = new Button { Content = "Выбрать безопасные", MinWidth = 155 };
+        safe.Click += (_, _) => ChooseSafe(true);
+        footer.Children.Add(safe);
+        var clear = new Button
+        {
+            Content = "Снять выбор", MinWidth = 110, Margin = new Thickness(8, 0, 0, 0)
+        };
+        clear.Click += (_, _) => ChooseSafe(false);
+        footer.Children.Add(clear);
+        _resolve.Margin = new Thickness(8, 0, 0, 0);
+        _resolve.Click += ResolveAmbiguous;
+        WorkspaceWindowUi.StyleButton(safe, icon: "IconLabelCheck");
+        WorkspaceWindowUi.StyleButton(clear);
+        footer.Children.Add(_resolve);
+        _confirm.Margin = new Thickness(8, 0, 0, 0);
+        footer.Children.Add(_confirm);
+        footer.Children.Add(cancel);
+
+        _grid.ItemsSource = _rows;
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Статус", Binding = new Binding(nameof(ExcelExistingDifference.Kind)),
+            IsReadOnly = true, Width = 110
+        });
+        var template = new DataTemplate();
+        var check = new FrameworkElementFactory(typeof(CheckBox));
+        check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        check.SetBinding(CheckBox.IsCheckedProperty, new Binding("Apply")
+        {
+            Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+        });
+        check.SetBinding(CheckBox.IsEnabledProperty,
+            new Binding(nameof(ExcelExistingDifference.SafeToApply)));
+        template.VisualTree = check;
+        _grid.Columns.Add(new DataGridTemplateColumn
+        {
+            Header = "Применить", CellTemplate = template, Width = 90
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Excel / SQL ID", Binding = new Binding(nameof(ExcelExistingDifference.DisplayIdentity)),
+            IsReadOnly = true, Width = 190
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Система", Binding = new Binding(nameof(ExcelExistingDifference.DisplaySystem)),
+            IsReadOnly = true, Width = 220
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Наименование", Binding = new Binding(nameof(ExcelExistingDifference.DisplayName)),
+            IsReadOnly = true, Width = 250
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Объём до → после", Binding = new Binding(nameof(ExcelExistingDifference.DisplayQuantity)),
+            IsReadOnly = true, Width = 145
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Цена сохранена / в Excel", Binding = new Binding(nameof(ExcelExistingDifference.DisplayPrice)),
+            IsReadOnly = true, Width = 155
+        });
+        _grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "Причина / последствия", Binding = new Binding(nameof(ExcelExistingDifference.Explanation)),
+            IsReadOnly = true, Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+        });
+        foreach (var column in _grid.Columns.OfType<DataGridTextColumn>())
+            WorkspaceWindowUi.StyleColumn(column, column.Header?.ToString() switch
+            {
+                "Статус" or "Excel / SQL ID" => TextAlignment.Center,
+                "Объём до → после" or "Цена сохранена / в Excel" => TextAlignment.Right,
+                _ => TextAlignment.Left
+            });
+        TableColumnMenu.SetProtect(_grid, "Статус|Применить|Excel / SQL ID|Наименование|Объём до → после|Причина / последствия");
+        TableColumnMenu.SetKey(_grid, "excel-update-preview");
+        layout.Children.Add(_grid);
+
+        _contracts.SelectionChanged += (_, _) => ResetPlan();
+        _blocks.SelectionChanged += (_, _) => ResetPlan();
+        _compare.Click += async (_, _) =>
+        {
+            if (_contracts.SelectedItem is not ContractChoice contract ||
+                _blocks.SelectedItem is not BlockChoice block) return;
+            _compare.IsEnabled = false;
+            _contracts.IsEnabled = false;
+            _blocks.IsEnabled = false;
+            ResetPlan();
+            _summary.Text = "Сравнение…";
+            try
+            {
+                var plan = await Task.Run(() => SqlServerExcelExistingUpdate.Prepare(
+                    _connectionString, contract.Id, _filePath, new[] { block.Block }));
+                if (!string.Equals(plan.FileSha256, _parsedFingerprint, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Файл Excel изменён после первоначального разбора.");
+                Plan = plan;
+                _resolve.IsEnabled = true;
+                foreach (var row in plan.Differences) _rows.Add(row);
+                var groups = plan.Differences.GroupBy(x => x.Kind)
+                    .Select(g => g.Key + ": " + g.Count());
+                _summary.Text = string.Join("  |  ", groups) +
+                    ". Отсутствующие в Excel строки останутся на месте. " +
+                    "Конфликты пропускаются; без подтверждённого исходного объёма нужен выбор каждой строки вручную.";
+                _confirm.IsEnabled = plan.Differences.Any(x => x.SafeToApply) &&
+                    !_hasMissingFormulaCache;
+                if (_hasMissingFormulaCache)
+                    _summary.Text += " Запись заблокирована: есть формулы без сохранённых результатов.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Не удалось сравнить смету",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                _summary.Text = "Сравнение не выполнено. SQL не изменён.";
+            }
+            finally
+            {
+                _compare.IsEnabled = true;
+                _contracts.IsEnabled = true;
+                _blocks.IsEnabled = true;
+            }
+        };
+    }
+
+    private static bool HasMissingFormulaCache(ExcelImportResult result) =>
+        result.Notes.Any(s => s.Contains("Формулы без сохранённого результата",
+            StringComparison.OrdinalIgnoreCase));
+
+    private static TextBlock Caption(string value) => new()
+    {
+        Text = value, VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(10, 0, 6, 0)
+    };
+
+    private void ResetPlan()
+    {
+        Plan = null;
+        _rows.Clear();
+        _confirm.IsEnabled = false;
+        _resolve.IsEnabled = false;
+    }
+
+    private void ResolveAmbiguous(object sender, RoutedEventArgs e)
+    {
+        if (Plan is null || _grid.SelectedItem is not ExcelExistingDifference target ||
+            target.Kind != ExcelExistingChangeKind.Ambiguous || target.Source is null)
+        {
+            MessageBox.Show(this, "Выбери неоднозначную строку Excel в таблице.",
+                "Сопоставление 1:1", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var source = target.Source;
+        var candidates = Plan.MappingCandidates(source.Ordinal);
+        if (candidates.Count == 0)
+        {
+            MessageBox.Show(this,
+                "Нет кандидатов с доказанным совпадением раздела, родителя, исходного имени и единицы. " +
+                "Изменение stable ID, перенос системы и m:n здесь запрещены. Строка останется SKIP.",
+                "Нет безопасного соответствия", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new Window
+        {
+            Owner = this, Title = "Подтверждение соответствия Excel → SQL",
+            Width = 860, Height = 420, MinWidth = 650, MinHeight = 330,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        WorkspaceWindowUi.ApplyChrome(dialog);
+        var panel = new DockPanel { Margin = new Thickness(14) };
+        dialog.Content = panel;
+        var info = new TextBlock
+        {
+            Text = "EXCEL: стр. " + source.SourceRow +
+                " | stable ID " + (source.StableId?.ToString() ?? "нет") +
+                " | " + source.SectionPath + " | родитель: " + source.ParentName +
+                " | " + source.Name + " / " + source.Unit +
+                " | количество " + source.Quantity + " | цена " + source.Price +
+                "\nВыбери ровно одну SQL-позицию. Ручные цены, формулы и связанные документы не изменятся. " +
+                "После сопоставления все галочки сбрасываются.",
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
+        };
+        DockPanel.SetDock(info, Dock.Top);
+        panel.Children.Add(info);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        panel.Children.Add(buttons);
+        var accept = new Button { Content = "Подтвердить 1:1", MinWidth = 150 };
+        var cancel = new Button { Content = "Оставить SKIP", MinWidth = 130, Margin = new Thickness(8, 0, 0, 0) };
+        WorkspaceWindowUi.StyleButton(accept, primary: true, icon: "IconLabelCheck");
+        WorkspaceWindowUi.StyleButton(cancel);
+        buttons.Children.Add(accept);
+        buttons.Children.Add(cancel);
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+
+        var choices = new ListBox { ItemsSource = candidates.Select(row => new MappingChoice(row)).ToArray() };
+        choices.SelectedIndex = -1;
+        panel.Children.Add(choices);
+        accept.Click += (_, _) =>
+        {
+            if (choices.SelectedItem is not MappingChoice chosen) return;
+            var old = chosen.Row;
+            if (MessageBox.Show(dialog,
+                    "Excel: " + source.Name + " / " + source.Unit + " / " + source.Quantity +
+                    "\nSQL ID " + old.Id + ": " + old.Name + " / " + old.Unit + " / " + old.Quantity +
+                    "\n\nЗафиксировать исключительно это соответствие 1:1? " +
+                    "Все действия останутся SKIP до отдельного подтверждения.",
+                    "Ручное соответствие", MessageBoxButton.YesNo, MessageBoxImage.Warning) !=
+                MessageBoxResult.Yes) return;
+            try
+            {
+                var mapped = Plan!.WithExplicitMapping(source.Ordinal, old.Id);
+                Plan = mapped;
+                _rows.Clear();
+                foreach (var difference in mapped.Differences) _rows.Add(difference);
+                _grid.Items.Refresh();
+                _confirm.IsEnabled = mapped.Differences.Any(x => x.SafeToApply) &&
+                    !_hasMissingFormulaCache;
+                _summary.Text = "Ручное 1:1 сопоставление сохранено только в плане предпросмотра. " +
+                    "Выбор изменений сброшен: отметь нужную строку отдельно. " +
+                    "Ни одна SQL-запись ещё не изменена.";
+                dialog.DialogResult = true;
+            }
+            catch (Exception error)
+            {
+                MessageBox.Show(dialog, error.Message, "Соответствие отклонено",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        dialog.ShowDialog();
+    }
+
+    private void ChooseSafe(bool selected)
+    {
+        if (Plan is null) return;
+        foreach (var row in Plan.Differences)
+            row.Apply = selected && row.SafeForBulk;
+        _grid.Items.Refresh();
+    }
+
+    private void Confirm(object sender, RoutedEventArgs e)
+    {
+        if (Plan is null) return;
+        _grid.CommitEdit(DataGridEditingUnit.Row, true);
+        try
+        {
+            var selected = Plan.Selected();
+            if (selected.Any(x => !x.SafeToApply)) throw new InvalidOperationException("Есть неразрешённый конфликт.");
+            var confirmed = MessageBox.Show(this,
+                "Применить " + selected.Count + " изменений в существующее КП?\n" +
+                "Цены и примечания существующих строк не изменятся. " +
+                "Удаление отсутствующих в Excel позиций не выполняется.",
+                "Подтверждение Excel", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmed == MessageBoxResult.Yes) DialogResult = true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Нельзя применить", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+}

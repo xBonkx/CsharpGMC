@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.7" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Логотипы по умолчанию: те же файлы, что в Python-версии (нужны и миграции, и выгрузкам). -->
+    <EmbeddedResource Include="Assets\logo_konsol.jpg" LogicalName="GmcSmeta.Core.Assets.logo_konsol.jpg" />
+    <EmbeddedResource Include="Assets\logo_gmc.png" LogicalName="GmcSmeta.Core.Assets.logo_gmc.png" />
+  </ItemGroup>
+
+</Project>

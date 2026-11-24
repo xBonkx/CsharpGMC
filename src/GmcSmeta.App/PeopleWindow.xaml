@@ -1,0 +1,150 @@
+<Window x:Class="GmcSmeta.App.PeopleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:GmcSmeta.App"
+        Title="Люди и автомобили" Width="1200" Height="760" MinWidth="840" MinHeight="550"
+        FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" WindowStartupLocation="CenterOwner"
+        Background="#F4F6FA" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <DockPanel Margin="22,16,22,14" LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <DockPanel Margin="0,0,0,8">
+                <Button DockPanel.Dock="Right" Content="Загрузить из Excel…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Import_Click"
+                        Padding="16,8" Margin="12,0,0,0" VerticalAlignment="Top"/>
+                <StackPanel>
+                    <TextBlock x:Name="TitleText" Text="Люди и автомобили"
+                               FontSize="24" FontWeight="SemiBold" Foreground="#1F2937"/>
+                    <TextBlock x:Name="SubtitleText" Text="Общая база сотрудников и автомобилей"
+                               Foreground="#64748B" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+            </DockPanel>
+            <StackPanel x:Name="HistoryPanel" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,7">
+                <TextBlock Text="Галочки как в списке:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#64748B"/>
+                <ComboBox x:Name="HistoryBox" MinWidth="420" Width="475" DisplayMemberPath="Label"
+                          SelectionChanged="History_Changed"/>
+                <Button Content="Открыть файл" Click="OpenHistory_Click" Padding="10,6" Margin="8,0,0,0"/>
+            </StackPanel>
+            <WrapPanel Margin="0,4,0,0">
+                <TextBox x:Name="SearchBox" Width="390" Padding="9,7" TextChanged="Search_Changed"
+                         ToolTip="Поиск по ФИО, должности, номеру машины"/>
+                <CheckBox x:Name="ShowInactive" Content="Показать тех, кто уже не работает"
+                          Margin="20,0,0,0" VerticalAlignment="Center"
+                          Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+            </WrapPanel>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <Grid x:Name="AccessOptions" Visibility="Collapsed" Margin="0,2,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="От организации:" VerticalAlignment="Top" Margin="0,8,8,0"/>
+                <ComboBox Grid.Column="1" x:Name="CompanyBox" DisplayMemberPath="Name"
+                          Margin="0,0,18,0" Height="32"/>
+                <TextBlock Grid.Column="2" Text="Текст письма:" VerticalAlignment="Top" Margin="0,8,8,0"/>
+                <TextBox Grid.Column="3" x:Name="IntroBox" Height="56" Padding="6" AcceptsReturn="True"
+                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            </Grid>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="OrdersButton" Visibility="Collapsed" Content="Приказы…"
+                            Click="Orders_Click" Padding="12,7" Margin="0,0,8,0"/>
+                    <Button x:Name="ExportButton" Visibility="Collapsed" Content="Сформировать список (Excel)" ContentTemplate="{StaticResource IconLabelDownload}"
+                            Click="Export_Click" Background="#F97316" Foreground="White"
+                            BorderBrush="#F97316" FontWeight="SemiBold" Padding="14,7" Margin="0,0,8,0"/>
+                    <Button Content="Закрыть" Click="Close_Click" Padding="14,7"/>
+                </StackPanel>
+                <TextBlock x:Name="HintText" TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="#64748B" FontSize="12"
+                           Text="Выберите строку для редактирования; все изменения сохраняются в SQL Server."/>
+            </DockPanel>
+        </StackPanel>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3*"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DockPanel Grid.Row="0">
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6" VerticalAlignment="Center">
+                    <TextBlock Text="ЛЮДИ" FontWeight="SemiBold" VerticalAlignment="Center"
+                               Foreground="#475569" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="PeopleCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <Button x:Name="PeopleAll" Visibility="Collapsed" Content="Отметить всех"
+                            Click="PeopleAll_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button x:Name="PeopleNone" Visibility="Collapsed" Content="Снять все"
+                            Click="PeopleNone_Click" Padding="8,4" Margin="0,0,8,0"/>
+                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" ToolTip="Выше" Click="PersonUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" ToolTip="Ниже" Click="PersonDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Добавить человека" ContentTemplate="{StaticResource IconLabelPlus}" Click="PersonAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Редактировать" Click="PersonEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button x:Name="PersonActiveButton" Content="Не работает / Снова работает"
+                            Click="PersonActive_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button x:Name="PersonDeleteButton" Content="Удалить…" Click="PersonDelete_Click"
+                            Padding="8,4"/>
+                </WrapPanel>
+                <DataGrid local:TableColumnMenu.Key="people" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="ФИО" x:Name="PeopleGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                          HeadersVisibility="Column" GridLinesVisibility="All"
+                          SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False" MinRowHeight="24"
+                          Background="White" CanUserReorderColumns="True"
+                          SelectionChanged="Selection_Changed"
+                          MouseDoubleClick="People_DoubleClick" ContextMenuOpening="People_ContextMenuOpening"
+                          PreviewKeyDown="People_PreviewKeyDown"
+                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
+                    <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn x:Name="PeopleSelectedColumn" Header="В списке"
+                            Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            Width="90"/>
+                        <DataGridTextColumn Header="ФИО" Binding="{Binding Fio}" Width="300" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <DataGridTextColumn Header="Должность" Binding="{Binding Post}" Width="210" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <DataGridTextColumn Header="Дата рождения" Binding="{Binding Birth}" Width="120" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="180" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <DataGridTextColumn Header="ФИО — кого" Binding="{Binding DisplayGenitive}" Width="280" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <DataGridTextColumn Header="Должность — кого" Binding="{Binding DisplayPostGenitive}"
+                                            Width="180" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+            <GridSplitter Grid.Row="1" Height="8" HorizontalAlignment="Stretch"
+                          VerticalAlignment="Center" Background="#E2E8F0"
+                          ResizeDirection="Rows"/>
+            <DockPanel Grid.Row="2" Margin="0,6,0,0">
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <TextBlock Text="АВТОМОБИЛИ" FontWeight="SemiBold" Foreground="#475569"
+                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="CarsCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <Button x:Name="CarsAll" Visibility="Collapsed" Content="Отметить все"
+                            Click="CarsAll_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button x:Name="CarsNone" Visibility="Collapsed" Content="Снять все"
+                            Click="CarsNone_Click" Padding="8,4" Margin="0,0,8,0"/>
+                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" ToolTip="Выше" Click="CarUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" ToolTip="Ниже" Click="CarDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Добавить автомобиль" ContentTemplate="{StaticResource IconLabelPlus}" Click="CarAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Редактировать" Click="CarEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Не работает / Снова работает" Click="CarActive_Click"
+                            Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Удалить…" Click="CarDelete_Click" Padding="8,4"/>
+                </WrapPanel>
+                <DataGrid local:TableColumnMenu.Key="cars" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="Марка|Госномер" x:Name="CarsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                          HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
+                          GridLinesVisibility="All" MinRowHeight="24" Background="White"
+                          MouseDoubleClick="Cars_DoubleClick" ContextMenuOpening="Cars_ContextMenuOpening"
+                          PreviewKeyDown="Cars_PreviewKeyDown"
+                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
+                    <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn x:Name="CarsSelectedColumn" Header="В списке"
+                             Width="90" Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <DataGridTextColumn Header="Марка" Binding="{Binding Model}" Width="300" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <DataGridTextColumn Header="Госномер" Binding="{Binding Plate}" Width="160" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>
