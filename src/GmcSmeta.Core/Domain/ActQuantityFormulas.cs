@@ -15,30 +15,58 @@ public static class ActQuantityFormulas
     private static readonly Regex Visible = new("[КK](\\d+(?:[.,]\\d+)*)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex Stored = new("@(\\d+)", RegexOptions.Compiled);
 
-    /// <summary>Заменить видимые номера К2 на стабильные id перед сохранением (act_qty.bind).</summary>
-    public static string Bind(string text, IReadOnlyDictionary<long, int> numbers)
+    private static string NormalizeNumber(string value) => value.Replace(',', '.');
+    private static Dictionary<long,string> AsStrings(IReadOnlyDictionary<long,int> numbers) =>
+        numbers.ToDictionary(p=>p.Key,p=>p.Value.ToString(CultureInfo.InvariantCulture));
+
+    public static string Bind(string text, IReadOnlyDictionary<long,int> numbers) => Bind(text,AsStrings(numbers));
+    public static string Bind(string text, IReadOnlyDictionary<long,string> numbers)
     {
-        var byNumber = numbers.GroupBy(p => p.Value).ToDictionary(g => g.Key, g => g.Select(p => p.Key).ToList());
-        return Visible.Replace(text, match =>
+        var byNumber = numbers.GroupBy(p=>NormalizeNumber(p.Value),StringComparer.Ordinal)
+            .ToDictionary(g=>g.Key,g=>g.Select(p=>p.Key).ToList(),StringComparer.Ordinal);
+        return Visible.Replace(text,match=>
         {
-            var numberText = match.Groups[1].Value.Replace(',', '.');
-            if (!int.TryParse(numberText, NumberStyles.Any, CultureInfo.InvariantCulture, out var number))
+            var number=NormalizeNumber(match.Groups[1].Value);
+            if(!byNumber.TryGetValue(number,out var ids))
                 throw new InvalidOperationException($"Позиция не найдена: {match.Value}");
-            if (!byNumber.TryGetValue(number, out var ids))
-                throw new InvalidOperationException($"Позиция не найдена: {match.Value}");
-            if (ids.Count != 1)
+            if(ids.Count!=1)
                 throw new InvalidOperationException($"Номер неоднозначен: {match.Value}. Скопируйте ссылку через ПКМ по позиции.");
-            return "@" + ids[0];
+            return "@"+ids[0].ToString(CultureInfo.InvariantCulture);
         });
     }
 
-    /// <summary>Вернуть видимые номера для показа (act_qty.display).</summary>
-    public static string Display(string formula, IReadOnlyDictionary<long, int> numbers) =>
-        Stored.Replace(formula, m =>
+    public static string Display(string formula,IReadOnlyDictionary<long,int> numbers) => Display(formula,AsStrings(numbers));
+    public static string Display(string formula,IReadOnlyDictionary<long,string> numbers) =>
+        Stored.Replace(formula,m=>long.TryParse(m.Groups[1].Value,NumberStyles.None,CultureInfo.InvariantCulture,out var id)
+            && numbers.TryGetValue(id,out var number) ? "К"+number : m.Value);
+
+    private static readonly Regex EditingReference=new(@"[КK](\d+(?:[.,]\d+)*)|@(\d+)",RegexOptions.IgnoreCase|RegexOptions.Compiled);
+
+    /// <summary>Python 0.67.9: unique valid references in typing order, including incomplete formulas.</summary>
+    public static IReadOnlyList<long> EditingReferences(string? text,IReadOnlyDictionary<long,string> numbers)
+    {
+        var result=new List<long>();
+        if(text is null||!text.TrimStart().StartsWith('=')) return result;
+        var byNumber=numbers.GroupBy(p=>NormalizeNumber(p.Value),StringComparer.Ordinal)
+            .ToDictionary(g=>g.Key,g=>g.Select(p=>p.Key).ToList(),StringComparer.Ordinal);
+        var seen=new HashSet<long>();
+        foreach(Match match in EditingReference.Matches(text))
         {
-            var id = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-            return numbers.TryGetValue(id, out var number) ? "К" + number : m.Value;
-        });
+            long id;
+            if(match.Groups[2].Success)
+            {
+                if(!long.TryParse(match.Groups[2].Value,NumberStyles.None,CultureInfo.InvariantCulture,out id)
+                    ||!numbers.ContainsKey(id)) continue;
+            }
+            else
+            {
+                if(!byNumber.TryGetValue(NormalizeNumber(match.Groups[1].Value),out var ids)||ids.Count!=1) continue;
+                id=ids[0];
+            }
+            if(seen.Add(id)) result.Add(id);
+        }
+        return result;
+    }
 
     /// <summary>
     /// Перепривязать стабильные id позиций (@123) после восстановления из корзины со

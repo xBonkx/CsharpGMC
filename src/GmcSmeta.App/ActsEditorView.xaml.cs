@@ -30,6 +30,7 @@ public sealed class KsRowVm : INotifyPropertyChanged
     private string _issued = "";
     private string _price = "";
     private string _amount = "";
+    private Brush? _referenceBrush;
     private bool _inAct;
     private bool _warn;
     private bool _overLeft;
@@ -67,6 +68,18 @@ public sealed class KsRowVm : INotifyPropertyChanged
     public decimal RestRaw { get => _restRaw; set { _restRaw = value; Raise(); } }
     /// <summary>Остаток после акта — «Больше, чем по смете!» при минусе.</summary>
     public decimal LeftRaw { get => _leftRaw; set { _leftRaw = value; Raise(nameof(LeftRaw), nameof(LeftCellFore)); } }
+
+    public Brush? ReferenceBrush
+    {
+        get => _referenceBrush;
+        set
+        {
+            if (ReferenceEquals(_referenceBrush,value)) return;
+            _referenceBrush=value;
+            Raise(nameof(ReferenceBrush),nameof(HasReference));
+        }
+    }
+    public bool HasReference => ReferenceBrush is not null;
 
     public string RowBack { get; init; } = "#FFFFFF";
     public string NowCellBack { get; init; } = "#DCE8FF";
@@ -150,6 +163,7 @@ public partial class ActsEditorView : UserControl
     {
         InitializeComponent();
         ApplyTilesVisibility();
+        Unloaded += (_,_) => DetachQuantityEditor();
     }
 
     /// <summary>Bind the same editor to a document, whether hosted inline or in a legacy window.</summary>
@@ -445,8 +459,8 @@ public partial class ActsEditorView : UserControl
         _sharedExtraIds.Clear();
         _details = null;
         _totals = null;
+        DetachQuantityEditor();
         _rows = null;
-        _qtyEditor = null;
         _moveAfter = 0;
         ActGrid.ItemsSource = null;
         EditorRoot.Visibility = Visibility.Collapsed;
@@ -471,6 +485,7 @@ public partial class ActsEditorView : UserControl
 
     private void BuildGrid()
     {
+        DetachQuantityEditor();
         var items = new ObservableCollection<KsRowVm>();
         var sheet = _sheet;
         if (sheet is not null)
@@ -539,7 +554,7 @@ public partial class ActsEditorView : UserControl
             tooltip += "\nКод работ: " + p.WorkCode;
         }
         var now = p.LineQty;
-        var displayed = ActQuantityFormulas.Display(p.LineFormula ?? "", RefNumbersInt());
+        var displayed = ActQuantityFormulas.Display(p.LineFormula ?? "", RefNumbers());
         var left = p.OutOfKp ? 0m : p.QtyByKp - p.ClosedByOthers - now;
         var inAct = p.LineId is not null;
         var warn = p.TrackIssues && p.ClosedByOthers + now - p.Issued > 0.000001m;
@@ -572,16 +587,9 @@ public partial class ActsEditorView : UserControl
         };
     }
 
-    /// <summary>Ссылки «КN» для формул: только однозначные числовые номера.</summary>
-    private Dictionary<long, int> RefNumbersInt()
-    {
-        var map = new Dictionary<long, int>();
-        if (_sheet is null) return map;
-        foreach (var (pid, num) in _sheet.RefDisplay)
-            if (int.TryParse(num, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n))
-                map[pid] = n;
-        return map;
-    }
+    /// <summary>Стабильные ID, в том числе составные номера вида 15.1.</summary>
+    private Dictionary<long,string> RefNumbers() =>
+        _sheet?.RefDisplay.ToDictionary(p=>p.Key,p=>p.Value) ?? new();
 
     private void FilterRows()
     {
@@ -731,12 +739,48 @@ public partial class ActsEditorView : UserControl
     private void ActGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
         if (e.EditingElement is not TextBox editor) return;
+        DetachQuantityEditor();
         _qtyEditor = editor;
-        editor.Text = ((KsRowVm)e.Row.Item).NowRaw;
+        var raw = ((KsRowVm)e.Row.Item).NowRaw;
+        var map = RefNumbers();
+        editor.Text = !raw.StartsWith('=') &&
+            ActQuantityFormulas.EditingReferences("="+raw,map).Count>0 ? "="+raw : raw;
+        editor.TextChanged += QuantityEditor_TextChanged;
+        editor.Unloaded += QuantityEditor_Unloaded;
+        UpdateQuantityReferences();
         editor.SelectAll();
         editor.ToolTip = "Начните с = и щёлкайте по ячейкам «В этом акте». Enter — сохранить, Esc — отменить.";
         editor.KeyDown -= QtyEditor_KeyDown;
         editor.KeyDown += QtyEditor_KeyDown;
+    }
+
+    private static readonly Brush[] ReferenceColors = new[]{"#2563EB","#DC2626","#16803C","#9333EA","#C2410C","#087F8C","#A21CAF","#946200"}
+        .Select(hex=>{ var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); brush.Freeze(); return (Brush)brush; }).ToArray();
+
+    private void QuantityEditor_TextChanged(object sender, TextChangedEventArgs e) => UpdateQuantityReferences();
+    private void QuantityEditor_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (ReferenceEquals(sender,_qtyEditor)) DetachQuantityEditor();
+    }
+    private void UpdateQuantityReferences()
+    {
+        if (_rows is null) return;
+        var refs=ActQuantityFormulas.EditingReferences(_qtyEditor?.Text,RefNumbers())
+            .Select((id,index)=>(id,brush:ReferenceColors[index%ReferenceColors.Length]))
+            .ToDictionary(x=>x.id,x=>x.brush);
+        foreach(var row in _rows)
+            row.ReferenceBrush=!row.IsSection&&refs.TryGetValue(row.PositionId,out var brush)?brush:null;
+    }
+    private void DetachQuantityEditor()
+    {
+        if(_qtyEditor is { } editor)
+        {
+            editor.KeyDown-=QtyEditor_KeyDown;
+            editor.TextChanged-=QuantityEditor_TextChanged;
+            editor.Unloaded-=QuantityEditor_Unloaded;
+            _qtyEditor=null;
+        }
+        if(_rows is not null) foreach(var row in _rows) row.ReferenceBrush=null;
     }
 
     private void QtyEditor_KeyDown(object sender, KeyEventArgs e)
@@ -751,22 +795,22 @@ public partial class ActsEditorView : UserControl
 
     private async void ActGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
     {
-        if (e.EditAction != DataGridEditAction.Commit || _building || _inSave) return;
+        if (e.EditAction == DataGridEditAction.Cancel)
+        {
+            DetachQuantityEditor();
+            _moveAfter=0;
+            return;
+        }
+        if (_building || _inSave) return;
         if (e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
             || e.EditingElement is not TextBox editor) return;
         if (_signed || _contractLocked) return;
-        if (_qtyEditor == editor)
-        {
-            editor.KeyDown -= QtyEditor_KeyDown;
-            _qtyEditor = null;
-        }
-
         var step = _moveAfter;
         _moveAfter = 0;
         GmcSmeta.Core.Domain.ActQuantityInput.Parsed input;
         try
         {
-            input = ActQuantityInput.Parse(editor.Text, RefNumbersInt());
+            input = ActQuantityInput.Parse(editor.Text, RefNumbers());
         }
         catch (Exception ex)
         {
@@ -774,6 +818,7 @@ public partial class ActsEditorView : UserControl
             e.Cancel = true;
             return;
         }
+        DetachQuantityEditor();
         await SaveQtyAsync(row.PositionId, input.Quantity, input.Formula, step,
             positionName: row.Name);
     }
@@ -871,7 +916,7 @@ public partial class ActsEditorView : UserControl
                 var p = byPosition.GetValueOrDefault(vm.PositionId);
                 if (p is null)
                     continue;
-                var displayed = ActQuantityFormulas.Display(p.LineFormula ?? "", RefNumbersInt());
+                var displayed = ActQuantityFormulas.Display(p.LineFormula ?? "", RefNumbers());
                 var left = p.OutOfKp ? 0m : p.QtyByKp - p.ClosedByOthers - p.LineQty;
                 var inAct = p.LineId is not null;
                 var amount = inAct ? LineAmount(p.LineQty, p.LinePrice) : 0m;
@@ -1005,7 +1050,7 @@ public partial class ActsEditorView : UserControl
         menu.Items.Add(clear);
 
         // Python ks_view._row_menu: ссылки хранят ID позиций, а не номер строки.
-        var refs = RefNumbersInt();
+        var refs = RefNumbers();
         if (!hit.IsSection && refs.ContainsKey(hit.PositionId))
         {
             void AddCopy(string header, string value)

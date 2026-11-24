@@ -16,7 +16,10 @@ public static class ActQuantityInput
 
     private const decimal MaxNumber = 1_000_000_000_000m;
 
-    public static Parsed Parse(string? text, IReadOnlyDictionary<long, int> visibleNumbers)
+    public static Parsed Parse(string? text, IReadOnlyDictionary<long, int> visibleNumbers) =>
+        Parse(text,visibleNumbers.ToDictionary(p=>p.Key,p=>p.Value.ToString(CultureInfo.InvariantCulture)));
+
+    public static Parsed Parse(string? text, IReadOnlyDictionary<long, string> visibleNumbers)
     {
         var value = (text ?? "").Trim();
         if (value.Length == 0) return new Parsed(0m, "");

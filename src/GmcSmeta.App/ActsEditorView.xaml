@@ -30,6 +30,10 @@
                     <Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/>
                     <Setter Property="Foreground" Value="{Binding NowCellFore}"/>
                 </Trigger>
+                <DataTrigger Binding="{Binding HasReference}" Value="True">
+                    <Setter Property="BorderBrush" Value="{Binding ReferenceBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </DataTrigger>
                 <Trigger Property="IsEditing" Value="True">
                     <Setter Property="Background" Value="#FFFFFF"/>
                     <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>

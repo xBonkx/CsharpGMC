@@ -123,4 +123,15 @@ public sealed class ActQuantityFormulaTests
             Sources(41));
         Assert.Empty(result);
     }
+
+    [Fact]
+    public void EditingReferences_PartialDuplicateAmbiguousAndStable()
+    {
+        var numbers=new Dictionary<long,string>{[1]="12",[2]="15.1",[3]="99",[4]="99"};
+        Assert.Equal(new long[]{1,2,4},ActQuantityFormulas.EditingReferences("=K12+К15,1+@1+@4+К99+",numbers));
+        Assert.Empty(ActQuantityFormulas.EditingReferences("=К999+@999+К",numbers));
+        Assert.Empty(ActQuantityFormulas.EditingReferences("К12",numbers));
+        Assert.Equal("@2",ActQuantityInput.Parse("=К15,1",numbers).Formula);
+        Assert.Equal("К15.1",ActQuantityFormulas.Display("@2",numbers));
+    }
 }
