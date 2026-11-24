@@ -37,7 +37,11 @@ try
         guard.Parameters.AddWithValue("@name","GMC-Smeta-schema-release:"+name);
         if (Convert.ToInt32(guard.ExecuteScalar()) < 0) throw new InvalidOperationException("Another migration rehearsal is active.");
     }
-    var before = Counts(source);
+    CheckIdle(admin,name,source.ServerProcessId);
+    Console.WriteLine("Fingerprint original tables and values…");
+    var original = MigrationFingerprint.Describe(source);
+    var before = MigrationFingerprint.Read(source,original);
+    CheckIdle(admin,name,source.ServerProcessId);
     using var paths = new SqlCommand("SELECT CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultBackupPath')),CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultDataPath')),CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultLogPath'))",admin);
     string backupDir,dataDir,logDir;
     using (var r=paths.ExecuteReader())
@@ -68,15 +72,21 @@ try
     using var copy=Open(copyName);
     if (copy.Database!=copyName || Identity(copy)!=Identity(source)) throw new InvalidOperationException("Restore identity mismatch.");
     Verify(copy,version);
-    Compare(before,Counts(copy));
+    MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(copy,original),"backup restore");
+    CheckIdle(admin,copyName,copy.ServerProcessId);
     using var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream(script)
         ?? throw new InvalidOperationException("Migration resource missing.");
     using var reader=new StreamReader(stream);
     Exec(copy,reader.ReadToEnd());
     Verify(copy,target);
-    Compare(before,Counts(copy));
+    MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(copy,original),"migration");
+    VerifyNewDefaults(copy,version,target);
+    CheckIdle(admin,copyName,copy.ServerProcessId);
     Exec(admin,$"DBCC CHECKDB ({Id(copyName)}) WITH NO_INFOMSGS, ALL_ERRORMSGS");
-    Console.WriteLine($"TEST ONLY: {version} -> {target} verified. Source unchanged by DDL. Copy: {copyName}; backup: {backup}");
+    CheckIdle(admin,name,source.ServerProcessId);
+    Verify(source,version);
+    MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(source,original),"source unchanged");
+    Console.WriteLine($"TEST ONLY: {version} -> {target} verified. Original table contents and new defaults match. Copy: {copyName}; backup: {backup}");
     return 0;
 
     SqlConnection Open(string db)
@@ -129,15 +139,33 @@ static void Verify(SqlConnection c,int version)
             throw new InvalidOperationException("Unexpected NULL in "+table+"."+col);
     }
 }
-static Dictionary<string,long> Counts(SqlConnection c)
+static void CheckIdle(SqlConnection admin,string database,int ownSpid)
 {
-    var tables=new List<(string Schema,string Name)>();
-    using(var cmd=new SqlCommand("SELECT SCHEMA_NAME(schema_id),name FROM sys.tables WHERE is_ms_shipped=0 ORDER BY 1,2",c))
-    using(var r=cmd.ExecuteReader()) while(r.Read()) tables.Add((r.GetString(0),r.GetString(1)));
-    return tables.ToDictionary(t=>Id(t.Schema)+"."+Id(t.Name),t=>Convert.ToInt64(Scalar(c,$"SELECT COUNT_BIG(*) FROM {Id(t.Schema)}.{Id(t.Name)}")));
+    using var cmd=new SqlCommand("""
+        SELECT COUNT_BIG(*) FROM sys.dm_exec_sessions
+        WHERE is_user_process=1 AND database_id=DB_ID(@db) AND session_id<>@self
+        """,admin);
+    cmd.Parameters.Add("@db",SqlDbType.NVarChar,128).Value=database;
+    cmd.Parameters.Add("@self",SqlDbType.Int).Value=ownSpid;
+    if(Convert.ToInt64(cmd.ExecuteScalar())!=0)
+        throw new InvalidOperationException("Active sessions in "+database+". Close clients and retry; no sessions were killed.");
 }
-static void Compare(Dictionary<string,long> a,Dictionary<string,long> b)
+static void VerifyNewDefaults(SqlConnection c,int from,int to)
 {
-    if(a.Count!=b.Count||a.Any(p=>!b.TryGetValue(p.Key,out var n)||n!=p.Value))
-        throw new InvalidOperationException("Row counts differ; migration not accepted.");
+    void Check(string table,string column,string expected)
+    {
+        if(Convert.ToInt64(Scalar(c,$"SELECT COUNT_BIG(*) FROM dbo.{Id(table)} WHERE {Id(column)} IS NULL OR {Id(column)}<>{expected}"))!=0)
+            throw new InvalidOperationException("Unexpected migrated default: "+table+"."+column);
+    }
+    if(from<29&&to>=29)
+    {
+        Check("contracts","discount_percent","0");
+        Check("acts","discount_percent","0");
+    }
+    if(from<30&&to>=30) Check("acts","section_amounts_json","N''");
+    if(from<31&&to>=31)
+    {
+        Check("acts","discount_override","0");
+        Check("acts","manual_total_cents","-1");
+    }
 }
