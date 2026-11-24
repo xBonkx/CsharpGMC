@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using GmcSmeta.Launcher;
 using GmcSmeta.Core;
 
@@ -8,33 +7,32 @@ StartupTrace.Mark("launcher_start");
 // Скачивает готовую WPF-сборку из GitHub Releases и запускает её.
 // Если релиза нет или GitHub недоступен — собирает локальный git-клон (запасной путь).
 var options = LaunchOptions.Parse(args);
-// The updater is launched without a console; skip console setup and all output.
-if (!options.BackgroundUpdate)
-{
-    Console.OutputEncoding = Encoding.UTF8;
-    Console.Title = "ГМЦ-Смета — обновление и запуск";
-}
-var ui = new ConsoleUi(options.BackgroundUpdate);
+using var ui = new ConsoleUi(options.BackgroundUpdate, options.Check || options.Help);
 
 try
 {
     if (options.Help)
     {
-        LaunchOptions.PrintHelp();
+        ui.Show();
+        LaunchOptions.PrintHelp(ui);
+        ui.Done("Справка по запуску");
+        ui.WaitForClose();
         return;
     }
 
     var paths = AppPaths.Create();
-    LauncherSelfUpdate.CleanupOld();
     var installed = InstalledApp.Load(paths);
     StartupTrace.Mark("launcher_installed_state_read");
 
     if (options.Check)
     {
-        Console.WriteLine("Запускающий EXE:      " + AppVersion.CurrentLauncher());
-        Console.WriteLine("Установленная версия: " + (installed is null ? "нет" : installed.Version + " (" + installed.Flavor + ")"));
-        Console.WriteLine("Сборка для этого ПК:  " + (RuntimeProbe.HasDesktopRuntime10() ? "fx — .NET 10 Desktop найден" : "sc — автономная"));
-        Console.WriteLine("Каталог установки:    " + paths.Apps);
+        ui.Show();
+        ui.Info("Запускающий EXE: " + AppVersion.CurrentLauncher());
+        ui.Info("Установленная версия: " + (installed is null ? "нет" : installed.Version + " (" + installed.Flavor + ")"));
+        ui.Info("Сборка для этого ПК: " + (RuntimeProbe.HasDesktopRuntime10() ? "fx — .NET 10 Desktop найден" : "sc — автономная"));
+        ui.Info("Каталог установки: " + paths.Apps);
+        ui.Done("Сведения об установке");
+        ui.WaitForClose();
         return;
     }
 
@@ -72,6 +70,9 @@ try
         return;
     }
 
+    ui.Show();
+    ui.Versions(installed?.Version ?? "Не установлена", "Проверяется…");
+
     // Install/state files must never be modified by two launcher instances at once.
     using var updateLock = LauncherUpdateLock.TryAcquire();
     if (updateLock is null)
@@ -80,6 +81,7 @@ try
         throw new InvalidOperationException("Обновление уже выполняется. Повторите --update-only позже.");
     }
 
+    LauncherSelfUpdate.CleanupOld();
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
     if (string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
 
@@ -105,8 +107,10 @@ try
     if (options.UpdateOnly && release is null && updateError is not null)
         throw new InvalidOperationException("Не удалось проверить обновления: " + updateError);
 
+    ui.Token.ThrowIfCancellationRequested();
     if (release is not null)
     {
+        ui.Versions(installed?.Version ?? "Не установлена", release.Version);
         var installer = new AppInstaller(releases, paths, ui);
         var preferredAsset = AppInstaller.AssetNameFor(installer.PreferredFlavor);
         var flavorMismatch = release.Assets.Any(a =>
@@ -114,8 +118,8 @@ try
             installed is not null &&
             !string.Equals(installed.Flavor, installer.PreferredFlavor, StringComparison.OrdinalIgnoreCase);
         if (installed is null ||
-            !string.Equals(installed.Version, release.Version, StringComparison.OrdinalIgnoreCase) ||
-            flavorMismatch ||
+            AppVersion.IsOlder(installed.Version, release.Version) ||
+            (flavorMismatch && !AppVersion.IsOlder(release.Version, installed.Version)) ||
             !File.Exists(installed.Exe))
         {
             ui.Step($"2/3  Устанавливаю версию {release.Version}…");
@@ -126,9 +130,10 @@ try
         }
         else
         {
-            ui.Step($"2/3  Установлена последняя версия {release.Version}.");
+            ui.Step($"2/3  Обновление не требуется: установлена версия {installed.Version}.");
         }
 
+        ui.BeginCommit("Завершаю обновление…");
         StartupTrace.Mark("launcher_self_update_begin");
         LauncherSelfUpdate.TryUpdate(releases, release, paths, ui);
         StartupTrace.Mark("launcher_self_update_end");
@@ -143,15 +148,15 @@ try
     {
         if (options.UpdateOnly)
         {
-            ui.Done($"Готово — установлена версия {installed.Version}. Запуск пропущен (--update-only).");
+            ui.Done($"Установлена версия {installed.Version}. Программа не перезапускалась.");
+            ui.WaitForClose();
             return;
         }
         ui.Step("3/3  Запускаю программу…");
         StartupTrace.Mark("launcher_app_launch_begin");
         installed.Launch();
         StartupTrace.Mark("launcher_app_launch_returned");
-        Console.WriteLine();
-        ui.Done($"Готово — версия {installed.Version} запущена. Это окно можно закрыть.");
+        ui.Done($"Версия {installed.Version} запущена.");
         Thread.Sleep(1200);
         return;
     }
@@ -171,13 +176,17 @@ catch (Exception ex)
         Environment.ExitCode = 1;
         return;
     }
-    ui.Error("");
-    ui.Error("Не удалось: " + ex.Message);
-    Console.WriteLine();
-    Console.Write("Нажмите любую клавишу, чтобы закрыть окно… ");
-    try { Console.ReadKey(intercept: true); }
-    catch (InvalidOperationException) { Thread.Sleep(5000); }   // ввод перенаправлен — просто подождать
-    Environment.Exit(1);
+    if (ex is OperationCanceledException && ui.Token.IsCancellationRequested)
+    {
+        ui.FinishCancelled();
+        ui.WaitForClose();
+        Environment.ExitCode = 2;
+        return;
+    }
+    ui.Show();
+    ui.Error(ex.Message);
+    ui.WaitForClose();
+    Environment.ExitCode = 1;
 }
 return;
 
@@ -188,10 +197,11 @@ void RunDevBuild()
         throw new InvalidOperationException(
             "Не найден ни релиз на GitHub, ни локальный репозиторий с GmcSmeta.slnx. " +
             "Проверьте интернет и токен GitHub либо запустите EXE из папки репозитория.");
-    ui.Info("Токен и GitHub не используются: сборка из " + repo);
+    ui.Show();
+    ui.BeginCommit("Подготовка локальной сборки…");
+    ui.Info("Локальная сборка из " + repo);
     DevBuild.Run(ui, repo);
-    Console.WriteLine();
-    ui.Done("Готово — программа запущена из локальной сборки. Это окно можно закрыть.");
+    ui.Done("Программа запущена из локальной сборки.");
     Thread.Sleep(1200);
 }
 
@@ -266,25 +276,25 @@ internal sealed class LaunchOptions
         return new LaunchOptions { NoUpdate = noUpdate, Dev = dev, Check = check, Help = help, UpdateOnly = updateOnly, BackgroundUpdate = backgroundUpdate };
     }
 
-    public static void PrintHelp()
+    public static void PrintHelp(ConsoleUi ui)
     {
-        Console.WriteLine("ГМЦ-Смета — обновление и запуск");
-        Console.WriteLine();
-        Console.WriteLine("Без параметров: сразу запускает установленную версию, а обновление готовит в фоне.");
-        Console.WriteLine("Если программа не установлена, скачивает релиз GitHub Releases.");
-        Console.WriteLine();
-        Console.WriteLine("  --check       показать версии и ничего не запускать");
-        Console.WriteLine("  --no-update   запустить уже установленную версию без обращения к GitHub");
-        Console.WriteLine("  --update-only скачать/обновить версию и не запускать программу");
-        Console.WriteLine("  --dev         собрать локальный git-клон через .NET SDK вместо релиза");
-        Console.WriteLine("  --help        эта справка");
-        Console.WriteLine();
-        Console.WriteLine("Переменные среды:");
-        Console.WriteLine("  GMC_SMETA_RELEASES=owner/repo  источник релизов (по умолчанию xBonkx/CsharpGMC)");
-        Console.WriteLine("  GMC_SMETA_TOKEN=...            токен GitHub для закрытого репозитория");
-        Console.WriteLine("  GMC_SMETA_NO_UPDATE=1          не проверять обновления");
-        Console.WriteLine("  GMC_SMETA_NO_SELF_UPDATE=1     не обновлять сам запускающий EXE");
-        Console.WriteLine("  GMC_SMETA_STARTUP_TRACE_DIR=...  каталог CSV замеров запуска (необязательно)");
+        ui.Info("ГМЦ-Смета — обновление и запуск");
+        ui.Info("");
+        ui.Info("Без параметров: сразу запускает установленную версию, а обновление готовит в фоне.");
+        ui.Info("Если программа не установлена, скачивает релиз GitHub Releases.");
+        ui.Info("");
+        ui.Info("  --check       показать версии и ничего не запускать");
+        ui.Info("  --no-update   запустить уже установленную версию без обращения к GitHub");
+        ui.Info("  --update-only скачать/обновить версию и не запускать программу");
+        ui.Info("  --dev         собрать локальный git-клон через .NET SDK вместо релиза");
+        ui.Info("  --help        эта справка");
+        ui.Info("");
+        ui.Info("Переменные среды:");
+        ui.Info("  GMC_SMETA_RELEASES=owner/repo  источник релизов (по умолчанию xBonkx/CsharpGMC)");
+        ui.Info("  GMC_SMETA_TOKEN=...            токен GitHub для закрытого репозитория");
+        ui.Info("  GMC_SMETA_NO_UPDATE=1          не проверять обновления");
+        ui.Info("  GMC_SMETA_NO_SELF_UPDATE=1     не обновлять сам запускающий EXE");
+        ui.Info("  GMC_SMETA_STARTUP_TRACE_DIR=...  каталог CSV замеров запуска (необязательно)");
     }
 }
 

@@ -68,7 +68,7 @@ echo ============================================================
 echo Application:
 echo   src\GmcSmeta.App\bin\Release\net10.0-windows\GMC-Smeta-Next.exe
 echo Launcher build:
-echo   tools\launcher\GmcSmeta.Launcher\bin\Release\net10.0\GmcSmeta.Launcher.exe
+echo   tools\launcher\GmcSmeta.Launcher\bin\Release\net10.0-windows\GmcSmeta.Launcher.exe
 echo.
 echo Optional:
 echo   BUILD_GMC_SMETA.bat test      - build and run Core tests

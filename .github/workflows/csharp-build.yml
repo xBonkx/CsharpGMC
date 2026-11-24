@@ -48,7 +48,7 @@ jobs:
         run: dotnet test tests/GmcSmeta.Core.Tests/GmcSmeta.Core.Tests.csproj --configuration Release --no-build --nologo
 
       - name: Publish single-file Windows desktop launcher
-        run: dotnet publish tools/launcher/GmcSmeta.Launcher/GmcSmeta.Launcher.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -o "$env:RUNNER_TEMP\gmc-launcher" --nologo
+        run: dotnet publish tools/launcher/GmcSmeta.Launcher/GmcSmeta.Launcher.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "$env:RUNNER_TEMP\gmc-launcher" --nologo
 
       - name: Upload downloadable desktop launcher
         uses: actions/upload-artifact@v4

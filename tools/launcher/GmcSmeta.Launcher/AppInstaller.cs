@@ -59,7 +59,16 @@ internal sealed class InstalledApp
             "sha256=" + (Sha256 ?? ""),
             "installedUtc=" + InstalledUtc,
         };
-        File.WriteAllLines(paths.StateFile, lines);
+        var temporary = paths.StateFile + ".tmp";
+        try
+        {
+            File.WriteAllLines(temporary, lines);
+            File.Move(temporary, paths.StateFile, overwrite: true);
+        }
+        finally
+        {
+            try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     public void Launch()
@@ -144,59 +153,49 @@ internal sealed class AppInstaller
 
         var checksums = _releases.TryGetChecksums(release);
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
+        if (!AppVersion.TryParse(release.Version, out _))
+            throw new InvalidOperationException("Некорректный номер версии релиза.");
+        if (string.IsNullOrWhiteSpace(expected))
+            throw new InvalidOperationException("В релизе отсутствует SHA-256 для архива программы.");
         var zip = Path.Combine(_paths.Downloads, asset.Name);
         if (File.Exists(zip)) File.Delete(zip);
 
-        _ui.Info($"Файл: {asset.Name}" + (asset.Size > 0 ? $", {asset.Size / 1048576.0:0.0} МБ" : ""));
-        var hash = _releases.Download(asset, zip, expected);
-
         var target = Path.Combine(_paths.Apps, $"{release.Version}-{flavor}");
+        // Never delete or overwrite an installation that may still be running.
+        if (Directory.Exists(target))
+            target += "-" + Guid.NewGuid().ToString("N")[..8];
         var staging = target + ".staging";
-        if (Directory.Exists(staging)) Directory.Delete(staging, true);
-        Directory.CreateDirectory(staging);
-
-        _ui.Info("Распаковываю…");
+        var moved = false;
+        var committed = false;
         try
         {
+            _ui.Info($"Файл: {asset.Name}" + (asset.Size > 0 ? $", {asset.Size / 1048576.0:0.0} МБ" : ""));
+            var hash = _releases.Download(asset, zip, expected);
+            _ui.BeginCommit("Проверка завершена. Распаковываю обновление…");
+            Directory.CreateDirectory(staging);
             ZipFile.ExtractToDirectory(zip, staging);
-        }
-        catch (InvalidDataException ex)
-        {
-            TryDeleteDirectory(staging);
-            throw new InvalidOperationException("архив повреждён: " + ex.Message);
-        }
+            if (!File.Exists(Path.Combine(staging, AppExeName)))
+                throw new InvalidOperationException($"В архиве нет {AppExeName}.");
 
-        var exe = Path.Combine(staging, AppExeName);
-        if (!File.Exists(exe))
-        {
-            TryDeleteDirectory(staging);
-            throw new InvalidOperationException($"в архиве нет {AppExeName}.");
-        }
-
-        if (Directory.Exists(target))
-        {
-            try { Directory.Delete(target, true); }
-            catch (IOException)
+            Directory.Move(staging, target);
+            moved = true;
+            var installed = new InstalledApp
             {
-                // Предыдущая версия ещё запущена — ставим рядом с суффиксом.
-                target = target + "-" + DateTime.UtcNow.ToString("HHmmss");
-            }
+                Version = release.Version, Flavor = flavor, Directory = target,
+                Exe = Path.Combine(target, AppExeName), Sha256 = hash,
+                InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            };
+            installed.Save(_paths);
+            committed = true;
+            PruneOldVersions(target, current?.Directory);
+            return installed;
         }
-        Directory.Move(staging, target);
-        try { File.Delete(zip); } catch (IOException) { }
-
-        var installed = new InstalledApp
+        finally
         {
-            Version = release.Version,
-            Flavor = flavor,
-            Directory = target,
-            Exe = Path.Combine(target, AppExeName),
-            Sha256 = hash,
-            InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        };
-        installed.Save(_paths);
-        PruneOldVersions(target, current?.Directory);
-        return installed;
+            TryDeleteDirectory(staging);
+            if (moved && !committed) TryDeleteDirectory(target);
+            try { File.Delete(zip); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     public static string AssetNameFor(string flavor) =>
@@ -216,11 +215,34 @@ internal sealed class AppInstaller
                     TryDeleteDirectory(directory);
                     continue;
                 }
-                TryDeleteDirectory(directory);
+                // Do not partially delete an older app that is still running.
+                if (!IsRunningVersion(directory)) TryDeleteDirectory(directory);
             }
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
+    }
+
+    private static bool IsRunningVersion(string directory)
+    {
+        var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(AppExeName));
+        try
+        {
+            foreach (var process in processes)
+            {
+                try
+                {
+                    var executable = process.MainModule?.FileName;
+                    if (string.IsNullOrWhiteSpace(executable)) return true;
+                    if (string.Equals(Path.GetDirectoryName(executable), directory, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch (InvalidOperationException) { /* Process exited. */ }
+                catch (System.ComponentModel.Win32Exception) { return true; }
+            }
+            return false;
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
     }
 
     private static void TryDeleteDirectory(string directory)
@@ -248,35 +270,43 @@ internal static class LauncherSelfUpdate
         if (!string.Equals(Path.GetExtension(self), ".exe", StringComparison.OrdinalIgnoreCase)) return;
         if (!AppVersion.IsOlder(AppVersion.CurrentLauncher(), release.Version)) return;
 
+        var download = Path.Combine(paths.Downloads, "GmcSmeta.Launcher.new.exe");
+        var staged = self + "." + Guid.NewGuid().ToString("N") + ".new";
         try
         {
             ui.Step($"Обновляю запускающий EXE до {release.Version}…");
             var checksums = releases.TryGetChecksums(release);
             var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
-            var download = Path.Combine(paths.Downloads, "GmcSmeta.Launcher.new.exe");
+            if (string.IsNullOrWhiteSpace(expected))
+                throw new InvalidOperationException("В релизе отсутствует SHA-256 для лаунчера.");
             if (File.Exists(download)) File.Delete(download);
             releases.Download(asset, download, expected);
 
+            // Copy the verified replacement completely on the same volume before
+            // touching the current executable. Roll back its name on failure.
+            File.Copy(download, staged);
             var backup = self + ".old";
-            try { if (File.Exists(backup)) File.Delete(backup); } catch (IOException) { }
+            if (File.Exists(backup)) File.Delete(backup);
             File.Move(self, backup);
-            try
-            {
-                File.Copy(download, self, overwrite: true);
-            }
+            try { File.Move(staged, self); }
             catch
             {
-                File.Move(backup, self);
+                if (!File.Exists(self)) File.Move(backup, self);
                 throw;
             }
             try { File.Delete(download); } catch (IOException) { }
             ui.Info("Запускающий EXE обновлён — новый файл вступит в силу сразу, повторно скачивать не нужно.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                       or System.Net.Http.HttpRequestException)
+                                       or System.Net.Http.HttpRequestException or OperationCanceledException)
         {
             ui.Warn("Не удалось обновить запускающий EXE: " + ex.Message);
             ui.Warn("Программа всё равно запустится; EXE можно обновить позже вручную.");
+        }
+        finally
+        {
+            try { File.Delete(download); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            try { File.Delete(staged); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
 

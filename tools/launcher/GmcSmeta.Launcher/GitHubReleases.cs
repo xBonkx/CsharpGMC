@@ -218,7 +218,7 @@ internal sealed class GitHubReleases
             error = Describe(ex);
             return null;
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException) when (!_ui.Token.IsCancellationRequested)
         {
             error = "истекло время ожидания ответа GitHub";
             return null;
@@ -238,12 +238,14 @@ internal sealed class GitHubReleases
         try
         {
             using var request = CreateRequest(HttpMethod.Get, asset.ApiUrl, "application/octet-stream");
-            using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_ui.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
-            using var reader = new StreamReader(response.Content.ReadAsStream(), Encoding.UTF8);
-            return reader.ReadToEnd();
+            using var reader = new StreamReader(response.Content.ReadAsStream(timeout.Token), Encoding.UTF8);
+            return reader.ReadToEndAsync(timeout.Token).GetAwaiter().GetResult();
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException || (ex is OperationCanceledException && !_ui.Token.IsCancellationRequested))
         {
             _ui.Warn("Не удалось получить контрольные суммы: " + ex.Message);
             return null;
@@ -271,7 +273,8 @@ internal sealed class GitHubReleases
     public string Download(ReleaseAsset asset, string destination, string? expectedSha256)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(60));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_ui.Token);
+        timeout.CancelAfter(TimeSpan.FromMinutes(60));
         using var request = CreateRequest(HttpMethod.Get, asset.ApiUrl, "application/octet-stream");
         using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (response.StatusCode == HttpStatusCode.NotFound)
@@ -289,7 +292,7 @@ internal sealed class GitHubReleases
         var started = Stopwatch.StartNew();
         while (true)
         {
-            var read = source.Read(buffer, 0, buffer.Length);
+            var read = source.ReadAsync(buffer.AsMemory(), timeout.Token).AsTask().GetAwaiter().GetResult();
             if (read <= 0) break;
             target.Write(buffer, 0, read);
             hash.AppendData(buffer, 0, read);
@@ -300,7 +303,9 @@ internal sealed class GitHubReleases
                 Report(done, total);
             }
         }
-        Console.WriteLine();
+        _ui.Token.ThrowIfCancellationRequested();
+        if (total > 0 && done != total)
+            throw new IOException("Размер скачанного файла не совпадает с ожидаемым.");
 
         var actual = Convert.ToHexString(hash.GetHashAndReset());
         if (!string.IsNullOrWhiteSpace(expectedSha256) &&
@@ -315,16 +320,7 @@ internal sealed class GitHubReleases
         return actual;
     }
 
-    private void Report(long done, long total)
-    {
-        var text = total > 0
-            ? $"{done / 1048576.0:0.0} / {total / 1048576.0:0.0} МБ ({done * 100 / total}%)"
-            : $"{done / 1048576.0:0.0} МБ";
-        var width = 0;
-        try { width = Console.BufferWidth; } catch (IOException) { }
-        if (width > 0 && text.Length + 2 > width) text = text[..Math.Max(0, width - 3)];
-        Console.Write("\r  " + text + "   ");
-    }
+    private void Report(long done, long total) => _ui.Progress(done, total);
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string url, string accept)
     {
@@ -338,7 +334,8 @@ internal sealed class GitHubReleases
 
     private JsonDocument GetJson(string url, TimeSpan timeout)
     {
-        using var cts = new CancellationTokenSource(timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(_ui.Token);
+        cts.CancelAfter(timeout);
         using var request = CreateRequest(HttpMethod.Get, url, "application/vnd.github+json");
         using var response = _http.Send(request, HttpCompletionOption.ResponseContentRead, cts.Token);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
