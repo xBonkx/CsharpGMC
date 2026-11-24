@@ -87,6 +87,8 @@ if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
     Fail "Версия должна быть вида 0.1.0 (тег $tag не подходит)."
 }
 
+# Always check the SQL contract before requesting credentials or building.
+$schemaVersion = & (Join-Path $PSScriptRoot 'sql-migrations/Test-ReleaseSchema.ps1') -RepositoryRoot $repoRoot
 $script:token = Get-GitHubToken
 if (-not $script:token) {
     Fail 'Не найден токен GitHub: задайте GMC_SMETA_TOKEN или сохраните учётные данные git для github.com.'
@@ -153,6 +155,7 @@ try {
     Compress-Archive -Path (Join-Path $work 'app-fx\*') -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64-fx.zip') -CompressionLevel Optimal
     Copy-Item (Join-Path $work 'launcher\GmcSmeta.Launcher.exe') (Join-Path $out 'GmcSmeta.Launcher.exe')
     Set-Content -Path (Join-Path $out 'version.txt') -Value $tag -Encoding utf8
+    Set-Content -Path (Join-Path $out 'sql-schema-version.txt') -Value $schemaVersion -Encoding utf8
     $sums = Get-ChildItem $out -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
         $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         "$hash  $($_.Name)"

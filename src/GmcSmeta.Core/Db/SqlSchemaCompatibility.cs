@@ -7,6 +7,9 @@ namespace GmcSmeta.Core.Db;
 /// </summary>
 public static class SqlSchemaCompatibility
 {
+    // Single authoritative version for ordinary writable SQL Server clients.
+    // Updating this requires an approved database migration and release gate.
+    public const int WritableSchemaVersion = 28;
     public const string PreviewDatabase = "GmcSmetaPilot_Test_Csharp";
     public const string WriteTestDatabase = "GmcSmetaPilot_Schema31WriteTest";
 
@@ -80,8 +83,8 @@ public static class SqlSchemaCompatibility
                     "Для предпросмотра нужна восстановленная база схемы 31 GmcSmetaPilot_Test_Csharp в режиме READ_ONLY со всеми полями скидок и КС.");
             return;
         }
-        if (version != "28")
+        if (version != WritableSchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
             throw new InvalidOperationException(
-                "Схема SQL Server должна быть версии 28. Для просмотра схемы 31 подготовьте отдельную READ_ONLY копию GmcSmetaPilot_Test_Csharp.");
+                $"Схема SQL Server должна быть версии {WritableSchemaVersion}. Для просмотра схемы 31 подготовьте отдельную READ_ONLY копию GmcSmetaPilot_Test_Csharp.");
     }
 }

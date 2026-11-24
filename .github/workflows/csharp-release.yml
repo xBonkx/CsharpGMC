@@ -37,6 +37,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Guard SQL schema before release
+        shell: pwsh
+        run: |
+          $schemaVersion = & ./tools/sql-migrations/Test-ReleaseSchema.ps1 -RepositoryRoot $PWD.Path
+          "SQL_SCHEMA_VERSION=$schemaVersion" >> $env:GITHUB_ENV
+
       - name: Install .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -129,6 +135,7 @@ jobs:
             -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64-fx.zip') -CompressionLevel Optimal
           Copy-Item $exe (Join-Path $out 'GmcSmeta.Launcher.exe')
           Set-Content -Path (Join-Path $out 'version.txt') -Value $env:TAG -Encoding utf8
+          Set-Content -Path (Join-Path $out 'sql-schema-version.txt') -Value $env:SQL_SCHEMA_VERSION -Encoding utf8
 
           $sums = Get-ChildItem $out -File |
             Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |

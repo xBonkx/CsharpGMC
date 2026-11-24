@@ -51,6 +51,8 @@ powershell -ExecutionPolicy Bypass -File .\tools\install-release-builder.ps1
 ошибка тестов, прерывание загрузки, совпадение тега, полный выпуск и проверка
 автообновления. Реальная Windows и публикационная приёмка открыты.
 
+Миграции SQL Server: [план однокнопочного выпуска с резервным копированием](docs/SQL_MIGRATION_RELEASE_TODO.md). До готовности перехода 28 → 31 изменение WritableSchemaVersion блокирует публикацию.
+
 ## Запуск
 
 ```powershell

@@ -175,10 +175,11 @@ public static class RemoteSqlProbe
             var version = Convert.ToString(
                 await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
                 CultureInfo.InvariantCulture);
-            if (version != "28")
-                return new(true, true, false, $"Схема несовместима: требуется 28, получено {version ?? "нет версии"}.",
+            var required = SqlSchemaCompatibility.WritableSchemaVersion.ToString(CultureInfo.InvariantCulture);
+            if (version != required)
+                return new(true, true, false, $"Схема несовместима: требуется {required}, получено {version ?? "нет версии"}.",
                     networkMs, clock.ElapsedMilliseconds);
-            return new(true, true, true, "Сервер доступен, авторизация выполнена, схема версии 28 подходит.",
+            return new(true, true, true, $"Сервер доступен, авторизация выполнена, схема версии {required} подходит.",
                 networkMs, clock.ElapsedMilliseconds);
         }
         catch (SqlException ex)
