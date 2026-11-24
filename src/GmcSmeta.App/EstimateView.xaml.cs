@@ -253,6 +253,12 @@ public partial class EstimateView : UserControl
         PnrEdit.Text = est.Totals.Pnr == 0m ? "0" : N2(est.Totals.Pnr);
         SmrEdit.Text = N2(est.SmrMode == "sum" ? est.Statistics.Smr : est.Totals.Smr);
 
+        var sourceCheck=est.SourceCheck;
+        SourceCheckChip.Visibility=sourceCheck.Matches==false?Visibility.Visible:Visibility.Collapsed;
+        SourceCheckChip.ToolTip=sourceCheck.Details.Length>0?sourceCheck.Details:null;
+        DiscountTotalText.Visibility=est.Totals.DiscountPercent!=0m?Visibility.Visible:Visibility.Collapsed;
+        DiscountTotalText.Text=est.Totals.DiscountPercent!=0m
+            ? $"Скидка {est.Totals.DiscountPercent:0.#########}%: −{N2(est.Totals.DiscountAmount)} ₽" : "";
         TotalText.Text = N2(est.Totals.Total);
         VatText.Text = est.VatTop
             ? $"НДС {Rate(est.VatRate)} сверху: {N2(est.Totals.Vat)} ₽"

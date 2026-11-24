@@ -71,6 +71,9 @@ public sealed record EstimateDocument(
     public bool BasisAllowed { get; init; }
     // Этап подготовки КП (kp_workflow.PHASES эталона): volumes / prices / review / ready / sent.
     public string KpPhase { get; init; } = "";
+    public decimal? DeclaredMaterial { get; init; }
+    public decimal? DeclaredTotal { get; init; }
+    public EstimateSourceCheck.Result SourceCheck => EstimateSourceCheck.Compare(DeclaredMaterial,DeclaredTotal,Totals);
 }
 
 /// <summary>Contract.stats в Python: монтаж строками показан в СМР, общий итог не меняется.</summary>
@@ -121,7 +124,7 @@ public static class EstimateReader
     private const string BatchSql =
         "SELECT c.id, c.kind, c.number, c.[date], c.name, o.name, COALESCE(co.name, ''), " +
         "       c.form, c.smr_mode, c.vat_rate, c.locked, c.locked_by, COALESCE(c.kp_phase, ''), " +
-        "       c.smr_amount, c.smr_percent, c.transport_amount, c.pnr_amount " +
+        "       c.smr_amount, c.smr_percent, c.transport_amount, c.pnr_amount, c.declared_material, c.declared_total " +
         "FROM contracts c JOIN objects o ON o.id = c.object_id " +
         "LEFT JOIN companies co ON co.id = c.company_id WHERE c.id = @id;" +
         "SELECT [key], rules FROM tags;" +
@@ -214,7 +217,7 @@ public static class EstimateReader
     {
         var cmd = conn.CreateCommand();
         cmd.CommandText = SqlSchemaCompatibility.HasPreviewColumns(conn)
-            ? BatchSql.Replace("c.transport_amount, c.pnr_amount ", "c.transport_amount, c.pnr_amount, c.discount_percent ", StringComparison.Ordinal)
+            ? BatchSql.Replace("c.declared_total ", "c.declared_total, c.discount_percent ", StringComparison.Ordinal)
             : BatchSql;
         var parameter = cmd.CreateParameter();
         parameter.ParameterName = "@id";
@@ -337,7 +340,9 @@ public static class EstimateReader
             SmrMode = head.SmrMode,
             BasisAllowed = AreaCellPresentation.IsBasisAllowed(head.Form, rules.Has(head.Form, "basis")),
             Statistics = Statistics(totals, positions),
-            KpPhase = head.KpPhase
+            KpPhase = head.KpPhase,
+            DeclaredMaterial = head.DeclaredMaterial,
+            DeclaredTotal = head.DeclaredTotal
         };
     }
 
@@ -382,6 +387,8 @@ public static class EstimateReader
         public decimal Transport;
         public decimal Pnr;
         public decimal DiscountPercent;
+        public decimal? DeclaredMaterial;
+        public decimal? DeclaredTotal;
     }
 
     private static Head? ReadHead(DbDataReader r)
@@ -411,7 +418,9 @@ public static class EstimateReader
             SmrPercent = Dec(r, 14),
             Transport = Dec(r, 15),
             Pnr = Dec(r, 16),
-            DiscountPercent = r.FieldCount > 17 ? DiscountPolicy.ReadPercent(r, 17) : 0m,
+            DeclaredMaterial = r.IsDBNull(17)?null:Dec(r,17),
+            DeclaredTotal = r.IsDBNull(18)?null:Dec(r,18),
+            DiscountPercent = r.FieldCount > 19 ? DiscountPolicy.ReadPercent(r, 19) : 0m,
         };
     }
 

@@ -405,6 +405,11 @@
                                    Foreground="#0F172A" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </DockPanel>
+                    <Border x:Name="SourceCheckChip" HorizontalAlignment="Left" Background="#FEE2E2"
+                            CornerRadius="8" Padding="8,3" Margin="0,4,0,0" Visibility="Collapsed">
+                        <TextBlock Text="✗ Не сходится с файлом" Foreground="#B91C1C"
+                                   FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                    </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" VerticalAlignment="Top">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
@@ -2143,6 +2148,8 @@
                         <TextBlock Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"
                                    FontSize="24"/>
+                        <TextBlock x:Name="DiscountTotalText" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}"
+                                   TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
                         <TextBlock x:Name="VatText" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"
                                    Margin="0,2,0,0"/>
                     </StackPanel>
