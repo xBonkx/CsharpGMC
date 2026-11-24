@@ -28,6 +28,25 @@ dotnet build GmcSmeta.slnx -c Release
 src\GmcSmeta.App\bin\Release\net10.0-windows\GMC-Smeta-Next.exe
 ```
 
+### Кнопка сборки Release на рабочем столе
+
+Из корня репозитория один раз выполните:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\install-release-builder.ps1
+```
+
+Появится EXE «ГМЦ-Смета — собрать релиз». Откройте его и нажмите
+«Собрать релиз»: NuGet restore, Release build решения и лаунчера,
+по желанию Core-тесты. После успеха можно открыть папку готовой сборки.
+Используется текущая локальная копия исходников, без git pull, без публикации
+GitHub Releases и без операций с SQL Server. Для сборки нужен .NET 10 SDK;
+для самого окна — .NET 10 Desktop Runtime. BAT остаётся запасным вариантом.
+
+Приёмка: Windows publish, запуск EXE с рабочего стола, сборка успешная/с
+ошибкой, путь с пробелами, открытие выходного каталога, повторный запуск,
+отсутствие действий с Git/SQL. Визуальная и локальная Windows-проверка открыты.
+
 ## Запуск
 
 ```powershell

@@ -8,4 +8,7 @@
     <Project Path="tests/GmcSmeta.Core.Tests/GmcSmeta.Core.Tests.csproj" />
     <Project Path="tests/GmcSmeta.Export.Checks/GmcSmeta.Export.Checks.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/release-builder/GmcSmeta.ReleaseBuilder/GmcSmeta.ReleaseBuilder.csproj" />
+  </Folder>
 </Solution>
