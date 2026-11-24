@@ -4,8 +4,6 @@ name: C# release (GitHub Releases)
 # Именно эти вложения скачивает лаунчер с рабочего стола (см. tools/launcher/README.md).
 on:
   push:
-    tags:
-      - "v*"
     branches:
       - main
     paths:
