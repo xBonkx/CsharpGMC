@@ -215,11 +215,34 @@ internal sealed class AppInstaller
                     TryDeleteDirectory(directory);
                     continue;
                 }
-                TryDeleteDirectory(directory);
+                // Do not partially delete an older app that is still running.
+                if (!IsRunningVersion(directory)) TryDeleteDirectory(directory);
             }
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
+    }
+
+    private static bool IsRunningVersion(string directory)
+    {
+        var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(AppExeName));
+        try
+        {
+            foreach (var process in processes)
+            {
+                try
+                {
+                    var executable = process.MainModule?.FileName;
+                    if (string.IsNullOrWhiteSpace(executable)) return true;
+                    if (string.Equals(Path.GetDirectoryName(executable), directory, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                catch (InvalidOperationException) { /* Process exited. */ }
+                catch (System.ComponentModel.Win32Exception) { return true; }
+            }
+            return false;
+        }
+        finally { foreach (var process in processes) process.Dispose(); }
     }
 
     private static void TryDeleteDirectory(string directory)
@@ -248,6 +271,7 @@ internal static class LauncherSelfUpdate
         if (!AppVersion.IsOlder(AppVersion.CurrentLauncher(), release.Version)) return;
 
         var download = Path.Combine(paths.Downloads, "GmcSmeta.Launcher.new.exe");
+        var staged = self + "." + Guid.NewGuid().ToString("N") + ".new";
         try
         {
             ui.Step($"Обновляю запускающий EXE до {release.Version}…");
@@ -258,23 +282,23 @@ internal static class LauncherSelfUpdate
             if (File.Exists(download)) File.Delete(download);
             releases.Download(asset, download, expected);
 
+            // Copy the verified replacement completely on the same volume before
+            // touching the current executable. Roll back its name on failure.
+            File.Copy(download, staged);
             var backup = self + ".old";
-            try { if (File.Exists(backup)) File.Delete(backup); } catch (IOException) { }
+            if (File.Exists(backup)) File.Delete(backup);
             File.Move(self, backup);
-            try
-            {
-                File.Copy(download, self, overwrite: true);
-            }
+            try { File.Move(staged, self); }
             catch
             {
-                File.Move(backup, self);
+                if (!File.Exists(self)) File.Move(backup, self);
                 throw;
             }
             try { File.Delete(download); } catch (IOException) { }
             ui.Info("Запускающий EXE обновлён — новый файл вступит в силу сразу, повторно скачивать не нужно.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                       or System.Net.Http.HttpRequestException)
+                                       or System.Net.Http.HttpRequestException or OperationCanceledException)
         {
             ui.Warn("Не удалось обновить запускающий EXE: " + ex.Message);
             ui.Warn("Программа всё равно запустится; EXE можно обновить позже вручную.");
@@ -282,6 +306,7 @@ internal static class LauncherSelfUpdate
         finally
         {
             try { File.Delete(download); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            try { File.Delete(staged); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
 

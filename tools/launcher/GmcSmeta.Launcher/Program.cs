@@ -21,7 +21,6 @@ try
     }
 
     var paths = AppPaths.Create();
-    LauncherSelfUpdate.CleanupOld();
     var installed = InstalledApp.Load(paths);
     StartupTrace.Mark("launcher_installed_state_read");
 
@@ -82,6 +81,7 @@ try
         throw new InvalidOperationException("Обновление уже выполняется. Повторите --update-only позже.");
     }
 
+    LauncherSelfUpdate.CleanupOld();
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
     if (string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
 
@@ -130,7 +130,7 @@ try
         }
         else
         {
-            ui.Step($"2/3  Установлена последняя версия {release.Version}.");
+            ui.Step($"2/3  Обновление не требуется: установлена версия {installed.Version}.");
         }
 
         ui.BeginCommit("Завершаю обновление…");

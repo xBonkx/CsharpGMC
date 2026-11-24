@@ -99,7 +99,7 @@ internal sealed class ConsoleUi : IDisposable
     {
         if (_console) Console.Error.WriteLine(text);
         Send(w => w.Finish("Не удалось завершить обновление", true, text));
-        if (!_silent && !_console && _window is null)
+        if (!_silent && !_console && (_window is null || _startupError is not null))
             MessageBox.Show(text, "ГМЦ-Смета", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
