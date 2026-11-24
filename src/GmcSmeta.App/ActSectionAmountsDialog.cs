@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -65,7 +66,7 @@ internal sealed class ActSectionAmountsDialog : Window
         Column("СМР в этой КС",nameof(Entry.Smr),new DataGridLength(220),_pos);
         Column("Транспорт в этой КС",nameof(Entry.Transport),new DataGridLength(220),false);
         _grid.ItemsSource=_rows;root.Children.Add(_grid);Content=root;
-        _grid.CellEditEnding+=(_,_)=>Dispatcher.BeginInvoke(new Action(Refresh));
+        _grid.CellEditEnding+=(_,_)=>Dispatcher.BeginInvoke(new Action(()=>{Refresh();}));
         _save.Click+=(_,_)=>{if(Commit()&&Refresh())DialogResult=true;};
         auto.Click+=(_,_)=>{if(Commit())Fill(snapshot.Suggested);};
         Fill(snapshot.Current);

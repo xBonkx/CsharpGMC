@@ -287,7 +287,7 @@ public static partial class SqlServerActs
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
-        return CreateCore(conn, contractId, expectedRevision, false);
+        return CreateCore(conn, contractId, expectedRevision, SqlSchemaCompatibility.HasPreviewColumns(conn));
     }
 
     public static long CreateSchema31Test(string connectionString, long contractId, string expectedRevision)

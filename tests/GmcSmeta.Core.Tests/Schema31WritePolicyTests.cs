@@ -72,4 +72,26 @@ public sealed class Schema31WritePolicyTests
         Assert.Empty(result.Smr);
         Assert.Equal(1m,result.Transport.Values.Sum());
     }
+
+    [Fact]
+    public void OrdinarySchema31RoutesFailBeforeNetworkWhileGateIsClosed()
+    {
+        Assert.False(SqlSchemaCompatibility.OrdinarySchema31Enabled);
+        const string cs="Server=invalid.invalid;Database=GmcSmetaPilot_UnitTest;Integrated Security=true";
+        var discount=SqlServerActs.SaveDiscount(cs,1,"total",0m,"r1");
+        Assert.False(discount.Saved);
+        Assert.Equal("r1",discount.Revision);
+        var amounts=new KsActAllocation.SectionAmounts(new Dictionary<long,decimal>(),new Dictionary<long,decimal>());
+        Assert.False(SqlServerActs.SaveSections(cs,1,amounts,"r1").Saved);
+        Assert.Throws<InvalidOperationException>(()=>SqlServerActs.ReadSections(cs,1));
+    }
+
+    [Fact]
+    public void ManualTotalRemainsExactAfterChangingQuantities()
+    {
+        var input=DiscountPolicy.Normalize("total",2669383.47m,5m);
+        Assert.Equal(2669383.47m,DiscountPolicy.Payable(3000000m,input.Percent,input.ManualTotalCents));
+        Assert.Equal(2669383.47m,DiscountPolicy.Payable(3100000m,input.Percent,input.ManualTotalCents));
+        Assert.Equal(430616.53m,DiscountPolicy.Amount(3100000m,input.Percent,input.ManualTotalCents));
+    }
 }
