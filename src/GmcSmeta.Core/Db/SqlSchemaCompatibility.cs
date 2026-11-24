@@ -10,6 +10,8 @@ public static class SqlSchemaCompatibility
     // Single authoritative version for ordinary writable SQL Server clients.
     // Updating this requires an approved database migration and release gate.
     public const int WritableSchemaVersion = 28;
+    // Keep disabled until all schema31 routes (including undo/trash/export) pass SQL acceptance.
+    public static bool OrdinarySchema31Enabled => WritableSchemaVersion == 31;
     public const string PreviewDatabase = "GmcSmetaPilot_Test_Csharp";
     public const string WriteTestDatabase = "GmcSmetaPilot_Schema31WriteTest";
 
@@ -34,7 +36,8 @@ public static class SqlSchemaCompatibility
     // run. Keep the old projection for schema 28 and legacy offline fixtures.
     public static bool HasPreviewColumns(System.Data.Common.DbConnection conn) =>
         conn is Microsoft.Data.SqlClient.SqlConnection sql &&
-        (IsPreviewDatabase(sql.Database) || IsWriteTestDatabase(sql.Database));
+        (IsPreviewDatabase(sql.Database) || IsWriteTestDatabase(sql.Database) ||
+            OrdinarySchema31Enabled && IsWritablePilot(sql.Database,sql.DataSource));
 
     public static bool IsPreviewDatabase(string? name) =>
         string.Equals(name, PreviewDatabase, StringComparison.OrdinalIgnoreCase);
@@ -86,5 +89,8 @@ public static class SqlSchemaCompatibility
         if (version != WritableSchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
             throw new InvalidOperationException(
                 $"Схема SQL Server должна быть версии {WritableSchemaVersion}. Для просмотра схемы 31 подготовьте отдельную READ_ONLY копию GmcSmetaPilot_Test_Csharp.");
+        if(OrdinarySchema31Enabled&&(!IsWritablePilot(name,dataSource)||!requiredColumns||
+            !string.Equals(updateability,"READ_WRITE",StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Штатная запись v31 требует отдельной пилотной базы READ_WRITE со всеми новыми полями.");
     }
 }

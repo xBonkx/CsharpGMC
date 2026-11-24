@@ -71,6 +71,7 @@ public sealed record EstimateDocument(
     public bool BasisAllowed { get; init; }
     // Этап подготовки КП (kp_workflow.PHASES эталона): volumes / prices / review / ready / sent.
     public string KpPhase { get; init; } = "";
+    public bool SupportsFinalDiscount { get; init; }
     public decimal? DeclaredMaterial { get; init; }
     public decimal? DeclaredTotal { get; init; }
     public EstimateSourceCheck.Result SourceCheck => EstimateSourceCheck.Compare(DeclaredMaterial,DeclaredTotal,Totals);
@@ -341,6 +342,7 @@ public static class EstimateReader
             BasisAllowed = AreaCellPresentation.IsBasisAllowed(head.Form, rules.Has(head.Form, "basis")),
             Statistics = Statistics(totals, positions),
             KpPhase = head.KpPhase,
+            SupportsFinalDiscount=DiscountPolicy.SupportsDiscount(vatTop,rules.Has(head.Form,"ks_dns"),head.Form,head.ObjectName),
             DeclaredMaterial = head.DeclaredMaterial,
             DeclaredTotal = head.DeclaredTotal
         };

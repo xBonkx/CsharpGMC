@@ -200,26 +200,29 @@ public partial class EstimateView
     /// <summary>Скидка на всю смету (apply_discount): процент, СМР вместе, целые рубли.</summary>
     private async void Discount_Click(object sender, RoutedEventArgs e)
     {
-        if (_estimate?.Locked != false) return;
-        if (_serverConflict) { SetStatus("Сначала обнови смету: данные на сервере изменились.", true); return; }
-        var dialog = new PromptDialog("Скидка на смету",
-            "Процент (отрицательный — наценка):", "") { Owner = Window.GetWindow(this) };
-        if (dialog.ShowDialog() != true || dialog.Value.Trim().Length == 0) return;
-        if (!decimal.TryParse(dialog.Value.Trim().Replace(',', '.'), NumberStyles.Any,
-                CultureInfo.InvariantCulture, out var percent))
-        {
-            SetStatus("Недопустимое число: " + dialog.Value, true);
-            return;
-        }
+        if (_estimate is not {Locked:false} estimate) return;
+        if (_serverConflict || HasUnsettledCacheWrites)
+        { SetStatus("Сначала завершите сохранение и обновите смету.",true); return; }
+        var totals=estimate.Totals;
+        var baselineRevision=_serverRevision;
+        var dialog=new EstimateDiscountDialog(new(
+            totals.Total+totals.DiscountAmount,totals.Total,totals.Materials,totals.Smr,
+            estimate.SmrMode=="percent",totals.DiscountPercent,
+            SqlSchemaCompatibility.OrdinarySchema31Enabled&&estimate.SupportsFinalDiscount&&!_doc.IsStage))
+            {Owner=Window.GetWindow(this)};
+        if(dialog.ShowDialog()!=true||dialog.Result is not {Changed:true} result)return;
+        if(_serverRevision!=baselineRevision||_serverConflict||HasUnsettledCacheWrites)
+        { SetStatus("Смета изменилась. Откройте окно скидки заново.",true);return; }
         _reloadTimer.Stop();
         var pending = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Сохранение… ({pending})", false);
         await _writeLock.WaitAsync();
         try
         {
-            var saved = await Task.Run(() => SqlServerEditorOps.ApplyDiscount(
-                _sqlConnectionString, _contractId, percent, smr: true,
-                wholeRubles: false, _serverRevision));
+            var saved=await Task.Run(()=>result.OnTotal
+                ? SqlServerActs.SaveContractDiscount(_sqlConnectionString,_contractId,result.Percent,baselineRevision)
+                : SqlServerEditorOps.ApplyDiscount(_sqlConnectionString,_contractId,result.Percent,result.Smr,
+                    result.WholeRubles,baselineRevision));
             if (!saved.Saved) { _saveError = saved.Error ?? "Скидка не применена"; _serverConflict = true; }
             else
             {

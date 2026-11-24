@@ -51,14 +51,14 @@ public static partial class SqlServerDatabase
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (preview)
+            if (preview || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = cmd.ExecuteReader();
                 if (!reader.Read()) throw new InvalidOperationException("Не удалось проверить тестовую базу.");
                 SqlSchemaCompatibility.Validate(version, conn.Database,
                     Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1);
+                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1, builder.DataSource);
             }
             else
             {
@@ -118,14 +118,14 @@ public static partial class SqlServerDatabase
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
             token.ThrowIfCancellationRequested();
-            if (preview)
+            if (preview || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                 if (!await reader.ReadAsync(token).ConfigureAwait(false)) throw new InvalidOperationException("Не удалось проверить тестовую базу.");
                 SqlSchemaCompatibility.Validate(version, conn.Database,
                     Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1);
+                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1, builder.DataSource);
             }
             else
             {

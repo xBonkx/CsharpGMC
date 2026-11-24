@@ -48,6 +48,13 @@ public static class SqlServerEditorOps
         if (locked)
             return SqlServerDatabase.SaveResult.Fail("Смета подписана — скидка недоступна.", rev);
 
+        if(SqlSchemaCompatibility.HasPreviewColumns(conn))
+        {
+            using var discount=new SqlCommand("SELECT discount_percent FROM dbo.contracts WHERE id=@id",conn,tx);
+            discount.Parameters.Add("@id",SqlDbType.BigInt).Value=contractId;
+            if(Convert.ToDouble(discount.ExecuteScalar(),CultureInfo.InvariantCulture)!=0d)
+                return SqlServerDatabase.SaveResult.Fail("Сначала снимите итоговую скидку, чтобы не применить две скидки.",rev);
+        }
         var k = (double)(1m - percent / 100m);
         int digits = wholeRubles ? 0 : 2;
         decimal Scale(decimal v) => decimal.Round(v * (decimal)k, digits, MidpointRounding.AwayFromZero);

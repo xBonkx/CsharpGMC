@@ -14,6 +14,22 @@ public static partial class SqlServerActs
         string connectionString,long contractId,decimal percent,string expectedRevision)
     {
         using var conn=OpenSchema31WriteTest(connectionString);
+        return SaveContractDiscountCore(conn,contractId,percent,expectedRevision);
+    }
+
+    public static SqlServerDatabase.SaveResult SaveContractDiscount(string connectionString,long contractId,
+        decimal percent,string expectedRevision)
+    {
+        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            return SqlServerDatabase.SaveResult.Fail("Штатная запись скидок v31 пока не разрешена.",expectedRevision);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        using var conn=SqlServerDatabase.Open(connectionString);
+        return SaveContractDiscountCore(conn,contractId,percent,expectedRevision);
+    }
+
+    private static SqlServerDatabase.SaveResult SaveContractDiscountCore(SqlConnection conn,long contractId,
+        decimal percent,string expectedRevision)
+    {
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);
         var rev=SqlServerDatabase.LockRevision(conn,tx);
         if(rev is null||!string.Equals(rev,expectedRevision,StringComparison.Ordinal))
