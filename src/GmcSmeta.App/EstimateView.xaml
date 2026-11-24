@@ -597,6 +597,7 @@
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сделать договором (закупки, выдача, КС)…" Click="MakeContract_Click" Tag="{StaticResource GlyphCheck}" x:Name="MakeContractItem"
                                 ToolTip="У КП появятся Закупки, Выдача и КС-2 / КС-3"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Создать допсоглашение к этому договору…" Click="CreateDop_Click" Tag="{StaticResource GlyphFilePlus}" x:Name="CreateDopItem"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="MoveContractItem" Content="Перенести в другой объект…" Click="MoveContract_Click" Tag="{StaticResource GlyphFilePlus}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть договоры из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphStage}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сравнить с другим документом…" Click="CompareDocs_Click" Tag="{StaticResource GlyphList}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>

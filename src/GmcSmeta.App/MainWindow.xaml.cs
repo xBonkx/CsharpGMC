@@ -1316,6 +1316,9 @@ public partial class MainWindow : Window
                 var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus");
                 dop.Click += (_, _) => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id);
                 menu.Items.Add(dop);
+                var move = ContextMenuIcons.Create("Перенести в другой объект…", "FilePlus", SqlWritesEnabled);
+                move.Click += (_, _) => MoveCurrentContract(doc);
+                menu.Items.Add(move);
             }
             var exportEstimate = ContextMenuIcons.Create("Сохранить смету в Excel…", "Download");
             exportEstimate.Click += (_, _) => ExportEstimate(doc);

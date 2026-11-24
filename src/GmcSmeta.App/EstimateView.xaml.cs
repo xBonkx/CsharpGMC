@@ -43,6 +43,8 @@ public partial class EstimateView : UserControl
         System.Windows.Data.CollectionViewSource.GetDefaultView(grid.ItemsSource)
             is System.ComponentModel.IEditableCollectionView { IsEditingItem: true };
 
+    internal bool CanTransferDocument => !CacheReadOrWriteInProgress && !HasUnsettledCacheWrites &&
+        !HasActiveEstimateEdit() && !HasNestedCacheActivity;
     internal bool CanReleaseCachedView => !IsLoaded && !CacheReadOrWriteInProgress &&
         !HasUnsettledCacheWrites && !_reloadTimer.IsEnabled && !HasActiveEstimateEdit() &&
         !HasNestedCacheActivity;
@@ -117,6 +119,7 @@ public partial class EstimateView : UserControl
             EnsureUndoBaselineAsync);
         _cellSaveQueue = new ContractCellSaveQueue(WriteCellOnBackgroundAsync);
         InitializeComponent();
+        MoveContractItem.Visibility=doc.Kind=="main"?Visibility.Visible:Visibility.Collapsed;
         // Python kp_table: «Обоснование» — последний столбец сметы.
         BasisColumn.DisplayIndex = EstimateGrid.Columns.Count - 1;
         BasisColumn.CanUserReorder = false;

@@ -159,6 +159,13 @@ public partial class EstimateView
         ExtraActionsExpander.IsOpen = false;
     }
 
+    private void MoveContract_Click(object sender,RoutedEventArgs e)
+    {
+        ExtraActionsExpander.IsOpen=false;
+        if(Window.GetWindow(this) is MainWindow main && _doc.Kind=="main")
+            main.MoveCurrentContract(_doc);
+    }
+
     private void DeleteContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)

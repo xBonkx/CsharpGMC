@@ -10,7 +10,7 @@ namespace GmcSmeta.Core.Db;
 /// Writes are deliberately restricted to isolated GmcSmetaPilot_* databases until
 /// SQL Server integration tests and an explicit production cutover are complete.
 /// </summary>
-public static class SqlServerWorkspace
+public static partial class SqlServerWorkspace
 {
     public sealed record NewContractData(string Kind, string Number, string Date, string Name,
         long? CompanyId, long? BaseContractId);
