@@ -11,7 +11,6 @@
             <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button x:Name="TestButton" Click="TestButton_Click" Style="{StaticResource PythonToolbarButton}"
                         Content="Проверить подключение" ContentTemplate="{StaticResource IconLabelSearch}" Margin="0,0,8,4"/>
-                <Button x:Name="DemoButton" Content="Демо" Click="DemoButton_Click" Style="{StaticResource PythonToolbarButton}" Margin="0,0,8,4"/>
                 <Button x:Name="ConnectButton" Content="Сохранить и подключиться" IsDefault="True"
                         Click="ConnectButton_Click" Style="{StaticResource PythonToolbarPrimary}" ContentTemplate="{StaticResource IconLabelCheck}" Margin="0,0,8,4"/>
                 <Button Content="Отмена" IsCancel="True" Style="{StaticResource PythonToolbarButton}" Margin="0,0,0,4"/>

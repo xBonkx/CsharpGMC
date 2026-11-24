@@ -13,7 +13,6 @@ public partial class SqlConnectionDialog : Window
     private bool _closed;
 
     public string? SelectedConnectionString { get; private set; }
-    public bool DemoRequested { get; private set; }
 
     public SqlConnectionDialog()
     {
@@ -125,7 +124,7 @@ public partial class SqlConnectionDialog : Window
     {
         _busy = busy;
         foreach (var control in new Control[] { ProfilePicker, DeleteProfileButton, ProfileNameBox,
-            ServerBox, PortBox, DatabaseBox, AuthBox, TrustBox, TestButton, ConnectButton, DemoButton })
+            ServerBox, PortBox, DatabaseBox, AuthBox, TrustBox, TestButton, ConnectButton })
             control.IsEnabled = !busy;
         UpdateAuthentication();
     }
@@ -221,12 +220,5 @@ public partial class SqlConnectionDialog : Window
         {
             StatusText.Text = "Не удалось удалить профиль: " + ex.GetType().Name;
         }
-    }
-
-    private void DemoButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_busy || _closed) return;
-        DemoRequested = true;
-        DialogResult = true;
     }
 }

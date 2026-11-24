@@ -35,7 +35,9 @@ dotnet run --project src/GmcSmeta.App
 ```
 
 Строка подключения к SQL Server задаётся в диалоге при запуске или через
-переменную окружения `GMC_SMETA_SQL_CONNECTION`:
+переменную окружения `GMC_SMETA_SQL_CONNECTION`. При отмене диалога приложение закрывается; для работы необходимо подключение к SQL Server.
+
+Пример для запуска:
 
 ```powershell
 $env:GMC_SMETA_SQL_CONNECTION = "Server=localhost;Database=GmcSmeta;Integrated Security=True;Encrypt=False;TrustServerCertificate=True;"

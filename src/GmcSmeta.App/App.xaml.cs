@@ -84,14 +84,6 @@ public partial class App : Application
         }
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        if (e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase))
-        {
-            var demo = new DemoWindow();
-            MainWindow = demo;
-            demo.Show();
-            ShutdownMode = ShutdownMode.OnMainWindowClose;
-            return;
-        }
         // CLI and CI can still supply an ephemeral connection string. It is never persisted.
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION")))
         {
@@ -102,14 +94,6 @@ public partial class App : Application
             if (dialogResult != true)
             {
                 Shutdown(0);
-                return;
-            }
-            if (dialog.DemoRequested)
-            {
-                var demo = new DemoWindow();
-                MainWindow = demo;
-                demo.Show();
-                ShutdownMode = ShutdownMode.OnMainWindowClose;
                 return;
             }
             Environment.SetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION", dialog.SelectedConnectionString);
