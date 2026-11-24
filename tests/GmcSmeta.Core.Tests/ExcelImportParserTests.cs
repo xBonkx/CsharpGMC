@@ -243,4 +243,56 @@ public sealed class ExcelImportParserTests
         Assert.True(block.Ok);
     }
 
+
+    [Fact]
+    public void Python0668_SectionTotalsAndUnpricedRows()
+    {
+        var book=Parse(
+            Row("Приложение №1 к Дополнительному соглашению №3 от 08.04.2026 г."),
+            Row("Поз.","Наименование и техническая характеристика","Ед. изм.","Коли-чество","Цена","Всего"),
+            Row(1,"Раздел 1 - прокладка воздуховодов по фасаду"),
+            Row(2,"Воздуховод оцинк. б=0,8мм","м2",1460.8m,1450m,2118160m),
+            Row(3,"Расходные материалы","компл.",1m,300000m,300000m),
+            Row(4,"ИТОГО ЗА МАТЕРИАЛ:",null,null,null,2418160m),
+            Row(5,"ТРАНСПОРТНЫЕ РАСХОДЫ:",null,null,null,250000m),
+            Row(6,"СМР:",null,null,null,3450000m),
+            Row(7,"ИТОГО, с учетом НДС 22%:",null,null,null,6118160m),
+            Row(8,"Раздел 2 - покраска декоративных решеток"),
+            Row(9,"Решетка декоративная 1100х400","шт",26,"*","*"),
+            Row(10,"Окрашивание решетки в RAL 7024","шт",208,null,280000m),
+            Row(11,"ИТОГО, с учетом НДС 22%:",null,null,null,280000m),
+            Row(12,"Всего по разделам Р.1,2",null,null,null,6398160m));
+        var block=Assert.Single(book.Blocks);
+        Assert.True(block.Ok,string.Join("; ",block.Checks.Select(c=>c.Description)));
+        Assert.Equal(4,block.PositionCount);
+        Assert.Equal(2698160m,block.DeclaredMaterial);
+        Assert.Equal(250000m,block.Transport);
+        Assert.Equal(3450000m,block.Smr);
+        Assert.Equal(6398160m,block.CalculatedTotal);
+        Assert.Equal("dop",block.Kind);
+        Assert.Equal("3",block.Number);
+        Assert.Equal("08.04.2026",block.Date);
+        var positions=block.Sections.SelectMany(s=>s.Positions).ToList();
+        Assert.Equal(0m,positions.Single(p=>p.Name.StartsWith("Решетка")).Price);
+        var painted=positions.Single(p=>p.Name.StartsWith("Окрашивание"));
+        Assert.Equal(280000m,decimal.Round(painted.Price*painted.Quantity,2));
+    }
+
+    [Theory]
+    [InlineData(45,true)]
+    [InlineData(47,false)]
+    public void Python0670_NumberedSectionRangeMustMatch(int rangeTotal,bool merged)
+    {
+        var book=Parse(
+            Row("№","Наименование","Ед.","Кол-во","Цена","Всего"),
+            Row(null,"Раздел 1"),
+            Row(1,"Позиция A","шт",1,15,15),
+            Row(null,"ВСЕГО ПО Р.1 С НДС 22%",null,null,null,15),
+            Row(null,"Раздел 2"),
+            Row(2,"Позиция B","шт",1,30,30),
+            Row(null,"ВСЕГО ПО Р.2 С НДС 22%",null,null,null,30),
+            Row(null,"ВСЕГО ПО Р.1-Р.2 С НДС 22%",null,null,null,rangeTotal));
+        Assert.Equal(merged?1:2,book.Blocks.Count);
+        Assert.Equal(45m,book.Blocks.Sum(b=>b.CalculatedTotal));
+    }
 }

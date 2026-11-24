@@ -131,12 +131,16 @@ public static partial class ExcelImportParser
                 basic.Blocks.Add(revit);
             if (basic.Blocks.Count > 1 && CountHeaders(rows) == 1)
             {
-                var joined = ParseSheetCore(name, rows, true, cancellationToken);
+                var numberedClosings = NumberedSectionClosings(rows, basic.Blocks);
                 var hasSectionTotals = rows.Any(r => r.Take(4).Any(v => Text(v).Contains("по раздел", StringComparison.OrdinalIgnoreCase)));
+                var joined = ParseSheetCore(name, rows, true, cancellationToken,
+                    hasSectionTotals || numberedClosings.Count > 0, numberedClosings);
                 if (joined.Blocks.Count < basic.Blocks.Count &&
                     joined.Blocks.All(b => b.DeclaredTotal is not null) &&
                     joined.Blocks.Sum(b => b.PositionCount) >= basic.Blocks.Sum(b => b.PositionCount) &&
-                    (joined.Blocks.All(b => b.Ok) || hasSectionTotals))
+                    (joined.Blocks.All(b => b.Ok) || hasSectionTotals) &&
+                    (numberedClosings.Count == 0 || (joined.Blocks.Count == 1 && joined.Blocks[0].Ok &&
+                        Math.Abs(joined.Blocks[0].DeclaredTotal!.Value-basic.Blocks.Sum(b=>b.DeclaredTotal!.Value))<=1m)))
                 {
                     foreach (var block in joined.Blocks)
                         block.Warnings.Insert(0, "Промежуточные итоги систем объединены в один документ.");
@@ -153,8 +157,41 @@ public static partial class ExcelImportParser
 
     private static int CountHeaders(IReadOnlyList<IReadOnlyList<object?>> rows) => rows.Count(r => DetectHeader(r) is not null);
 
+    // 0.67.0: numbered section closings only belong to one document when
+    // a later explicit range total confirms both the sequence and its amount.
+    private static HashSet<int> NumberedSectionClosings(IReadOnlyList<IReadOnlyList<object?>> rows,
+        IReadOnlyList<ExcelImportBlock> blocks)
+    {
+        var result=new HashSet<int>();
+        if(blocks.Count<2||blocks.Any(b=>!b.Ok||b.DeclaredTotal is null)) return result;
+        var single=new Regex(@"^всего\s+по\s+р\.\s*(\d+)\s+с\s+ндс\b",RegexOptions.IgnoreCase);
+        var combined=new Regex(@"^всего\s+по\s+р\.\s*(\d+)\s*[-–—]\s*р\.\s*(\d+)\s+с\s+ндс\b",RegexOptions.IgnoreCase);
+        var numbers=new List<int>();
+        foreach(var block in blocks)
+        {
+            if(block.LastRow<1||block.LastRow>rows.Count) return new();
+            var match=rows[block.LastRow-1].Select(v=>single.Match(Text(v))).FirstOrDefault(m=>m.Success);
+            if(match is null||!int.TryParse(match.Groups[1].Value,out var n)) return new();
+            numbers.Add(n); result.Add(block.LastRow);
+        }
+        if(numbers.Where((n,i)=>(long)n!=(long)numbers[0]+i).Any()) return new();
+        foreach(var row in rows.Skip(blocks[^1].LastRow))
+        {
+            if(row.All(v=>Text(v).Length==0)) continue;
+            var match=row.Select(v=>combined.Match(Text(v))).FirstOrDefault(m=>m.Success);
+            var total=row.Reverse().Select(Number).FirstOrDefault(n=>n.HasValue);
+            if(match is not null&&int.TryParse(match.Groups[1].Value,out var first)&&
+                int.TryParse(match.Groups[2].Value,out var last)&&first==numbers[0]&&last==numbers[^1]&&
+                total.HasValue&&Math.Abs(total.Value-blocks.Sum(b=>b.DeclaredTotal!.Value))<=1m)
+                return result;
+            break;
+        }
+        return new();
+    }
+
     private static (List<ExcelImportBlock> Blocks, List<string> Notes) ParseSheetCore(
-        string sheet, IReadOnlyList<IReadOnlyList<object?>> rows, bool mergeTotals, CancellationToken ct)
+        string sheet, IReadOnlyList<IReadOnlyList<object?>> rows, bool mergeTotals, CancellationToken ct,
+        bool sectionAware=false, IReadOnlySet<int>? keepOpenAt=null)
     {
         var blocks = new List<ExcelImportBlock>();
         var notes = new List<string>();
@@ -291,11 +328,15 @@ public static partial class ExcelImportParser
                             if (!subtotals.TryGetValue(block, out var list))
                                 subtotals[block] = list = new();
                             list.Add((rowNumber, kind, v, name, system));
-                            if (kind == "smr" && system is not null && !low.Contains("по раздел"))
+                            if (!sectionAware && kind == "smr" && system is not null && !low.Contains("по раздел"))
                                 system.Smr = (system.Smr ?? 0m) + v;
                         }
-                        if (kind == "total" && low.StartsWith("всего") && low.Contains("ндс"))
-                            block = null;
+                        if (kind == "total" && low.StartsWith("всего") && low.Contains("ндс") &&
+                            !low.Contains("по раздел") && !(keepOpenAt?.Contains(rowNumber) ?? false))
+                        {
+                            block.LastRow=rowNumber;
+                            block=null; system=null; lastTop=null;
+                        }
                         continue;
                     }
                     switch (kind)
@@ -409,14 +450,6 @@ public static partial class ExcelImportParser
                     return totals.Where(t => t.Kind == kind && t.Row <= lastPosition &&
                         !t.Label.Contains("по раздел", StringComparison.OrdinalIgnoreCase)).Sum(t => t.Value);
                 }
-                b.DeclaredMaterial = Choose("material");
-                b.Transport = Choose("transport");
-                b.Smr = Choose("smr");
-                b.VatDeclared = Choose("vat");
-                b.DeclaredTotal = Choose("total");
-                b.LastRow = totals.Max(t => t.Row);
-                var grand = totals.LastOrDefault(t => t.Kind == "total").Label;
-                if (grand is not null) ReadVatRate(grand, b);
                 string root = "";
                 for (var i = 0; i < b.Sections.Count; i++)
                 {
@@ -424,6 +457,71 @@ public static partial class ExcelImportParser
                     if (s.Positions.Count == 0 && i + 1 < b.Sections.Count) root = s.Name;
                     else if (root.Length > 0) s.Parent = root;
                 }
+                if(sectionAware)
+                {
+                    // 0.66.8: sum section subtotals, but count a matching final aggregate once.
+                    // Sections with no material subtotal contribute their exact row sums.
+                    List<(int Row,string Kind,decimal Value,string Label,ExcelImportSection? Section)> Values(string kind) =>
+                        totals.Where(t=>t.Kind==kind).ToList();
+                    int? AggregateRow(string kind)
+                    {
+                        var vals=Values(kind);
+                        return vals.Count>=2&&vals[^1].Row>lastPosition&&
+                            Math.Abs(vals.Take(vals.Count-1).Sum(t=>t.Value)-vals[^1].Value)<=1m?vals[^1].Row:null;
+                    }
+                    decimal? SumKind(string kind)
+                    {
+                        var vals=Values(kind);
+                        if(vals.Count==0) return null;
+                        return AggregateRow(kind).HasValue?vals[^1].Value:ExcelImportSection.DecimalRound(vals.Sum(t=>t.Value));
+                    }
+                    var materials=Values("material");
+                    if(AggregateRow("material").HasValue) b.DeclaredMaterial=materials[^1].Value;
+                    else
+                    {
+                        var covered=materials.Where(t=>t.Section is not null).Select(t=>t.Section!).ToHashSet();
+                        var byName=b.Sections.GroupBy(s=>s.Name).ToDictionary(g=>g.Key,g=>g.First());
+                        bool Covered(ExcelImportSection section)
+                        {
+                            var seen=new HashSet<ExcelImportSection>();
+                            ExcelImportSection? current=section;
+                            while(current is not null&&seen.Add(current))
+                            {
+                                if(covered.Contains(current)) return true;
+                                current=current.Parent.Length>0?byName.GetValueOrDefault(current.Parent):null;
+                            }
+                            return false;
+                        }
+                        b.DeclaredMaterial=ExcelImportSection.DecimalRound(materials.Sum(t=>t.Value)+
+                            b.Sections.Where(s=>s.Positions.Count>0&&!Covered(s)).Sum(s=>s.UnroundedMaterialSum));
+                    }
+                    b.Transport=SumKind("transport"); b.Smr=SumKind("smr"); b.Pnr=SumKind("pnr");
+                    b.VatDeclared=Values("vat").LastOrDefault().Row>0?Values("vat")[^1].Value:null;
+                    var totalRows=Values("total");
+                    b.DeclaredTotal=keepOpenAt is { Count:>0 }&&totalRows.Count>0
+                        ?totalRows[^1].Value:SumKind("total");
+                    var smrGrand=AggregateRow("smr");
+                    foreach(var t in Values("smr"))
+                    {
+                        if(t.Row==smrGrand||t.Section is null) continue;
+                        if(!t.Label.Contains("по раздел",StringComparison.OrdinalIgnoreCase))
+                            t.Section.Smr=(t.Section.Smr??0m)+t.Value;
+                        else if(byParent(t.Section) is { } parent&&parent.Smr is null&&
+                            !b.Sections.Any(s=>s.Parent==parent.Name&&s.Smr.GetValueOrDefault()!=0))
+                            parent.Smr=t.Value;
+                    }
+                    ExcelImportSection? byParent(ExcelImportSection section)=>
+                        b.Sections.FirstOrDefault(s=>section.Parent.Length>0&&s.Name==section.Parent);
+                }
+                else
+                {
+                    b.DeclaredMaterial=Choose("material"); b.Transport=Choose("transport");
+                    b.Smr=Choose("smr"); b.Pnr=Choose("pnr"); b.VatDeclared=Choose("vat");
+                    b.DeclaredTotal=Choose("total");
+                }
+                b.LastRow=totals.Max(t=>t.Row);
+                var grand=totals.LastOrDefault(t=>t.Kind=="total").Label;
+                if(grand is not null) ReadVatRate(grand,b);
             }
         if (columns is null) notes.Add("Не найдена шапка таблицы с наименованием и количеством.");
         if (missingPrices.Count > 0)
