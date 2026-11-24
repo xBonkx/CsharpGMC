@@ -323,6 +323,18 @@ public static partial class SqlServerWorkspace
                 objName + ": " + Documents.ContractTitleText(v.Kind, v.Number, v.Date, v.Name), id, src.ObjectId);
             Log(conn, tx, "contract", id, "copy", "из «" + src.Title + "»", id, src.ObjectId);
 
+            if (SqlSchemaCompatibility.HasPreviewColumns(conn))
+            {
+                using var discount = new SqlCommand("""
+                    UPDATE dst SET discount_percent=src.discount_percent
+                    FROM dbo.contracts dst CROSS JOIN dbo.contracts src
+                    WHERE dst.id=@dst AND src.id=@src
+                    """, conn, tx);
+                discount.Parameters.Add("@dst", SqlDbType.BigInt).Value=id;
+                discount.Parameters.Add("@src", SqlDbType.BigInt).Value=sourceId;
+                if(discount.ExecuteNonQuery()!=1)
+                    throw new DBConcurrencyException("Не удалось скопировать итоговую скидку договора.");
+            }
             if (withPositions)
                 CopyStructure(conn, tx, sourceId, id);
             BumpRevision(conn, tx);

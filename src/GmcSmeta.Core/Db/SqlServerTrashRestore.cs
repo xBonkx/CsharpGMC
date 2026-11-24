@@ -148,6 +148,10 @@ public static partial class SqlServerTrash
             maps["objects"][oldObjectId] = intoObjectId ?? oldObjectId;
         }
 
+        // Keep the original ownership before foreign keys are rewritten in-place.
+        var ownedSystems=decoded["systems"].GroupBy(r=>RequiredId(r,"contract_id"))
+            .ToDictionary(g=>g.Key,g=>(IReadOnlySet<long>)g.Select(r=>RequiredId(r,"id")).ToHashSet());
+
         // Отложенные ссылки: цель в копии, но ещё не вставлена — NULL сейчас, UPDATE после всех вставок.
         var pending = new List<(string Table, long OldId, Dictionary<string, (string Target, long Ref)> Links)>();
         foreach (var table in RestoreOrder)
@@ -160,6 +164,12 @@ public static partial class SqlServerTrash
             foreach (var row in rows)
             {
                 var oldId = RequiredId(row, "id");
+                if(table=="acts"&&row.TryGetValue("section_amounts_json",out var allocation)&&allocation is string json)
+                {
+                    var originalContract=RequiredId(row,"contract_id");
+                    row["section_amounts_json"]=KsActAllocation.RemapManual(json,maps["systems"],
+                        ownedSystems.GetValueOrDefault(originalContract)??new HashSet<long>());
+                }
                 row.Remove("id");
                 var delayed = new Dictionary<string, (string Target, long Ref)>();
                 foreach (var (column, target) in RestoreForeignKeys)

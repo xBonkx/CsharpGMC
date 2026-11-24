@@ -39,6 +39,32 @@ public static class KsActAllocation
         return new SectionAmounts(Read("smr"), Read("transport"));
     }
 
+    /// <summary>Trash restore allocates new system IDs. Preserve exact amounts and
+    /// move obsolete section references into the explicit unallocated bucket (0),
+    /// never attach them to an unrelated live system reusing the old ID.</summary>
+    public static string RemapManual(string json,IReadOnlyDictionary<long,long> systemIds,
+        IReadOnlySet<long> ownedSystemIds)
+    {
+        var manual=ReadManual(json);
+        if(manual is null)return "";
+        Dictionary<long,decimal> Remap(IReadOnlyDictionary<long,decimal> amounts)
+        {
+            var result=new Dictionary<long,decimal>();
+            foreach(var (id,amount) in amounts)
+            {
+                var mapped=id!=0&&ownedSystemIds.Contains(id)&&systemIds.TryGetValue(id,out var replacement)
+                    ?replacement:0L;
+                result[mapped]=result.GetValueOrDefault(mapped)+amount;
+            }
+            return result;
+        }
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            smr=Remap(manual.Smr),
+            transport=Remap(manual.Transport)
+        });
+    }
+
     public static SectionAmounts Resolve(IReadOnlyList<Line> lines, IReadOnlySet<long> validSystems,
         decimal smr, decimal transport, bool perPosition, bool bySystem, string? json,
         bool roundRows = false)
