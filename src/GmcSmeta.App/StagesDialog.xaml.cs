@@ -244,16 +244,25 @@ public partial class StagesDialog : Window
     private void StagesGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         StageMenu.Items.Clear();
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision))
-        {
-            e.Handled = true;
-            return;
-        }
         // Меню строк и заголовка принципиально разные: операция над всеми
         // строками этапа не должна быть доступна из ПКМ по обычной ячейке.
         var keyboard = e.CursorLeft < 0 && e.CursorTop < 0;
         var header = false;
         var target = keyboard ? StagesGrid.CurrentColumn : ColumnUnderMouse(out header);
+        if (_building || _quantityWriteBusy)
+        {
+            e.Handled = true;
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_revision))
+        {
+            // A missing SQL revision must block every data command, but not
+            // the local column layout. No stale stage ID may reach a mutation.
+            if (!keyboard && header)
+                TableColumnMenu.AppendDynamicMenu(StagesGrid, StageMenu);
+            e.Handled = StageMenu.Items.Count == 0;
+            return;
+        }
         if (keyboard || !header)
         {
             var hit = ContextMenuTarget.SelectRow<DataRowView>(StagesGrid, e);

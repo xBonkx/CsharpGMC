@@ -44,6 +44,12 @@ public static class TableColumnMenu
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Layout> Layouts = new();
 
+    // WPF smoke checks can use a temporary profile directory. Production always
+    // uses the existing per-user location; this hook is internal and process-local.
+    internal static string? TestProfileDirectory { get; set; }
+    private static string ProfileDirectory => TestProfileDirectory ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GMC-Smeta-Next", "column-layouts");
+
     internal static void RefreshDynamic(DataGrid grid, string key, bool ownHeaderMenu)
     {
         if (!ValidKey(key)) throw new ArgumentException("Invalid column layout key.", nameof(key));
@@ -66,6 +72,7 @@ public static class TableColumnMenu
     internal static void AppendDynamicMenu(DataGrid grid, ItemsControl menu)
     {
         if (!Layouts.TryGetValue(grid, out var layout)) return;
+        layout.Initialize();
         var columns = new MenuItem { Header = "Столбцы" };
         if (!layout.Populate(columns)) return;
         if (menu.Items.Count != 0) menu.Items.Add(new Separator());
@@ -210,8 +217,7 @@ public static class TableColumnMenu
         private bool _initialized, _applying;
         private Preferences _prefs = new();
         private Dictionary<DataGridColumn, DataGridLength>? _resizeStart;
-        private string PathName => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "GMC-Smeta-Next", "column-layouts", key + ".json");
+        private string PathName => Path.Combine(ProfileDirectory, key + ".json");
 
         private Preferences Read()
         {

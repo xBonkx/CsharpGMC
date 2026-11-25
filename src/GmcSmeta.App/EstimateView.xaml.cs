@@ -130,7 +130,7 @@ public partial class EstimateView : UserControl
         ApplyEstimateZoom();
         _uiSettingsReady = true;
         InitializeEstimateColumnLayout();
-        TableColumnMenu.InstallHeaderMenu(EstimateGrid, header => ShowEstimateColumns(header, PlacementMode.MousePoint, includePurchase: false));
+        TableColumnMenu.InstallHeaderMenu(EstimateGrid, header => ShowEstimateColumns(header, PlacementMode.MousePoint, includePurchase: true));
         KpDocumentTabs.Visibility = _isContract ? Visibility.Collapsed : Visibility.Visible;
         ContractDocumentTabs.Visibility = _isContract ? Visibility.Visible : Visibility.Collapsed;
         HintBar.Visibility = _uiSettings.EstimateHintHidden ? Visibility.Collapsed : Visibility.Visible;

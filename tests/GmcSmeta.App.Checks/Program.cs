@@ -13,10 +13,15 @@ using GmcSmeta.Core.Db;
 internal static class Program
 {
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--column-menu-check")
+            {
+                ColumnMenuChecks.Run();
+                return 0;
+            }
             CheckEstimateUiSettingsRecovery();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))
