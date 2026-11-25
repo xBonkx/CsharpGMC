@@ -108,17 +108,17 @@
                     <Button x:Name="MoreButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}"
                             Margin="6,0,0,0" Click="HeaderMore_Click">
                         <Button.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
+                            <ContextMenu Opened="ActMoreMenu_Opened">
+                                <MenuItem x:Name="PreSignMenuItem" Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
                                           ToolTip="Объёмы сверх КП, цены, строки вне сметы и выдача материалов"/>
                                 <Separator/>
-                                <MenuItem Header="Ведомость объёмов работ (ВОР) по этому акту…" Click="ExportVor_Click"/>
-                                <MenuItem Header="Сохранить все акты в один Excel…" Click="ExportAll_Click"/>
-                                <MenuItem Header="Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…" Click="ExportGroup_Click"/>
+                                <MenuItem x:Name="VorMenuItem" Header="Ведомость объёмов работ (ВОР) по этому акту…" Click="ExportVor_Click"/>
+                                <MenuItem x:Name="AllActsMenuItem" Header="Сохранить все акты в один Excel…" Click="ExportAll_Click"/>
+                                <MenuItem x:Name="GroupExportMenuItem" Header="Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…" Click="ExportGroup_Click"/>
                                 <Separator/>
                                 <MenuItem x:Name="ExtraMenuItem" Header="Добавить позицию вне сметы…" Click="AddExtra_Click"/>
                                 <Separator/>
-                                <MenuItem Header="Удалить акт…" Foreground="#DC2626" Click="DeleteAct_Click"/>
+                                <MenuItem x:Name="DeleteActMenuItem" Header="Удалить акт…" Foreground="#DC2626" Click="DeleteAct_Click"/>
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
@@ -142,7 +142,7 @@
                             Margin="0,0,2,0" Click="ClearSelected_Click" ToolTip="Убрать выделенные строки из этого акта"/>
                     <Button Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}" Click="BarMore_Click">
                         <Button.ContextMenu>
-                            <ContextMenu>
+                            <ContextMenu Opened="ActMoreMenu_Opened">
                                 <MenuItem x:Name="ActDiscountMenuItem" Header="Корректировка итога КС…" Click="ActDiscount_Click" Visibility="Collapsed"/>
                                 <MenuItem x:Name="SectionAmountsMenuItem" Header="СМР и транспорт по разделам…" Click="SectionAmounts_Click" Visibility="Collapsed"/>
                                 <MenuItem x:Name="IssuedMenuItem" Header="Сдать то, что выдано на объект (из «Закупок»)"

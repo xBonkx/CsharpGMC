@@ -162,6 +162,16 @@ public partial class ActsEditorView : UserControl
     public ActsEditorView()
     {
         InitializeComponent();
+        ContextMenuIcons.Set(PreSignMenuItem, "Check");
+        ContextMenuIcons.Set(VorMenuItem, "Download");
+        ContextMenuIcons.Set(AllActsMenuItem, "Download");
+        ContextMenuIcons.Set(GroupExportMenuItem, "Download");
+        ContextMenuIcons.Set(ExtraMenuItem, "Plus");
+        ContextMenuIcons.Set(DeleteActMenuItem, "Trash", danger: true);
+        ContextMenuIcons.Set(ActDiscountMenuItem, "Edit");
+        ContextMenuIcons.Set(SectionAmountsMenuItem, "Layers");
+        ContextMenuIcons.Set(IssuedMenuItem, "Upload");
+        ContextMenuIcons.Set(RestAllMenuItem, "Check");
         ApplyTilesVisibility();
         Unloaded += (_,_) => DetachQuantityEditor();
     }
@@ -2279,6 +2289,28 @@ public partial class ActsEditorView : UserControl
     }
 
     // -------------------------------------------------------------- меню «Ещё»
+
+    // Re-evaluate on actual popup opening (including right-click and keyboard),
+    // not only when the act snapshot was initially loaded. No SQL I/O here.
+    private void ActMoreMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var current = Current;
+        var ready = CaptureActCommand() is not null && current is not null && _sheet is not null;
+        var unsigned = ready && current is { Signed: false };
+        var editableQuantities = unsigned && !_contractLocked;
+        var manualSections = !string.IsNullOrEmpty(_details?.SectionAmountsJson);
+        PreSignMenuItem.IsEnabled = VorMenuItem.IsEnabled =
+            AllActsMenuItem.IsEnabled = GroupExportMenuItem.IsEnabled = ready;
+        // Extra lines and act deletion retain their existing unsigned-act policy;
+        // SQL validation and the captured revision remain authoritative.
+        ExtraMenuItem.IsEnabled = DeleteActMenuItem.IsEnabled = unsigned;
+        IssuedMenuItem.IsEnabled = editableQuantities;
+        RestAllMenuItem.IsEnabled = editableQuantities && !manualSections && _totals is not null;
+        var adjustmentAvailable = ActDiscountMenuItem.Visibility == Visibility.Visible &&
+            _details?.SupportsAdjustment == true;
+        ActDiscountMenuItem.IsEnabled = SectionAmountsMenuItem.IsEnabled =
+            editableQuantities && adjustmentAvailable && _totals is not null;
+    }
 
     private void HeaderMore_Click(object sender, RoutedEventArgs e) => OpenMenu(sender);
 
