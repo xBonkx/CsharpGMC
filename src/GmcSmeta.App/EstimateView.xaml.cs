@@ -714,12 +714,7 @@ public partial class EstimateView : UserControl
     {
         // Python: status.emit → нижняя строка главного окна (QStatusBar).
         if (!_detached && Window.GetWindow(this) is MainWindow main)
-        {
-            main.StatusText.Text = message;
-            main.StatusText.Foreground = new SolidColorBrush(error
-                ? Color.FromRgb(0xC5, 0x30, 0x30)
-                : Color.FromRgb(0x64, 0x74, 0x8B));
-        }
+            main.SetEstimateStatus(message, error);
     }
 
     private async void RefreshAfterSave(object? sender, EventArgs e)
@@ -858,7 +853,7 @@ public partial class EstimateView : UserControl
                 else if (_saveAwaitingReadback)
                     SetStatus("Сохранено и сверено с SQL Server ✓", false);
                 else if (firstLoad)
-                    SetStatus("Смета загружена", false);
+                    SetStatus(loaded.Estimate.Title, false);
                 _saveAwaitingReadback = false;
                 _saveError = null;
                 SelectPositionFromSearch();
