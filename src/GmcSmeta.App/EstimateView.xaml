@@ -1350,7 +1350,8 @@
                 </WrapPanel>
                 <!-- таблица (cost_summary_view.show_data): группы, полосатые строки по блокам,
                      редактируются цены за ед./наименование/ед./кол-во, суммы считаются -->
-                <DataGrid local:TableColumnMenu.Key="estimate-summary" x:Name="SummaryGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="False"
+                <Grid Grid.Row="2" ClipToBounds="True">
+                    <DataGrid local:TableColumnMenu.Key="estimate-summary" x:Name="SummaryGrid" AutoGenerateColumns="False" IsReadOnly="False"
                           MinRowHeight="24" ColumnHeaderHeight="78" MinHeight="120"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
                           VirtualizingPanel.VirtualizationMode="Recycling"
@@ -1370,26 +1371,31 @@
                         <!-- шапки блоков: ПОЗИЦИЯ / МАТЕРИАЛЫ (голубой) / СМР (оранжевый) /
                              ИТОГО (зелёный) / маржи (сиреневый) — цвета SummaryHeader эталона -->
                         <Style x:Key="SumHdrPos" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+                            <Setter Property="Padding" Value="4,32,4,4"/>
                             <Setter Property="Background" Value="#EFF3F9"/>
                             <Setter Property="Foreground" Value="#526782"/>
                         </Style>
                         <Style x:Key="SumHdrMat" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+                            <Setter Property="Padding" Value="4,32,4,4"/>
                             <Setter Property="Background" Value="#F1F6FD"/>
                             <Setter Property="Foreground" Value="#526782"/>
                         </Style>
                         <Style x:Key="SumHdrWork" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+                            <Setter Property="Padding" Value="4,32,4,4"/>
                             <Setter Property="Background" Value="#FFF8EF"/>
                             <Setter Property="Foreground" Value="#526782"/>
                         </Style>
                         <Style x:Key="SumHdrTot" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+                            <Setter Property="Padding" Value="4,32,4,4"/>
                             <Setter Property="Background" Value="#F0F8F2"/>
                             <Setter Property="Foreground" Value="#526782"/>
                         </Style>
                         <Style x:Key="SumHdrMarg" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+                            <Setter Property="Padding" Value="4,32,4,4"/>
                             <Setter Property="Background" Value="#F1EAFB"/>
                             <Setter Property="Foreground" Value="#526782"/>
                         </Style>
-                        <TextBlock x:Key="SumBandSpacer" Text="" FontSize="10" FontWeight="SemiBold" MinHeight="13"/>
+                        <Style x:Key="SummaryMoney" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}"><Setter Property="TextTrimming" Value="None"/></Style>
                         <!-- ячейки: полосатые строки внутри цветных блоков + шапки систем/ИТОГО -->
                         <Style x:Key="SumCellBase" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}"></Style>
                         <Style x:Key="SumCellPos" TargetType="DataGridCell" BasedOn="{StaticResource SumCellBase}">
@@ -1510,11 +1516,7 @@
                                                 CellStyle="{StaticResource SumCellPos}"
                                                 HeaderStyle="{StaticResource SumHdrPos}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="ПОЗИЦИЯ" FontSize="10" FontWeight="SemiBold" Foreground="#526782"
-                                               HorizontalAlignment="Center" Margin="0,0,0,1"/>
-                                    <TextBlock Text="Наименование" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Наименование" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -1588,22 +1590,17 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- МАТЕРИАЛЫ: закуп за ед. · розн. за ед. · закуп · розница -->
-                        <DataGridTemplateColumn Width="96" SortMemberPath="m_ucost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_ucost"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="МАТЕРИАЛЫ" FontSize="10" FontWeight="SemiBold" Foreground="#286297"
-                                               HorizontalAlignment="Center" Margin="0,0,0,1"/>
-                                    <TextBlock Text="Закупка&#10;за ед." TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Закупка&#10;за ед." TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding CostUnitText}" ToolTip="{Binding CostUnitTip}">
                                         <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding CostMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
@@ -1623,21 +1620,17 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="96" SortMemberPath="m_uprice"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_uprice"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Цена клиенту&#10;за ед." TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Цена клиенту&#10;за ед." TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding PriceUnitText}" ToolTip="{Binding PriceUnitTip}">
                                         <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding PriceMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
@@ -1657,18 +1650,15 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="105" SortMemberPath="m_mcost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_mcost"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Закупка ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Закупка ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding MCostText}" Style="{StaticResource CompactCostMoney}"
+                                    <TextBlock Text="{Binding MCostText}" Style="{StaticResource SummaryMoney}"
                                                ToolTip="{Binding MCostTip}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -1680,18 +1670,15 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="105" SortMemberPath="m_msell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_msell"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Клиенту ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Клиенту ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding MSellText}" Style="{StaticResource CompactCostMoney}"/>
+                                    <TextBlock Text="{Binding MSellText}" Style="{StaticResource SummaryMoney}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -1703,22 +1690,17 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- СМР: закуп за ед. · розн. за ед. · закуп · розница -->
-                        <DataGridTemplateColumn Width="96" SortMemberPath="w_ucost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_ucost"
                                                 CellStyle="{StaticResource SumCellWork}"
                                                 HeaderStyle="{StaticResource SumHdrWork}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="СМР" FontSize="10" FontWeight="SemiBold" Foreground="#92591D"
-                                               HorizontalAlignment="Center" Margin="0,0,0,1"/>
-                                    <TextBlock Text="Закупка&#10;за ед." TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Закупка&#10;за ед." TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding WorkCostText}" ToolTip="{Binding WorkCostTip}">
                                         <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding WorkCostMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
@@ -1738,21 +1720,17 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="96" SortMemberPath="w_usell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_usell"
                                                 CellStyle="{StaticResource SumCellWork}"
                                                 HeaderStyle="{StaticResource SumHdrWork}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Цена клиенту&#10;за ед." TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Цена клиенту&#10;за ед." TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding WorkSellText}" ToolTip="{Binding WorkSellTip}">
                                         <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding WorkSellMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
@@ -1772,44 +1750,47 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Width="105" SortMemberPath="w_wcost" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wcost" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
                                             Binding="{Binding WCostText}"
-                                            ElementStyle="{StaticResource CompactCostMoney}">
+                                            ElementStyle="{StaticResource SummaryMoney}">
                             <DataGridTextColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Закупка ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Закупка ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="105" SortMemberPath="w_wsell" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wsell" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
                                             Binding="{Binding WSellText}"
-                                            ElementStyle="{StaticResource CompactCostMoney}">
+                                            ElementStyle="{StaticResource SummaryMoney}">
                             <DataGridTextColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Клиенту ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Клиенту ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
+                        <DataGridTextColumn Width="Auto" MinWidth="72" SortMemberPath="markup" IsReadOnly="True"
+                                            CellStyle="{StaticResource SumCellWork}"
+                                            HeaderStyle="{StaticResource SumHdrWork}"
+                                            Binding="{Binding MarkupText}">
+                            <DataGridTextColumn.Header>
+                                <TextBlock Text="Наценка,&#10;%" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
+                            </DataGridTextColumn.Header>
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
+                                    <Setter Property="Margin" Value="0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <!-- ИТОГО ПО ПОЗИЦИИ: закуп ∑ · клиенту ∑ -->
-                        <DataGridTemplateColumn Width="105" SortMemberPath="t_cost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_cost"
                                                 CellStyle="{StaticResource SumCellTot}"
                                                 HeaderStyle="{StaticResource SumHdrTot}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="ИТОГО ПО ПОЗИЦИИ" FontSize="10" FontWeight="SemiBold" Foreground="#2E7547"
-                                               HorizontalAlignment="Center" Margin="0,0,0,1"/>
-                                    <TextBlock Text="Закупка ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Закупка ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding TotalCostText}" Style="{StaticResource CompactCostMoney}"/>
+                                    <TextBlock Text="{Binding TotalCostText}" Style="{StaticResource SummaryMoney}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -1820,18 +1801,15 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="105" SortMemberPath="t_sell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_sell"
                                                 CellStyle="{StaticResource SumCellTot}"
                                                 HeaderStyle="{StaticResource SumHdrTot}">
                             <DataGridTemplateColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Клиенту ∑" HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Клиенту ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTemplateColumn.Header>
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding TotalSellText}" Style="{StaticResource CompactCostMoney}"/>
+                                    <TextBlock Text="{Binding TotalSellText}" Style="{StaticResource SummaryMoney}"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -1843,19 +1821,15 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- маржи: материалы / работы (сиреневый блок) -->
-                        <DataGridTextColumn Width="108" SortMemberPath="mat_margin" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="mat_margin" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellMarg}"
                                             HeaderStyle="{StaticResource SumHdrMarg}"
                                             Binding="{Binding MatMarginText}">
                             <DataGridTextColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Маржа&#10;материалов, ₽" TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Маржа&#10;материалов, ₽" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                             <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding MatMarginNeg}" Value="True">
                                             <Setter Property="Foreground" Value="#DC2626"/>
@@ -1865,19 +1839,15 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="104" SortMemberPath="work_margin" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="work_margin" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellMarg}"
                                             HeaderStyle="{StaticResource SumHdrMarg}"
                                             Binding="{Binding WorkMarginText}">
                             <DataGridTextColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock FontSize="10" MinHeight="13" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Маржа&#10;работ, ₽" TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
+                                <TextBlock Text="Маржа&#10;работ, ₽" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                             <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding WorkMarginNeg}" Value="True">
                                             <Setter Property="Foreground" Value="#DC2626"/>
@@ -1887,26 +1857,10 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="78" SortMemberPath="markup" IsReadOnly="True"
-                                            CellStyle="{StaticResource SumCellWork}"
-                                            HeaderStyle="{StaticResource SumHdrWork}"
-                                            Binding="{Binding MarkupText}">
-                            <DataGridTextColumn.Header>
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="СМР" FontSize="10" FontWeight="SemiBold" Foreground="#92591D"
-                                               HorizontalAlignment="Center" Margin="0,0,0,1"/>
-                                    <TextBlock Text="Наценка,&#10;%" TextAlignment="Center" TextWrapping="Wrap"
-                                               HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </DataGridTextColumn.Header>
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
-                                    <Setter Property="Margin" Value="0"/>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
                     </DataGrid.Columns>
                 </DataGrid>
+                    <local:SummaryHeaderBands SourceGrid="{Binding ElementName=SummaryGrid}" Height="80" VerticalAlignment="Top" IsHitTestVisible="False"/>
+                </Grid>
                 <!-- примечание под таблицей (⚠ Неполно / Показано по фильтру) -->
                 <TextBlock x:Name="SummaryNote" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap"
                            Margin="2,8,2,0" Visibility="Collapsed"/>
