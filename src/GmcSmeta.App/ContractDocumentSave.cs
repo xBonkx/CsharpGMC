@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using ClosedXML.Excel;
 using Microsoft.Win32;
@@ -13,10 +14,15 @@ namespace GmcSmeta.App;
 /// </summary>
 public static class ContractDocumentSave
 {
-    public static async Task<bool> XlsxAsync(Window? owner, string proposedName, Func<XLWorkbook> create)
+    public static Task<bool> XlsxAsync(Window? owner, string proposedName, Func<XLWorkbook> create) =>
+        XlsxAsync(owner, proposedName, create, CancellationToken.None);
+
+    public static async Task<bool> XlsxAsync(Window? owner, string proposedName,
+        Func<XLWorkbook> create, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested) return false;
         var path = Destination(owner, "Экспорт Excel", "Excel (*.xlsx)|*.xlsx", ".xlsx", proposedName);
-        if (path is null) return false;
+        if (path is null || cancellationToken.IsCancellationRequested) return false;
         return await SaveAsync(owner, path, temporary =>
         {
             using var workbook = create();
@@ -26,7 +32,7 @@ public static class ContractDocumentSave
             using var check = new XLWorkbook(temporary);
             if (check.Worksheets.Count == 0)
                 throw new InvalidDataException("Не удалось проверить сохранённую книгу.");
-        }, ".xlsx");
+        }, ".xlsx", cancellationToken);
     }
 
     public static async Task<bool> PdfAsync(Window? owner, string proposedName, Func<byte[]> create)
@@ -58,7 +64,7 @@ public static class ContractDocumentSave
     }
 
     private static async Task<bool> SaveAsync(Window? owner, string destination,
-        Action<string> generate, string extension)
+        Action<string> generate, string extension, CancellationToken cancellationToken = default)
     {
         var folder = Path.GetDirectoryName(Path.GetFullPath(destination))!;
         var temporary = Path.Combine(folder, ".gmc-export-" + Guid.NewGuid().ToString("N") + extension);
@@ -66,12 +72,20 @@ public static class ContractDocumentSave
         {
             await Task.Run(() =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 generate(temporary);
+                // Before publication the old destination is still untouched.
+                cancellationToken.ThrowIfCancellationRequested();
                 File.Move(temporary, destination, true);
             });
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
         catch (Exception error)
         {
+            if (cancellationToken.IsCancellationRequested) return false;
             MessageBox.Show(owner, error.Message, "Экспорт документа",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
@@ -82,6 +96,7 @@ public static class ContractDocumentSave
             catch { /* Temporary file cleanup must not mask the original error. */ }
         }
 
+        if (cancellationToken.IsCancellationRequested) return true;
         try { Process.Start(new ProcessStartInfo(destination) { UseShellExecute = true }); }
         catch { /* The saved file is valid without a local viewer. */ }
         return true;

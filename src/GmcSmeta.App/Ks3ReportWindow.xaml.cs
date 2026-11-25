@@ -1,4 +1,6 @@
+using System.Threading;
 using System.Windows;
+using ClosedXML.Excel;
 using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 
@@ -18,6 +20,9 @@ public partial class Ks3ReportWindow : Window
     private readonly string _actNumber;
     private readonly DateTime _actDate;
     private SqlServerActs.Ks3Report? _report;
+    private readonly CancellationTokenSource _exportLifetime = new();
+    private bool _closed;
+    private bool _exportInProgress;
 
     public Ks3ReportWindow(string connectionString, long actId, string actNumber,
         DateTime actDate, DateTime? from, DateTime? to)
@@ -30,6 +35,12 @@ public partial class Ks3ReportWindow : Window
         ActInfoText.Text = $"КС-2 № {actNumber} от {actDate:dd.MM.yyyy} · " +
             $"период с {from:dd.MM.yyyy} по {to:dd.MM.yyyy}";
         Loaded += OnLoaded;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _exportLifetime.Cancel();
+            _exportLifetime.Dispose();
+        };
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -39,7 +50,7 @@ public partial class Ks3ReportWindow : Window
         {
             ActInfoText.Text += " · загрузка SQL Server…";
             var report = await Task.Run(() => SqlServerActs.Ks3Figures(_connectionString, _actId));
-            if (!IsLoaded) return;
+            if (_closed || !IsLoaded) return;
             _report = report;
             ActInfoText.Text = $"КС-2 № {_actNumber} от {_actDate:dd.MM.yyyy}";
             PeriodNetText.Text = Money.Format(report.Period);
@@ -55,20 +66,48 @@ public partial class Ks3ReportWindow : Window
         }
         catch (Exception ex)
         {
-            ActInfoText.Text = "Ошибка загрузки: " + ex.Message;
+            if (!_closed) ActInfoText.Text = "Ошибка загрузки: " + ex.Message;
         }
     }
 
-    private void Export_Click(object sender, RoutedEventArgs e)
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
         var report = _report;
-        if (report is null) return;
-        XlsxExport.Save(this, $"Расчёт КС-3 № {_actNumber} от {_actDate:dd.MM.yyyy}", sheet =>
+        if (_closed || _exportInProgress || report is null) return;
+        _exportInProgress = true;
+        ExportButton.IsEnabled = false;
+        var originalInfo = ActInfoText.Text;
+        var token = _exportLifetime.Token;
+        try
         {
+            ActInfoText.Text = originalInfo + " · подготовка Excel…";
+            var saved = await ContractDocumentSave.XlsxAsync(this,
+                $"Расчёт КС-3 № {_actNumber} от {_actDate:dd.MM.yyyy}",
+                () => CreateWorkbook(report, _actNumber, _actDate), token);
+            if (!_closed)
+                ActInfoText.Text = originalInfo + (saved ? " · Excel сохранён" : " · экспорт не завершён");
+        }
+        catch (Exception ex)
+        {
+            if (!_closed) ActInfoText.Text = originalInfo + " · ошибка экспорта: " + ex.Message;
+        }
+        finally
+        {
+            _exportInProgress = false;
+            if (!_closed) ExportButton.IsEnabled = _report is not null;
+        }
+    }
+
+    private static XLWorkbook CreateWorkbook(SqlServerActs.Ks3Report report, string number, DateTime date)
+    {
+        var book = new XLWorkbook();
+        try
+        {
+            var sheet = book.Worksheets.Add("Лист1");
             sheet.Cell(1, 1).Value = "РАСЧЁТ КС-3 — финансовая справка, не официальный бланк";
             sheet.Range(1, 1, 1, 3).Merge();
             sheet.Cell(1, 1).Style.Font.Bold = true;
-            sheet.Cell(2, 1).Value = $"КС-2 № {_actNumber} от {_actDate:dd.MM.yyyy}";
+            sheet.Cell(2, 1).Value = $"КС-2 № {number} от {date:dd.MM.yyyy}";
             XlsxExport.Header(sheet, 4, new[] { "Показатель", "Сумма, ₽" });
             var amounts = new (string Caption, decimal Value)[]
             {
@@ -97,7 +136,15 @@ public partial class Ks3ReportWindow : Window
             }
             sheet.Column(1).Width = 57;
             sheet.Column(2).Width = 24;
-        });
+            // XlsxExport.Save previously applied the same bounded autofit.
+            sheet.Columns().AdjustToContents(1, Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 1, 200));
+            return book;
+        }
+        catch
+        {
+            book.Dispose();
+            throw;
+        }
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
