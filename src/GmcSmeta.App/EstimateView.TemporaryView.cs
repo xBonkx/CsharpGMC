@@ -113,7 +113,7 @@ public partial class EstimateView
         {
             var text = Clipboard.ContainsText() ? Clipboard.GetText() : null;
             ownClip = EstimateClipboardPolicy.IsOwned(ClipboardIsOurs, ClipboardTextAtCopy, text);
-            excelClip = text is not null && !ownClip;
+            excelClip = EstimateClipboardPolicy.IsExternalText(ClipboardIsOurs, ClipboardTextAtCopy, text);
         }
         catch (System.Runtime.InteropServices.ExternalException) { /* буфер занят */ }
         if (excelClip)

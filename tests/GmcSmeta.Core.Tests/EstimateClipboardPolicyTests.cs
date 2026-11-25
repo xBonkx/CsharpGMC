@@ -14,4 +14,16 @@ public sealed class EstimateClipboardPolicyTests
     {
         Assert.Equal(expected, EstimateClipboardPolicy.IsOwned(copied, owned, actual));
     }
+
+    [Theory]
+    [InlineData(true, "position\tqty", "position\tqty", false)]
+    [InlineData(true, "position\tqty", "invoice\tqty", true)]
+    [InlineData(false, null, "invoice\tqty", true)]
+    [InlineData(true, "position\tqty", null, false)]
+    [InlineData(false, null, "", false)]
+    [InlineData(false, null, " \t\r\n", false)]
+    public void ReplacementRequiresCurrentExternalText(bool copied, string? owned, string? actual, bool expected)
+    {
+        Assert.Equal(expected, EstimateClipboardPolicy.IsExternalText(copied, owned, actual));
+    }
 }

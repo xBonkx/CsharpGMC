@@ -293,14 +293,23 @@ public partial class EstimateView
             SetStatus("Заверши сохранение и обнови смету перед операцией с буфером.", true);
             return;
         }
-        if (!Clipboard.ContainsText())
+        // Recheck at execution, not just when the context menu was opened.
+        // Read once so the validated text is exactly the text passed to the parser.
+        string? systemText;
+        try { systemText = Clipboard.ContainsText() ? Clipboard.GetText() : null; }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            SetStatus("Буфер Windows временно занят. Повтори замену.", true);
+            return;
+        }
+        if (!EstimateClipboardPolicy.IsExternalText(ClipboardIsOurs, ClipboardTextAtCopy, systemText))
         {
             SetStatus("Сначала скопируйте в Excel строки (например, из счёта), потом выделите строки КП " +
                 "и нажмите Ctrl+Shift+V", true);
             return;
         }
         IReadOnlyList<PastedPosition> parsed;
-        try { parsed = PastedPositions.Parse(Clipboard.GetText()); }
+        try { parsed = PastedPositions.Parse(systemText!); }
         catch (Exception ex) { SetStatus("Ошибка разбора буфера: " + ex.Message, true); return; }
         var newRows = parsed.Where(r => !string.IsNullOrWhiteSpace(r.Name)).ToList();
         if (newRows.Count == 0)
