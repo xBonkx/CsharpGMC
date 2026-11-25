@@ -68,12 +68,11 @@ function Upload-Asset([long]$releaseId, [string]$file) {
     $size = [math]::Round((Get-Item -LiteralPath $file).Length / 1MB, 1)
     Write-Host "  загружаю $name ($size МБ)…"
     $url = "https://uploads.github.com/repos/$Repository/releases/$releaseId/assets?name=$([uri]::EscapeDataString($name))"
-    $code = & curl.exe -sS -X POST -H "Authorization: Bearer $script:token" -H 'User-Agent: GMC-Smeta-Release' `
-        -H 'Content-Type: application/octet-stream' --data-binary "@$file" -o "$env:TEMP\gmc-upload.json" `
-        -w '%{http_code}' $url
-    if ($code -ne '201') {
-        $detail = Get-Content "$env:TEMP\gmc-upload.json" -Raw -ErrorAction SilentlyContinue
-        throw "GitHub не принял $name (HTTP $code): $detail"
+    $result = Invoke-WebRequest -UseBasicParsing -Method Post -Uri $url -InFile $file `
+        -Headers @{ Authorization = "Bearer $script:token"; 'User-Agent' = 'GMC-Smeta-Release' } `
+        -ContentType 'application/octet-stream' -TimeoutSec 900
+    if ([int]$result.StatusCode -ne 201) {
+        throw "GitHub не принял $name (HTTP $($result.StatusCode))."
     }
 }
 
@@ -175,6 +174,7 @@ try {
     Compress-Archive -Path (Join-Path $work 'app-sc\*') -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64.zip') -CompressionLevel Optimal
     Compress-Archive -Path (Join-Path $work 'app-fx\*') -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64-fx.zip') -CompressionLevel Optimal
     Copy-Item (Join-Path $work 'launcher\GmcSmeta.Launcher.exe') (Join-Path $out 'GmcSmeta.Launcher.exe')
+    Copy-Item (Join-Path $work 'launcher\GmcSmeta.Launcher.exe') (Join-Path $out 'GMC-Smeta-CSharp-Start.exe')
     Set-Content -Path (Join-Path $out 'version.txt') -Value $tag -Encoding utf8
     Set-Content -Path (Join-Path $out 'sql-schema-version.txt') -Value $schemaVersion -Encoding utf8
     $sums = Get-ChildItem $out -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
