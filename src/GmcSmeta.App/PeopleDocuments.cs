@@ -126,7 +126,9 @@ public static class PeopleDocuments
                         values.Reverse().FirstOrDefault(x => Regex.IsMatch(x, @"\d{3}") && x.Length <= 12) ?? "";
                     var carModel = model > 0 && model <= cells.Length ? cells[model - 1] :
                         values.FirstOrDefault(x => x != carPlate && !int.TryParse(x, out _)) ?? "";
-                    if (carModel.Length > 0 || carPlate.Length > 0)
+                    // A car row always has at least the ordinal number plus model/plate;
+                    // merged trailing rows (signer, totals) have a single value and are not cars.
+                    if ((carModel.Length > 0 || carPlate.Length > 0) && values.Length >= 2)
                         cars.Add(new CarImportRow(carModel, carPlate));
                 }
             }
