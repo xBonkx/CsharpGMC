@@ -188,6 +188,13 @@ public partial class EstimateView
         }.ShowDialog();
     }
 
+    private void SaveCalculationLink_Click(object sender, RoutedEventArgs e)
+    {
+        ExtraActionsExpander.IsOpen = false;
+        if (Window.GetWindow(this) is MainWindow main && _doc is not null)
+            main.CreateGmcsLink(_doc);
+    }
+
     private void ShowHistory_Click(object sender, RoutedEventArgs e)
     {
         ExtraActionsExpander.IsOpen = false;

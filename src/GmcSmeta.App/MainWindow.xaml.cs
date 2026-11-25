@@ -1675,7 +1675,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CreateGmcsLink(DocRow doc)
+    internal void CreateGmcsLink(DocRow doc)
     {
         try
         {
@@ -1693,7 +1693,9 @@ public partial class MainWindow : Window
             {
                 type = "gmc-smeta-link",
                 version = 1,
-                db = _sqlConnectionString ?? "",
+                // A portable link identifies a document in the already connected database.
+                // Never persist a SQL connection string (it may contain credentials).
+                db = "",
                 contract_id = doc.Id,
                 object_id = doc.ObjectId,
                 @object = obj?.Name ?? "",
