@@ -205,6 +205,13 @@ public partial class EstimateView
         }
     }
 
+    private void SaveDocumentLink_Click(object sender, RoutedEventArgs e)
+    {
+        ExtraActionsExpander.IsOpen = false;
+        if (Window.GetWindow(this) is MainWindow main)
+            main.CreateGmcsLink(_doc);
+    }
+
     private void CompareDocs_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
