@@ -126,7 +126,7 @@ public static partial class SqlServerTrash
             throw new InvalidOperationException("Неверный формат снимка корзины.");
         // P1 #67: no partial restoration that silently drops protected history or FK.
         // Runs under the existing SERIALIZABLE/meta.rev transaction, before INSERT.
-        TrashRestoreSafety.ValidateSnapshot(snapshot.RootElement, kind);
+        TrashRestoreSafety.ValidateSnapshot(snapshot.RootElement, kind, allowStage: true);
 
         var columns = LoadColumns(conn, tx, RestoreOrder);
         var decoded = RestoreOrder.ToDictionary(t => t, t => SnapshotRows(snapshot.RootElement, t, columns[t]));
@@ -136,6 +136,11 @@ public static partial class SqlServerTrash
         if ((kind == "object" && decoded["objects"].Count == 0)
             || (kind == "contract" && decoded["contracts"].Count == 0))
             throw new InvalidOperationException("Снимок корзины неполный: отсутствует корневая запись.");
+
+        long? stageParent = kind == "contract" && decoded["contracts"][0].GetValueOrDefault("stage_of") is object parentLink
+            ? Convert.ToInt64(parentLink, CultureInfo.InvariantCulture) : null;
+        if (stageParent is long fullId)
+            ValidateStageRestore(conn, tx, fullId, decoded, intoObjectId);
 
         // trash.restore: одиночный документ остаётся на живом объекте; иначе — объект назначения
         // или новый объект с названием из записи корзины.
@@ -190,7 +195,12 @@ public static partial class SqlServerTrash
                     && parent is not null)
                 {
                     var oldParentId = Convert.ToInt64(parent, CultureInfo.InvariantCulture);
-                    row["parent_id"] = maps[table].TryGetValue(oldParentId, out var newParentId) ? newParentId : null;
+                    if (maps[table].TryGetValue(oldParentId, out var newParentId))
+                        row["parent_id"] = newParentId;
+                    else if (stageParent.HasValue)
+                        throw new InvalidOperationException("Не удалось восстановить родительскую строку этапа.");
+                    else
+                        row["parent_id"] = null;
                 }
                 foreach (var (column, target) in new[]
                 {
@@ -227,6 +237,16 @@ public static partial class SqlServerTrash
         Relink(conn, tx, snapshot.RootElement, "price_links", "price_history", "contract_id", maps["contracts"]);
         Relink(conn, tx, snapshot.RootElement, "metal_links", "metal_entries", "object_id", maps["objects"]);
 
+        if (stageParent is long restoredParent)
+        {
+            var (stages, rows) = SqlServerStages.StageTable(conn, restoredParent, tx);
+            var restoredStageId = maps["contracts"].Values.Single();
+            var stageIndex = stages.FindIndex(stage => stage.Id == restoredStageId);
+            if (stageIndex < 0 || rows.Any(row => row.PerStage[stageIndex] > 0m && row.Rest < -0.000001m))
+                throw new InvalidOperationException("Объёмы этапа превышают текущий остаток полного КП.");
+            SqlServerStages.RefreshStageGroup(conn, tx, restoredParent);
+        }
+
         using (var del = new SqlCommand("DELETE dbo.trash WHERE id=@id", conn, tx))
         {
             del.Parameters.Add("@id", SqlDbType.BigInt).Value = trashId;
@@ -247,6 +267,53 @@ public static partial class SqlServerTrash
                 throw new TrashCommitUnknownException(error);
         }
         return new RestoredItem(kind, restoredId);
+    }
+
+    private static void ValidateStageRestore(SqlConnection conn, SqlTransaction tx, long fullId,
+        Dictionary<string, List<Dictionary<string, object?>>> rows, long? destination)
+    {
+        var contract = rows["contracts"].Single();
+        var objectId = RequiredId(contract, "object_id");
+        using (var check = new SqlCommand("""
+            SELECT COUNT(*) FROM dbo.contracts c
+            JOIN dbo.objects o ON o.id=c.object_id
+            WHERE c.id=@full AND c.object_id=@object AND c.kind=N'kp' AND c.stage_of IS NULL
+              AND c.locked=0 AND o.archived=0
+              AND NOT EXISTS (SELECT 1 FROM dbo.contracts s WHERE s.stage_of=c.id AND s.stage_no=@number)
+            """, conn, tx))
+        {
+            check.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
+            check.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
+            check.Parameters.Add("@number", SqlDbType.BigInt).Value = RequiredId(contract, "stage_no");
+            if ((destination.HasValue && destination != objectId) || (int)check.ExecuteScalar()! != 1)
+                throw new InvalidOperationException("Исходное КП недоступно или номер этапа уже занят.");
+        }
+
+        var sourceSystems = new HashSet<long>();
+        var sourcePositions = new HashSet<long>();
+        using (var sources = new SqlCommand("""
+            SELECT id FROM dbo.systems WHERE contract_id=@full;
+            SELECT p.id FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id WHERE s.contract_id=@full;
+            """, conn, tx))
+        {
+            sources.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
+            using var reader = sources.ExecuteReader();
+            while (reader.Read()) sourceSystems.Add(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture));
+            reader.NextResult();
+            while (reader.Read()) sourcePositions.Add(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture));
+        }
+        bool LinkMissing(Dictionary<string, object?> row, string column, HashSet<long> valid) =>
+            row.GetValueOrDefault(column) is object id &&
+            !valid.Contains(Convert.ToInt64(id, CultureInfo.InvariantCulture));
+        bool ExternalMissing(Dictionary<string, object?> row, string column, string table) =>
+            row.GetValueOrDefault(column) is object id &&
+            !Exists(conn, tx, table, Convert.ToInt64(id, CultureInfo.InvariantCulture));
+        if (ExternalMissing(contract, "company_id", "companies") ||
+            rows["systems"].Any(row => LinkMissing(row, "stage_sys_src", sourceSystems)) ||
+            rows["positions"].Any(row => LinkMissing(row, "stage_src", sourcePositions) ||
+                ExternalMissing(row, "catalog_item_id", "catalog_items") ||
+                ExternalMissing(row, "supplier_id", "suppliers")))
+            throw new InvalidOperationException("Исходные разделы, позиции или справочники этапа изменились.");
     }
 
     /// <summary>Удалить навсегда одну запись из корзины (данные были удалены раньше).</summary>

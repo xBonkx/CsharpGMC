@@ -49,7 +49,7 @@ public static partial class SqlServerTrash
     }
 
     /// <summary>Полная копия документа перед удалением (trash.keep_contract). Возвращает id записи корзины.</summary>
-    public static long KeepContract(SqlConnection conn, SqlTransaction tx, long contractId)
+    public static long KeepContract(SqlConnection conn, SqlTransaction tx, long contractId, bool allowStage = false)
     {
         string title, objectName;
         using (var cmd = new SqlCommand(
@@ -67,7 +67,7 @@ public static partial class SqlServerTrash
         var dump = DumpContracts(conn, tx, new List<long> { contractId });
         // KeepContract is called before SqlServerWorkspace deletes acts/movements.
         // Do not allow irreversible loss that the current restore cannot recover.
-        TrashRestoreSafety.ValidateSnapshot(JsonSerializer.SerializeToElement(dump, JsonOptions), "contract");
+        TrashRestoreSafety.ValidateSnapshot(JsonSerializer.SerializeToElement(dump, JsonOptions), "contract", allowStage);
         return Store(conn, tx, "contract", title, objectName, dump);
     }
 

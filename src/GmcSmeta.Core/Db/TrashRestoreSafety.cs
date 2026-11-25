@@ -17,7 +17,7 @@ public static class TrashRestoreSafety
         "access_lists", "contract_links", "price_links", "metal_links"
     ];
 
-    public static void ValidateSnapshot(JsonElement root, string kind)
+    public static void ValidateSnapshot(JsonElement root, string kind, bool allowStage = false)
     {
         if (root.ValueKind != JsonValueKind.Object || kind is not ("object" or "contract"))
             throw new InvalidDataException("Недопустимый снимок корзины.");
@@ -54,6 +54,7 @@ public static class TrashRestoreSafety
             kind == "contract" && (objects.Count != 0 || contracts.Count != 1))
             throw new InvalidDataException("Количество корневых записей не совпадает.");
 
+        var linkedStage = allowStage && kind == "contract" && HasReference(contracts[0], "stage_of");
         var objectIds = Ids(objects);
         var contractIds = Ids(contracts);
         var systemIds = Ids(systems);
@@ -67,12 +68,12 @@ public static class TrashRestoreSafety
         {
             if (!IsFalse(contract, "locked") ||
                 !TryText(contract, "kind", out var type) || type != "kp" ||
-                HasReference(contract, "stage_of") || IsTrue(contract, "stage_rest"))
+                (!linkedStage && HasReference(contract, "stage_of")) || IsTrue(contract, "stage_rest"))
                 throw new InvalidOperationException("Только незакрытые КП допускаются к восстановлению.");
             if (kind == "object") MustReference(contract, "object_id", objectIds);
             // The current restore drops missing external company/parent links to NULL.
             // Do not accept that loss under the restricted restoration policy.
-            if (HasReference(contract, "company_id") || HasReference(contract, "base_contract_id"))
+            if ((!linkedStage && HasReference(contract, "company_id")) || HasReference(contract, "base_contract_id"))
                 throw new InvalidOperationException("Внешние ссылки КП требуют отдельной проверки.");
         }
 
@@ -80,7 +81,7 @@ public static class TrashRestoreSafety
         {
             MustReference(system, "contract_id", contractIds);
             OptionalReference(system, "parent_id", systemIds);
-            if (HasReference(system, "stage_sys_src"))
+            if (!linkedStage && HasReference(system, "stage_sys_src"))
                 throw new InvalidOperationException("Ссылки этапов не проверены.");
         }
 
@@ -88,9 +89,9 @@ public static class TrashRestoreSafety
         {
             MustReference(position, "system_id", systemIds);
             OptionalReference(position, "parent_id", positionIds);
-            if (HasReference(position, "stage_src") ||
+            if (!linkedStage && (HasReference(position, "stage_src") ||
                 HasReference(position, "catalog_item_id") ||
-                HasReference(position, "supplier_id"))
+                HasReference(position, "supplier_id")))
                 throw new InvalidOperationException("Внешние ссылки позиции требуют проверки.");
         }
     }

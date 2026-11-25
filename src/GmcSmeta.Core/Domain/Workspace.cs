@@ -177,7 +177,9 @@ public static class Workspace
         var docs = all.Where(d => mode == NavigationMode.Archive ||
             (mode == NavigationMode.Kp ? d.Kind == "kp" : d.Kind is "main" or "dop")).ToList();
         var counted = CountedDocumentIds(all, mode);
-        var finances = FinanceReader.ReadAll(conn);
+        var finances = conn is Microsoft.Data.SqlClient.SqlConnection sql
+            ? FinanceReader.ReadSelected(sql, docs.Select(doc => doc.Id), out _)
+            : FinanceReader.ReadAll(conn);
         var tags = new Dictionary<string, string>();
         using (var cmd = conn.CreateCommand())
         {

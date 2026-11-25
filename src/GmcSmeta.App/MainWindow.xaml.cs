@@ -472,6 +472,8 @@ public partial class MainWindow : Window
     // UI-only sequence; superseded object-card results never replace the
     // currently open page when a user navigates quickly.
     private int _objectCardLoadRequest;
+    private readonly Dictionary<(int ObjectId, NavigationMode Mode), ObjectDocuments> _objectCardCache = new();
+    private string? _objectCardCacheRevision;
 
     private async void ShowObject(ObjectRow o)
     {
@@ -517,20 +519,25 @@ public partial class MainWindow : Window
         ObjectTotals.DataContext = null;
         DocumentCards.ItemsSource = null;
         StatusText.Text = $"{o.Name} · загрузка карточек SQL Server…";
-        ObjectDocuments documents;
+        var cacheKey = (o.Id, mode);
+        var cached = _objectCardCache.GetValueOrDefault(cacheKey);
+        var cachedRevision = _objectCardCacheRevision;
+        (ObjectDocuments Documents, string Revision) loaded;
         try
         {
-            documents = await Task.Run(() =>
+            loaded = await Task.Run(() =>
             {
                 using var read = SqlServerDatabase.Open(connectionString);
                 var before = SqlServerDatabase.Revision(read);
                 if (string.IsNullOrWhiteSpace(before) ||
                     !Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot))
                     throw new InvalidOperationException("Состав документов или реквизиты объекта изменились. Нажмите F5.");
-                var result = Workspace.ReadObjectDocuments(read, o, documentsSnapshot, mode);
+                var result = cached is not null && cachedRevision == before
+                    ? cached
+                    : Workspace.ReadObjectDocuments(read, o, documentsSnapshot, mode);
                 if (before != SqlServerDatabase.Revision(read))
                     throw new InvalidOperationException("Данные изменились во время загрузки карточек. Нажмите F5.");
-                return result;
+                return (result, before);
             });
         }
         catch (Exception ex)
@@ -545,6 +552,11 @@ public partial class MainWindow : Window
         }
         // A different object/estimate may have been selected before SQL replied.
         if (!IsCurrent()) return;
+        if (_objectCardCacheRevision != loaded.Revision || _objectCardCache.Count >= 24)
+            _objectCardCache.Clear();
+        _objectCardCacheRevision = loaded.Revision;
+        var documents = loaded.Documents;
+        _objectCardCache[cacheKey] = documents;
         ObjectTotals.DataContext = documents;
         _objectTileLayout = null;
         ObjectProgressCard.Visibility = documents.ShowProgress ? Visibility.Visible : Visibility.Collapsed;

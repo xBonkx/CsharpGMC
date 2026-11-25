@@ -33,6 +33,13 @@ public sealed class KsActMoneyGoldenTests
         Assert.Equal(0.67m,KsFinancialPolicy.Materials(rows,true,false));
     }
 
+    [Fact]
+    public void DnsRoundsProductWithOriginalPrecisionBeforeRoundingToKopecks()
+    {
+        var rows = new[] { (Quantity: 0.3349999999m, Price: 1m), (Quantity: 1.0000004m, Price: 12499.999m) };
+        Assert.Equal(12500.34m, KsFinancialPolicy.Materials(rows, false, true));
+    }
+
     [Theory]
     [InlineData(2500)]
     [InlineData(10000)]

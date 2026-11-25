@@ -35,6 +35,8 @@ public static class KsFinancialPolicy
         foreach (var (quantity, price) in lines)
         {
             var product = quantity * price;
+            if (roundEachRow && !rowsExact)
+                product = decimal.Round(product, 9, MidpointRounding.ToEven);
             total += rowsExact ? product :
                 decimal.Round(product, 2, roundEachRow
                     ? MidpointRounding.AwayFromZero : MidpointRounding.ToEven);

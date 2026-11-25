@@ -97,8 +97,12 @@ public static partial class SqlServerActs
             while (r.Read())
             {
                 var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-                var qty = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
-                var price = r.IsDBNull(2) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(2), CultureInfo.InvariantCulture));
+                var qty = r.IsDBNull(1) ? 0m : decimal.Parse(
+                    Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture),
+                    NumberStyles.Float, CultureInfo.InvariantCulture);
+                var price = r.IsDBNull(2) ? 0m : decimal.Parse(
+                    Convert.ToDouble(r.GetValue(2), CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture),
+                    NumberStyles.Float, CultureInfo.InvariantCulture);
                 if (!lines.TryGetValue(id, out var list))
                     lines[id] = list = new List<(decimal Quantity, decimal Price)>();
                 list.Add((qty, price));

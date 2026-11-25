@@ -823,13 +823,20 @@ public static partial class SqlServerStages
         RequireEditableStage(conn, tx, fullId, stageId, StageMutationPolicy.Operation.Delete);
         RequireNoDependentDocuments(conn, tx, stageId);
         var info = DescribeContract(conn, tx, stageId);
-        SqlServerTrash.KeepContract(conn, tx, stageId);
+        SqlServerTrash.KeepContract(conn, tx, stageId, allowStage: true);
         LogDelete(conn, tx, stageId, $"{info.ObjectName}: {info.Title}");
         DeleteStageRows(conn, tx, stageId);
         Execute(conn, tx, "DELETE FROM dbo.contracts WHERE id=@id", stageId);
-        SyncParentMoney(conn, tx, fullId);
+        RefreshStageGroup(conn, tx, fullId);
         SqlServerWorkspace.BumpRevision(conn, tx);
         tx.Commit();
+    }
+
+    internal static void RefreshStageGroup(SqlConnection conn, SqlTransaction tx, long fullId)
+    {
+        if (RestDoc(conn, tx, fullId) is long restId)
+            SyncRestCore(conn, tx, fullId, restId);
+        SyncParentMoney(conn, tx, fullId);
     }
 
     /// <summary>Деньги полного КП при разбивке по подписанным этапам (stages.sync_parent_money).</summary>
