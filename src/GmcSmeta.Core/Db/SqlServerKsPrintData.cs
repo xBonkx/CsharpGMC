@@ -77,13 +77,45 @@ public static class SqlServerKsPrintData
         return package;
     }
 
+    // Export all acts of the selected document, not all annexes of the legal agreement.
+    // Read once under the same revision, while keeping the legal scope for cumulative KS-3.
+    public static IReadOnlyList<Package> ReadAll(string connectionString, long contractId,
+        string expectedRevision)
+    {
+        using var conn = SqlServerDatabase.Open(connectionString);
+        var before = SqlServerDatabase.Revision(conn);
+        if (string.IsNullOrWhiteSpace(before) || before != expectedRevision)
+            throw new InvalidOperationException("КС изменились. Обновите акт перед выгрузкой.");
+        var scope = SqlServerKsContractScope.Read(conn, contractId);
+        var local = scope.Acts.Where(a => a.ContractId == contractId)
+            .OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
+        if (local.Length == 0 || local.Length > 500)
+            throw new InvalidOperationException("Неверное число актов для экспорта.");
+        var snapshot = ReadPackage(conn, contractId, scope,
+            KsGroupReport.CalculateSingle(scope, local[0].Id), local);
+        var document = scope.Documents.Single(d => d.Id == contractId);
+        var objectName = snapshot.Requisites.ObjectName.Trim().ToLowerInvariant();
+        var grouped = document.Form.Trim().Equals("r4", StringComparison.OrdinalIgnoreCase) &&
+            objectName is ("р4" or "p4" or "r4");
+        var reports = grouped
+            ? local.GroupBy(KsWorkspaceProjection.GroupKey)
+                .Select(g => KsGroupReport.Calculate(scope, g.Key, selectedDocumentOnly: true))
+            : local.Select(a => KsGroupReport.CalculateSingle(scope, a.Id));
+        var packages = reports.Select(report => snapshot with { Report = report }).ToArray();
+        if (before != SqlServerDatabase.Revision(conn))
+            throw new InvalidOperationException("КС изменились во время подготовки экспорта. Обновите акт.");
+        return packages;
+    }
+
     private static Package ReadPackage(SqlConnection conn, long contractId,
-        SqlServerKsContractScope.Scope scope, KsGroupReport report)
+        SqlServerKsContractScope.Scope scope, KsGroupReport report,
+        IReadOnlyList<SqlServerActs.ActInfo>? readActs = null)
     {
         var requisites = SqlServerKsRequisites.Read(conn, contractId);
         if (requisites.ObjectId != scope.Documents[0].ObjectId)
             throw new InvalidOperationException("Реквизиты не относятся к объекту выбранной КС-3.");
-        if (report.Acts.Count == 0 || report.Acts.Count > 500)
+        var selectedActs = readActs ?? report.Acts;
+        if (selectedActs.Count == 0 || selectedActs.Count > 500)
             throw new InvalidOperationException("Неверное число актов для экспорта.");
 
         var contractors = new Dictionary<long, Contractor>();
@@ -102,7 +134,7 @@ public static class SqlServerKsPrintData
             contractors.Add(doc.Id, new Contractor(doc.Id,S(0),S(1),S(2),S(3),S(4)));
         }
 
-        var ids = report.Acts.Select(a => a.Id).ToList();
+        var ids = selectedActs.Select(a => a.Id).ToList();
         var parameters = ids.Select((id, i) => "@act" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
         var lines = new List<Line>();
         using (var command = new SqlCommand(
@@ -150,7 +182,7 @@ public static class SqlServerKsPrintData
         }
 
         var sections=new List<Section>();
-        var docIds=report.Acts.Select(a=>a.ContractId).Distinct().ToArray();
+        var docIds=selectedActs.Select(a=>a.ContractId).Distinct().ToArray();
         using(var cmd=new SqlCommand(
             "SELECT id,contract_id,name FROM dbo.systems WHERE contract_id IN ("+
             string.Join(",",docIds.Select((_,i)=>"@d"+i))+") ORDER BY contract_id,[order],id",conn))

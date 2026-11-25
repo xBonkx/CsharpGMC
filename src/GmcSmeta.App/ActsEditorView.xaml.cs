@@ -1819,12 +1819,38 @@ public partial class ActsEditorView : UserControl
         }
     }
 
-    /// <summary>«Сохранить все акты в один Excel…» — окно общей КС-3: все КС-2 группы одним файлом.</summary>
+    /// <summary>All acts of this document, in one workbook (Python export_all).</summary>
     private void ExportAll_Click(object sender, RoutedEventArgs e)
     {
-        var current = Current;
-        if (current is null) return;
-        OpenGroupReport(KsWorkspaceProjection.GroupKey(current));
+        var target = CaptureActCommand();
+        if (target is null) return;
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Все акты в Excel",
+            FileName = SafeName($"КС-2, КС-3 все акты {_title} {DateTime.Today:dd.MM.yyyy}"),
+            Filter = "Excel (*.xlsx)|*.xlsx",
+        };
+        if (dlg.ShowDialog() != true) return;
+        try
+        {
+            RequireCurrentActCommand(target);
+            SetStatus("Сохранение всех актов…");
+            var bytes = Task.Run(() =>
+            {
+                var packages = SqlServerKsPrintData.ReadAll(
+                    target.ConnectionString, target.ContractId, target.Revision);
+                using var book = KsCustomerForms.CreateAll(packages);
+                using var stream = new MemoryStream();
+                book.SaveAs(stream);
+                return stream.ToArray();
+            }).GetAwaiter().GetResult();
+            System.IO.File.WriteAllBytes(dlg.FileName, bytes);
+            SetStatus("Сохранено: " + System.IO.Path.GetFileName(dlg.FileName));
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Ошибка сохранения всех актов: " + ex.Message, true);
+        }
     }
 
     /// <summary>«Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…».</summary>

@@ -23,12 +23,14 @@ public static class KsExcelForms
 
     private sealed record ActCells(string Sheet, int TotalRow, int VatRow);
 
-    public static void Fill(XLWorkbook book, SqlServerKsPrintData.Package package)
+    public static void Fill(XLWorkbook book, SqlServerKsPrintData.Package package) =>
+        Fill(book, package, new HashSet<string>(book.Worksheets.Select(w => w.Name), StringComparer.OrdinalIgnoreCase));
+
+    internal static void Fill(XLWorkbook book, SqlServerKsPrintData.Package package, HashSet<string> names)
     {
         if (package.Report.Acts.Count == 0)
             throw new InvalidOperationException("Нет актов для создания КС-2.");
 
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var cells = new List<ActCells>();
         foreach (var act in package.Report.Acts)
         {
