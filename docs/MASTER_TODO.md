@@ -277,7 +277,7 @@
 
 | ID | Приоритет | Задача | Статус | Доказательство | Остаток |
 |---|---|---|---|---|---|
-| [SUM-VIS-01](COST_SUMMARY_VISUAL_TODO_20261125.md) | P1 | Сводная стоимость: детальный визуальный и UX-паритет | PARTIAL | Блоки 1–7: оформление, picker, ПКМ, перестановка, маржа, скрытые колонки, viewport anchor до readback; тесты добавлены | Windows build/GUI/DPI, C12, C10/anchor на реальном WPF, E01–06; CTX-022 связан |
+| [SUM-VIS-01](COST_SUMMARY_VISUAL_TODO_20261125.md) | P1 | Сводная стоимость: детальный визуальный и UX-паритет | PARTIAL | Блоки 1–8: оформление, picker, ПКМ, перестановка, маржа, скрытые колонки, viewport anchor, статическая C12/E06, regression guards | Windows build/GUI/DPI, C12 на копии/округление, C10/anchor, E01–06 (отдельный legacy route); CTX-022 связан |
 
 ## Быстродействие
 

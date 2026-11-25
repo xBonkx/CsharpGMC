@@ -38,6 +38,53 @@ public sealed class SqlServerCostSummaryProjectionTests
         Assert.Equal(100m, result[1].MarkupPct);
     }
 
+    // Python cost_summary_view.row_rec deliberately retains the KP unit price
+    // of a manual installation row, but excludes it from material retail.
+    [Theory]
+    [InlineData(true, null, null, 0, 0)]
+    [InlineData(true, 5, 10, 0, 30)]
+    [InlineData(true, 0, 0, 0, 0)]
+    [InlineData(false, 5, 10, 60, 30)]
+    public void ManualWorkAndMaterialRowsKeepIndependentRetailFields(bool work,
+        int? workCost, int? workSell, int expectedMaterialSell, int expectedWorkSell)
+    {
+        var row = new CostSummaryRow(
+            Id: 1, SystemId: 1, Name: work ? "Монтаж П1" : "Воздуховод",
+            Unit: "шт", Qty: 3m, Supplier: "", MCost: 7m, MSell: 0m, WCost: 0m, WSell: 0m,
+            NoCost: false, NoPrice: false, NowCost: false, NowSell: false,
+            UCost: 2m, UPrice: 20m, UWcost: workCost, UWsell: workSell,
+            Fact: false, Plan: 2m, Kids: true, Work: work);
+        var result = Assert.Single(SqlServerCostSummary.FinalizeRows(new[] { row }));
+        Assert.Equal(20m, result.UPrice);
+        Assert.Equal(13m, result.MCost);
+        Assert.Equal((decimal)expectedMaterialSell, result.MSell);
+        Assert.Equal((decimal)expectedWorkSell, result.WSell);
+        Assert.Equal(3m * (workCost ?? 0), result.WCost);
+        Assert.Equal((decimal)(expectedMaterialSell + expectedWorkSell), result.TotalSell);
+        Assert.Equal(workCost is null, result.NowCost);
+        Assert.Equal(workSell is null, result.NowSell);
+        Assert.False(result.NoPrice);
+    }
+
+    [Fact]
+    public void MissingPurchaseFlagExcludesManualWorkButRetainsExplicitZero()
+    {
+        var source = new CostSummaryRow(
+            Id: 1, SystemId: 1, Name: "Позиция", Unit: "шт", Qty: 2m, Supplier: "",
+            MCost: 0m, MSell: 0m, WCost: 0m, WSell: 0m,
+            NoCost: false, NoPrice: false, NowCost: false, NowSell: false,
+            UCost: null, UPrice: 30m, UWcost: null, UWsell: null,
+            Fact: false, Plan: null, Kids: false, Work: false);
+        var rows = SqlServerCostSummary.FinalizeRows(new[] {
+            source, source with { Id = 2, Work = true },
+            source with { Id = 3, UCost = 0m },
+            source with { Id = 4, Qty = 0m } });
+        Assert.True(rows[0].NoCost);
+        Assert.False(rows[1].NoCost);
+        Assert.False(rows[2].NoCost);
+        Assert.False(rows[3].NoCost);
+    }
+
     [Fact]
     public void UnitCost_UsesActualThenPlanWithoutConfusingZeroAndMissing()
     {
