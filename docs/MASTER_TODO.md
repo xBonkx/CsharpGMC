@@ -524,6 +524,6 @@
 
 | ID | P | Задача | Статус | Доказательство | Остаток |
 |---|---|---|---|---|---|
-| MIG-REL-01 | P0 | Безопасный выпуск и миграция SQL | PARTIAL | `tools/publish-release.ps1`, 25.11.2026: статически восстановлен единый draft-first сценарий; добавлена кнопка изолированной репетиции и журнал; `MigrationFinanceSnapshot` сверяет КП/КС-2/КС-3 по версиям 28–31; guard v28 сохранён | PowerShell/Windows, фактическая репетиция SQL, независимый Python oracle, приёмка, cutover | 
+| MIG-REL-01 | P0 | Безопасный выпуск и миграция SQL | PARTIAL | `tools/publish-release.ps1`, 25.11.2026: статически восстановлен единый draft-first сценарий; добавлена кнопка изолированной репетиции и журнал; `MigrationFinanceSnapshot` сверяет КП/КС-2/КС-3 по версиям 28–31; guard v28 сохранён | PowerShell/Windows, фактическая репетиция SQL, запуск независимого Python oracle (`tools/sql-migrations/verify-python-finance.py`), приёмка, cutover | 
 
 Сводка новой активной очереди: 1 PARTIAL, 0 DONE; исторические 400 без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).
