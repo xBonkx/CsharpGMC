@@ -80,6 +80,7 @@ public partial class DirectorView : UserControl
         ExportButton.IsEnabled = false;
         RetryButton.Visibility = Visibility.Collapsed;
         LoadStatus.Text = "Загрузка сводки из SQL Server…";
+        LoadStatusPanel.Visibility = Visibility.Visible;
         TileTotalValue.Text = TileClosedValue.Text = TileExtraValue.Text = TileEarnedValue.Text = "—";
         var mode = (ModeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "contracts";
         var kp = mode == "kp";
@@ -113,12 +114,14 @@ public partial class DirectorView : UserControl
             _snapshotReady = true;
             ExportButton.IsEnabled = true;
             LoadStatus.Text = "";
+            LoadStatusPanel.Visibility = Visibility.Collapsed;
             StartupTrace.Mark("director_load_end");
         }
         catch (Exception ex)
         {
             if (generation != _loadGeneration || !IsLoaded) return;
             LoadStatus.Text = "Не удалось загрузить сводку: " + ex.Message;
+            LoadStatusPanel.Visibility = Visibility.Visible;
             RetryButton.Visibility = Visibility.Visible;
             StartupTrace.Mark("director_load_failed");
         }
@@ -195,8 +198,14 @@ public partial class DirectorView : UserControl
 
     private void Grid_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (_snapshotReady && DirectorGrid.SelectedItem is DirectorPreviewRow row)
-            ObjectOpenRequested?.Invoke((int)row.ObjectId);
+        // Like Python cellDoubleClicked: only the row actually clicked may open.
+        // Header, scrollbar and empty background must not open an old selection.
+        if (!_snapshotReady || e.ChangedButton != MouseButton.Left ||
+            e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(DirectorGrid, source) is not DataGridRow container ||
+            container.Item is not DirectorPreviewRow row)
+            return;
+        ObjectOpenRequested?.Invoke((int)row.ObjectId);
     }
 
     /// <summary>Экспорт сводки — xlsx.</summary>
