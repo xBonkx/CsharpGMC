@@ -385,12 +385,12 @@ public static partial class SqlServerActs
         long actId;
         using (var insert = new SqlCommand(
             "INSERT dbo.acts (contract_id,number,[date],period_from,period_to,signed,ds_no,ds_date,ds_extra," +
-            "smr_amount,rows_exact,gross_adjustment_cents,note" +
+            "smr_amount,transport_amount,rows_exact,gross_adjustment_cents,note,smr_by_system,created_at" +
             (schema31 ? ",discount_percent,discount_override,manual_total_cents,section_amounts_json" : "") + ") " +
             "OUTPUT INSERTED.id " +
             "SELECT id,@number,@date,@from," + (schema31 ? "@date" : "@from") +
-            ",0,ISNULL(ds_no,N''),ISNULL(ds_date,NULL),ISNULL(ds_extra,N'')," +
-            "0,0,0,N''" + (schema31 ? ",discount_percent,CONVERT(bit,0),-1,N''" : "") +
+            ",0,N'',NULL,N''," +
+            "0,0,0,0,N'',0,SYSDATETIME()" + (schema31 ? ",discount_percent,CONVERT(bit,0),-1,N''" : "") +
             " FROM dbo.contracts WHERE id=@cid", conn, tx))
         {
             insert.Parameters.AddWithValue("@number", nextNumber);

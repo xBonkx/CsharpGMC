@@ -10,3 +10,15 @@
 25.11.2026 MIG-REL-01 PARTIAL: в SchemaRehearsal добавлена сверка финансовых снимков до/после restore и DDL, версия явно определяет чтение полей скидок, распределения и ручной суммы. Тесты сравнения добавлены; Windows/SQL/Python oracle не запускались. Рабочая БД не изменена. Следующий шаг — проверить итоговые суммы по независимому Python эталону и выполнить тестовый прогон.
 
 25.11.2026 MIG-REL-01 PARTIAL: добавлен tools/sql-migrations/verify-python-finance.py и PythonFinanceOracleTests. Восемь синтетических сценариев по закреплённому Python aa6b34dcf0314df93086a297f01d549ff58cf705, временная SQLite, проверка фактических расчётов C# через xUnit. Написано, не выполнено; SQL/Windows не запускались, рабочая БД не тронута. Остаток — фактический запуск oracle и миграционной репетиции, реальные накопительные итоги и безопасное возобновление выпуска.
+
+## MIG-REL-01, DeepSeek/local acceptance — PARTIAL (25.11.2026)
+- Обычная запись v31 разрешена ТОЛЬКО для выделенной локальной тестовой БД `GmcSmetaPilot_Test_Schema31` (`SqlSchemaCompatibility.Schema31WritesAllowed`). Guard production не изменён; `WritableSchemaVersion` остаётся 28.
+- UI-гейты (скидки, разбивка КС) переведены на `Schema31WritesAllowed` вместо `OrdinarySchema31Enabled`.
+- Добавлен CLI-приёмочный прогон: `dotnet run --project src/GmcSmeta.Cli -- sql schema31 <conn>` (чтение 34 договоров, скидка договора +/-1%, скидка акта, разбивка, create/toggle signed/delete акта, undo/redo).
+- Исправлен `SqlServerActs.Create`: добавлены обязательные NOT NULL колонки (`smr_by_system`, `transport_amount`, `created_at`), убраны неверные ссылки `ds_no`/`ds_date`/`ds_extra` на `contracts`.
+- Тесты: 1256 пройдено; добавлены проверки совместимости для новой тестовой БД.
+- Известные проблемы для Codex:
+  1. Undo/Redo всё ещё падает на v31: «contract[0].created_at» значения выглядят одинаково, но равенство не проходит (похоже точность/Kind DateTime при восстановлении через `AddWithValue`). Добавлена диагностика в `UndoApplyResult.Error` и `SnapshotDifference`.
+  2. `SaveDiscount` percent 0% отклоняется для неподдерживаемых форм КС (ожидаемо).
+  3. В тестовой копии нет неподписанного акта с ручной разбивкой, поэтому запись разбивки проверена только чтением.
+- WIP отправлен в main; production cutover не согласован.

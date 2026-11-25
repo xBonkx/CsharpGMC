@@ -23,7 +23,7 @@ public static class SqlLive
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Использование: sql <status|smoke|trash|trash-obj|restore> <строка подключения> [id]");
+            Console.WriteLine("Использование: sql <status|smoke|schema31|trash|trash-obj|restore> <строка подключения> [id]");
             return 2;
         }
         var sub = args[0];
@@ -37,6 +37,7 @@ public static class SqlLive
         {
             "status" => Status(connectionString),
             "smoke" => Smoke(connectionString),
+            "schema31" => Schema31Acceptance(connectionString),
             "trash" => TrashRoundtrip(connectionString, long.Parse(args[2], CultureInfo.InvariantCulture)),
             "trash-obj" => TrashObjectRoundtrip(connectionString, long.Parse(args[2], CultureInfo.InvariantCulture)),
             "restore" => RestoreOnly(connectionString, long.Parse(args[2], CultureInfo.InvariantCulture)),
@@ -113,6 +114,196 @@ public static class SqlLive
         clock.Stop();
         Console.WriteLine();
         Console.WriteLine($"Документов: {ids.Count}, расхождений/ошибок: {failures}, время: {clock.ElapsedMilliseconds} мс");
+        return failures == 0 ? 0 : 1;
+    }
+
+    // --------------------------------------------------------- schema 31 gate
+
+    /// <summary>
+    /// Приёмочный прогон обычных писателей схемы 31 на выделенной локальной копии:
+    /// чтение всех документов, скидка договора, скидка акта, ручная разбивка,
+    /// жизненный цикл КС-2 и Undo/Redo. Любая другая база v31 отвергается Open().
+    /// </summary>
+    private static int Schema31Acceptance(string connectionString)
+    {
+        var failures = 0;
+        void Check(bool ok, string what)
+        {
+            Console.WriteLine((ok ? "OK: " : "FAIL: ") + what);
+            if (!ok) failures++;
+        }
+
+        using (var conn = SqlServerDatabase.Open(connectionString))
+        {
+            Check(SqlSchemaCompatibility.Schema31WritesAllowed(connectionString),
+                "обычная запись v31 разрешена только для " + SqlSchemaCompatibility.OrdinarySchema31TestDatabase);
+            Console.WriteLine($"База: {conn.Database}, схема 31, обычный Open");
+        }
+
+        Console.WriteLine("--- чтение всех документов ---");
+        if (Smoke(connectionString) != 0) return 1;
+
+        string RevisionOf()
+        {
+            using var conn = SqlServerDatabase.Open(connectionString);
+            return SqlServerDatabase.Revision(conn);
+        }
+
+        long contractId;
+        using (var conn = SqlServerDatabase.Open(connectionString))
+        using (var cmd = new SqlCommand("""
+            SELECT TOP(1) c.id
+            FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id
+            WHERE c.locked=0 AND c.stage_of IS NULL AND o.archived=0 AND c.discount_percent=0
+              AND NOT EXISTS(SELECT 1 FROM dbo.acts a WHERE a.contract_id=c.id
+                    AND (a.signed=1 OR a.discount_override=1 OR a.manual_total_cents>=0))
+              AND NOT EXISTS(SELECT 1 FROM dbo.contracts s WHERE s.stage_of=c.id)
+              AND NOT EXISTS(SELECT 1 FROM dbo.shipment_lines sl
+                    JOIN dbo.shipments sh ON sh.id=sl.shipment_id
+                    JOIN dbo.positions p ON p.id=sl.position_id
+                    JOIN dbo.systems sy ON sy.id=p.system_id
+                    WHERE sy.contract_id=c.id AND sh.fixed=1)
+              AND NOT EXISTS(SELECT 1 FROM dbo.movements m
+                    JOIN dbo.positions p ON p.id=m.position_id
+                    JOIN dbo.systems sy ON sy.id=p.system_id
+                    WHERE sy.contract_id=c.id AND m.shipment_id IS NOT NULL)
+            ORDER BY c.id
+            """, conn))
+        {
+            contractId = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        }
+        if (contractId == 0)
+        {
+            Console.WriteLine("Нет подходящего черновика для проверки записи.");
+            return 1;
+        }
+        Console.WriteLine($"Черновик для проверки записи: {contractId}");
+
+        decimal Total()
+        {
+            using var conn = SqlServerDatabase.Open(connectionString);
+            return Totals.ReadOne(conn, checked((int)contractId))?.Total ?? 0m;
+        }
+
+        var original = Total();
+        var saved = SqlServerActs.SaveContractDiscount(connectionString, contractId, 1m, RevisionOf());
+        Check(saved.Saved, "SaveContractDiscount 1%: " + (saved.Error ?? "сохранено"));
+        if (saved.Saved)
+        {
+            var discounted = Total();
+            Check(discounted < original && Math.Abs(original - discounted - original * 0.01m) < 0.05m,
+                $"итог изменился на 1%: {original:N2} → {discounted:N2}");
+            var restored = SqlServerActs.SaveContractDiscount(connectionString, contractId, 0m, saved.Revision);
+            Check(restored.Saved, "SaveContractDiscount 0%: " + (restored.Error ?? "сохранено"));
+            if (restored.Saved) Check(Math.Abs(Total() - original) < 0.005m, "итог договора восстановлен");
+        }
+
+        long draftAct;
+        using (var conn = SqlServerDatabase.Open(connectionString))
+        using (var cmd = new SqlCommand("""
+            SELECT TOP(1) a.id
+            FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id
+            WHERE a.signed=0 AND c.locked=0 AND c.stage_of IS NULL
+              AND c.discount_percent=0 AND a.discount_percent=0
+              AND a.discount_override=0 AND a.manual_total_cents<0
+            ORDER BY a.id
+            """, conn))
+        {
+            draftAct = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        }
+        if (draftAct > 0)
+        {
+            var percent = SqlServerActs.SaveDiscount(connectionString, draftAct, "percent", 0m, RevisionOf());
+            Check(percent.Saved, "SaveDiscount percent 0%: " + (percent.Error ?? "сохранено"));
+            if (percent.Saved)
+            {
+                var contract = SqlServerActs.SaveDiscount(connectionString, draftAct, "contract", null, percent.Revision);
+                Check(contract.Saved, "SaveDiscount contract: " + (contract.Error ?? "сохранено"));
+            }
+        }
+        else Console.WriteLine("SKIP: у черновика нет акта для проверки скидки КС.");
+
+        long sectionAct;
+        using (var conn = SqlServerDatabase.Open(connectionString))
+        using (var cmd = new SqlCommand("""
+            SELECT TOP(1) a.id
+            FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id
+            WHERE a.signed=0 AND c.locked=0 AND c.stage_of IS NULL
+              AND LEN(ISNULL(a.section_amounts_json,N''))>2
+            ORDER BY a.id
+            """, conn))
+        {
+            sectionAct = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        }
+        if (sectionAct > 0)
+        {
+            var snapshot = SqlServerActs.ReadSections(connectionString, sectionAct);
+            Check(snapshot.Supported, "ReadSections: форма поддерживает ручную разбивку");
+            if (snapshot.Supported)
+            {
+                var same = SqlServerActs.SaveSections(connectionString, sectionAct, snapshot.Current, snapshot.Revision);
+                Check(same.Saved, "SaveSections без изменений: " + (same.Error ?? "сохранено"));
+                if (same.Saved)
+                {
+                    var reread = SqlServerActs.ReadSections(connectionString, sectionAct);
+                    Check(reread.SavedJson == snapshot.SavedJson, "JSON разбивки не изменился");
+                }
+            }
+        }
+        else Console.WriteLine("SKIP: у черновика нет акта с ручной разбивкой.");
+
+        long actId = 0;
+        try
+        {
+            actId = SqlServerActs.Create(connectionString, contractId, RevisionOf());
+            Check(actId > 0, "Create КС-2");
+        }
+        catch (Exception ex) { Check(false, "Create КС-2: " + ex.Message); }
+        if (actId > 0)
+        {
+            var sign = SqlServerActs.ToggleSigned(connectionString, actId, true, RevisionOf());
+            Check(sign.Saved, "ToggleSigned(true): " + (sign.Error ?? "сохранено"));
+            var unsign = sign.Saved
+                ? SqlServerActs.ToggleSigned(connectionString, actId, false, sign.Revision) : null;
+            Check(unsign?.Saved == true, "ToggleSigned(false): " + (unsign?.Error ?? "сохранено"));
+            var delete = SqlServerActs.Delete(connectionString, actId, RevisionOf());
+            Check(delete.Saved, "Delete черновика КС-2: " + (delete.Error ?? "удалён"));
+        }
+
+        using (var conn = SqlServerDatabase.Open(connectionString))
+        {
+            var s0 = SqlServerUndo.Snapshot(conn, null, checked((int)contractId));
+            Check(s0 is not null, "снимок Undo");
+            if (s0 is not null)
+            {
+                var discount = SqlServerActs.SaveContractDiscount(connectionString, contractId, 1m, RevisionOf());
+                Check(discount.Saved, "Undo: скидка 1% сохранена");
+                if (discount.Saved)
+                {
+                    using var after = SqlServerDatabase.Open(connectionString);
+                    var s1 = SqlServerUndo.Snapshot(after, null, checked((int)contractId));
+                    Check(s1 is not null, "снимок после скидки");
+                    if (s1 is not null)
+                    {
+                        var undo = SqlServerUndo.Apply(connectionString, checked((int)contractId), s0, s1, true);
+                        Check(undo.Status == UndoApplyStatus.Applied,
+                            "Undo: " + undo.Status + (undo.Error is null ? "" : " — " + undo.Error));
+                        Check(Math.Abs(Total() - original) < 0.005m, "Undo восстановил итог");
+                        var redo = SqlServerUndo.Apply(connectionString, checked((int)contractId), s1, s0, false);
+                        Check(redo.Status == UndoApplyStatus.Applied,
+                            "Redo: " + redo.Status + (redo.Error is null ? "" : " — " + redo.Error));
+                        var undoAgain = SqlServerUndo.Apply(connectionString, checked((int)contractId), s0, s1, true);
+                        Check(undoAgain.Status == UndoApplyStatus.Applied,
+                            "Повторный Undo: " + undoAgain.Status + (undoAgain.Error is null ? "" : " — " + undoAgain.Error));
+                        Check(Math.Abs(Total() - original) < 0.005m, "Итог после Undo/Redo/Undo совпал");
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine(failures == 0
+            ? "ПРИЁМКА v31: OK (чтение, скидки, разбивка, КС-2, Undo/Redo)."
+            : $"ПРИЁМКА v31: ОШИБОК {failures}.");
         return failures == 0 ? 0 : 1;
     }
 

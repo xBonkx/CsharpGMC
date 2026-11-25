@@ -139,7 +139,7 @@ public static partial class SqlServerActs
 
     public static Schema31Sections ReadSections(string connectionString,long actId)
     {
-        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+        if(!SqlSchemaCompatibility.Schema31WritesAllowed(connectionString))
             throw new InvalidOperationException("Штатная запись разбивки v31 пока не разрешена.");
         RequirePilotWrite(connectionString);
         using var conn=SqlServerDatabase.Open(connectionString);
@@ -169,7 +169,7 @@ public static partial class SqlServerActs
     public static SqlServerDatabase.SaveResult SaveSections(string connectionString,long actId,
         KsActAllocation.SectionAmounts amounts,string expectedRevision)
     {
-        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+        if(!SqlSchemaCompatibility.Schema31WritesAllowed(connectionString))
             return SqlServerDatabase.SaveResult.Fail("Штатная запись разбивки v31 пока не разрешена.",expectedRevision);
         RequirePilotWrite(connectionString);
         using var conn=SqlServerDatabase.Open(connectionString);

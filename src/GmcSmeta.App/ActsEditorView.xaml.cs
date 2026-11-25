@@ -446,7 +446,7 @@ public partial class ActsEditorView : UserControl
             TrInput.IsEnabled = !_signed && !_contractLocked && !manualSections;
             PnrInput.IsEnabled = !_signed && !_contractLocked;
             SmrBySystemCheck.IsEnabled = !_signed && !_contractLocked && !manualSections;
-            var adjustmentAvailable=SqlSchemaCompatibility.OrdinarySchema31Enabled&&_details?.SupportsAdjustment==true;
+            var adjustmentAvailable=SqlSchemaCompatibility.Schema31WritesAllowed(_connectionString)&&_details?.SupportsAdjustment==true;
             ActDiscountMenuItem.Visibility=SectionAmountsMenuItem.Visibility=adjustmentAvailable?Visibility.Visible:Visibility.Collapsed;
             ActDiscountMenuItem.IsEnabled=SectionAmountsMenuItem.IsEnabled=adjustmentAvailable&&!_signed&&!_contractLocked;
             RestAllMenuItem.IsEnabled=!_signed&&!_contractLocked&&!manualSections;

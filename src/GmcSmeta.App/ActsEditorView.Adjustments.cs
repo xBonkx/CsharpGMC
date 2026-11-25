@@ -9,7 +9,7 @@ public partial class ActsEditorView
 {
     private ActCommandTarget? CaptureAdjustment()
     {
-        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled||_signed||_contractLocked||
+        if(!SqlSchemaCompatibility.Schema31WritesAllowed(_connectionString)||_signed||_contractLocked||
             _details?.SupportsAdjustment!=true||_totals is null||Current is null)return null;
         if(!ActGrid.CommitEdit(DataGridEditingUnit.Cell,true)||!ActGrid.CommitEdit(DataGridEditingUnit.Row,true))
             return null;

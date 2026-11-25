@@ -55,7 +55,7 @@ public static partial class SqlServerActs
     public static SqlServerDatabase.SaveResult SaveDiscount(string connectionString,long actId,
         string mode,decimal? value,string expectedRevision)
     {
-        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+        if(!SqlSchemaCompatibility.Schema31WritesAllowed(connectionString))
             return SqlServerDatabase.SaveResult.Fail("Штатная запись скидок v31 пока не разрешена.",expectedRevision);
         RequirePilotWrite(connectionString);
         using var conn=SqlServerDatabase.Open(connectionString);

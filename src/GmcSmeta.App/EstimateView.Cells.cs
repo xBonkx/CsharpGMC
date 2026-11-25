@@ -208,7 +208,7 @@ public partial class EstimateView
         var dialog=new EstimateDiscountDialog(new(
             totals.Total+totals.DiscountAmount,totals.Total,totals.Materials,totals.Smr,
             estimate.SmrMode=="percent",totals.DiscountPercent,
-            SqlSchemaCompatibility.OrdinarySchema31Enabled&&estimate.SupportsFinalDiscount&&!_doc.IsStage))
+            SqlSchemaCompatibility.Schema31WritesAllowed(_sqlConnectionString)&&estimate.SupportsFinalDiscount&&!_doc.IsStage))
             {Owner=Window.GetWindow(this)};
         if(dialog.ShowDialog()!=true||dialog.Result is not {Changed:true} result)return;
         if(_serverRevision!=baselineRevision||_serverConflict||HasUnsettledCacheWrites)

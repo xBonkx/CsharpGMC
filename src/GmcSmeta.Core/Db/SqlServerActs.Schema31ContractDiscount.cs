@@ -20,7 +20,7 @@ public static partial class SqlServerActs
     public static SqlServerDatabase.SaveResult SaveContractDiscount(string connectionString,long contractId,
         decimal percent,string expectedRevision)
     {
-        if(!SqlSchemaCompatibility.OrdinarySchema31Enabled)
+        if(!SqlSchemaCompatibility.Schema31WritesAllowed(connectionString))
             return SqlServerDatabase.SaveResult.Fail("Штатная запись скидок v31 пока не разрешена.",expectedRevision);
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn=SqlServerDatabase.Open(connectionString);

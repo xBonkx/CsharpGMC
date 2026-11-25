@@ -14,9 +14,50 @@ public static class SqlSchemaCompatibility
     public static bool OrdinarySchema31Enabled => WritableSchemaVersion == 31;
     public const string PreviewDatabase = "GmcSmetaPilot_Test_Csharp";
     public const string WriteTestDatabase = "GmcSmetaPilot_Schema31WriteTest";
+    // The only database where the ordinary application may write schema 31 before
+    // the production cutover is approved. Must stay a local, dedicated test copy.
+    public const string OrdinarySchema31TestDatabase = "GmcSmetaPilot_Test_Schema31";
 
     public static bool IsWriteTestDatabase(string? name) =>
         string.Equals(name, WriteTestDatabase, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsLocalServer(string? dataSource)
+    {
+        var source = (dataSource ?? "").Trim();
+        if (source.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+            source = source[4..];
+        var comma = source.IndexOf(',');
+        if (comma >= 0) source = source[..comma];
+        source = source.Trim();
+        return source.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || source == "." || source == "(local)"
+            || source == "127.0.0.1"
+            || source.StartsWith(@"(localdb)\", StringComparison.OrdinalIgnoreCase)
+            || source.StartsWith(@".\", StringComparison.Ordinal);
+    }
+
+    public static bool IsOrdinarySchema31TestDatabase(string? name, string? dataSource) =>
+        string.Equals(name, OrdinarySchema31TestDatabase, StringComparison.OrdinalIgnoreCase)
+        && IsLocalServer(dataSource);
+
+    /// <summary>True when ordinary (UI) writers may persist schema 31 rows for this
+    /// database. Production stays on schema 28 until the owner approves cutover.</summary>
+    public static bool Schema31WritesAllowed(string? name, string? dataSource) =>
+        OrdinarySchema31Enabled || IsOrdinarySchema31TestDatabase(name, dataSource);
+
+    public static bool Schema31WritesAllowed(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString)) return false;
+        try
+        {
+            var builder = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connectionString);
+            return Schema31WritesAllowed(builder.InitialCatalog, builder.DataSource);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 
     public static void RequireWriteTestDatabase(string? name)
     {
@@ -37,6 +78,7 @@ public static class SqlSchemaCompatibility
     public static bool HasPreviewColumns(System.Data.Common.DbConnection conn) =>
         conn is Microsoft.Data.SqlClient.SqlConnection sql &&
         (IsPreviewDatabase(sql.Database) || IsWriteTestDatabase(sql.Database) ||
+            IsOrdinarySchema31TestDatabase(sql.Database, sql.DataSource) ||
             OrdinarySchema31Enabled && IsWritablePilot(sql.Database,sql.DataSource));
 
     public static bool IsPreviewDatabase(string? name) =>
@@ -84,6 +126,15 @@ public static class SqlSchemaCompatibility
                 !string.Equals(updateability, "READ_ONLY", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(
                     "Для предпросмотра нужна восстановленная база схемы 31 GmcSmetaPilot_Test_Csharp в режиме READ_ONLY со всеми полями скидок и КС.");
+            return;
+        }
+        if (IsOrdinarySchema31TestDatabase(name, dataSource))
+        {
+            if (version != "31" || !requiredColumns ||
+                !string.Equals(updateability, "READ_WRITE", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Для тестовой записи v31 нужна локальная база " + OrdinarySchema31TestDatabase +
+                    " в режиме READ_WRITE со всеми полями скидок и КС.");
             return;
         }
         if (version != WritableSchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))

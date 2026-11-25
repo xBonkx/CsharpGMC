@@ -30,6 +30,7 @@ public sealed class UndoSnapshot
     public IReadOnlyList<Dictionary<string, object?>> Rows(string table) =>
         _tables.TryGetValue(table, out var rows) ? rows : Array.Empty<Dictionary<string, object?>>();
 
+    public IReadOnlyCollection<string> TableNames => _tables.Keys;
     public string Canonical => _canonical ??= JsonSerializer.Serialize(_tables, JsonOptions);
 
     public override bool Equals(object? obj) => obj is UndoSnapshot other &&
@@ -50,6 +51,8 @@ public readonly record struct UndoApplyResult(UndoApplyStatus Status, UndoSnapsh
 {
     // Only populated by the transaction that actually committed the restore.
     public string? Revision { get; init; }
+    // Failure diagnostics; null on success.
+    public string? Error { get; init; }
 }
 
 /// <summary>
@@ -178,25 +181,52 @@ public static class SqlServerUndo
             }
             var restored = Snapshot(conn, tx, contractId);
             if (restored is null || !restored.Equals(target))
-                throw new InvalidOperationException("Восстановленный документ не совпал со снимком.");
+                throw new InvalidOperationException(
+                    "Восстановленный документ не совпал со снимком: " +
+                    (restored is null ? "снимок пуст" : SnapshotDifference(target, restored)));
             var committedRevision = SqlServerDatabase.BumpPositionRevision(conn, tx);
             commitAttempted = true;
             tx.Commit();
             return new UndoApplyResult(UndoApplyStatus.Applied, restored, null)
                 { Revision = committedRevision };
         }
-        catch
+        catch (Exception ex)
         {
             // A network fault during COMMIT has an uncertain outcome. Do not
             // advertise a safe retry of this non-idempotent restoration.
             if (commitAttempted)
-                return new UndoApplyResult(UndoApplyStatus.Indeterminate, null, null);
+                return new UndoApplyResult(UndoApplyStatus.Indeterminate, null, null)
+                    { Error = "Неизвестен результат COMMIT." };
             try { tx.Rollback(); } catch { /* SQL connection may already be lost. */ }
-            return new UndoApplyResult(UndoApplyStatus.Failed, null, now);
+            return new UndoApplyResult(UndoApplyStatus.Failed, null, now)
+                { Error = ex.Message };
         }
     }
 
     // ---------------------------------------------------------------- восстановление
+
+    private static string SnapshotDifference(UndoSnapshot expected, UndoSnapshot actual)
+    {
+        foreach (var table in expected.TableNames.Union(actual.TableNames))
+        {
+            var left = expected.Rows(table);
+            var right = actual.Rows(table);
+            if (left.Count != right.Count)
+                return $"{table}: строк {left.Count} → {right.Count}";
+            for (var i = 0; i < left.Count; i++)
+            {
+                foreach (var key in left[i].Keys.Union(right[i].Keys))
+                {
+                    left[i].TryGetValue(key, out var lv);
+                    right[i].TryGetValue(key, out var rv);
+                    if (!Equals(lv, rv))
+                        return $"{table}[{i}].{key}: {Show(lv)} → {Show(rv)}";
+                }
+            }
+        }
+        return "значения совпадают; различается порядок или тип";
+        static string Show(object? value) => value is null ? "NULL" : $"{value} ({value.GetType().Name})";
+    }
 
     private static void Restore(SqlConnection conn, SqlTransaction tx, int contractId, UndoSnapshot target)
     {

@@ -47,7 +47,8 @@ public static partial class SqlServerDatabase
                     throw new InvalidOperationException("Исключение Cutover действует только на локальном SQL Server этого компьютера.");
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
-            var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database);
+            var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
+                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
@@ -112,7 +113,8 @@ public static partial class SqlServerDatabase
                     throw new InvalidOperationException("Исключение Cutover действует только на локальном SQL Server этого компьютера.");
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
-            var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database);
+            var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
+                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
             token.ThrowIfCancellationRequested();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
