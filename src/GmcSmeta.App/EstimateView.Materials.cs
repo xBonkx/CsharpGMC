@@ -1034,6 +1034,10 @@ public partial class EstimateView
 
     private void MaterialsSetView(string mode, string sort)
     {
+        // Python cost_view._set_view clears frozen keys even when the same
+        // sort is chosen again. Ordinary edits/rebuilds still keep row order.
+        _materialsFrozenKeys.Clear();
+        _materialsFrozenDoc = null;
         _materialsMode = mode;
         _materialsSort = sort;
         MaterialsRebuild();
@@ -1068,7 +1072,7 @@ public partial class EstimateView
             menu.Items.Add(item);
         }
         menu.Items.Add(new Separator());
-        var reset = new MenuItem { Header = "Вернуть как в КП" };
+        var reset = ContextMenuIcons.Create("Вернуть как в КП", "X");
         reset.Click += (_, _) => MaterialsSetView("kp", "kp");
         menu.Items.Add(reset);
         menu.IsOpen = true;
