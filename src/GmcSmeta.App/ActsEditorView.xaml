@@ -108,7 +108,7 @@
                     <Button x:Name="MoreButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}"
                             Margin="6,0,0,0" Click="HeaderMore_Click">
                         <Button.ContextMenu>
-                            <ContextMenu>
+                            <ContextMenu Opened="ActMoreMenu_Opened">
                                 <MenuItem x:Name="PreSignMenuItem" Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
                                           ToolTip="Объёмы сверх КП, цены, строки вне сметы и выдача материалов"/>
                                 <Separator/>
@@ -142,7 +142,7 @@
                             Margin="0,0,2,0" Click="ClearSelected_Click" ToolTip="Убрать выделенные строки из этого акта"/>
                     <Button Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}" Click="BarMore_Click">
                         <Button.ContextMenu>
-                            <ContextMenu>
+                            <ContextMenu Opened="ActMoreMenu_Opened">
                                 <MenuItem x:Name="ActDiscountMenuItem" Header="Корректировка итога КС…" Click="ActDiscount_Click" Visibility="Collapsed"/>
                                 <MenuItem x:Name="SectionAmountsMenuItem" Header="СМР и транспорт по разделам…" Click="SectionAmounts_Click" Visibility="Collapsed"/>
                                 <MenuItem x:Name="IssuedMenuItem" Header="Сдать то, что выдано на объект (из «Закупок»)"

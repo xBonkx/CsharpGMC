@@ -2321,6 +2321,25 @@ public partial class ActsEditorView : UserControl
         ContextMenuIcons.Set(RestAllMenuItem, "Check");
     }
 
+    // Re-evaluate on every popup opening, including keyboard and right-click.
+    private void ActMoreMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var current = Current;
+        var ready = CaptureActCommand() is not null && current is not null && _sheet is not null;
+        var unsigned = ready && current is { Signed: false };
+        var editable = unsigned && !_contractLocked;
+        var manualSections = !string.IsNullOrEmpty(_details?.SectionAmountsJson);
+        PreSignMenuItem.IsEnabled = VorMenuItem.IsEnabled =
+            ExportAllMenuItem.IsEnabled = ExportGroupMenuItem.IsEnabled = ready;
+        DeleteActMenuItem.IsEnabled = unsigned;
+        ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;
+        RestAllMenuItem.IsEnabled = editable && !manualSections && _totals is not null;
+        var adjustmentAvailable = ActDiscountMenuItem.Visibility == Visibility.Visible &&
+            _details?.SupportsAdjustment == true;
+        ActDiscountMenuItem.IsEnabled = SectionAmountsMenuItem.IsEnabled =
+            editable && adjustmentAvailable && _totals is not null;
+    }
+
     private void HeaderMore_Click(object sender, RoutedEventArgs e) => OpenMenu(sender);
 
     private void BarMore_Click(object sender, RoutedEventArgs e) => OpenMenu(sender);
