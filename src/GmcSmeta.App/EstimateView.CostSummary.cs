@@ -162,7 +162,13 @@ public partial class EstimateView
         _costSummaryData = null;
         _summaryRecs = new();
         _summaryLoading = false;
-        if (SummaryGrid is not null) SummaryGrid.ItemsSource = null;
+        if (SummaryGrid is { } grid)
+        {
+            // Reload after a write clears the source before the asynchronous read.
+            // Capture once, before that clear, not from an already empty grid.
+            if (grid.ItemsSource is not null) _summaryPendingView = CaptureSummaryView(grid);
+            grid.ItemsSource = null;
+        }
     }
 
     private async Task LoadCostSummaryAsync(bool force = false)
@@ -450,47 +456,114 @@ public partial class EstimateView
     private static string? SummarySelectionKey(SummaryRow row) =>
         SummarySystemSelection.RowKey(row.Kind, row.SystemId, row.SupplierGroupKey, row.MemberIds);
 
+    private sealed record SummaryViewState(HashSet<string> Selected, string? CurrentKey,
+        DataGridColumn? Column, double Vertical, double Horizontal,
+        SummaryViewportAnchor.Row? CurrentAnchor, SummaryViewportAnchor.Row? TopAnchor);
+    private SummaryViewState? _summaryPendingView;
+
+    private static ScrollViewer? SummaryScroll(DataGrid grid) =>
+        grid.Template?.FindName("DG_ScrollViewer", grid) as ScrollViewer;
+
+    private static ScrollContentPresenter? SummaryViewport(ScrollViewer? scroll) =>
+        scroll?.Template?.FindName("PART_ScrollContentPresenter", scroll) as ScrollContentPresenter;
+
+    // Walk only realized visual rows; do not enumerate/generate offscreen containers.
+    private static IEnumerable<DataGridRow> SummaryRealizedRows(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is DataGridRow row) yield return row;
+            else if (child is not DataGrid)
+                foreach (var nested in SummaryRealizedRows(child)) yield return nested;
+        }
+    }
+
+    private static double? SummaryRowY(DataGridRow row, ScrollContentPresenter viewport)
+    {
+        if (!row.IsVisible || row.ActualHeight <= 0 || !viewport.IsAncestorOf(row)) return null;
+        var y = row.TranslatePoint(new Point(0, 0), viewport).Y;
+        return double.IsFinite(y) ? y : null;
+    }
+
+    private static SummaryViewState CaptureSummaryView(DataGrid grid)
+    {
+        var selected = grid.SelectedItems.OfType<SummaryRow>().Select(SummarySelectionKey)
+            .OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var current = grid.CurrentCell;
+        var currentKey = current.Item is SummaryRow row ? SummarySelectionKey(row) : null;
+        var scroll = SummaryScroll(grid);
+        SummaryViewportAnchor.Row? currentAnchor = null, topAnchor = null;
+        if (grid.IsVisible && SummaryViewport(scroll) is { } viewport)
+        {
+            foreach (var container in SummaryRealizedRows(viewport))
+            {
+                if (container.Item is not SummaryRow item || SummarySelectionKey(item) is not { } key ||
+                    SummaryRowY(container, viewport) is not double y ||
+                    y + container.ActualHeight <= 0 || y >= viewport.ActualHeight) continue;
+                if (topAnchor is null || y < topAnchor.Value.Y)
+                    topAnchor = new(key, y);
+                // Like Python view_anchor: prefer the current row when its top is visible.
+                if (key == currentKey && y >= 0) currentAnchor = new(key, y);
+            }
+        }
+        return new(selected, currentKey, current.Column, scroll?.VerticalOffset ?? 0,
+            scroll?.HorizontalOffset ?? 0, currentAnchor, topAnchor);
+    }
+
     private void SummaryReplaceRows(List<SummaryRow> built)
     {
         var grid = SummaryGrid;
-        var old = grid.ItemsSource;
-        var selected = grid.SelectedItems.OfType<SummaryRow>()
-            .Select(SummarySelectionKey).OfType<string>().ToHashSet(StringComparer.Ordinal);
-        var current = grid.CurrentCell;
-        var currentKey = current.Item is SummaryRow row ? SummarySelectionKey(row) : null;
-        var scroll = grid.Template?.FindName("DG_ScrollViewer", grid) as ScrollViewer;
-        var vertical = scroll?.VerticalOffset ?? 0;
-        var horizontal = scroll?.HorizontalOffset ?? 0;
+        var state = grid.ItemsSource is not null ? CaptureSummaryView(grid) : _summaryPendingView;
+        _summaryPendingView = null;
         var source = new ObservableCollection<SummaryRow>(built);
         grid.ItemsSource = source;
-        if (old is null) return;
+        if (state is null) return;
 
-        // Restore only exact identities, never a different group with new
-        // members or a filtered-out row. No focus change or data operation.
-        SummaryRow? restoredCurrent = null;
-        if (selected.Count != 0 || currentKey is not null)
-        {
-            foreach (var candidate in built)
-            {
-                var key = SummarySelectionKey(candidate);
-                if (key is null) continue;
-                if (selected.Contains(key)) grid.SelectedItems.Add(candidate);
-                if (key == currentKey) restoredCurrent = candidate;
-            }
-        }
-        if (restoredCurrent is not null && current.Column is { Visibility: Visibility.Visible } column &&
-            grid.Columns.Contains(column))
+        // Use exact stable keys; duplicate/ambiguous keys must not carry selection.
+        var byKey = built.Select(item => (Item: item, Key: SummarySelectionKey(item)))
+            .Where(x => x.Key is not null).GroupBy(x => x.Key!, StringComparer.Ordinal)
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single().Item, StringComparer.Ordinal);
+        foreach (var (key, item) in byKey)
+            if (state.Selected.Contains(key)) grid.SelectedItems.Add(item);
+        if (state.CurrentKey is { } currentKey && byKey.TryGetValue(currentKey, out var restoredCurrent) &&
+            state.Column is { Visibility: Visibility.Visible } column && grid.Columns.Contains(column))
             grid.CurrentCell = new DataGridCellInfo(restoredCurrent, column);
 
-        // Pixel offsets are restored after the new source is measured. A later
-        // rebuild/invalidated view supersedes this callback.
-        if (scroll is not null && grid.IsVisible)
-            grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        var anchor = SummaryViewportAnchor.Choose(state.CurrentAnchor, state.TopAnchor,
+            byKey.Keys.ToHashSet(StringComparer.Ordinal));
+
+        bool IsCurrent() => !_detached && grid.IsVisible && ReferenceEquals(grid.ItemsSource, source);
+        void Restore(bool realize)
+        {
+            if (!IsCurrent() || SummaryScroll(grid) is not { } scroll) return;
+            scroll.ScrollToHorizontalOffset(state.Horizontal);
+            if (anchor is not { } target || SummaryViewport(scroll) is not { } viewport)
             {
-                if (_detached || !grid.IsVisible || !ReferenceEquals(grid.ItemsSource, source)) return;
-                scroll.ScrollToHorizontalOffset(horizontal);
-                scroll.ScrollToVerticalOffset(vertical);
-            }));
+                scroll.ScrollToVerticalOffset(state.Vertical);
+                return;
+            }
+            var item = byKey[target.Key];
+            if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow container &&
+                SummaryRowY(container, viewport) is double y)
+            {
+                scroll.ScrollToVerticalOffset(SummaryViewportAnchor.Offset(scroll.VerticalOffset, y,
+                    target.Y, scroll.ScrollableHeight));
+                // A second bounded pass compensates for virtualization/remeasurement.
+                if (realize) grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                    new Action(() => Restore(false)));
+            }
+            else if (realize)
+            {
+                grid.ScrollIntoView(item);
+                grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Restore(false)));
+            }
+            else scroll.ScrollToVerticalOffset(state.Vertical);
+        }
+
+        if (grid.IsVisible)
+            grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Restore(true)));
     }
 
     private void MergeInto(SummaryRec m, SummaryRec r)
