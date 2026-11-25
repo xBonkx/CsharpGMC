@@ -45,6 +45,7 @@ public static partial class ExcelImportParser
         var block = new ExcelImportBlock { Sheet = sheet, Title = "Объёмы из Ревита",
             VolumesOnly = true, FirstRow = 0 };
         ExcelImportSection? system = null;
+        var hasSpecificationTitle = false;
         for (var i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
@@ -64,6 +65,8 @@ public static partial class ExcelImportParser
                     ? name + " " + mark : name;
                 var maker = u == 5 ? Text(Cell(row, 4)).Trim('«', '»', '"', '\'') : "";
                 var note = Text(Cell(row, u + 3));
+                if (quantity < 0)
+                    block.Warnings.Add($"Стр. {i + 1}: отрицательное количество {quantity} — проверьте.");
                 var p = new ExcelImportPosition
                 {
                     Name = Regex.Replace(full, @"\s+", " ").Trim(), Unit = unit, Quantity = quantity,
@@ -80,15 +83,18 @@ public static partial class ExcelImportParser
             if (single.Length == 1 && single[0].Col == 0)
             {
                 var heading = single[0].Value;
-                if (i == 0 || heading.StartsWith("спецификация", StringComparison.OrdinalIgnoreCase))
+                if (heading.StartsWith("спецификация", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasSpecificationTitle = true;
                     continue;
+                }
+                if (i == 0) continue;
                 system = new ExcelImportSection { Name = heading };
                 block.Sections.Add(system);
             }
         }
         block.Sections.RemoveAll(s => s.Positions.Count == 0);
-        if (block.PositionCount < 3 || block.Sections.Count < 2 &&
-            !rows.Take(10).Any(r => r.Any(v => Text(v).StartsWith("спецификация", StringComparison.OrdinalIgnoreCase))))
+        if (block.PositionCount < 3 || (block.Sections.Count < 2 && !hasSpecificationTitle))
             return null;
         block.Warnings.Insert(0, $"Спецификация Revit: {block.PositionCount} строк в {block.Sections.Count} системах. " +
             "Загружаются только количества; цены остаются нулевыми.");

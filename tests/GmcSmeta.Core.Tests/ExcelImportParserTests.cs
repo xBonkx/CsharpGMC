@@ -225,6 +225,57 @@ public sealed class ExcelImportParserTests
     }
 
     [Fact]
+    public void RevitSingleSystem_AcceptsRealTitleAfterFirstTenRows()
+    {
+        var rows = Enumerable.Repeat(Row(), 11).Concat(new[]
+        {
+            Row("Спецификация материалов и оборудования"),
+            Row("В1"),
+            Row("-", "Воздуховод", "Оц", "", "", "м.п.", 2),
+            Row("-", "Отвод", "90°", "", "", "шт", 3),
+            Row("-", "Решётка", "ДР", "", "", "шт", 1)
+        }).ToArray();
+
+        var block = Assert.Single(Parse(rows).Blocks);
+        Assert.True(block.VolumesOnly);
+        Assert.True(block.Ok);
+        var section = Assert.Single(block.Sections);
+        Assert.Equal("В1", section.Name);
+        Assert.Equal(3, section.Positions.Count);
+        Assert.Equal("м", section.Positions[0].Unit);
+        Assert.Equal(14, section.Positions[0].SourceRow);
+    }
+
+    [Fact]
+    public void RevitSingleSystem_RejectsSpecificationWordInOrdinaryCell()
+    {
+        var result = Parse(
+            Row("Документ", "Спецификация", null, null, null, null, null),
+            Row("В1"),
+            Row("-", "Воздуховод", "Оц", "", "", "м", 2),
+            Row("-", "Отвод", "90°", "", "", "шт", 3),
+            Row("-", "Решётка", "ДР", "", "", "шт", 1));
+
+        Assert.Empty(result.Blocks);
+    }
+
+    [Fact]
+    public void RevitNegativeQuantity_PreservesValueAndWarnsWithSourceRow()
+    {
+        var block = Assert.Single(Parse(
+            Row("Спецификация материалов и оборудования"),
+            Row("В1"),
+            Row("-", "Воздуховод", "Оц", "", "", "м", -2),
+            Row("-", "Отвод", "90°", "", "", "шт", 0),
+            Row("-", "Решётка", "ДР", "", "", "шт", 1)).Blocks);
+        var positions = Assert.Single(block.Sections).Positions;
+        Assert.Equal(-2m, positions[0].Quantity);
+        Assert.Equal(0m, positions[1].Quantity);
+        var warning = Assert.Single(block.Warnings.Where(w => w.Contains("отрицательное количество")));
+        Assert.Contains("Стр. 3:", warning);
+    }
+
+    [Fact]
     public void StandardVatOnTop_ReconcilesGrossTotal()
     {
         var result = Parse(
