@@ -30,6 +30,20 @@ public class SummaryHeaderLayoutTests
         }, runs.ToArray());
     }
 
+    [Fact]
+    public void ReorderingAcrossBandsKeepsHeaderRunsAlignedAndNameFirst()
+    {
+        string[] defaults = ["name", "m_ucost", "w_ucost", "m_msell", "t_cost"];
+        var order = GmcSmeta.Core.Domain.ColumnOrderPolicy.Normalize(defaults,
+            ["w_ucost", "t_cost", "m_msell", "name", "m_ucost"], new HashSet<string> { "name" });
+        Assert.Equal(new[] { "name", "w_ucost", "t_cost", "m_msell", "m_ucost" }, order);
+        var runs = Build(order.Select(k => new Column(k, 100)), -30);
+        Assert.Equal(new Run[] {
+            new(Band.Position, -30, 100), new(Band.Work, 70, 100),
+            new(Band.Total, 170, 100), new(Band.Materials, 270, 200)
+        }, runs.ToArray());
+    }
+
     [Theory]
     [InlineData("mat_margin", Band.Total)]
     [InlineData("work_margin", Band.Total)]

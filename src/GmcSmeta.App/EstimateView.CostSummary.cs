@@ -382,6 +382,8 @@ public partial class EstimateView
                         Kind = "extra", Name = name,
                         WCostText = SumText(cost), WSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        MatMarginText = MarginText(0m, 0m), WorkMarginText = MarginText(cost, sell),
+                        WorkMarginNeg = MarginNeg(cost, sell),
                     });
                 }
                 else if (kind == "trans")
@@ -393,6 +395,8 @@ public partial class EstimateView
                         Kind = "extra", IsTransport = true, Name = name,
                         MCostText = SumText(cost), MSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
+                        MatMarginNeg = MarginNeg(cost, sell),
                     });
                 }
                 else
@@ -403,6 +407,8 @@ public partial class EstimateView
                         Kind = "extra", Name = name,
                         MCostText = SumText(cost), MSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
+                        MatMarginNeg = MarginNeg(cost, sell),
                     });
                 }
             }
@@ -537,12 +543,12 @@ public partial class EstimateView
     // ------------------------------------------------------------------ row factory
     private static string SumText(decimal v) => Math.Abs(v) >= 0.005m ? Money.Format(v) : "";
 
-    /// <summary>Маржа блока: «—», когда нет ни закупа, ни розницы (cost_summary_view._money_item).</summary>
+    // Display-only policy from Python _money_item. Actual totals and SQL remain unchanged.
     private static string MarginText(decimal cost, decimal sell) =>
-        cost != 0m || sell != 0m ? Money.Format(Money.Round2(sell - cost)) : "—";
+        SummaryMoneyDisplay.Margin(cost, sell).Text;
 
     private static bool MarginNeg(decimal cost, decimal sell) =>
-        (cost != 0m || sell != 0m) && sell - cost < -0.005m;
+        SummaryMoneyDisplay.Margin(cost, sell).Negative;
 
     private static string UnitText(decimal? value, bool diff, bool isPrice) =>
         diff || value is null ? "" : (value.Value != 0m || !isPrice ? Money.Format(value.Value) : "");
@@ -563,7 +569,7 @@ public partial class EstimateView
         if (kinds.Contains("noprice") && r.NoPrice && priceText.Length == 0) priceText = "—";
         var workCostText = UnitText(r.UWcost, r.UWcostDiff, isPrice: false);
         if (kinds.Contains("nowcost") && r.NowCost && workCostText.Length == 0) workCostText = "—";
-        var workSellText = UnitText(r.UWsell, r.UWsellDiff, isPrice: true);
+        var workSellText = UnitText(r.UWsell, r.UWsellDiff, isPrice: false);
         if (kinds.Contains("nowsell") && r.NowSell && workSellText.Length == 0) workSellText = "—";
         return new SummaryRow
         {
@@ -587,7 +593,7 @@ public partial class EstimateView
             WorkCostText = workCostText,
             WorkCostRaw = UnitRaw(r.UWcost, r.UWcostDiff, isPrice: false),
             WorkSellText = workSellText,
-            WorkSellRaw = UnitRaw(r.UWsell, r.UWsellDiff, isPrice: true),
+            WorkSellRaw = UnitRaw(r.UWsell, r.UWsellDiff, isPrice: false),
             MCostText = SumText(r.MCost), MSellText = SumText(r.MSell),
             WCostText = SumText(r.WCost), WSellText = SumText(r.WSell),
             TotalCostText = SumText(r.Cost), TotalSellText = SumText(r.Sell),
@@ -600,7 +606,7 @@ public partial class EstimateView
             CostMark = r.NoCost,
             PriceMark = kinds.Contains("noprice") && r.NoPrice && UnitText(r.UPrice, r.UPriceDiff, true).Length == 0,
             WorkCostMark = kinds.Contains("nowcost") && r.NowCost && UnitText(r.UWcost, r.UWcostDiff, false).Length == 0,
-            WorkSellMark = kinds.Contains("nowsell") && r.NowSell && UnitText(r.UWsell, r.UWsellDiff, true).Length == 0,
+            WorkSellMark = kinds.Contains("nowsell") && r.NowSell && UnitText(r.UWsell, r.UWsellDiff, false).Length == 0,
         };
     }
 
@@ -611,19 +617,20 @@ public partial class EstimateView
         decimal wCost = items.Sum(x => x.WCost), wSell = items.Sum(x => x.WSell);
 
         static (string Text, string Raw, bool Uniform) Price(
-            Func<SummaryRec, decimal?> get, List<SummaryRec> list, bool isPrice)
+            Func<SummaryRec, decimal?> get, Func<SummaryRec, bool> differs, List<SummaryRec> list)
         {
+            if (list.Any(differs)) return ("", "", false);
             var values = list.Select(get).ToHashSet();
             if (values.Count == 1 && values.First() is decimal v)
-                return (v != 0m || !isPrice ? Money.Format(v) : "",
-                        v != 0m || !isPrice ? NumberText.QtyText(v) : "", true);
-            return ("", "", false);
+                return (v != 0m ? Money.Format(v) : "", NumberText.QtyText(v), true);
+            // All missing is uniform too; only differing prices get the mixed-price tip.
+            return ("", "", values.Count == 1);
         }
 
-        var cost = Price(x => x.UCost, items, isPrice: false);
-        var price = Price(x => x.UPrice, items, isPrice: true);
-        var wcost = Price(x => x.UWcost, items, isPrice: false);
-        var wsell = Price(x => x.UWsell, items, isPrice: true);
+        var cost = Price(x => x.UCost, x => x.UCostDiff, items);
+        var price = Price(x => x.UPrice, x => x.UPriceDiff, items);
+        var wcost = Price(x => x.UWcost, x => x.UWcostDiff, items);
+        var wsell = Price(x => x.UWsell, x => x.UWsellDiff, items);
         static string Tip(string what, bool uniform, int n) =>
             $"Впишите {what} — получат все {n} строк этой группы" + (uniform ? "" : " (сейчас цены у них разные)");
 

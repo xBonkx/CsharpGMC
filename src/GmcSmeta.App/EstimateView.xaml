@@ -1448,7 +1448,7 @@
                           VirtualizingPanel.VirtualizationMode="Recycling"
                           VirtualizingPanel.ScrollUnit="Pixel"
                           CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
-                          CanUserReorderColumns="False" RowHeaderWidth="0"
+                          CanUserReorderColumns="True" RowHeaderWidth="0"
                           HeadersVisibility="Column" GridLinesVisibility="All"
                           HorizontalGridLinesBrush="#E9EEF5" VerticalGridLinesBrush="#EDF1F7"
                           BorderThickness="0" Background="#FFFFFF"
@@ -1605,7 +1605,7 @@
                     </DataGrid.RowStyle>
                     <DataGrid.Columns>
                         <!-- ПОЗИЦИЯ: наименование с ▾ сворачиванием систем, ед., кол-во -->
-                        <DataGridTemplateColumn Width="*" MinWidth="250" SortMemberPath="name"
+                        <DataGridTemplateColumn Width="*" MinWidth="250" SortMemberPath="name" CanUserReorder="False"
                                                 CellStyle="{StaticResource SumCellPos}"
                                                 HeaderStyle="{StaticResource SumHdrPos}">
                             <DataGridTemplateColumn.Header>
