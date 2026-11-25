@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="app.png" />
     <Using Include="System.IO" />
     <Using Include="System.Net.Http" />
     <Resource Include="..\..\..\src\GmcSmeta.App\Assets\app.ico" Link="app.ico" />

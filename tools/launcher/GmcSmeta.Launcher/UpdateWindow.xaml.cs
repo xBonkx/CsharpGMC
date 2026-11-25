@@ -1,18 +1,13 @@
 using System.Windows;
 using System.Windows.Threading;
-using System.Windows.Media.Imaging;
 
 namespace GmcSmeta.Launcher;
 
 internal partial class UpdateWindow : Window
 {
-    public UpdateWindow()
-    {
-        InitializeComponent();
-        var icon = BitmapDecoder.Create(new Uri("pack://application:,,,/app.ico"),
-            BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-        BrandIcon.Source = icon.Frames.OrderByDescending(frame => frame.PixelWidth).First();
-    }
+    public UpdateWindow() => InitializeComponent();
+
+    private void HideUpdateWindow(object sender, RoutedEventArgs e) => Close();
 
     public void SetStatus(string status, string details, double? percent = null, bool showProgress = true)
     {
