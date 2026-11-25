@@ -46,6 +46,41 @@ public sealed class ActQuantityFormulaTests
         Assert.Equal(12m, result[42]);
     }
 
+    [Theory]
+    [InlineData("@41@43")]
+    [InlineData("@41.5")]
+    [InlineData("2@41")]
+    [InlineData("@41(2)")]
+    [InlineData("@41+")]
+    public void Calculate_ReferencesCannotBeJoinedIntoNumericLiterals(string formula)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => ActQuantityFormulas.Calculate(
+            Lines((41, "", 8m), (42, "", 0m), (43, "", 2m)),
+            Edits((42, 0m, formula)),
+            Sources(41, 43)));
+        Assert.Contains("Проверьте выражение", error.Message);
+    }
+
+    [Fact]
+    public void Calculate_ReferencesAreIndependentOperandsIncludingRepeatedReferences()
+    {
+        var result = ActQuantityFormulas.Calculate(
+            Lines((41, "", 8m), (42, "", 0m), (43, "", 2m)),
+            Edits((42, 0m, "(@41+@43)*@43-@41/2")),
+            Sources(41, 43));
+        Assert.Equal(16m, result[42]);
+    }
+
+    [Fact]
+    public void Calculate_ExistingMissingReferenceRemainsZeroButCannotBeConcatenated()
+    {
+        var result = ActQuantityFormulas.Calculate(
+            Lines((42, "@99+2", 0m)), Edits(), Sources());
+        Assert.Equal(2m, result[42]);
+        Assert.Throws<InvalidOperationException>(() => ActQuantityFormulas.Calculate(
+            Lines((42, "@99.5", 0m)), Edits(), Sources()));
+    }
+
     [Fact]
     public void Calculate_DependentChain_ResolvesInOrder()
     {

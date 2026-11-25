@@ -144,10 +144,20 @@ public static class ActQuantityFormulas
         var result = new Dictionary<long, decimal>();
         foreach (var pid in ordered)
         {
+            // Match Python: references are complete operands, never fragments of a numeric literal.
             var expression = Stored.Replace(formulas[pid], m =>
                 values.TryGetValue(long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), out var v)
-                    ? v.ToString("0.############", CultureInfo.InvariantCulture) : "0");
-            var value = Evaluate(expression);
+                    ? "(" + v.ToString("0.############", CultureInfo.InvariantCulture) + ")" : "(0)");
+            double value;
+            try
+            {
+                value = Evaluate(expression);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidOperationException(
+                    "Не удалось вычислить формулу объёма. Проверьте выражение и деление на ноль.", ex);
+            }
             if (!double.IsFinite(value) || value < 0 || value > 1e12)
                 throw new InvalidOperationException("Формула должна давать неотрицательный объём до 1 трлн.");
             values[pid] = (decimal)Math.Round(value, 12);
