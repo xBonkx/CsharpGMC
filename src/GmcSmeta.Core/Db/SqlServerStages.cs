@@ -429,7 +429,7 @@ public static partial class SqlServerStages
         using (var insert = new SqlCommand(
             @"INSERT dbo.systems (contract_id,parent_id,name,[order],smr_amount,heading,source_num,stage_sys_src)
               OUTPUT INSERTED.id
-              SELECT @stage,@parent,sy.name,sy.order,NULL,sy.heading,N'',sy.id
+              SELECT @stage,@parent,sy.name,sy.[order],NULL,sy.heading,N'',sy.id
               FROM dbo.systems sy WHERE sy.id=@src", conn, tx))
         {
             insert.Parameters.Add("@stage", SqlDbType.BigInt).Value = stageId;

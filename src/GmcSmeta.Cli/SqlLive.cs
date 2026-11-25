@@ -133,10 +133,13 @@ public static class SqlLive
             if (!ok) failures++;
         }
 
+        var target = new SqlConnectionStringBuilder(connectionString);
+        if (!SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(target.InitialCatalog, target.DataSource))
+            return Fail("Для приёмки требуется локальная " + SqlSchemaCompatibility.OrdinarySchema31TestDatabase);
+
         using (var conn = SqlServerDatabase.Open(connectionString))
         {
-            Check(SqlSchemaCompatibility.Schema31WritesAllowed(connectionString),
-                "обычная запись v31 разрешена только для " + SqlSchemaCompatibility.OrdinarySchema31TestDatabase);
+            Check(true, "обычная запись v31 разрешена для " + conn.Database);
             Console.WriteLine($"База: {conn.Database}, схема 31, обычный Open");
         }
 
@@ -152,8 +155,9 @@ public static class SqlLive
         long contractId;
         using (var conn = SqlServerDatabase.Open(connectionString))
         using (var cmd = new SqlCommand("""
-            SELECT TOP(1) c.id
+            SELECT c.id,c.form,o.name,t.rules
             FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id
+            LEFT JOIN dbo.tags t ON t.[key]=c.form
             WHERE c.locked=0 AND c.stage_of IS NULL AND o.archived=0 AND c.discount_percent=0
               AND NOT EXISTS(SELECT 1 FROM dbo.acts a WHERE a.contract_id=c.id
                     AND (a.signed=1 OR a.discount_override=1 OR a.manual_total_cents>=0))
@@ -170,7 +174,18 @@ public static class SqlLive
             ORDER BY c.id
             """, conn))
         {
-            contractId = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+            contractId = 0;
+            using var candidates = cmd.ExecuteReader();
+            while (candidates.Read())
+            {
+                string Field(int ordinal) => candidates.IsDBNull(ordinal) ? "" : candidates.GetString(ordinal);
+                var rules = Field(3);
+                if (!DiscountPolicy.SupportsDiscount(KsFinancialPolicy.HasRule(rules, "vat_top"),
+                        KsFinancialPolicy.HasRule(rules, "ks_dns"), Field(1), Field(2)))
+                    continue;
+                contractId = Convert.ToInt64(candidates.GetValue(0), CultureInfo.InvariantCulture);
+                break;
+            }
         }
         if (contractId == 0)
         {
@@ -198,67 +213,6 @@ public static class SqlLive
             if (restored.Saved) Check(Math.Abs(Total() - original) < 0.005m, "итог договора восстановлен");
         }
 
-        long draftAct;
-        using (var conn = SqlServerDatabase.Open(connectionString))
-        using (var cmd = new SqlCommand("""
-            SELECT TOP(1) a.id
-            FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id
-            LEFT JOIN dbo.tags t ON t.[key]=c.form
-            WHERE a.signed=0 AND c.locked=0 AND c.stage_of IS NULL
-              AND c.discount_percent=0 AND a.discount_percent=0
-              AND a.discount_override=0 AND a.manual_total_cents<0
-              AND (ISNULL(t.rules,N'') NOT LIKE '%vat_top%' AND ISNULL(t.rules,N'') NOT LIKE '%ks_dns%')
-            ORDER BY a.id
-            """, conn))
-        {
-            draftAct = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
-        }
-        if (draftAct > 0)
-        {
-            var percent = SqlServerActs.SaveDiscount(connectionString, draftAct, "percent", 0m, RevisionOf());
-            if (!percent.Saved && percent.Error == "Корректировка не поддерживается этой формой КС.")
-                Console.WriteLine("SKIP: выбранный акт не поддерживает корректировку (форма/имя).");
-            else
-            {
-                Check(percent.Saved, "SaveDiscount percent 0%: " + (percent.Error ?? "сохранено"));
-                if (percent.Saved)
-                {
-                    var contract = SqlServerActs.SaveDiscount(connectionString, draftAct, "contract", null, percent.Revision);
-                    Check(contract.Saved, "SaveDiscount contract: " + (contract.Error ?? "сохранено"));
-                }
-            }
-        }
-        else Console.WriteLine("SKIP: у черновика нет акта для проверки скидки КС.");
-
-        long sectionAct;
-        using (var conn = SqlServerDatabase.Open(connectionString))
-        using (var cmd = new SqlCommand("""
-            SELECT TOP(1) a.id
-            FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id
-            WHERE a.signed=0 AND c.locked=0 AND c.stage_of IS NULL
-              AND LEN(ISNULL(a.section_amounts_json,N''))>2
-            ORDER BY a.id
-            """, conn))
-        {
-            sectionAct = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
-        }
-        if (sectionAct > 0)
-        {
-            var snapshot = SqlServerActs.ReadSections(connectionString, sectionAct);
-            Check(snapshot.Supported, "ReadSections: форма поддерживает ручную разбивку");
-            if (snapshot.Supported)
-            {
-                var same = SqlServerActs.SaveSections(connectionString, sectionAct, snapshot.Current, snapshot.Revision);
-                Check(same.Saved, "SaveSections без изменений: " + (same.Error ?? "сохранено"));
-                if (same.Saved)
-                {
-                    var reread = SqlServerActs.ReadSections(connectionString, sectionAct);
-                    Check(reread.SavedJson == snapshot.SavedJson, "JSON разбивки не изменился");
-                }
-            }
-        }
-        else Console.WriteLine("SKIP: у черновика нет акта с ручной разбивкой.");
-
         long actId = 0;
         try
         {
@@ -268,13 +222,36 @@ public static class SqlLive
         catch (Exception ex) { Check(false, "Create КС-2: " + ex.Message); }
         if (actId > 0)
         {
-            var sign = SqlServerActs.ToggleSigned(connectionString, actId, true, RevisionOf());
-            Check(sign.Saved, "ToggleSigned(true): " + (sign.Error ?? "сохранено"));
-            var unsign = sign.Saved
-                ? SqlServerActs.ToggleSigned(connectionString, actId, false, sign.Revision) : null;
-            Check(unsign?.Saved == true, "ToggleSigned(false): " + (unsign?.Error ?? "сохранено"));
-            var delete = SqlServerActs.Delete(connectionString, actId, RevisionOf());
-            Check(delete.Saved, "Delete черновика КС-2: " + (delete.Error ?? "удалён"));
+            try
+            {
+                var percent = SqlServerActs.SaveDiscount(connectionString, actId, "percent", 1m, RevisionOf());
+                Check(percent.Saved, "SaveDiscount percent 1%: " + (percent.Error ?? "сохранено"));
+                using (var conn = SqlServerDatabase.Open(connectionString))
+                {
+                    var act = SqlServerActs.ActsOf(conn, contractId).Single(a => a.Id == actId);
+                    Check(act.DiscountOverride && act.DiscountPercent == 1m, "скидка КС прочитана после записи");
+                }
+                var inherited = SqlServerActs.SaveDiscount(connectionString, actId, "contract", null, RevisionOf());
+                Check(inherited.Saved, "SaveDiscount contract: " + (inherited.Error ?? "сохранено"));
+
+                var sections = SqlServerActs.ReadSections(connectionString, actId);
+                var savedSections = SqlServerActs.SaveSections(connectionString, actId, sections.Suggested, sections.Revision);
+                Check(savedSections.Saved, "SaveSections: " + (savedSections.Error ?? "сохранено"));
+                var actual = SqlServerActs.ReadSections(connectionString, actId);
+                Check(actual.SavedJson.Length > 0 && actual.SavedJson != sections.SavedJson,
+                    "ручная разбивка КС прочитана после записи");
+
+                var sign = SqlServerActs.ToggleSigned(connectionString, actId, true, RevisionOf());
+                Check(sign.Saved, "ToggleSigned(true): " + (sign.Error ?? "сохранено"));
+                var unsign = sign.Saved
+                    ? SqlServerActs.ToggleSigned(connectionString, actId, false, sign.Revision) : null;
+                Check(unsign?.Saved == true, "ToggleSigned(false): " + (unsign?.Error ?? "сохранено"));
+            }
+            finally
+            {
+                var deleted = SqlServerActs.Delete(connectionString, actId, RevisionOf());
+                Check(deleted.Saved, "Delete черновика КС-2: " + (deleted.Error ?? "удалён"));
+            }
         }
 
         using (var conn = SqlServerDatabase.Open(connectionString))

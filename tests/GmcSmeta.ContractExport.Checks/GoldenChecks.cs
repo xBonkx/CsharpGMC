@@ -1,3 +1,4 @@
+using System.IO;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -151,7 +152,7 @@ internal static class GoldenChecks
             StringComparison.Ordinal)), "shipment issuer signature");
         Expect(sheet.CellsUsed().Any(c => c.GetString().Contains(shipment.Recipient,
             StringComparison.Ordinal)), "shipment recipient signature");
-        CheckXlsx(book, "golden-shipment.xlsx", "portrait", 6);
+        CheckXlsx(book, "golden-shipment.xlsx", "portrait", 6, expectsFormulas: false);
         VerifyPdf(ShipmentPdfForms.Create(shipment), "golden-shipment.pdf", false,
             "Ведомость выдачи", "Воздуховод", "Мастер участка", "Прораб");
         Console.WriteLine("PASS synthetic shipment: XLSX OOXML, quantity, signatures; PDF opens");
@@ -166,7 +167,7 @@ internal static class GoldenChecks
     }
 
     private static void CheckXlsx(XLWorkbook workbook, string name,
-        string orientation, int lastColumn)
+        string orientation, int lastColumn, bool expectsFormulas = true)
     {
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -182,8 +183,8 @@ internal static class GoldenChecks
         Expect(page.Descendants().Any(e => e.Name.LocalName == "pageSetup" &&
             (string?)e.Attribute("orientation") == orientation),
             name + " print orientation");
-        Expect(page.Descendants().Any(e => e.Name.LocalName == "f"),
-            name + " formulas lost in OOXML");
+        Expect(page.Descendants().Any(e => e.Name.LocalName == "f") == expectsFormulas,
+            name + " unexpected formula presence in OOXML");
         var metadata = Xml(archive, "xl/workbook.xml");
         var names = metadata.Descendants().Where(e => e.Name.LocalName == "definedName")
             .Select(e => (string?)e.Attribute("name")).ToHashSet();
