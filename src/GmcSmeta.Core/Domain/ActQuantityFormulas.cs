@@ -166,6 +166,17 @@ public static class ActQuantityFormulas
         return result;
     }
 
+    private static double FloorDivide(double left, double right)
+    {
+        // Python float // uses the remainder before rounding, e.g. 1 // 0.1 is 9.
+        var remainder = left % right;
+        var quotient = (left - remainder) / right;
+        if (remainder != 0 && (remainder < 0) != (right < 0))
+            quotient--;
+        var floor = Math.Floor(quotient);
+        return quotient - floor > 0.5 ? floor + 1 : floor;
+    }
+
     /// <summary>
     /// Безопасный вычислитель выражений из цифр и + * / ( ) − — только эти символы
     /// проходят валидацию, аналог eval без builtins в Python.
@@ -194,9 +205,16 @@ public static class ActQuantityFormulas
                 var op = expression[pos];
                 if (op != '*' && op != '/') break;
                 pos++;
+                var floorDivision = op == '/' && pos < expression.Length && expression[pos] == '/';
+                if (floorDivision) pos++;
                 var right = ParseFactor();
-                if (op == '*') left *= right;
-                else left /= right;      // деление на ноль даёт NaN/∞ — отсечётся проверкой isfinite
+                if (op == '*')
+                    left *= right;
+                else
+                {
+                    if (right == 0) throw new FormatException("Деление на ноль.");
+                    left = floorDivision ? FloorDivide(left, right) : left / right;
+                }
             }
             return left;
         }

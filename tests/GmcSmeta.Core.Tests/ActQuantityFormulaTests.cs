@@ -121,6 +121,33 @@ public sealed class ActQuantityFormulaTests
             Sources(41)));
     }
 
+    [Theory]
+    [InlineData("@41//3", 2)]
+    [InlineData("-(@41//-3)", 3)]
+    [InlineData("(@41/8)//0,1", 9)]
+    [InlineData("2*@41//3+1", 6)]
+    public void Calculate_FloorDivisionMatchesPython(string formula, int expected)
+    {
+        var parsed = ActQuantityInput.Parse("=" + formula, new Dictionary<long, string>());
+        var result = ActQuantityFormulas.Calculate(
+            Lines((41, "", 8m), (42, "", 0m)),
+            Edits((42, parsed.Quantity, parsed.Formula)), Sources(41));
+
+        Assert.Equal((decimal)expected, result[42]);
+    }
+
+    [Theory]
+    [InlineData("1/(@41/0)")]
+    [InlineData("1/(@41//0)")]
+    [InlineData("@41///2")]
+    public void Calculate_DivisionErrorsCannotBecomeZero(string formula)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => ActQuantityFormulas.Calculate(
+            Lines((41, "", 8m), (42, "", 0m)), Edits((42, 0m, formula)), Sources(41)));
+
+        Assert.Contains("Не удалось вычислить формулу объёма", error.Message);
+    }
+
     [Fact]
     public void Calculate_NegativeResult_Rejected()
     {
