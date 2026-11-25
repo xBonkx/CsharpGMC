@@ -26,4 +26,30 @@ public sealed class KsAsyncExportSourceTests
         Assert.Contains("if (_exportInProgress) return;", export);
         Assert.Contains("File.Delete(staged)", export);
     }
+
+    [Fact]
+    public void GroupExportsStageInBackgroundAndGuardPublication()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "KsGroupReportWindow.xaml.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "KsGroupReportWindow.xaml.cs"))
+            .Replace("\r\n", "\n");
+        Assert.Contains("private async void Excel_Click(", code);
+        Assert.Contains("private async void Pdf_Click(", code);
+        Assert.Contains("private async void Vor_Click(", code);
+        Assert.Contains("KsCustomerForms.Create(p)", code);
+        Assert.Contains("KsPdfForms.Create(p)", code);
+        Assert.Contains("KsVorForms.Create(p, act.Id)", code);
+        Assert.Contains("if (_closed || _exportInProgress) return;", code);
+        Assert.Contains("await Task.Run(() => render(staged));", code);
+        var check = code.IndexOf("if (_closed) return;", code.IndexOf("await Task.Run(() => render(staged));", StringComparison.Ordinal), StringComparison.Ordinal);
+        var publish = code.IndexOf("File.Move(staged, destination, overwrite: true)", StringComparison.Ordinal);
+        Assert.True(check >= 0 && publish > check);
+        Assert.Contains("File.Delete(staged)", code);
+        Assert.Contains("if (!_closed) SetExportButtons(_package is not null);", code);
+        Assert.DoesNotContain("XlsxExport.SaveCreatedWorkbook(", code);
+        Assert.DoesNotContain("KsPdfForms.Save(", code);
+    }
 }
