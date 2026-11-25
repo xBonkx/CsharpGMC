@@ -239,11 +239,16 @@ internal static class Program
         if (frame.Clip.Bounds.Width != 400 || frame.Clip.Bounds.Height != 150)
             throw new Exception("Summary table clip was not resized.");
         var grouped = new EstimateView.SummaryRow { Kind = "system", SystemId = 5 };
-        var supplier = new EstimateView.SummaryRow { Kind = "system", SystemId = 0 };
-        if (!grouped.CanCollapseSystem || supplier.CanCollapseSystem ||
+        var supplier = new EstimateView.SummaryRow { Kind = "system", SystemId = 0, SupplierGroupKey = "" };
+        var noGroup = new EstimateView.SummaryRow { Kind = "system", SystemId = 0 };
+        if (!grouped.CanCollapseSystem || !supplier.CanCollapseSystem || noGroup.CanCollapseSystem ||
             new EstimateView.SummaryRow().IsIndented)
             throw new Exception("Summary group affordances do not match supported actions.");
-        Console.WriteLine("Summary table clip and group affordances OK.");
+        var column = new DataGridTextColumn { Header = "Закупка ∑", SortMemberPath = "w_wcost" };
+        TableColumnMenu.SetMenuTitle(column, "СМР · закупка ∑");
+        if (TableColumnMenu.Title(column) != "СМР · закупка ∑" || column.SortMemberPath != "w_wcost")
+            throw new Exception("Column menu title must distinguish the financial group without changing identity.");
+        Console.WriteLine("Summary table clip, group affordances and column labels OK.");
     }
 
     private static void CheckEstimateCalculatedColumns()

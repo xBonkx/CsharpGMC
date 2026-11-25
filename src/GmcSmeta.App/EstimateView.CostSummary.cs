@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -42,7 +43,8 @@ public partial class EstimateView
         public bool IsTotalRow => Kind == "total";
         public bool IsPositionRow => Kind == "pos";
         public bool IsIndented { get; init; }
-        public bool CanCollapseSystem => IsSystemHeader && SystemId != 0;
+        public string? SupplierGroupKey { get; init; }
+        public bool CanCollapseSystem => IsSystemHeader && (SystemId != 0 || SupplierGroupKey is not null);
         public bool IsExtraRow => Kind == "extra";
         /// <summary>▾ / ▸ у шапки системы (сворачивание, как в QTreeWidget эталона).</summary>
         public string CollapseMark { get; init; } = "▾";
@@ -117,6 +119,9 @@ public partial class EstimateView
     private string _summarySort = "kp";
     private bool _summaryMissingOn;
     private readonly HashSet<long> _collapsedSummarySystems = new();
+    private readonly HashSet<string> _collapsedSummarySuppliers = new(StringComparer.Ordinal);
+    private readonly HashSet<long> _summarySelectedSystems = new();
+    private List<(long Id, string Label)> _summarySystemOptions = new();
     private bool _summaryBusy;
     private bool _summaryLoading;
     private int _summaryLoadVersion;
@@ -197,33 +202,74 @@ public partial class EstimateView
         }
     }
 
-    private sealed record SummarySystemOption(long? Id, string Label)
-    {
-        public override string ToString() => Label;
-    }
-
     private void SummaryFillSystemFilter()
     {
-        if (SummarySystemFilter is null) return;
-        var selected = SummarySystemFilter.SelectedItem as SummarySystemOption;
-        var options = new List<SummarySystemOption> { new(null, "Все системы") };
-        foreach (var (id, name, _) in _costSummaryData!.Systems)
-            options.Add(new SummarySystemOption(id, _summaryLabels.GetValueOrDefault(id, name)));
-        SummarySystemFilter.ItemsSource = options;
-        SummarySystemFilter.SelectedItem =
-            options.FirstOrDefault(o => o.Id == selected?.Id) ?? options[0];
+        if (_costSummaryData is not { } data) return;
+        var systemsWithRows = _summaryRecs.Select(r => r.SystemId).ToHashSet();
+        _summarySystemOptions = data.Systems
+            .Where(s => s.Label != "Без системы" || systemsWithRows.Contains(s.Id))
+            .Select(s => (s.Id, _summaryLabels.GetValueOrDefault(s.Id, s.Label))).ToList();
+        _summarySelectedSystems.IntersectWith(_summarySystemOptions.Select(s => s.Id));
+        SummarySyncSystemFilter();
     }
 
-    /// <summary>Подписи систем: подраздел — «Родитель › подраздел» (System.label эталона);
-    /// подсистемы в эталоне идут сразу за родителем.</summary>
+    private void SummarySyncSystemFilter()
+    {
+        if (SummarySystemFilter is null || SummarySystemFilterText is null) return;
+        var names = _summarySystemOptions.Where(s => _summarySelectedSystems.Contains(s.Id))
+            .Select(s => s.Label).ToArray();
+        SummarySystemFilterText.Text = names.Length switch
+        {
+            0 => "Все системы", <= 2 => string.Join(", ", names), _ => $"Систем: {names.Length}"
+        };
+        SummarySystemFilter.Tag = names.Length > 0 ? "True" : "False";
+        SummarySystemFilter.ToolTip = names.Length == 0
+            ? "Показать одну или несколько систем вместе с подразделами"
+            : string.Join("\n", names);
+    }
+
+    private void SummarySystemFilter_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || _costSummaryData is null) return;
+        var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        var options = _summarySystemOptions;
+        var all = new MenuItem { Header = "Все системы", IsCheckable = true, IsChecked = _summarySelectedSystems.Count == 0, StaysOpenOnClick = true };
+        menu.Items.Add(all);
+        menu.Items.Add(new Separator());
+        var items = new List<(long Id, MenuItem Item)>();
+        foreach (var (id, label) in options)
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true,
+                IsChecked = _summarySelectedSystems.Contains(id), StaysOpenOnClick = true };
+            items.Add((id, item));
+            menu.Items.Add(item);
+            item.Click += (_, _) =>
+            {
+                if (!ReferenceEquals(options, _summarySystemOptions)) { menu.IsOpen = false; return; }
+                if (item.IsChecked) _summarySelectedSystems.Add(id);
+                else _summarySelectedSystems.Remove(id);
+                all.IsChecked = _summarySelectedSystems.Count == 0;
+                SummarySyncSystemFilter();
+                SummaryRebuild();
+            };
+        }
+        all.Click += (_, _) =>
+        {
+            if (!ReferenceEquals(options, _summarySystemOptions)) { menu.IsOpen = false; return; }
+            _summarySelectedSystems.Clear();
+            foreach (var (_, item) in items) item.IsChecked = false;
+            all.IsChecked = true;
+            SummarySyncSystemFilter();
+            SummaryRebuild();
+        };
+        menu.IsOpen = true;
+    }
+
+    /// <summary>Python System.label: parent name › child name.</summary>
     private void SummaryComputeLabels()
     {
-        var systems = _costSummaryData!.Systems;
-        _summaryLabels = new Dictionary<long, string>();
-        // в SQL-выборке нет parent_id: составные подписи строим по порядку,
-        // как их отдаёт Core (имя системы целиком, для подразделов — имя как есть)
-        foreach (var (id, name, _) in systems)
-            _summaryLabels[id] = name;
+        var data = _costSummaryData!;
+        _summaryLabels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);
     }
 
     // ------------------------------------------------------------------ build
@@ -255,11 +301,11 @@ public partial class EstimateView
         var words = (SummarySearch?.Text ?? "")
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(w => w.ToLowerInvariant()).ToArray();
-        long? systemId = (SummarySystemFilter?.SelectedItem as SummarySystemOption)?.Id;
+        var systemIds = SummarySystemSelection.Expand(_summarySelectedSystems, data.SystemParents);
         var rows = new List<SummaryRec>();
         foreach (var r in recs)
         {
-            if (systemId is long sid && r.SystemId != sid) continue;
+            if (systemIds is not null && !systemIds.Contains(r.SystemId)) continue;
             if (_summaryMissingOn && !chosen.Any(k => SummaryFlag(r, k))) continue;
             if (words.Length > 0)
             {
@@ -310,13 +356,13 @@ public partial class EstimateView
         else
         {
             // группы: по системам или по поставщикам; свёрнутая группа тоже редактируется
-            var groups = new List<(string Title, long SystemId, List<SummaryRec> Items)>();
+            var groups = new List<(string Title, long SystemId, string? SupplierKey, List<SummaryRec> Items)>();
             if (_summaryMode == "sup")
             {
                 foreach (var g in rows.GroupBy(r => r.Supplier).OrderBy(g => g.Key.Length == 0 ? 1 : 0)
                          .ThenBy(g => g.Key.Length == 0 ? "" : g.Key.ToLowerInvariant(), StringComparer.Ordinal))
                     groups.Add((g.Key.Length == 0 ? "Поставщик не указан" : $"Поставщик: {g.Key}",
-                        0, g.ToList()));
+                        0, g.Key, g.ToList()));
             }
             else
             {
@@ -324,17 +370,17 @@ public partial class EstimateView
                 {
                     var items = rows.Where(r => r.SystemId == id).ToList();
                     if (items.Count > 0)
-                        groups.Add((_summaryLabels.GetValueOrDefault(id, label), id, items));
+                        groups.Add((_summaryLabels.GetValueOrDefault(id, label), id, null, items));
                 }
             }
-            foreach (var (title, sysId, items) in groups)
+            foreach (var (title, sysId, supplierKey, items) in groups)
             {
                 var sorted = SortRecs(items);
-                built.Add(SummaryRowFromGroup(sysId, title, sorted, chosen));
+                built.Add(SummaryRowFromGroup(sysId, supplierKey, title, sorted, chosen));
                 // Сворачивание скрывает только детали, не исключает систему из итогов.
                 totMCost += sorted.Sum(x => x.MCost); totMSell += sorted.Sum(x => x.MSell);
                 totWCost += sorted.Sum(x => x.WCost); totWSell += sorted.Sum(x => x.WSell);
-                if (sysId != 0 && _collapsedSummarySystems.Contains(sysId))
+                if (SummaryGroupCollapsed(sysId, supplierKey))
                     continue;
                 foreach (var r in sorted)
                     AddStripe(SummaryRowFromRec(r, kinds: markKinds) with { IsIndented = true });
@@ -531,7 +577,7 @@ public partial class EstimateView
     }
 
     /// <summary>Шапка системы / поставщика: суммы группы и цены, вписываемые во все строки.</summary>
-    private SummaryRow SummaryRowFromGroup(long systemId, string title, List<SummaryRec> items, HashSet<string> chosen)
+    private SummaryRow SummaryRowFromGroup(long systemId, string? supplierKey, string title, List<SummaryRec> items, HashSet<string> chosen)
     {
         decimal mCost = items.Sum(x => x.MCost), mSell = items.Sum(x => x.MSell);
         decimal wCost = items.Sum(x => x.WCost), wSell = items.Sum(x => x.WSell);
@@ -557,10 +603,11 @@ public partial class EstimateView
         {
             Kind = "system",
             SystemId = systemId,
+            SupplierGroupKey = supplierKey,
             MemberIds = items.SelectMany(x => x.Ids).ToArray(),
             Name = title,
             QtyText = $"{items.Count} поз.",
-            CollapseMark = systemId != 0 && _collapsedSummarySystems.Contains(systemId) ? "▸" : "▾",
+            CollapseMark = SummaryGroupCollapsed(systemId, supplierKey) ? "▸" : "▾",
             CostUnitText = cost.Text, CostUnitRaw = cost.Raw,
             CostUnitTip = Tip("закуп материала за ед.", cost.Uniform, items.Count),
             PriceUnitText = price.Text, PriceUnitRaw = price.Raw,
@@ -627,7 +674,6 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ toolbar events
-    private void SummaryFilter_Changed(object sender, SelectionChangedEventArgs e) => SummaryRebuild();
     private void SummarySearch_TextChanged(object sender, TextChangedEventArgs e) => SummaryRebuild();
 
     private void ClearSummarySearch_Click(object sender, RoutedEventArgs e)
@@ -717,14 +763,19 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ collapse
+    private bool SummaryGroupCollapsed(long systemId, string? supplierKey) =>
+        supplierKey is not null ? _collapsedSummarySuppliers.Contains(supplierKey) :
+        systemId != 0 && _collapsedSummarySystems.Contains(systemId);
+
     private void SummaryToggleSystem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: SummaryRow row } || row.Kind != "system") return;
-        if (row.SystemId != 0)
+        if (sender is not Button { DataContext: SummaryRow row } || !row.CanCollapseSystem) return;
+        if (row.SupplierGroupKey is { } supplierKey)
         {
-            if (!_collapsedSummarySystems.Add(row.SystemId)) _collapsedSummarySystems.Remove(row.SystemId);
-            SummaryRebuild();
+            if (!_collapsedSummarySuppliers.Add(supplierKey)) _collapsedSummarySuppliers.Remove(supplierKey);
         }
+        else if (!_collapsedSummarySystems.Add(row.SystemId)) _collapsedSummarySystems.Remove(row.SystemId);
+        SummaryRebuild();
         e.Handled = true;
     }
 

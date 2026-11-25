@@ -43,6 +43,8 @@ public sealed record CostSummaryData(
     IReadOnlyList<string> Notes,
     decimal SmrContract)
 {
+    // Already read from systems.parent_id; metadata only, no additional SQL or writes.
+    public IReadOnlyDictionary<long, long> SystemParents { get; init; } = new Dictionary<long, long>();
     public decimal TotalCost => Rows.Sum(r => r.TotalCost) + Extra.Sum(e => e.Cost);
     public decimal TotalSell => Rows.Sum(r => r.TotalSell) + Extra.Sum(e => e.Sell);
 }
@@ -64,16 +66,19 @@ public static partial class SqlServerCostSummary
     public static CostSummaryData Summary(SqlConnection conn, int contractId)
     {
         var systems = new List<(long Id, string Label, bool IsSub)>();
+        var systemParents = new Dictionary<long, long>();
         using (var read = new SqlCommand(
             "SELECT id,name,parent_id FROM dbo.systems WHERE contract_id=@id ORDER BY [order],id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = read.ExecuteReader();
             while (r.Read())
-                systems.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    r.IsDBNull(1) ? "" : r.GetString(1),
-                    !r.IsDBNull(2)));
+            {
+                var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var isSub = !r.IsDBNull(2);
+                systems.Add((id, r.IsDBNull(1) ? "" : r.GetString(1), isSub));
+                if (isSub) systemParents[id] = Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture);
+            }
         }
 
         var rows = new List<CostSummaryRow>();
@@ -190,7 +195,7 @@ public static partial class SqlServerCostSummary
 
         // СМР документа — из проверенного Totals (Contract.stats()["smr"] эталона).
         var smr = Totals.ReadOne(conn, contractId)?.Smr ?? 0m;
-        return new CostSummaryData(systems, rows, extra, notes, smr);
+        return new CostSummaryData(systems, rows, extra, notes, smr) { SystemParents = systemParents };
     }
 
     /// <summary>

@@ -1385,9 +1385,26 @@
                     </Button>
                     </WrapPanel>
                     <WrapPanel x:Name="SummaryFilters" VerticalAlignment="Center">
-                    <ComboBox x:Name="SummarySystemFilter" Width="170" Height="34" MinHeight="0" VerticalContentAlignment="Center"
-                              SelectionChanged="SummaryFilter_Changed" Margin="0,0,6,0"
-                              ToolTip="Показать строки одной системы"/>
+                    <Button x:Name="SummarySystemFilter" Width="170" Height="34" MinHeight="0"
+                            Click="SummarySystemFilter_Click" Margin="0,0,6,0"
+                            ToolTip="Показать одну или несколько систем вместе с подразделами"
+                            AutomationProperties.Name="Фильтр систем">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                <Style.Triggers>
+                                    <Trigger Property="Tag" Value="True">
+                                        <Setter Property="Background" Value="#E8F0FE"/>
+                                        <Setter Property="BorderBrush" Value="#2563EB"/>
+                                        <Setter Property="Foreground" Value="#1E40AF"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <DockPanel LastChildFill="True" Width="146">
+                            <Viewbox DockPanel.Dock="Right" Width="12" Height="12" Margin="6,0,0,0" VerticalAlignment="Center"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="#64748B"/></Canvas></Viewbox>
+                            <TextBlock x:Name="SummarySystemFilterText" Text="Все системы" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </Button>
                     <Grid Width="200" Height="34"><TextBox x:Name="SummarySearch" Style="{StaticResource PythonSearch}" Padding="30,5,27,5" AutomationProperties.Name="Найти позицию"
                              TextChanged="SummarySearch_TextChanged"
                              ToolTip="Только строки с этим в названии (или системе / поставщике) — например «решетк»"/>
