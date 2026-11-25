@@ -603,7 +603,6 @@
                         <Button Style="{StaticResource EstimateMenuItem}" x:Name="MoveContractItem" Content="Перенести в другой объект…" Click="MoveContract_Click" Tag="{StaticResource GlyphFilePlus}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть договоры из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphStage}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сравнить с другим документом…" Click="CompareDocs_Click" Tag="{StaticResource GlyphList}"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Сохранить ссылку на расчёт в папку…" Click="SaveDocumentLink_Click" Tag="{StaticResource GlyphFilePlus}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>
                         <TextBlock Text="ЦЕНЫ" Style="{StaticResource EstimateMenuHeader}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Скопировать расценки" Click="TransferRates_Click" Tag="{StaticResource GlyphCopy}"
@@ -625,6 +624,7 @@
                         <Separator Style="{StaticResource MenuSeparator}"/>
                         <TextBlock Text="ПРОЧЕЕ" Style="{StaticResource EstimateMenuHeader}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="История изменений документа…" Click="ShowHistory_Click" Tag="{StaticResource GlyphHistory}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" Content="Сохранить ссылку на расчёт в папку…" Click="SaveDocumentLink_Click" Tag="{StaticResource GlyphFolder}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Пересортировать строки КП (запись)…" Click="Sort_Click" Tag="{StaticResource GlyphSort}"
                                 ToolTip="Физически изменить порядок строк в SQL Server: отдельно от временного вида"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Удалить документ…" Click="DeleteContract_Click" Tag="{StaticResource GlyphTrash}"/>

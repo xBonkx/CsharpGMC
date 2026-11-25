@@ -20,6 +20,8 @@ public sealed class DocumentLinkMenuSourceTests
         var command = Assert.Single(panel.Elements(wpf + "Button")
             .Where(e => (string?)e.Attribute("Click") == "SaveDocumentLink_Click"));
         Assert.Equal("Сохранить ссылку на расчёт в папку…", (string?)command.Attribute("Content"));
+        Assert.Equal("{StaticResource GlyphFolder}", (string?)command.Attribute("Tag"));
+        Assert.Equal("ShowHistory_Click", (string?)command.ElementsBeforeSelf().Last().Attribute("Click"));
         var header = File.ReadAllText(Path.Combine(app, "EstimateView.Header.cs"));
         Assert.Contains("main.CreateGmcsLink(_doc);", header);
         var main = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));

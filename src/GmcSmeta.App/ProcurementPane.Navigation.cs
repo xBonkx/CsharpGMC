@@ -95,7 +95,7 @@ public partial class ProcurementPane
             });
         }
         menu.Items.Add(new Separator());
-        void Movement(string label, string kind, string glyph, string document = "") =>
+        void Movement(string label, string kind, string? glyph = null, string document = "") =>
             MenuAction(menu, label, (_, _) =>
             {
                 if (CurrentSelection() && BuyGrid.SelectedItem is ProcurementPreviewRow row &&
@@ -104,11 +104,11 @@ public partial class ProcurementPane
             }, glyph, enabled: BuyGrid.SelectedItem is ProcurementPreviewRow selected &&
                                 ids.Contains(selected.PositionId));
 
-        Movement("На складе — пришло…", "in", "Download");
-        Movement("Выдано на объект…", "out", "Upload");
-        Movement("Возврат с объекта…", "back", "ArrowBack");
-        Movement("Возврат поставщику…", "back_supplier", "ArrowBack");
-        Movement("Изготовлено → на склад…", "in", "Download", "из цеха");
+        Movement("На складе — пришло…", "in");
+        Movement("Выдано на объект…", "out");
+        Movement("Возврат с объекта…", "back");
+        Movement("Возврат поставщику…", "back_supplier");
+        Movement("Изготовлено → на склад…", "in", document: "из цеха");
         MenuAction(menu, "Ожидаем поставку к…", (s, e) =>
         {
             if (CurrentSelection()) ProcurementBulkDue_Click(s, e);
@@ -171,7 +171,7 @@ public partial class ProcurementPane
             enabled: canWrite && extraSelected);
         MenuAction(menu, "Допсоглашение из докупленного…", ProcurementExtraDop_Click, "FilePlus",
             enabled: canWrite && _allRows.Any(row => row.OutOfKp));
-        MenuAction(menu, "Отдать в цех…", ProcurementToShop_Click, "FilePlus", enabled: canWrite && ids.Count > 0);
+        MenuAction(menu, "Отдать в цех…", ProcurementToShop_Click, "Settings", enabled: canWrite && ids.Count > 0);
         MenuAction(menu, "Заявка в цех (печать)…", ProcurementShopOrder_Click, "File");
         menu.Items.Add(new Separator());
         MenuAction(menu, "Заказ / оплата…", ProcurementOrder_Click, "File", shortcut: "F4", enabled: canWrite && ids.Count > 0);

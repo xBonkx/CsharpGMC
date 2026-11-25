@@ -966,37 +966,38 @@ public partial class ProcurementPane : UserControl
         var ids = SelectedBuyingIds().OrderBy(id => id).ToArray();
         bool CanExecute() => CanStartOperation && _revision == revision &&
             _allRows.Contains(row) && SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids);
-        void Add(string header, string kind, string glyph, string defaultDocument = "")
+        void Add(string header, string kind, string? glyph = null, string defaultDocument = "")
         {
-            var item = ContextMenuIcons.Create(header, glyph);
+            var item = glyph is null ? new MenuItem { Header = header } : ContextMenuIcons.Create(header, glyph);
             item.Click += (_, _) =>
             {
                 if (CanExecute()) _ = OpenMovementDialogAsync(row, kind, defaultDocument);
             };
             MovementMenu.Items.Add(item);
         }
-        void AddAction(string header, RoutedEventHandler handler, string glyph, string shortcut = "")
+        void AddAction(string header, RoutedEventHandler handler, string? glyph = null, string shortcut = "")
         {
-            var item = ContextMenuIcons.Create(header, glyph, shortcut: shortcut);
+            var item = glyph is null ? new MenuItem { Header = header, InputGestureText = shortcut } :
+                ContextMenuIcons.Create(header, glyph, shortcut: shortcut);
             item.Click += (sender, args) => { if (CanExecute()) handler(sender, args); };
             MovementMenu.Items.Add(item);
         }
-        AddAction("Поставщик для выделенных…", ProcurementBulkSupplier_Click, "Users");
+        AddAction("Поставщик для выделенных…", ProcurementBulkSupplier_Click, "Building");
         AddAction("Заявка поставщику…", ProcurementSupplierRequest_Click, "File");
         MovementMenu.Items.Add(new Separator());
         AddAction("Заказ / оплата…", ProcurementOrder_Click, "File", "F4");
         Add("Пришло на склад…", "in", "Download");
         Add("Выдано на объект (через ведомость)…", "out", "Upload");
         MovementMenu.Items.Add(new Separator());
-        AddAction("Отдать в цех…", ProcurementToShop_Click, "FilePlus");
-        Add("Изготовлено → на склад…", "in", "Download", "из цеха");
+        AddAction("Отдать в цех…", ProcurementToShop_Click, "Settings");
+        Add("Изготовлено → на склад…", "in", defaultDocument: "из цеха");
         MovementMenu.Items.Add(new Separator());
-        AddAction("Не заказываем", async (_, _) => await ApplyBulkProcAsync(null, "skip", "Статус обновлён"), "X");
-        AddAction("По факту / монтажники", async (_, _) => await ApplyBulkProcAsync(null, "fact", "Статус обновлён"), "Users");
-        AddAction("Сбросить статус", async (_, _) => await ApplyBulkProcAsync(null, "", "Статус сброшен"), "History");
+        AddAction("Не заказываем", async (_, _) => await ApplyBulkProcAsync(null, "skip", "Статус обновлён"));
+        AddAction("По факту / монтажники", async (_, _) => await ApplyBulkProcAsync(null, "fact", "Статус обновлён"));
+        AddAction("Сбросить статус", async (_, _) => await ApplyBulkProcAsync(null, "", "Статус сброшен"));
         MovementMenu.Items.Add(new Separator());
-        Add("Возврат с объекта…", "back", "ArrowBack");
-        Add("Возврат поставщику…", "back_supplier", "ArrowBack");
+        Add("Возврат с объекта…", "back");
+        Add("Возврат поставщику…", "back_supplier");
         MovementMenu.PlacementTarget = BuyGrid;
         MovementMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         e.Handled = true;
