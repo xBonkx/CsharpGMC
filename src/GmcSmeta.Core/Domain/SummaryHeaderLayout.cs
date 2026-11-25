@@ -9,9 +9,9 @@ public static class SummaryHeaderLayout
     public static Band GroupFor(string key) => key switch
     {
         "name" or "unit" or "qty" => Band.Position,
-        "m_ucost" or "m_uprice" or "m_mcost" or "m_msell" => Band.Materials,
-        "w_ucost" or "w_usell" or "w_wcost" or "w_wsell" or "markup" => Band.Work,
-        "t_cost" or "t_sell" or "mat_margin" or "work_margin" => Band.Total,
+        "m_ucost" or "m_uprice" or "m_mcost" or "m_msell" or "m_legacy_margin" => Band.Materials,
+        "w_ucost" or "w_usell" or "w_wcost" or "w_wsell" or "markup" or "w_legacy_margin" => Band.Work,
+        "t_cost" or "t_sell" or "mat_margin" or "work_margin" or "t_legacy_margin" => Band.Total,
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unknown cost summary column")
     };
 

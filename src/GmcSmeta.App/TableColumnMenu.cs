@@ -42,6 +42,12 @@ public static class TableColumnMenu
     public static void SetMenuTitle(DependencyObject target, string value) => target.SetValue(MenuTitleProperty, value);
     public static string GetMenuTitle(DependencyObject target) => (string)target.GetValue(MenuTitleProperty);
 
+    // An optional column can start hidden without being a mode-controlled column.
+    public static readonly DependencyProperty DefaultHiddenProperty = DependencyProperty.RegisterAttached(
+        "DefaultHidden", typeof(bool), typeof(TableColumnMenu), new PropertyMetadata(false));
+    public static void SetDefaultHidden(DependencyObject target, bool value) => target.SetValue(DefaultHiddenProperty, value);
+    public static bool GetDefaultHidden(DependencyObject target) => (bool)target.GetValue(DefaultHiddenProperty);
+
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Layout> Layouts = new();
 
     // WPF smoke checks can use a temporary profile directory. Production always
@@ -173,6 +179,7 @@ public static class TableColumnMenu
     {
         public Preferences() { }
         public List<string> Hidden { get; set; } = new();
+        public List<string> Shown { get; set; } = new();
         public Dictionary<string, double> Widths { get; set; } = new();
         public List<string> Order { get; set; } = new();
     }
@@ -199,7 +206,9 @@ public static class TableColumnMenu
                 {
                     foreach (var entry in _entries.Where(x => !x.Excluded))
                     {
-                        if (!entry.Protected && _prefs.Hidden.Contains(entry.Id))
+                        if (!entry.Protected && GetDefaultHidden(entry.Column))
+                            entry.Column.Visibility = Visibility.Collapsed;
+                        else if (!entry.Protected && _prefs.Hidden.Contains(entry.Id))
                             entry.Column.Visibility = Visibility.Visible;
                         entry.Column.Width = entry.Width;
                     }
@@ -226,6 +235,7 @@ public static class TableColumnMenu
                 if (!File.Exists(PathName)) return new();
                 var value = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(PathName)) ?? new();
                 value.Hidden ??= new();
+                value.Shown ??= new();
                 value.Widths ??= new();
                 value.Order ??= new();
                 return value;
@@ -281,7 +291,7 @@ public static class TableColumnMenu
                 var identity = Identity(column);
                 var id = identity + "#" + columns.Take(index).Count(c => Identity(c) == identity);
                 var excluded = exclude.Contains(title) ||
-                    (column.Visibility != Visibility.Visible && !protect.Contains(title));
+                    (column.Visibility != Visibility.Visible && !GetDefaultHidden(column) && !protect.Contains(title));
                 return new Entry(column, id, title, column.Width, index,
                     index == 0 || protect.Contains(title), excluded,
                     index == 0 || index < grid.FrozenColumnCount || excluded || !column.CanUserReorder);
@@ -293,8 +303,13 @@ public static class TableColumnMenu
             {
                 foreach (var entry in _entries.Where(x => !x.Excluded))
                 {
-                    if (!entry.Protected && _prefs.Hidden.Contains(entry.Id) && CanHide(entry.Column))
-                        entry.Column.Visibility = Visibility.Collapsed;
+                    if (!entry.Protected)
+                    {
+                        var hide = _prefs.Hidden.Contains(entry.Id) ||
+                            GetDefaultHidden(entry.Column) && !_prefs.Shown.Contains(entry.Id);
+                        if (hide && CanHide(entry.Column)) entry.Column.Visibility = Visibility.Collapsed;
+                        else if (GetDefaultHidden(entry.Column)) entry.Column.Visibility = Visibility.Visible;
+                    }
                     if (_prefs.Widths.TryGetValue(entry.Id, out var width) &&
                         double.IsFinite(width) && width is >= 36 and <= 2000)
                         entry.Column.Width = new DataGridLength(Math.Clamp(width, entry.Column.MinWidth,
@@ -401,9 +416,15 @@ public static class TableColumnMenu
         {
             var changed = changedEntries.Where(x => !x.Excluded && !x.Protected).ToArray();
             var changedIds = changed.Select(x => x.Id).ToHashSet();
-            Save(prefs => prefs.Hidden = prefs.Hidden.Where(id => !changedIds.Contains(id))
-                .Concat(changed.Where(x => x.Column.Visibility != Visibility.Visible)
-                    .Select(x => x.Id)).Distinct().ToList());
+            Save(prefs =>
+            {
+                prefs.Hidden = prefs.Hidden.Where(id => !changedIds.Contains(id))
+                    .Concat(changed.Where(x => x.Column.Visibility != Visibility.Visible)
+                        .Select(x => x.Id)).Distinct().ToList();
+                prefs.Shown = prefs.Shown.Where(id => !changedIds.Contains(id))
+                    .Concat(changed.Where(x => GetDefaultHidden(x.Column) && x.Column.Visibility == Visibility.Visible)
+                        .Select(x => x.Id)).Distinct().ToList();
+            });
         }
 
         internal void SaveOrder()

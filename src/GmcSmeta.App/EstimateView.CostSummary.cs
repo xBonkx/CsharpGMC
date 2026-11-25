@@ -74,6 +74,15 @@ public partial class EstimateView
         public string MatMarginText { get; init; } = "";
         public string WorkMarginText { get; init; } = "";
         public string MarkupText { get; init; } = "";
+        // Legacy columns display the raw differences, as Python VAL_COLS.
+        public decimal MatLegacyMargin { get; init; }
+        public decimal WorkLegacyMargin { get; init; }
+        public string MatLegacyMarginText => SumText(MatLegacyMargin);
+        public string WorkLegacyMarginText => SumText(WorkLegacyMargin);
+        public string TotalLegacyMarginText => SumText(MatLegacyMargin + WorkLegacyMargin);
+        public bool MatLegacyMarginNeg => MatLegacyMargin < -0.005m;
+        public bool WorkLegacyMarginNeg => WorkLegacyMargin < -0.005m;
+        public bool TotalLegacyMarginNeg => MatLegacyMargin + WorkLegacyMargin < -0.005m;
         public bool MatMarginNeg { get; init; }
         public bool WorkMarginNeg { get; init; }
         // красные «—» на пропусках (CostMark — всегда; остальные — при включённом фильтре)
@@ -382,6 +391,7 @@ public partial class EstimateView
                         Kind = "extra", Name = name,
                         WCostText = SumText(cost), WSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        WorkLegacyMargin = sell - cost,
                         MatMarginText = MarginText(0m, 0m), WorkMarginText = MarginText(cost, sell),
                         WorkMarginNeg = MarginNeg(cost, sell),
                     });
@@ -395,6 +405,7 @@ public partial class EstimateView
                         Kind = "extra", IsTransport = true, Name = name,
                         MCostText = SumText(cost), MSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        MatLegacyMargin = sell - cost,
                         MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
                         MatMarginNeg = MarginNeg(cost, sell),
                     });
@@ -407,6 +418,7 @@ public partial class EstimateView
                         Kind = "extra", Name = name,
                         MCostText = SumText(cost), MSellText = SumText(sell),
                         TotalCostText = SumText(cost), TotalSellText = SumText(sell),
+                        MatLegacyMargin = sell - cost,
                         MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
                         MatMarginNeg = MarginNeg(cost, sell),
                     });
@@ -422,6 +434,7 @@ public partial class EstimateView
             MCostText = SumText(totMCost), MSellText = SumText(totMSell),
             WCostText = SumText(totWCost), WSellText = SumText(totWSell),
             TotalCostText = SumText(totMCost + totWCost), TotalSellText = SumText(totMSell + totWSell),
+            MatLegacyMargin = totMSell - totMCost, WorkLegacyMargin = totWSell - totWCost,
             MatMarginText = MarginText(totMCost, totMSell),
             WorkMarginText = MarginText(totWCost, totWSell),
             MatMarginNeg = MarginNeg(totMCost, totMSell),
@@ -597,6 +610,7 @@ public partial class EstimateView
             MCostText = SumText(r.MCost), MSellText = SumText(r.MSell),
             WCostText = SumText(r.WCost), WSellText = SumText(r.WSell),
             TotalCostText = SumText(r.Cost), TotalSellText = SumText(r.Sell),
+            MatLegacyMargin = r.MSell - r.MCost, WorkLegacyMargin = r.WSell - r.WCost,
             MatMarginText = MarginText(r.MCost, r.MSell),
             WorkMarginText = MarginText(r.WCost, r.WSell),
             MatMarginNeg = MarginNeg(r.MCost, r.MSell),
@@ -654,6 +668,7 @@ public partial class EstimateView
             MCostText = SumText(mCost), MSellText = SumText(mSell),
             WCostText = SumText(wCost), WSellText = SumText(wSell),
             TotalCostText = SumText(mCost + wCost), TotalSellText = SumText(mSell + wSell),
+            MatLegacyMargin = mSell - mCost, WorkLegacyMargin = wSell - wCost,
             MatMarginText = MarginText(mCost, mSell),
             WorkMarginText = MarginText(wCost, wSell),
             MatMarginNeg = MarginNeg(mCost, mSell),

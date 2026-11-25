@@ -44,6 +44,20 @@ internal static class ColumnMenuChecks
             Item(restoredMenu, "Показать все столбцы").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Require(reopened.Columns[1].Visibility == Visibility.Visible &&
                 reopened.Columns[2].Visibility == Visibility.Collapsed, "Show-all changed a mode-controlled column.");
+            var optional = CreateGrid("optional");
+            var optionalMenu = Menu(optional);
+            var legacy = Item(optionalMenu, "Доп. маржа");
+            Require(!legacy.IsChecked && legacy.IsEnabled, "Default-hidden column must be available in menu.");
+            Click(legacy, true);
+            Require(CreateGrid("optional").Columns[3].Visibility == Visibility.Visible, "Explicit show did not persist.");
+            Require(CreateGrid("another").Columns[3].Visibility == Visibility.Collapsed, "Default hidden leaked to another profile.");
+            var again = CreateGrid("optional");
+            TableColumnMenu.RefreshDynamic(again, "another", ownHeaderMenu: true);
+            Require(again.Columns[3].Visibility == Visibility.Collapsed, "Profile switch did not restore hidden default.");
+            TableColumnMenu.RefreshDynamic(again, "optional", ownHeaderMenu: true);
+            Require(again.Columns[3].Visibility == Visibility.Visible, "Explicit show lost on profile switch.");
+            Click(Item(Menu(again), "Доп. маржа"), false);
+            Require(CreateGrid("optional").Columns[3].Visibility == Visibility.Collapsed, "Explicit hide did not persist.");
             Console.WriteLine("Column menu profile/visibility checks passed (no SQL).");
         }
         finally
@@ -59,6 +73,9 @@ internal static class ColumnMenuChecks
         grid.Columns.Add(new DataGridTextColumn { Header = "Наименование", SortMemberPath = "name" });
         grid.Columns.Add(new DataGridTextColumn { Header = "Закупка", SortMemberPath = "cost" });
         grid.Columns.Add(new DataGridTextColumn { Header = "Режим", SortMemberPath = "mode", Visibility = Visibility.Collapsed });
+        var legacy = new DataGridTextColumn { Header = "Доп. маржа", SortMemberPath = "legacy", Visibility = Visibility.Collapsed };
+        TableColumnMenu.SetDefaultHidden(legacy, true);
+        grid.Columns.Add(legacy);
         TableColumnMenu.RefreshDynamic(grid, key, ownHeaderMenu: true);
         return grid;
     }

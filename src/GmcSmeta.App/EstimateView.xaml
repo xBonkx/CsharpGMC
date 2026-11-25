@@ -1796,6 +1796,24 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- СМР: закуп за ед. · розн. за ед. · закуп · розница -->
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="m_legacy_margin"
+                                            local:TableColumnMenu.MenuTitle="Материалы · маржа" local:TableColumnMenu.DefaultHidden="True"
+                                            Visibility="Collapsed" IsReadOnly="True"
+                                            CellStyle="{StaticResource SumCellMat}" HeaderStyle="{StaticResource SumHdrMat}"
+                                            Binding="{Binding MatLegacyMarginText}">
+                            <DataGridTextColumn.Header>
+                                <TextBlock Text="Маржа" TextAlignment="Center" HorizontalAlignment="Center"/>
+                            </DataGridTextColumn.Header>
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding MatLegacyMarginNeg}" Value="True">
+                                            <Setter Property="Foreground" Value="#DC2626"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_ucost" local:TableColumnMenu.MenuTitle="СМР · закупка за ед."
                                                 CellStyle="{StaticResource SumCellWork}"
                                                 HeaderStyle="{StaticResource SumHdrWork}">
@@ -1874,6 +1892,24 @@
                                 <TextBlock Text="Клиенту ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="w_legacy_margin"
+                                            local:TableColumnMenu.MenuTitle="СМР · маржа" local:TableColumnMenu.DefaultHidden="True"
+                                            Visibility="Collapsed" IsReadOnly="True"
+                                            CellStyle="{StaticResource SumCellWork}" HeaderStyle="{StaticResource SumHdrWork}"
+                                            Binding="{Binding WorkLegacyMarginText}">
+                            <DataGridTextColumn.Header>
+                                <TextBlock Text="Маржа" TextAlignment="Center" HorizontalAlignment="Center"/>
+                            </DataGridTextColumn.Header>
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding WorkLegacyMarginNeg}" Value="True">
+                                            <Setter Property="Foreground" Value="#DC2626"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Width="Auto" MinWidth="72" SortMemberPath="markup" local:TableColumnMenu.MenuTitle="СМР · наценка, %" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
@@ -1927,6 +1963,24 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- маржи: материалы / работы (сиреневый блок) -->
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="t_legacy_margin"
+                                            local:TableColumnMenu.MenuTitle="Итого · общая маржа" local:TableColumnMenu.DefaultHidden="True"
+                                            Visibility="Collapsed" IsReadOnly="True"
+                                            CellStyle="{StaticResource SumCellMarg}" HeaderStyle="{StaticResource SumHdrMarg}"
+                                            Binding="{Binding TotalLegacyMarginText}">
+                            <DataGridTextColumn.Header>
+                                <TextBlock Text="Маржа ∑" TextAlignment="Center" HorizontalAlignment="Center"/>
+                            </DataGridTextColumn.Header>
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SummaryMoney}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TotalLegacyMarginNeg}" Value="True">
+                                            <Setter Property="Foreground" Value="#DC2626"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="mat_margin" local:TableColumnMenu.MenuTitle="Маржа материалов, ₽" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellMarg}"
                                             HeaderStyle="{StaticResource SumHdrMarg}"

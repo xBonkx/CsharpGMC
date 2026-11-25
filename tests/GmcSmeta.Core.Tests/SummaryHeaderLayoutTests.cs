@@ -48,6 +48,9 @@ public class SummaryHeaderLayoutTests
     [InlineData("mat_margin", Band.Total)]
     [InlineData("work_margin", Band.Total)]
     [InlineData("markup", Band.Work)]
+    [InlineData("m_legacy_margin", Band.Materials)]
+    [InlineData("w_legacy_margin", Band.Work)]
+    [InlineData("t_legacy_margin", Band.Total)]
     public void FinancialGroups(string key, Band expected) => Assert.Equal(expected, GroupFor(key));
 
     [Fact]
