@@ -1423,9 +1423,10 @@
                 </local:SummaryToolbarPanel>
                 <!-- таблица (cost_summary_view.show_data): группы, полосатые строки по блокам,
                      редактируются цены за ед./наименование/ед./кол-во, суммы считаются -->
-                <Grid Grid.Row="2" ClipToBounds="True">
+                <local:SummaryTableFrame Grid.Row="2" CornerRadius="9" BorderThickness="1" BorderBrush="#DAE3EF" Background="White">
+                    <Grid ClipToBounds="True">
                     <DataGrid local:TableColumnMenu.Key="estimate-summary" x:Name="SummaryGrid" AutoGenerateColumns="False" IsReadOnly="False"
-                          MinRowHeight="24" ColumnHeaderHeight="78" MinHeight="120"
+                          MinRowHeight="26" ColumnHeaderHeight="78" MinHeight="120"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
                           VirtualizingPanel.VirtualizationMode="Recycling"
                           VirtualizingPanel.ScrollUnit="Pixel"
@@ -1433,7 +1434,7 @@
                           CanUserReorderColumns="False" RowHeaderWidth="0"
                           HeadersVisibility="Column" GridLinesVisibility="All"
                           HorizontalGridLinesBrush="#E9EEF5" VerticalGridLinesBrush="#EDF1F7"
-                          BorderBrush="#DAE3EF" BorderThickness="1" Background="#FFFFFF"
+                          BorderThickness="0" Background="#FFFFFF"
                           BeginningEdit="SummaryGrid_BeginningEdit" PreparingCellForEdit="SummaryGrid_PreparingCellForEdit"
                           CellEditEnding="SummaryGrid_CellEditEnding" ContextMenuOpening="SummaryGrid_ContextMenuOpening"
                           ScrollViewer.CanContentScroll="True"
@@ -1470,7 +1471,9 @@
                         </Style>
                         <Style x:Key="SummaryMoney" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}"><Setter Property="TextTrimming" Value="None"/></Style>
                         <!-- ячейки: полосатые строки внутри цветных блоков + шапки систем/ИТОГО -->
-                        <Style x:Key="SumCellBase" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}"></Style>
+                        <Style x:Key="SumCellBase" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+                            <Setter Property="Padding" Value="6,3"/>
+                        </Style>
                         <Style x:Key="SumCellPos" TargetType="DataGridCell" BasedOn="{StaticResource SumCellBase}">
                             <Setter Property="Background" Value="#FFFFFF"/>
                             <Style.Triggers>
@@ -1568,7 +1571,7 @@
                         </Style>
                     </DataGrid.Resources>
                     <DataGrid.RowStyle>
-                        <Style TargetType="DataGridRow">
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsSystemHeader}" Value="True">
                                     <Setter Property="FontWeight" Value="Bold"/>
@@ -1598,14 +1601,27 @@
                                                 Background="Transparent" BorderThickness="0" FontSize="10"
                                                 Foreground="#475569" Content="{Binding CollapseMark}"
                                                 Click="SummaryToggleSystem_Click"
-                                                Visibility="{Binding IsSystemHeader, Converter={StaticResource OnlySystems}}"/>
+                                                AutomationProperties.Name="Свернуть или развернуть систему"
+                                                Visibility="{Binding CanCollapseSystem, Converter={StaticResource OnlySystems}}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="ArrowHit" Background="Transparent" CornerRadius="3">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ArrowHit" Property="Background" Value="#D4E2F8"/></Trigger>
+                                                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ArrowHit" Property="BorderBrush" Value="#2563EB"/><Setter TargetName="ArrowHit" Property="BorderThickness" Value="1"/></Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
                                         <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Margin" Value="0"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsPositionRow}" Value="True">
+                                                        <DataTrigger Binding="{Binding IsIndented}" Value="True">
                                                             <Setter Property="Margin" Value="14,0,0,0"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsExtraRow}" Value="True">
@@ -1678,7 +1694,7 @@
                                                     <DataTrigger Binding="{Binding CostMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
                                                     </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -1708,7 +1724,7 @@
                                                     <DataTrigger Binding="{Binding PriceMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
                                                     </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -1778,7 +1794,7 @@
                                                     <DataTrigger Binding="{Binding WorkCostMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
                                                     </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -1808,7 +1824,7 @@
                                                     <DataTrigger Binding="{Binding WorkSellMark}" Value="True">
                                                         <Setter Property="Foreground" Value="#DC2626"/>
                                                     </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
@@ -1907,7 +1923,7 @@
                                         <DataTrigger Binding="{Binding MatMarginNeg}" Value="True">
                                             <Setter Property="Foreground" Value="#DC2626"/>
                                         </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
@@ -1925,7 +1941,7 @@
                                         <DataTrigger Binding="{Binding WorkMarginNeg}" Value="True">
                                             <Setter Property="Foreground" Value="#DC2626"/>
                                         </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+
 </Style.Triggers>
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
@@ -1933,50 +1949,83 @@
                     </DataGrid.Columns>
                 </DataGrid>
                     <local:SummaryHeaderBands SourceGrid="{Binding ElementName=SummaryGrid}" Height="80" VerticalAlignment="Top" IsHitTestVisible="False"/>
-                </Grid>
+                    </Grid>
+                </local:SummaryTableFrame>
                 <!-- примечание под таблицей (⚠ Неполно / Показано по фильтру) -->
                 <TextBlock x:Name="SummaryNote" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap"
-                           Margin="2,8,2,0" Visibility="Collapsed"/>
+                           Margin="0,10,0,0" Visibility="Collapsed"/>
                 <!-- плитки (cost_summary_view tiles): материалы / СМР / себестоимость /
                      цена клиенту / маржа материалов + работ -->
-                <UniformGrid Grid.Row="4" Columns="5" Margin="0,10,0,0">
-                    <Border x:Name="SummaryTileMat" Margin="0,0,10,0" Style="{StaticResource PythonTile}" Background="#F1F6FD">
+                <Grid Grid.Row="4" Margin="0,10,0,0">
+                    <Grid.Resources>
+                        <Style x:Key="SummaryTileFrame" TargetType="Border" BasedOn="{StaticResource PythonTile}">
+                            <Setter Property="Effect" Value="{x:Null}"/>
+                            <Setter Property="BorderBrush" Value="#DFE6F0"/>
+                            <Setter Property="CornerRadius" Value="9"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Padding" Value="16,11"/>
+                        </Style>
+                        <Style x:Key="SummaryTileCaption" TargetType="TextBlock">
+                            <Setter Property="FontSize" Value="11"/>
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                        </Style>
+                        <Style x:Key="SummaryTileNumber" TargetType="TextBlock" BasedOn="{StaticResource PythonTileValue}">
+                            <Setter Property="FontSize" Value="22"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="Margin" Value="0,2,0,0"/>
+                        </Style>
+                        <Style x:Key="SummaryTileDetail" TargetType="TextBlock">
+                            <Setter Property="FontSize" Value="{StaticResource UiCaptionSize}"/>
+                            <Setter Property="Foreground" Value="#64748B"/>
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="Margin" Value="0,2,0,0"/>
+                        </Style>
+                    </Grid.Resources>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="SummaryTileMat" Grid.Column="0" Style="{StaticResource SummaryTileFrame}" Background="#F1F6FD">
                         <StackPanel>
-                            <TextBlock Text="Материалы · цена клиенту" FontSize="12" Foreground="#2B659C"/>
-                            <TextBlock x:Name="SummaryTileMatValue" Style="{StaticResource PythonTileValue}" Foreground="#2B659C"/>
-                            <TextBlock x:Name="SummaryTileMatDetail" FontSize="12" Foreground="#64748B"/>
+                            <TextBlock Text="Материалы · цена клиенту" Style="{StaticResource SummaryTileCaption}" Foreground="#2B659C"/>
+                            <TextBlock x:Name="SummaryTileMatValue" Style="{StaticResource SummaryTileNumber}" Foreground="#2B659C"/>
+                            <TextBlock x:Name="SummaryTileMatDetail" Style="{StaticResource SummaryTileDetail}"/>
                         </StackPanel>
                     </Border>
-                    <Border x:Name="SummaryTileWork" Margin="0,0,10,0" Style="{StaticResource PythonTile}" Background="#FFF8EF">
+                    <Border x:Name="SummaryTileWork" Grid.Column="2" Style="{StaticResource SummaryTileFrame}" Background="#FFF8EF">
                         <StackPanel>
-                            <TextBlock Text="СМР по позициям" FontSize="12" Foreground="#956023"/>
-                            <TextBlock x:Name="SummaryTileWorkValue" Style="{StaticResource PythonTileValue}" Foreground="#956023"/>
-                            <TextBlock x:Name="SummaryTileWorkDetail" FontSize="12" Foreground="#64748B" TextWrapping="Wrap"/>
+                            <TextBlock Text="СМР по позициям" Style="{StaticResource SummaryTileCaption}" Foreground="#956023"/>
+                            <TextBlock x:Name="SummaryTileWorkValue" Style="{StaticResource SummaryTileNumber}" Foreground="#956023"/>
+                            <TextBlock x:Name="SummaryTileWorkDetail" Style="{StaticResource SummaryTileDetail}"/>
                         </StackPanel>
                     </Border>
-                    <Border x:Name="SummaryTileCost" Margin="0,0,10,0" Style="{StaticResource PythonTile}" Background="#F1F4F9">
+                    <Border x:Name="SummaryTileCost" Grid.Column="4" Style="{StaticResource SummaryTileFrame}" Background="#F1F4F9">
                         <StackPanel>
-                            <TextBlock Text="Себестоимость · всего" FontSize="12" Foreground="#415B7E"/>
-                            <TextBlock x:Name="SummaryTileCostValue" Style="{StaticResource PythonTileValue}" Foreground="#415B7E"/>
-                            <TextBlock Text="Материалы + работы + транспорт" FontSize="12" Foreground="#64748B" TextWrapping="Wrap"/>
+                            <TextBlock Text="Себестоимость · всего" Style="{StaticResource SummaryTileCaption}" Foreground="#415B7E"/>
+                            <TextBlock x:Name="SummaryTileCostValue" Style="{StaticResource SummaryTileNumber}" Foreground="#415B7E"/>
+                            <TextBlock Text="Материалы + работы + транспорт" Style="{StaticResource SummaryTileDetail}"/>
                         </StackPanel>
                     </Border>
-                    <Border x:Name="SummaryTileSell" Margin="0,0,10,0" Style="{StaticResource PythonTile}" Background="#EDF8F0">
+                    <Border x:Name="SummaryTileSell" Grid.Column="6" Style="{StaticResource SummaryTileFrame}" Background="#EDF8F0">
                         <StackPanel>
-                            <TextBlock Text="Цена клиенту · всего" FontSize="12" Foreground="#287445"/>
-                            <TextBlock x:Name="SummaryTileSellValue" Style="{StaticResource PythonTileValue}" Foreground="#287445"/>
-                            <TextBlock Text="По текущей сводной" FontSize="12" Foreground="#64748B"/>
+                            <TextBlock Text="Цена клиенту · всего" Style="{StaticResource SummaryTileCaption}" Foreground="#287445"/>
+                            <TextBlock x:Name="SummaryTileSellValue" Style="{StaticResource SummaryTileNumber}" Foreground="#287445"/>
+                            <TextBlock Text="По текущей сводной" Style="{StaticResource SummaryTileDetail}"/>
                         </StackPanel>
                     </Border>
-                    <Border x:Name="SummaryTileMargin" Style="{StaticResource PythonTile}" Background="#F3EDFB">
+                    <Border x:Name="SummaryTileMargin" Grid.Column="8" Style="{StaticResource SummaryTileFrame}" Background="#F3EDFB">
                         <StackPanel>
-                            <TextBlock Text="Маржа материалов" FontSize="12" Foreground="#7954A8"/>
-                            <TextBlock x:Name="SummaryTileMatMarginValue" Style="{StaticResource PythonTileValue}" Foreground="#7954A8"/>
-                            <TextBlock Text="Маржа работ" FontSize="12" Foreground="#7954A8" Margin="0,6,0,0"/>
-                            <TextBlock x:Name="SummaryTileWorkMarginValue" Style="{StaticResource PythonTileValue}" Foreground="#7954A8"/>
+                            <TextBlock Text="Маржа материалов" Style="{StaticResource SummaryTileCaption}" Foreground="#7954A8"/>
+                            <TextBlock x:Name="SummaryTileMatMarginValue" Style="{StaticResource SummaryTileNumber}" Foreground="#7954A8"/>
+                            <TextBlock Text="Маржа работ" Style="{StaticResource SummaryTileCaption}" Foreground="#7954A8" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="SummaryTileWorkMarginValue" Style="{StaticResource SummaryTileNumber}" Foreground="#7954A8"/>
                         </StackPanel>
                     </Border>
-                </UniformGrid>
+                </Grid>
             </Grid>
         </Border>
 

@@ -42,6 +42,7 @@ internal static class Program
             CheckComboBoxDisplayMemberPath();
             CheckCatalogPageSelection();
             CheckEstimateCalculatedColumns();
+            CheckSummaryTableFrame();
             CheckNumericPastePlanning();
 
             var window = new MainWindow();
@@ -222,6 +223,29 @@ internal static class Program
     }
 
     /// <summary>S-23: typed qty/price/work must repaint calculated estimate cells.</summary>
+    private static void CheckSummaryTableFrame()
+    {
+        var frame = new SummaryTableFrame { CornerRadius = new CornerRadius(9) };
+        frame.Measure(new Size(200, 100));
+        frame.Arrange(new Rect(0, 0, 200, 100));
+        frame.UpdateRoundedClip();
+        if (frame.Clip is not System.Windows.Media.RectangleGeometry clip ||
+            clip.Rect.Width != 200 || clip.Rect.Height != 100 || clip.RadiusX != 9 ||
+            clip.FillContains(new Point(0, 0)) || !clip.FillContains(new Point(100, 50)))
+            throw new Exception("Summary table rounded clip does not match its bounds.");
+        frame.Measure(new Size(400, 150));
+        frame.Arrange(new Rect(0, 0, 400, 150));
+        frame.UpdateRoundedClip();
+        if (frame.Clip.Bounds.Width != 400 || frame.Clip.Bounds.Height != 150)
+            throw new Exception("Summary table clip was not resized.");
+        var grouped = new EstimateView.SummaryRow { Kind = "system", SystemId = 5 };
+        var supplier = new EstimateView.SummaryRow { Kind = "system", SystemId = 0 };
+        if (!grouped.CanCollapseSystem || supplier.CanCollapseSystem ||
+            new EstimateView.SummaryRow().IsIndented)
+            throw new Exception("Summary group affordances do not match supported actions.");
+        Console.WriteLine("Summary table clip and group affordances OK.");
+    }
+
     private static void CheckEstimateCalculatedColumns()
     {
         var source = new GmcSmeta.Core.Domain.EstimateRow(

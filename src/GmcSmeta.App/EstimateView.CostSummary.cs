@@ -41,6 +41,8 @@ public partial class EstimateView
         public bool IsSystemHeader => Kind == "system";
         public bool IsTotalRow => Kind == "total";
         public bool IsPositionRow => Kind == "pos";
+        public bool IsIndented { get; init; }
+        public bool CanCollapseSystem => IsSystemHeader && SystemId != 0;
         public bool IsExtraRow => Kind == "extra";
         /// <summary>▾ / ▸ у шапки системы (сворачивание, как в QTreeWidget эталона).</summary>
         public string CollapseMark { get; init; } = "▾";
@@ -335,7 +337,7 @@ public partial class EstimateView
                 if (sysId != 0 && _collapsedSummarySystems.Contains(sysId))
                     continue;
                 foreach (var r in sorted)
-                    AddStripe(SummaryRowFromRec(r, kinds: markKinds));
+                    AddStripe(SummaryRowFromRec(r, kinds: markKinds) with { IsIndented = true });
             }
         }
 
