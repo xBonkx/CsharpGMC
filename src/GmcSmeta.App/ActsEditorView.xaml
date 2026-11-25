@@ -109,16 +109,16 @@
                             Margin="6,0,0,0" Click="HeaderMore_Click">
                         <Button.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
+                                <MenuItem x:Name="PreSignMenuItem" Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
                                           ToolTip="Объёмы сверх КП, цены, строки вне сметы и выдача материалов"/>
                                 <Separator/>
-                                <MenuItem Header="Ведомость объёмов работ (ВОР) по этому акту…" Click="ExportVor_Click"/>
-                                <MenuItem Header="Сохранить все акты в один Excel…" Click="ExportAll_Click"/>
-                                <MenuItem Header="Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…" Click="ExportGroup_Click"/>
+                                <MenuItem x:Name="VorMenuItem" Header="Ведомость объёмов работ (ВОР) по этому акту…" Click="ExportVor_Click"/>
+                                <MenuItem x:Name="ExportAllMenuItem" Header="Сохранить все акты в один Excel…" Click="ExportAll_Click"/>
+                                <MenuItem x:Name="ExportGroupMenuItem" Header="Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…" Click="ExportGroup_Click"/>
                                 <Separator/>
                                 <MenuItem x:Name="ExtraMenuItem" Header="Добавить позицию вне сметы…" Click="AddExtra_Click"/>
                                 <Separator/>
-                                <MenuItem Header="Удалить акт…" Foreground="#DC2626" Click="DeleteAct_Click"/>
+                                <MenuItem x:Name="DeleteActMenuItem" Header="Удалить акт…" Click="DeleteAct_Click"/>
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>

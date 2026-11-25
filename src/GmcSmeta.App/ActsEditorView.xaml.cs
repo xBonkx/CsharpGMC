@@ -162,6 +162,7 @@ public partial class ActsEditorView : UserControl
     public ActsEditorView()
     {
         InitializeComponent();
+        InitializeActMenuIcons();
         ApplyTilesVisibility();
         Unloaded += (_,_) => DetachQuantityEditor();
     }
@@ -436,11 +437,11 @@ public partial class ActsEditorView : UserControl
             // подписанный акт (или заблокированный договор) запрещает правки
             SignedCheck.IsChecked = _signed;
             PropsButton.IsEnabled = !_signed;
-            ExtraMenuItem.IsEnabled = !_signed;
+            ExtraMenuItem.IsEnabled = !_signed && !_contractLocked;
+            DeleteActMenuItem.IsEnabled = !_signed;
             FillRestButton.IsEnabled = !_signed;
             ClearButton.IsEnabled = !_signed;
-            IssuedMenuItem.IsEnabled = !_signed;
-            RestAllMenuItem.IsEnabled = !_signed;
+            IssuedMenuItem.IsEnabled = !_signed && !_contractLocked;
             var manualSections=!string.IsNullOrEmpty(_details?.SectionAmountsJson);
             SmrInput.IsEnabled = !_signed && !_contractLocked && !_isPosSmr && !manualSections;
             TrInput.IsEnabled = !_signed && !_contractLocked && !manualSections;
@@ -2279,6 +2280,20 @@ public partial class ActsEditorView : UserControl
     }
 
     // -------------------------------------------------------------- меню «Ещё»
+
+    private void InitializeActMenuIcons()
+    {
+        ContextMenuIcons.Set(PreSignMenuItem, "Alert");
+        ContextMenuIcons.Set(VorMenuItem, "Download");
+        ContextMenuIcons.Set(ExportAllMenuItem, "Download");
+        ContextMenuIcons.Set(ExportGroupMenuItem, "Download");
+        ContextMenuIcons.Set(ExtraMenuItem, "Plus");
+        ContextMenuIcons.Set(DeleteActMenuItem, "Trash", danger: true);
+        ContextMenuIcons.Set(ActDiscountMenuItem, "Edit");
+        ContextMenuIcons.Set(SectionAmountsMenuItem, "Layers");
+        ContextMenuIcons.Set(IssuedMenuItem, "Upload");
+        ContextMenuIcons.Set(RestAllMenuItem, "Check");
+    }
 
     private void HeaderMore_Click(object sender, RoutedEventArgs e) => OpenMenu(sender);
 
