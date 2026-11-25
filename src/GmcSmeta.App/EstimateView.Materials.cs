@@ -1112,9 +1112,16 @@ public partial class EstimateView
 
     private void MaterialsColor_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button) return;
+        if (sender is not Button button || !MaterialsSnapshotReady) return;
+        var ids = MaterialsSelectedIds().OrderBy(id => id).ToArray();
+        if (ids.Length == 0) return;
+        var revision = _materialsRevision;
+        var contractId = _contractId;
+        bool CanExecute() => MaterialsSnapshotReady && contractId == _contractId &&
+            revision == _materialsRevision &&
+            MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids);
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
-        FillMaterialsColorItems(menu.Items);
+        FillMaterialsColorItems(menu.Items, CanExecute);
         menu.IsOpen = true;
     }
 
@@ -1166,10 +1173,10 @@ public partial class EstimateView
         if (ids.Count > 0)
         {
             if (menu.Items.Count > 0) menu.Items.Add(new Separator());
-            Add("Наценка для выделенных…", MaterialsMarkup_Click, "Edit");
+            Add("Наценка для выделенных…", MaterialsMarkup_Click, "List");
             Add("Подставить закуп из справочника (где пусто)", MaterialsCatalog_Click, "Book");
             Add(ids.Count > 1 ? $"Поставщик для выделенных… ({ids.Count})" : "Поставщик для выделенных…",
-                MaterialsSupplier_Click, "Users");
+                MaterialsSupplier_Click, "Building");
             Add("Заявка поставщику…", MaterialsRequest_Click, "File");
             menu.Items.Add(new Separator());
             var colors = ContextMenuIcons.Create("Цвет строки", "Edit");
@@ -1258,7 +1265,7 @@ public partial class EstimateView
             items.Add(item);
         }
         items.Add(new Separator());
-        var none = new MenuItem { Header = "Без цвета" };
+        var none = ContextMenuIcons.Create("Без цвета", "X");
         none.Click += (_, _) => { if (canExecute?.Invoke() != false) MaterialsSetColor(""); };
         items.Add(none);
     }
