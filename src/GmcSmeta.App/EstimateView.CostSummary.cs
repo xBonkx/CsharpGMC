@@ -246,9 +246,8 @@ public partial class EstimateView
             SummaryMissingText.Text = chosen.Count == 1 && chosen.Contains("nocost")
                 ? $"Без закупочных цен: {missingCount}"
                 : $"Без цен: {missingCount}";
-        if (SummaryMissingToggle is not null)
-            SummaryMissingToggle.Visibility = missingCount > 0 || _summaryMissingOn
-                ? Visibility.Visible : Visibility.Collapsed;
+        // Python keeps the split filter available even at zero: the user must
+        // still be able to select a different kind of missing price.
 
         // фильтр (show_data): системы, «без цен», поиск
         var words = (SummarySearch?.Text ?? "")
@@ -629,6 +628,12 @@ public partial class EstimateView
     private void SummaryFilter_Changed(object sender, SelectionChangedEventArgs e) => SummaryRebuild();
     private void SummarySearch_TextChanged(object sender, TextChangedEventArgs e) => SummaryRebuild();
 
+    private void ClearSummarySearch_Click(object sender, RoutedEventArgs e)
+    {
+        SummarySearch.Clear();
+        SummarySearch.Focus();
+    }
+
     private void SummaryMissing_Changed(object sender, RoutedEventArgs e)
     {
         _summaryMissingOn = SummaryMissingToggle?.IsChecked == true;
@@ -637,14 +642,14 @@ public partial class EstimateView
 
     private void SummaryMissingMenu_Click(object sender, RoutedEventArgs e)
     {
-        if (SummaryMissingToggle is null) return;
-        var menu = new ContextMenu { PlacementTarget = SummaryMissingToggle, Placement = PlacementMode.Bottom };
+        if (SummaryMissingChrome is null) return;
+        var menu = new ContextMenu { PlacementTarget = SummaryMissingChrome, Placement = PlacementMode.Bottom };
         _summaryMissingItems = new List<MenuItem>();
         foreach (var (key, text) in SummaryMissingKinds)
         {
             var item = new MenuItem
             {
-                Header = text, IsCheckable = true, StaysOpenOnClick = true, Tag = key,
+                Header = $"{text}: {_summaryRecs.Count(r => SummaryFlag(r, key))}", IsCheckable = true, StaysOpenOnClick = true, Tag = key,
                 IsChecked = _summaryMissingChecked.Contains(key),
             };
             item.Click += (_, _) =>

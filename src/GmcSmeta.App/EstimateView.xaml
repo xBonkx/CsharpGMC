@@ -1286,9 +1286,10 @@
                                VerticalAlignment="Center"/>
                 </DockPanel>
                 <!-- панель фильтров, как на «Материалах» (bar: вид, «без цен», наценка, системы, поиск) -->
-                <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                <local:SummaryToolbarPanel Grid.Row="1" Margin="0,0,0,10">
+                    <WrapPanel x:Name="SummaryActions" VerticalAlignment="Center">
                     <Button x:Name="SummaryGroupButton" Style="{StaticResource PythonToolbarButton}"
-                            Click="SummaryGroup_Click" Margin="0,0,3,0" MinHeight="30"
+                            Click="SummaryGroup_Click" Margin="0,0,6,0" Height="34" MinHeight="0"
                             ToolTip="Как показать строки: по системам, одинаковые вместе, по поставщику">
                         <StackPanel Orientation="Horizontal">
                             <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#64748B"/></Canvas></Viewbox>
@@ -1296,44 +1297,102 @@
                         </StackPanel>
                     </Button>
                     <Button x:Name="SummarySortButton" Style="{StaticResource PythonToolbarButton}"
-                            Click="SummarySort_Click" Margin="0,0,3,0" MinHeight="30"
+                            Click="SummarySort_Click" Margin="0,0,6,0" Height="34" MinHeight="0"
                             ToolTip="Порядок строк внутри групп">
                         <StackPanel Orientation="Horizontal">
                             <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSort}" Stroke="#64748B"/></Canvas></Viewbox>
                             <TextBlock Text="Сортировка" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <ToggleButton x:Name="SummaryMissingToggle" Style="{StaticResource MatFilterToggleWarm}"
-                                  Checked="SummaryMissing_Changed" Unchecked="SummaryMissing_Changed"
-                                  Margin="0,0,0,0" MinHeight="30" ToolTip="Показать только строки, где цена не вписана. Стрелка ▾ — какие цены искать: как «Без цены» / «Без закупа» на «Материалах» и «Без закупа» / «Без розницы» на «Монтаже»">
+                    <Border x:Name="SummaryMissingChrome" CornerRadius="7" BorderThickness="1" Height="34" Margin="0,0,6,0" SnapsToDevicePixels="True">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#FFF8EC"/>
+                                <Setter Property="BorderBrush" Value="#EACD9C"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="BorderBrush" Value="#B5761E"/></Trigger>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=SummaryMissingToggle}" Value="True">
+                                        <Setter Property="Background" Value="#E8F0FE"/>
+                                        <Setter Property="BorderBrush" Value="#2563EB"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <StackPanel Orientation="Horizontal">
-                            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#B5761E"/></Canvas></Viewbox>
-                            <TextBlock x:Name="SummaryMissingText" Text="Без цен" VerticalAlignment="Center"/>
+                            <ToggleButton x:Name="SummaryMissingToggle" Checked="SummaryMissing_Changed" Unchecked="SummaryMissing_Changed"
+                                          MinHeight="0" Padding="10,0,3,0" BorderThickness="0" Cursor="Hand"
+                                          AutomationProperties.Name="Фильтр позиций без цен"
+                                          ToolTip="Показать только позиции с выбранными пропусками цен">
+                                <ToggleButton.Style>
+                                    <Style TargetType="ToggleButton">
+                                        <Setter Property="Foreground" Value="#99631E"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value><ControlTemplate TargetType="ToggleButton">
+                                                <Border x:Name="Hit" Background="Transparent" CornerRadius="6,0,0,6" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Hit" Property="Background" Value="#10000000"/></Trigger>
+                                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Hit" Property="Background" Value="#19000000"/></Trigger>
+                                                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hit" Property="BorderBrush" Value="#2563EB"/><Setter TargetName="Hit" Property="BorderThickness" Value="1"/></Trigger>
+                                                    <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5"/></Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate></Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ToggleButton.Style>
+                                <StackPanel Orientation="Horizontal">
+                                    <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#B5761E"/></Canvas></Viewbox>
+                                    <TextBlock x:Name="SummaryMissingText" Text="Без цен" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ToggleButton>
+                            <Button x:Name="SummaryMissingArrow" Width="24" MinWidth="0" MinHeight="0" Padding="0"
+                                    Content="Варианты фильтра" AutomationProperties.Name="Выбрать пропуски цен"
+                                    Click="SummaryMissingMenu_Click" ToolTip="Какие пропуски цен искать">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Foreground" Value="#99631E"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value><ControlTemplate TargetType="Button">
+                                                <Border x:Name="Hit" Background="Transparent" CornerRadius="0,6,6,0">
+                                                    <Viewbox Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{TemplateBinding Foreground}"/></Canvas></Viewbox>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Hit" Property="Background" Value="#10000000"/></Trigger>
+                                                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Hit" Property="Background" Value="#19000000"/></Trigger>
+                                                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hit" Property="BorderBrush" Value="#2563EB"/><Setter TargetName="Hit" Property="BorderThickness" Value="1"/></Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5"/></Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate></Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=SummaryMissingToggle}" Value="True"><Setter Property="Foreground" Value="#1E40AF"/></DataTrigger></Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
-                    </ToggleButton>
-                    <Button x:Name="SummaryMissingArrow" Content="Варианты фильтра" ContentTemplate="{StaticResource IconOnlyChevronDown}" AutomationProperties.Name="Выбрать пропуски цен" Click="SummaryMissingMenu_Click"
-                            MinHeight="30" MinWidth="22" Padding="2,0" Margin="-1,0,3,0"
-                            FontSize="11" Foreground="#99631E" Background="#FFF8EC" BorderBrush="#EACD9C"
-                            ToolTip="Какие пропуски искать: «Без цены», «Без закупа», «Без розницы», «Без закупа работ»"/>
+                    </Border>
                     <Button x:Name="SummaryResetViewButton" Style="{StaticResource PythonToolbarButton}"
                             Content="Как в КП" ContentTemplate="{StaticResource IconLabelX}" Click="SummaryResetView_Click" Visibility="Collapsed"
-                            Margin="0,0,3,0" MinHeight="30" ToolTip="Вернуть обычный вид — по системам, как в КП"/>
+                            Margin="0,0,6,0" Height="34" MinHeight="0" ToolTip="Вернуть обычный вид — по системам, как в КП"/>
                     <Button x:Name="SummaryMarkupAllButton" Style="{StaticResource PythonToolbarButton}"
-                            Click="SummaryMarkupAll_Click" Margin="0,0,3,0" MinHeight="30"
+                            Click="SummaryMarkupAll_Click" Margin="0,0,6,0" Height="34" MinHeight="0"
                             ToolTip="Пересчитать цену клиенту по всем позициям СМР, включая скрытые фильтром">
                         <StackPanel Orientation="Horizontal">
                             <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphList}" Stroke="#64748B"/></Canvas></Viewbox>
                             <TextBlock Text="Наценка на все СМР…" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Border Width="10"/>
-                    <ComboBox x:Name="SummarySystemFilter" Width="170" MinHeight="30" VerticalContentAlignment="Center"
+                    </WrapPanel>
+                    <WrapPanel x:Name="SummaryFilters" VerticalAlignment="Center">
+                    <ComboBox x:Name="SummarySystemFilter" Width="170" Height="34" MinHeight="0" VerticalContentAlignment="Center"
                               SelectionChanged="SummaryFilter_Changed" Margin="0,0,6,0"
                               ToolTip="Показать строки одной системы"/>
-                    <Grid Width="200" MinHeight="30"><TextBox x:Name="SummarySearch" Style="{StaticResource PythonSearch}"
+                    <Grid Width="200" Height="34"><TextBox x:Name="SummarySearch" Style="{StaticResource PythonSearch}" Padding="30,5,27,5" AutomationProperties.Name="Найти позицию"
                              TextChanged="SummarySearch_TextChanged"
                              ToolTip="Только строки с этим в названии (или системе / поставщике) — например «решетк»"/>
-                        <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="12,0,0,0"
+                        <Viewbox Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
+                        <TextBlock Text="Найти позицию…" Foreground="#64748B" Margin="30,0,27,0"
                                    VerticalAlignment="Center" IsHitTestVisible="False">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -1346,8 +1405,22 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+                        <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" Click="ClearSummarySearch_Click"
+                                HorizontalAlignment="Right" VerticalAlignment="Center" Width="26" Height="26" Padding="0"
+                                ToolTip="Очистить поиск" AutomationProperties.Name="Очистить поиск позиций">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                    <Setter Property="MinHeight" Value="0"/>
+                                    <Setter Property="MinWidth" Value="0"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SummarySearch}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                     </Grid>
-                </WrapPanel>
+                    </WrapPanel>
+                </local:SummaryToolbarPanel>
                 <!-- таблица (cost_summary_view.show_data): группы, полосатые строки по блокам,
                      редактируются цены за ед./наименование/ед./кол-во, суммы считаются -->
                 <Grid Grid.Row="2" ClipToBounds="True">
