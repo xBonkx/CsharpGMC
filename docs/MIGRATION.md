@@ -264,9 +264,14 @@ WPF открывает только `db/base.db`, найденную вверх 
 dotnet test --no-restore
 dotnet run --project src/GmcSmeta.Cli --no-restore -- check
 dotnet run --project tests/GmcSmeta.App.Checks -p:OutputPath=bin/check -p:CopyRetryCount=0
+dotnet run --project tests/GmcSmeta.App.Checks -c Release -- --offline-check
 dotnet publish src/GmcSmeta.App -c Debug -r win-x64 --self-contained false -o artifacts/clone-preview -p:CopyRetryCount=0
 artifacts/clone-preview/GMC-Smeta-Next.exe --smoke-test
 ```
+
+`--offline-check` — все WPF-проверки без SQL (настройки, ComboBox, страница справочника,
+вычисляемые колонки, clip/группы сводной, массовая вставка 2500, колоночное меню,
+legacy summary projection). Этот же режим запускается шагом CI на windows-latest.
 
 App.Checks — отдельный процесс WPF, который не вызывает Show и не управляет живыми
 окнами пользователя. Загружает настоящие XAML, переключает страницы внутри теста,

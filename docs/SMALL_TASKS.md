@@ -187,6 +187,13 @@
 - Защита от ошибок/гонок: подпись отменяется при смене акта, изменении ревизии, ошибке чтения или сохранении объёмов. Только read-only диагностика, изменений рабочей SQL Server нет.
 - 5 офлайн-тестов включают 2500 строк, здоровый акт, все категории ошибок и порог округления. Статические проверки есть, Windows/.NET 10 и пилот SQL `GmcSmetaPilot_*` в этой сессии недоступны.
 
+### S-27. WPF-харнесс App.Checks не собирался и ни разу не запускался — Статус: CODE READY (25.11.2026; offline-прогон выполнен, SQL-режим открыт) — приоритет: высокий
+- Файлы: `tests/GmcSmeta.App.Checks/Program.cs`, `GmcSmeta.slnx`, `.github/workflows/csharp-build.yml`.
+- Проблема: проект был вне решения и CI, поэтому не компилировался. В `CheckSettingsMenu` — CS1061 (`UIElement.LayoutTransform`); даже после исправления `CreateApplication` падал на сборке ресурсов: ResourceDictionary оборачивался сам в себя, относительный `Theme/ToolbarIcons.xaml` искался в сборке проверок, терялся `xmlns:x`.
+- Сделано: проект добавлен в `GmcSmeta.slnx`; исправлен доступ к `LayoutTransform`; `CreateApplication` собирает настоящий `App.xaml`, переводит `Source` в pack URI `/GMC-Smeta-Next;component/…`, копирует namespace-объявления; добавлен режим `--offline-check` (все проверки без SQL) и шаг CI.
+- Готово когда: `dotnet build GmcSmeta.slnx`, Core-тесты и `--offline-check` зелёные на Windows; SQL-режим на `GmcSmetaPilot_*` проверяет только чтение.
+- Проверка (25.11.2026, Windows, .NET 10.0.401): build 0 ошибок; Core.Tests 1335/1335; `--offline-check` — 8/8; `--column-menu-check`, `--legacy-summary-check` — OK; `GmcSmeta.Export.Checks` — PASS. Полный SQL-режим не запускался (нет пилотной БД); рабочая БД не затрагивалась.
+
 ---
 
 ## Сделано (для истории)

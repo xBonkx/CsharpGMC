@@ -7,6 +7,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/GmcSmeta.Core.Tests/GmcSmeta.Core.Tests.csproj" />
     <Project Path="tests/GmcSmeta.Export.Checks/GmcSmeta.Export.Checks.csproj" />
+    <Project Path="tests/GmcSmeta.App.Checks/GmcSmeta.App.Checks.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/sql-migrations/GmcSmeta.SchemaRehearsal/GmcSmeta.SchemaRehearsal.csproj" />

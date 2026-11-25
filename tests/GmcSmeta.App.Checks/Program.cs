@@ -27,33 +27,22 @@ internal static class Program
                 LegacySummaryChecks.Run();
                 return 0;
             }
-            CheckEstimateUiSettingsRecovery();
+            if (args.Length == 1 && args[0] == "--offline-check")
+            {
+                var offline = CreateApplication();
+                RunOfflineChecks();
+                Console.WriteLine("Offline WPF checks passed (no SQL).");
+                offline.Shutdown();
+                return 0;
+            }
+            var app = CreateApplication();
+            RunOfflineChecks();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))
                 throw new InvalidOperationException("Set GMC_SMETA_SQL_CONNECTION to the synthetic pilot database.");
             using (var probe = SqlServerDatabase.Open(cs))
                 if (!probe.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("WPF checks require a GmcSmetaPilot_* database.");
-
-            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            var root = new DirectoryInfo(AppContext.BaseDirectory);
-            while (root is not null && !File.Exists(Path.Combine(root.FullName, "src/GmcSmeta.App/App.xaml")))
-                root = root.Parent;
-            if (root is null) throw new FileNotFoundException("Cannot find App.xaml");
-            var source = System.Xml.Linq.XDocument.Load(
-                Path.Combine(root.FullName, "src/GmcSmeta.App/App.xaml")).Root!;
-            var resources = new System.Xml.Linq.XElement(source.Name.Namespace + "ResourceDictionary",
-                source.Attributes().Where(a => a.IsNamespaceDeclaration),
-                source.Elements().Single().Elements());
-            app.Resources = (ResourceDictionary)XamlReader.Parse(resources.ToString());
-            FrameworkElement.LanguageProperty.OverrideMetadata(typeof(FrameworkElement),
-                new FrameworkPropertyMetadata(XmlLanguage.GetLanguage("ru-RU")));
-
-            CheckComboBoxDisplayMemberPath();
-            CheckCatalogPageSelection();
-            CheckEstimateCalculatedColumns();
-            CheckSummaryTableFrame();
-            CheckNumericPastePlanning();
 
             var window = new MainWindow();
             window.InitializeWorkspaceNavigation();
@@ -130,6 +119,59 @@ internal static class Program
     }
 
     /// <summary>
+    /// Builds the real App.xaml resource dictionary and ru-RU language override so the
+    /// WPF checks see production templates. Shared by the offline and SQL modes.
+    /// </summary>
+    private static Application CreateApplication()
+    {
+        // Load the app assembly up front: the merged dictionary pack URI needs it resolved.
+        var appAssembly = typeof(MainWindow).Assembly.GetName().Name!;
+        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src/GmcSmeta.App/App.xaml")))
+            root = root.Parent;
+        if (root is null) throw new FileNotFoundException("Cannot find App.xaml");
+        var appXml = System.Xml.Linq.XDocument.Load(
+            Path.Combine(root.FullName, "src/GmcSmeta.App/App.xaml")).Root!;
+        var appDictionary = appXml.Descendants()
+            .First(e => e.Name.LocalName == "ResourceDictionary");
+        // Relative merged-dictionary sources would resolve against this checks assembly,
+        // so point them at the real GmcSmeta.App resource assembly.
+        foreach (var dictionary in appDictionary.DescendantsAndSelf()
+                     .Where(e => e.Name.LocalName == "ResourceDictionary"))
+        {
+            var sourceAttribute = dictionary.Attribute("Source");
+            if (sourceAttribute is null) continue;
+            var value = sourceAttribute.Value.Trim();
+            if (value.Length == 0 || value.StartsWith('/')) continue;
+            sourceAttribute.Value = "/" + appAssembly + ";component/" + value.TrimStart('/');
+        }
+        var resources = new System.Xml.Linq.XElement(appDictionary.Name,
+            appXml.Attributes().Where(a => a.IsNamespaceDeclaration),
+            appDictionary.Elements());
+        app.Resources = (ResourceDictionary)XamlReader.Parse(resources.ToString());
+        FrameworkElement.LanguageProperty.OverrideMetadata(typeof(FrameworkElement),
+            new FrameworkPropertyMetadata(XmlLanguage.GetLanguage("ru-RU")));
+        return app;
+    }
+
+    /// <summary>
+    /// Every WPF check that needs no database. CI runs this mode on windows-latest so the
+    /// App project is not the only thing compiled and these regressions cannot rot silently.
+    /// </summary>
+    private static void RunOfflineChecks()
+    {
+        CheckEstimateUiSettingsRecovery();
+        CheckComboBoxDisplayMemberPath();
+        CheckCatalogPageSelection();
+        CheckEstimateCalculatedColumns();
+        CheckSummaryTableFrame();
+        CheckNumericPastePlanning();
+        ColumnMenuChecks.Run();
+        LegacySummaryChecks.Run();
+    }
+
+    /// <summary>
     /// Регрессия S-15: подменю «Настройки» содержит масштаб шрифта (FONT_SCALES эталона)
     /// и «Показать подсказки снова»; ApplyFontScale меняет LayoutTransform корневого layout.
     /// </summary>
@@ -148,7 +190,7 @@ internal static class Program
             throw new Exception("Missing 'О программе'.");
 
         window.ApplyFontScale(1.2);
-        var root = (UIElement)window.FindName("RootLayout")!;
+        var root = (FrameworkElement)window.FindName("RootLayout")!;
         if (root.LayoutTransform is not System.Windows.Media.ScaleTransform { ScaleX: 1.2, ScaleY: 1.2 })
             throw new Exception("Font scale did not apply ScaleTransform to the root layout.");
         window.ApplyFontScale(1.0);

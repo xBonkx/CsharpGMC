@@ -35,6 +35,11 @@ jobs:
       - name: Build entire solution
         run: dotnet build GmcSmeta.slnx --configuration Release --no-restore
 
+      # App.Checks was previously outside the solution and stopped compiling unnoticed.
+      # This run needs no SQL Server: templates, column menu, clipboard planning, settings.
+      - name: Run offline WPF checks
+        run: dotnet run --project tests/GmcSmeta.App.Checks/GmcSmeta.App.Checks.csproj --configuration Release --no-build -- --offline-check
+
       # Test only SQL Server-specific pure unit tests: no working database or SQL credentials.
       - name: Build remote SQL LAN benchmark (no database connection)
         run: dotnet build tools/RemoteSqlBench/RemoteSqlBench.csproj --configuration Release --nologo

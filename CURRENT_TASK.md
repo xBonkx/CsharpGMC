@@ -2,6 +2,12 @@
 
 Восстановлена документация из CsharpGMC-archive @ fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf. Архивный MASTER_TODO содержит 400 ID; 35 открытых Issues сохранены с описаниями. Архивные статусы не переподтверждены. Активная очередь остаётся Python 0.66.4–0.67.9 / SQL 28→31 / выпуск релиза; предыдущий кодовый коммит 34355f3b65668e28d53a3c2ec0099ee4e9df16c3 — пересчёт СМР по системам этапов. Следующий шаг: интеграция безопасной репетиции/проверки фактической схемы с ReleaseBuilder, потом полноценная миграция только после приёмки. Рабочая БД не тронута. Windows/SQL тесты не выполнены. История: docs/CURRENT_TASK_ARCHIVE_20261125.md.
 
+## 25.11.2026 — App.Checks: восстановлена сборка, offline-режим и CI-гейт
+Первый реальный прогон WPF-харнесса `tests/GmcSmeta.App.Checks` на Windows показал, что он не собирался: проект не входил в `GmcSmeta.slnx` и CI, а в `CheckSettingsMenu` было `UIElement.LayoutTransform` (CS1061). Проект добавлен в решение.
+После исправления выяснилось, что `CreateApplication` не работал никогда: ResourceDictionary оборачивался сам в себя («Отсутствует значение ключа для объекта ResourceDictionary»), относительный `Theme/ToolbarIcons.xaml` резолвился в сборке проверок, не копировался `xmlns:x`. Теперь ресурсы берутся из настоящего `App.xaml`, `Source` переводится в pack URI `/GMC-Smeta-Next;component/…`.
+Добавлен режим `--offline-check` без SQL: S-20 настройки UI, S-04 ComboBox, S-21 страница справочника, S-23 вычисляемые колонки, clip/группы сводной (SUM-VIS), S-24 массовая вставка 2500, CTX-022 колоночное меню, legacy summary projection. Шаг прогона добавлен в `.github/workflows/csharp-build.yml`.
+Фактически выполнено на этой машине (Windows, .NET SDK 10.0.401): `dotnet build GmcSmeta.slnx -c Release` — 0 ошибок; `dotnet test tests/GmcSmeta.Core.Tests` — 1335/1335, 0 пропущено; `--offline-check` — 8/8 блоков OK; `--column-menu-check` и `--legacy-summary-check` — OK; `tests/GmcSmeta.Export.Checks` — PASS (включая 2500 строк, КС/ВОР, ДНС/R4). Полный SQL-режим App.Checks (`GMC_SMETA_SQL_CONNECTION` → `GmcSmetaPilot_*`) не запускался: пилотной БД на этой машине нет. Рабочая БД не затрагивалась, релиз не публиковался.
+
 ## MIG-REL-01, ChatGPT / main — PARTIAL
 25.11.2026: восстановлен повреждённый publish-release.ps1, локальная публикация только draft-first, запрет пропуска тестов для публичного выпуска, remote HEAD и SQL gate перепроверяются перед публикацией. Статически один build и один publish; PowerShell/Windows/SQL не запускались, релиз не создавался. Далее изолированная репетиция из ReleaseBuilder.
 
