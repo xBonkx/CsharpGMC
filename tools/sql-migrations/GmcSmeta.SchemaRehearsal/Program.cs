@@ -41,6 +41,8 @@ try
     Console.WriteLine("Fingerprint original tables and values…");
     var original = MigrationFingerprint.Describe(source);
     var before = MigrationFingerprint.Read(source,original);
+    var finance=MigrationFinanceSnapshot.Read(source,version);
+    Console.WriteLine($"Finance baseline: {finance.Contracts.Count} contracts, {finance.Acts.Count} acts, {finance.Groups.Count} KS3 scoped groups.");
     CheckIdle(admin,name,source.ServerProcessId);
     using var paths = new SqlCommand("SELECT CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultBackupPath')),CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultDataPath')),CONVERT(nvarchar(4000),SERVERPROPERTY('InstanceDefaultLogPath'))",admin);
     string backupDir,dataDir,logDir;
@@ -73,6 +75,8 @@ try
     if (copy.Database!=copyName || Identity(copy)!=Identity(source)) throw new InvalidOperationException("Restore identity mismatch.");
     Verify(copy,version);
     MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(copy,original),"backup restore");
+    finance.RequireSame(MigrationFinanceSnapshot.Read(copy,version),"backup restore finance");
+    Console.WriteLine("Verified finance: backup restore");
     CheckIdle(admin,copyName,copy.ServerProcessId);
     using var stream=Assembly.GetExecutingAssembly().GetManifestResourceStream(script)
         ?? throw new InvalidOperationException("Migration resource missing.");
@@ -81,12 +85,15 @@ try
     Verify(copy,target);
     MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(copy,original),"migration");
     VerifyNewDefaults(copy,version,target);
+    finance.RequireSame(MigrationFinanceSnapshot.Read(copy,target),"migration finance");
+    Console.WriteLine("Verified finance: migration (contracts, KS2, KS3)");
     CheckIdle(admin,copyName,copy.ServerProcessId);
     Exec(admin,$"DBCC CHECKDB ({Id(copyName)}) WITH NO_INFOMSGS, ALL_ERRORMSGS");
     CheckIdle(admin,name,source.ServerProcessId);
     Verify(source,version);
     MigrationFingerprint.RequireSame(before,MigrationFingerprint.Read(source,original),"source unchanged");
-    Console.WriteLine($"TEST ONLY: {version} -> {target} verified. Original table contents and new defaults match. Copy: {copyName}; backup: {backup}");
+    finance.RequireSame(MigrationFinanceSnapshot.Read(source,version),"source unchanged finance");
+    Console.WriteLine($"TEST ONLY: {version} -> {target} verified. Original table contents, new defaults and C# financial totals match. Copy: {copyName}; backup: {backup}");
     return 0;
 
     SqlConnection Open(string db)

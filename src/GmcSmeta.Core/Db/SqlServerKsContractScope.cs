@@ -67,7 +67,7 @@ public static class SqlServerKsContractScope
         throw new InvalidOperationException("Данные договора изменились во время чтения КС. Повторите обновление.");
     }
 
-    internal static Scope Read(SqlConnection conn, long selectedDocumentId)
+    internal static Scope Read(SqlConnection conn, long selectedDocumentId,int? rehearsalSchema=null)
     {
         long objectId;
         using (var read = new SqlCommand(
@@ -104,7 +104,9 @@ public static class SqlServerKsContractScope
         var sourceDoc = documents.Single(d => d.Id == selectedDocumentId);
         var acts = new List<SqlServerActs.ActInfo>();
         foreach (var doc in scopeDocs)
-            acts.AddRange(SqlServerActs.ActsOf(conn, doc.Id)
+            acts.AddRange((rehearsalSchema is int version
+                ?SqlServerActs.ActsOfVersion(conn,doc.Id,null,version)
+                :SqlServerActs.ActsOf(conn,doc.Id))
                 .Select(a => a with { ContractId = doc.Id, SourceName = doc.Label }));
         acts.Sort((left, right) =>
         {

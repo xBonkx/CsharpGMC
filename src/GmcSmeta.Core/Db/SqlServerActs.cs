@@ -32,6 +32,12 @@ public static partial class SqlServerActs
     /// No per-act round trips and no nested DataReaders.
     /// </summary>
     public static List<ActInfo> ActsOf(SqlConnection conn, long contractId, SqlTransaction? transaction = null)
+        => ActsOfVersion(conn,contractId,transaction,SqlSchemaCompatibility.HasPreviewColumns(conn)?31:28);
+
+    // Internal explicit-version projection for isolated migration finance snapshots.
+    // The normal application still uses the existing guarded Open and name policy.
+    internal static List<ActInfo> ActsOfVersion(SqlConnection conn,long contractId,
+        SqlTransaction? transaction,int schemaVersion)
     {
         var ruleJson = new Dictionary<string, string>(StringComparer.Ordinal);
         using (var rules = new SqlCommand("SELECT [key],rules FROM dbo.tags", conn, transaction))
@@ -40,7 +46,7 @@ public static partial class SqlServerActs
                 if (!reader.IsDBNull(0))
                     ruleJson[reader.GetString(0)] = reader.IsDBNull(1) ? "" : reader.GetString(1);
 
-        var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
+        _ = SqlMigrationPlan.Script(schemaVersion,schemaVersion);
         var raw = new List<(long Id, string Number, DateTime Date, DateTime? Start, DateTime? End,
             bool Signed, decimal Smr, decimal Transport, decimal Pnr, bool Exact,
             long Adjustment, decimal VatRate, string Form, string DsNo, string DsDate,
@@ -50,7 +56,9 @@ public static partial class SqlServerActs
             "ISNULL(a.smr_amount,0),ISNULL(a.transport_amount,0),ISNULL(a.pnr_amount,0)," +
             "ISNULL(a.rows_exact,0),ISNULL(a.gross_adjustment_cents,0)," +
             "ISNULL(c.vat_rate,0),ISNULL(c.form,N''),ISNULL(a.ds_no,N''),ISNULL(a.ds_date,N'')" +
-            (schema31 ? ",a.discount_percent,a.discount_override,a.manual_total_cents,a.section_amounts_json" : "") +
+            (schemaVersion>=29?",a.discount_percent":",CAST(0 AS float)")+
+            (schemaVersion>=31?",a.discount_override,a.manual_total_cents":",CAST(0 AS bit),CAST(-1 AS bigint)")+
+            (schemaVersion>=30?",a.section_amounts_json":",CAST(N'' AS nvarchar(max))")+
             ",a.smr_by_system " +
             "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id " +
             "WHERE a.contract_id=@id ORDER BY a.[date],a.id", conn, transaction))
@@ -72,11 +80,11 @@ public static partial class SqlServerActs
                     r.IsDBNull(10) ? 0L : Convert.ToInt64(r.GetValue(10), CultureInfo.InvariantCulture),
                     D(11), r.IsDBNull(12) ? "" : r.GetString(12),
                     r.IsDBNull(13) ? "" : r.GetString(13), r.IsDBNull(14) ? "" : r.GetString(14),
-                    schema31 ? DiscountPolicy.ReadPercent(r, 15) : 0m,
-                    schema31 && !r.IsDBNull(16) && Convert.ToBoolean(r.GetValue(16)),
-                    schema31 && !r.IsDBNull(17) ? Convert.ToInt64(r.GetValue(17)) : -1L,
-                    schema31 && !r.IsDBNull(18) ? r.GetString(18) : "",
-                    !r.IsDBNull(schema31?19:15)&&Convert.ToBoolean(r.GetValue(schema31?19:15),CultureInfo.InvariantCulture)));
+                    DiscountPolicy.ReadPercent(r,15),
+                    !r.IsDBNull(16)&&Convert.ToBoolean(r.GetValue(16)),
+                    !r.IsDBNull(17)?Convert.ToInt64(r.GetValue(17)):-1L,
+                    !r.IsDBNull(18)?r.GetString(18):"",
+                    !r.IsDBNull(19)&&Convert.ToBoolean(r.GetValue(19),CultureInfo.InvariantCulture)));
         }
 
         var lines = new Dictionary<long, List<(decimal Quantity, decimal Price)>>();

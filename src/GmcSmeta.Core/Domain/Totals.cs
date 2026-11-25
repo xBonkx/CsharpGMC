@@ -59,9 +59,9 @@ public static class Totals
                 ReadPositions(conn), ReadPositionCounts(conn));
 
     internal static IReadOnlyList<ContractTotals> ReadSqlBatch(DbConnection conn,
-        ContractReadScope? scope, out TagRules rules)
+        ContractReadScope? scope, out TagRules rules, int? rehearsalSchema = null)
     {
-        var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
+        var schema31 = rehearsalSchema is int version ? version >= 29 : SqlSchemaCompatibility.HasPreviewColumns(conn);
         string Where(string column) => scope is null ? "" : " WHERE " + scope.Predicate(column);
         string And(string column) => scope is null ? "" : " AND " + scope.Predicate(column);
 
