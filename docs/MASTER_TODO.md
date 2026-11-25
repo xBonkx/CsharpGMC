@@ -1,6 +1,6 @@
 # Единый реестр замечаний GMC-Смета C#
 
-> **Восстановление реестра 25.11.2026.** Источник: [CsharpGMC-archive, fb8024c](https://github.com/xBonkx/CsharpGMC-archive/tree/fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf/csharp/docs). Ниже полностью сохранены архивные 400 ID и их исходные статусы. Это историческая оценка на старом дереве, не доказательство состояния нового main. Пути `csharp/src/` и `csharp/tests/` в старых документах соответствуют `src/` и `tests/` здесь; старые SHA/ссылки — исторические, искать в архиве при недоступности. Не закрывать пункты по одному факту переноса документации.
+> **Восстановление реестра 25.11.2026.** Источник: [CsharpGMC-archive, fb8024c](https://github.com/xBonkx/CsharpGMC-archive/tree/fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf/csharp/docs). Исходные ID и статусы сохранены в архиве. Ниже ведётся активная выборка. Это историческая оценка на старом дереве, не доказательство состояния нового main. Пути `csharp/src/` и `csharp/tests/` в старых документах соответствуют `src/` и `tests/` здесь; старые SHA/ссылки — исторические, искать в архиве при недоступности. Не закрывать пункты по одному факту переноса документации.
 >
 > **Текущий приоритет владельца:** сначала [перенос Python 0.66.4–0.67.9](PYTHON_0664_TO_0679_PARITY.md), [безопасная миграция SQL и выпуск](SQL_MIGRATION_RELEASE_TODO.md), затем архивная очередь. 35 [открытых архивных Issues](ARCHIVE_OPEN_ISSUES.md) и SMALL_TASKS/ROADMAP не прибавлять к 400 без проверки пересечений. [Исторический журнал](CURRENT_TASK_ARCHIVE_20261125.md) сохранён отдельно. Обновлять этот реестр, соответствующие TODO и корневой CURRENT_TASK.md в том же коммите.
 
@@ -9,17 +9,21 @@
 
 Это главный индекс текущих работ. Исходные аудиты сохраняются полностью: подробные причины, шаги реализации, сценарии приёмки и история находятся по ссылкам. Каждая строка — существующий уникальный ID, а не коммит или доказанная отдельная ошибка. Пересекающиеся задачи не суммировать как уникальные дефекты: объединять только после содержательной сверки и фиксировать алиас. Матрица окон, SMALL_TASKS, ROADMAP и Issues не прибавляются к основному счётчику.
 
+26.11.2026 — по запросу владельца удалён диалог профилей SQL. PERF-006 и
+WIN-26 сняты с активного контроля. Итог проверки — в
+[текущем журнале](../CURRENT_TASK.md#26112026--удаление-окна-профилей-sql).
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 119 | 120 | 2 | 0 | 0 | 1 | 0 | 0 | 0 |
-| [PERFORMANCE_TODO_20261124.md](PERFORMANCE_TODO_20261124.md) | 59 | 27 | 30 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| [PERFORMANCE_TODO_20261124.md](PERFORMANCE_TODO_20261124.md) | 58 | 26 | 30 | 2 | 0 | 0 | 0 | 0 | 0 |
 | [CONTEXT_MENU_TODO_20261124.md](CONTEXT_MENU_TODO_20261124.md) | 49 | 8 | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [FUNCTIONAL_BUG_TODO_20261124.md](FUNCTIONAL_BUG_TODO_20261124.md) | 51 | 0 | 0 | 51 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **Всего** | 401 | 154 | 191 | 55 | 0 | 0 | 1 | 0 | 0 | 0 |
+| **Всего** | 400 | 153 | 191 | 55 | 0 | 0 | 1 | 0 | 0 | 0 |
 
-Открыто до приёмки: **401**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
+Открыто до приёмки: **400**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
 
 ## Статусы и обновление
 
@@ -289,7 +293,6 @@
 | [PERF-003](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L38) | P1 | Проверить GitHubAuth.Resolve, checksum/download и LauncherSelfUpdate: HttpClient Timeout.InfiniteTimeSpan, у TryGetLatest отдельный лимит, прочим сетевым фазам дать ограничение/отмену; не делать длительный auth и self-update обязательными перед обычным стартом. | PARTIAL | [последняя запись по ID](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L156) | Сверить остаток и выполнить приёмку из источника |
 | [PERF-004](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L39) | P0 | Безопасная схема обновления: скачать в staging, проверить хеш и версию, установить атомарно при безопасном закрытии/следующем запуске; не заменять файлы живой программы, не терять несохранённые правки, rollback на предыдущую валидную версию. | UNVERIFIED | Нет явной записи выполнения по ID | Сверить код по ID, реализовать подтверждённый остаток и проверить |
 | [PERF-005](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L40) | P0 | App.xaml.cs OnStartup и MainWindow.xaml.cs:54–97: сейчас new MainWindow и InitializeWorkspaceNavigation до Show; в ctor синхронные SqlServerDatabase.Open, Workspace.Objects/Documents, RefreshNavigation. | PARTIAL | [последняя запись по ID](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L158) | Сверить остаток и выполнить приёмку из источника |
-| [PERF-006](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L41) | P1 | SqlConnectionDialog.VerifyAsync/ConnectButton_Click: измерить TCP/auth/schema и следующее повторное открытие MainWindow. | UNVERIFIED | Нет явной записи выполнения по ID | Сверить код по ID, реализовать подтверждённый остаток и проверить |
 | [PERF-007](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L42) | P1 | Workspace.Objects/Documents: пакетная загрузка кратких DTO, проверить scope архивов, payload и планы; отложенная загрузка необязательных данных. | UNVERIFIED | Нет явной записи выполнения по ID | Сверить код по ID, реализовать подтверждённый остаток и проверить |
 | [PERF-008](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L43) | P1 | Сверить startup ресурсов, иконок, шрифтов, InitializeComponent, JIT/публикацию fx/sc, антивирус/диск. | UNVERIFIED | Нет явной записи выполнения по ID | Сверить код по ID, реализовать подтверждённый остаток и проверить |
 | [PERF-009](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/PERFORMANCE_TODO_20261124.md#L47) | P0 | MainWindow.OpenEstimate (1082–1114): cache hit синхронно Open + Revision до ShowPage. | CODE READY | `SqlServerDatabase.OpenAsync`, `MainWindow.xaml.cs`, `SqlSchemaCompatibilityTests.cs`, `test_functional_connection_lifetime.py` (25.11.2026); статическая сверка | Windows build/test, SQL Pilot: cancel/login/schema/preview, A→B→A и stale-rev; PERF-012/052 отдельно |
@@ -483,7 +486,6 @@
 | [WIN-23](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L713) — Обновление сметы — ExcelExistingUpdatePreviewWindow | UNVERIFIED: парная приёмка по матрице |
 | [WIN-24](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L714) — История — HistoryWindow | UNVERIFIED: парная приёмка по матрице |
 | [WIN-25](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L715) — Корзина — TrashWindow | UNVERIFIED: парная приёмка по матрице |
-| [WIN-26](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L716) — SQL — SqlConnectionDialog | UNVERIFIED: парная приёмка по матрице |
 | [WIN-27](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L717) — Этапы — StagesDialog, StageMoneyDialog, StageSystemsMoneyDialog, StageLinksDialog | UNVERIFIED: парная приёмка по матрице |
 | [WIN-28](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L718) — Вложения — AttachmentWindow | UNVERIFIED: парная приёмка по матрице |
 | [WIN-29](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L719) — Сравнение — CompareDialog | UNVERIFIED: парная приёмка по матрице |

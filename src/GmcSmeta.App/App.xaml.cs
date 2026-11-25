@@ -45,7 +45,7 @@ public partial class App : Application
             catch (Exception ex) when (ex is System.IO.IOException or FormatException or
                 NotSupportedException or InvalidOperationException or System.Runtime.InteropServices.COMException)
             {
-                // Optional visual branding must never prevent the SQL dialog or main window opening.
+                // Optional visual branding must never prevent the main window opening.
                 // Windows can still use the icon embedded in the executable.
                 return;
             }
@@ -84,20 +84,15 @@ public partial class App : Application
         }
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        // CLI and CI can still supply an ephemeral connection string. It is never persisted.
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION")))
         {
-            var dialog = new SqlConnectionDialog();
-            StartupTrace.Mark("app_connection_dialog_show");
-            var dialogResult = dialog.ShowDialog();
-            StartupTrace.Mark("app_connection_dialog_returned");
-            if (dialogResult != true)
-            {
-                Shutdown(0);
-                return;
-            }
-            Environment.SetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION", dialog.SelectedConnectionString);
+            StartupTrace.Mark("app_sql_connection_missing");
+            MessageBox.Show("Откройте ГМЦ-Смету с рабочего ярлыка.", "ГМЦ-Смета",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(1);
+            return;
         }
+
         StartupTrace.Mark("app_main_window_ctor_begin");
         var window = new MainWindow();
         StartupTrace.Mark("app_main_window_ctor_end");

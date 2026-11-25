@@ -749,7 +749,6 @@ KsRequisitesWindow: 22+16+10=48 до текста поля; LetterEditorWindow �
 - [ ] Обновление сметы — ExcelExistingUpdatePreviewWindow
 - [ ] История — HistoryWindow
 - [ ] Корзина — TrashWindow
-- [ ] SQL — SqlConnectionDialog
 - [ ] Этапы — StagesDialog, StageMoneyDialog, StageSystemsMoneyDialog, StageLinksDialog
 - [ ] Вложения — AttachmentWindow
 - [ ] Сравнение — CompareDialog
