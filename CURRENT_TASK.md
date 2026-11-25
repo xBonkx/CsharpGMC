@@ -17,8 +17,9 @@
 - Добавлен CLI-приёмочный прогон: `dotnet run --project src/GmcSmeta.Cli -- sql schema31 <conn>` (чтение 34 договоров, скидка договора +/-1%, скидка акта, разбивка, create/toggle signed/delete акта, undo/redo).
 - Исправлен `SqlServerActs.Create`: добавлены обязательные NOT NULL колонки (`smr_by_system`, `transport_amount`, `created_at`), убраны неверные ссылки `ds_no`/`ds_date`/`ds_extra` на `contracts`.
 - Тесты: 1256 пройдено; добавлены проверки совместимости для новой тестовой БД.
-- Известные проблемы для Codex:
-  1. Undo/Redo всё ещё падает на v31: «contract[0].created_at» значения выглядят одинаково, но равенство не проходит (похоже точность/Kind DateTime при восстановлении через `AddWithValue`). Добавлена диагностика в `UndoApplyResult.Error` и `SnapshotDifference`.
-  2. `SaveDiscount` percent 0% отклоняется для неподдерживаемых форм КС (ожидаемо).
-  3. В тестовой копии нет неподписанного акта с ручной разбивкой, поэтому запись разбивки проверена только чтением.
+- Известные проблемы для Codex (обновлено):
+  1. Исправлена точность DateTime при восстановлении Undo (`SqlParameter` с `SqlDbType.DateTime2`/`DateTimeOffset` вместо `AddWithValue`). Undo/Redo теперь проходит.
+  2. CLI-приёмка `sql schema31` завершается успешно: «ПРИЁМКА v31: OK (чтение, скидки, разбивка, КС-2, Undo/Redo)».
+  3. Тесты: 1256 пройдено.
+  4. Осталось: запись разбивки проверена только чтением (нет подходящего акта в тестовой копии); экспорт проверяется offline-проверками.
 - WIP отправлен в main; production cutover не согласован.
