@@ -45,9 +45,9 @@ public static class SqlServerKsContractScope
         var selected = all.FirstOrDefault(x => x.Id == currentDocumentId)
             ?? throw new InvalidOperationException("Исходный договор не найден.");
         var number = EffectiveNumber(selected, all);
-        // Avoid merging unrelated unnumbered contracts into one KS-3.
-        if (string.IsNullOrWhiteSpace(number))
+        if (number.Length == 0 && selected.Kind is not ("main" or "dop"))
             return new[] { selected };
+        // Python groups by effective number within the object, including a blank number.
         return all.Where(d => d.ObjectId == selected.ObjectId &&
                 (d.Kind == "main" || d.Kind == "dop") &&
                 EffectiveNumber(d, all) == number)

@@ -8,7 +8,7 @@ public sealed class KsGroupReportTests
     private static SqlServerActs.ActInfo Act(long id, string number, DateTime when,
         decimal gross, decimal net, decimal vat, long contractId) =>
         new(id,number,when,when.AddDays(-7),when,true,5,gross,
-            contractId,"ДС",net,vat);
+            contractId,"ДС",net,vat,VatRate:22m);
 
     private static SqlServerKsContractScope.Scope Example()
     {

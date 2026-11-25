@@ -29,7 +29,7 @@ public sealed class Ks3FullTotalsTests
     }
 
     [Fact]
-    public void VatTopAdjustmentDoesNotDisappearFromReport()
+    public void SingleKs3ExtractsVatFromAdjustedGrossLikePython()
     {
         var money=KsFinancialPolicy.Calculate(100m,20m,0m,0m,22m,true,5);
         var act=new SqlServerActs.ActInfo(1,"3",new DateTime(2026,3,1),
@@ -37,8 +37,22 @@ public sealed class Ks3FullTotalsTests
             money.Ks3Net,money.Vat,money.Materials,money.Smr,money.Transport,money.Pnr,22m,true);
         var report=SqlServerActs.CalculateKs3ReportFromActs(new[]{act},1);
         Assert.Equal(146.45m,report.Total);
-        Assert.Equal(120.05m,report.Period);
-        Assert.Equal(26.4m,report.Vat);
+        Assert.Equal(120.04m,report.Period);
+        Assert.Equal(26.41m,report.Vat);
+    }
+
+    [Fact]
+    public void SingleKs3RoundsCumulativeGrossOnlyAfterExtractingVat()
+    {
+        var first = new SqlServerActs.ActInfo(1, "1", new DateTime(2026, 1, 1),
+            null, null, true, 1, 0.03m, Ks3Net: 0.02m, Vat: 0.01m, VatRate: 22m);
+        var second = first with { Id = 2, Number = "2", Date = first.Date.AddDays(1) };
+
+        var report = SqlServerActs.CalculateKs3ReportFromActs([first, second], second.Id);
+
+        Assert.Equal(0.02m, report.Period);
+        Assert.Equal(0.05m, report.Year);
+        Assert.Equal(0.05m, report.Start);
     }
 
     [Fact]

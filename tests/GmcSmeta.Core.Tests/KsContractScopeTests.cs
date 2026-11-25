@@ -56,13 +56,14 @@ public sealed class KsContractScopeTests
     }
 
     [Fact]
-    public void TwoUnnumberedContractsNeverMix()
+    public void UnnumberedContractsAndTheirAddendaGroupWithinOneObject()
     {
         var first = Main with { Number = "" };
         var second = Other with { Number = "" };
+        var foreign = first with { Id = 99, ObjectId = 20 };
         var result = SqlServerKsContractScope.ResolveDocuments(first.Id,
-            new[] { first, second });
-        Assert.Equal(first.Id, Assert.Single(result).Id);
+            new[] { first, second, Ds, foreign });
+        Assert.Equal(new long[] { first.Id, Ds.Id, second.Id }, result.Select(doc => doc.Id));
     }
 
     [Fact]

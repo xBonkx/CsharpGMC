@@ -997,17 +997,10 @@ public static partial class SqlServerActs
         IReadOnlyList<ActInfo> source, long actId)
     {
         var acts = source.OrderBy(a => a.Date).ThenBy(a => a.Id).ToList();
-        var index = acts.FindIndex(a => a.Id == actId);
-        if (index < 0) throw new InvalidOperationException("Акт не найден.");
-        var now = acts[index];
-        var previous = acts.Take(index).ToList();
-        return new Ks3Report(
-            now.Ks3Net,
-            now.Ks3Net + previous.Where(a => a.Date.Year == now.Date.Year).Sum(a => a.Ks3Net),
-            now.Ks3Net + previous.Sum(a => a.Ks3Net),
-            now.Vat, now.Total,
-            previous.Select(a => ($"КС-2 № {a.Number} от {a.Date:dd.MM.yyyy}", a.Ks3Net))
-                .ToList());
+        var current = acts.FirstOrDefault(a => a.Id == actId)
+            ?? throw new InvalidOperationException("Акт не найден.");
+        return CalculateKs3Report(
+            acts.Select(a => (a.Id, a.Number, a.Date, a.Total)).ToArray(), actId, current.VatRate);
     }
 
     /// <summary>

@@ -58,9 +58,9 @@ public sealed record KsGroupReport(
         var local = scope.Acts.Where(a => a.ContractId == act.ContractId)
             .OrderBy(a => a.Date).ThenBy(a => a.Id).ToList();
         var index = local.FindIndex(a => a.Id == actId);
-        var previous = local.Take(index).Select(a =>
-            new KsPreviousGroup(a.Number, a.Date, a.Ks3Net, a.Vat, a.Total)).ToList();
         var report = SqlServerActs.CalculateKs3ReportFromActs(local, actId);
+        var previous = local.Take(index).Zip(report.Previous,
+            (a, amount) => new KsPreviousGroup(a.Number, a.Date, amount.Net, a.Total - amount.Net, a.Total)).ToList();
         var groups = KsWorkspaceProjection.Build(scope.Acts);
         var groupIndex = groups.ToList().FindIndex(g => g.Key == KsWorkspaceProjection.GroupKey(act));
         if (groupIndex < 0) throw new InvalidOperationException("Группа КС-3 не найдена.");
