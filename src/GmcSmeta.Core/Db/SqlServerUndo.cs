@@ -297,7 +297,17 @@ public static class SqlServerUndo
         var set = string.Join(", ", cols.Select((c, i) => $"[{c}]=@c{i}"));
         using var cmd = new SqlCommand($"UPDATE dbo.contracts SET {set} WHERE id=@id", conn, tx);
         for (var i = 0; i < cols.Count; i++)
-            cmd.Parameters.AddWithValue($"@c{i}", contract[cols[i]] ?? DBNull.Value);
+        {
+            var value = contract[cols[i]] ?? DBNull.Value;
+            SqlParameter parameter;
+            if (value is DateTime dateTime)
+                parameter = new SqlParameter($"@c{i}", SqlDbType.DateTime2) { Value = dateTime };
+            else if (value is DateTimeOffset dateTimeOffset)
+                parameter = new SqlParameter($"@c{i}", SqlDbType.DateTimeOffset) { Value = dateTimeOffset };
+            else
+                parameter = new SqlParameter($"@c{i}", value ?? DBNull.Value);
+            cmd.Parameters.Add(parameter);
+        }
         cmd.Parameters.AddWithValue("@id", contract["id"] ?? DBNull.Value);
         if (cmd.ExecuteNonQuery() != 1)
             throw new InvalidOperationException("Документ исчез во время отмены.");
@@ -344,7 +354,14 @@ public static class SqlServerUndo
                 {
                     object? value = overrides is not null && overrides.TryGetValue(cols[i], out var over)
                         ? over : row.TryGetValue(cols[i], out var v) ? v : DBNull.Value;
-                    cmd.Parameters.AddWithValue($"@p{i}", value ?? DBNull.Value);
+                    SqlParameter parameter;
+                    if (value is DateTime dateTime)
+                        parameter = new SqlParameter($"@p{i}", SqlDbType.DateTime2) { Value = dateTime };
+                    else if (value is DateTimeOffset dateTimeOffset)
+                        parameter = new SqlParameter($"@p{i}", SqlDbType.DateTimeOffset) { Value = dateTimeOffset };
+                    else
+                        parameter = new SqlParameter($"@p{i}", value ?? DBNull.Value);
+                    cmd.Parameters.Add(parameter);
                 }
                 cmd.ExecuteNonQuery();
             }

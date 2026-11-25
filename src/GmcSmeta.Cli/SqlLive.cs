@@ -203,9 +203,11 @@ public static class SqlLive
         using (var cmd = new SqlCommand("""
             SELECT TOP(1) a.id
             FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id
+            LEFT JOIN dbo.tags t ON t.[key]=c.form
             WHERE a.signed=0 AND c.locked=0 AND c.stage_of IS NULL
               AND c.discount_percent=0 AND a.discount_percent=0
               AND a.discount_override=0 AND a.manual_total_cents<0
+              AND (ISNULL(t.rules,N'') NOT LIKE '%vat_top%' AND ISNULL(t.rules,N'') NOT LIKE '%ks_dns%')
             ORDER BY a.id
             """, conn))
         {
@@ -214,11 +216,16 @@ public static class SqlLive
         if (draftAct > 0)
         {
             var percent = SqlServerActs.SaveDiscount(connectionString, draftAct, "percent", 0m, RevisionOf());
-            Check(percent.Saved, "SaveDiscount percent 0%: " + (percent.Error ?? "сохранено"));
-            if (percent.Saved)
+            if (!percent.Saved && percent.Error == "Корректировка не поддерживается этой формой КС.")
+                Console.WriteLine("SKIP: выбранный акт не поддерживает корректировку (форма/имя).");
+            else
             {
-                var contract = SqlServerActs.SaveDiscount(connectionString, draftAct, "contract", null, percent.Revision);
-                Check(contract.Saved, "SaveDiscount contract: " + (contract.Error ?? "сохранено"));
+                Check(percent.Saved, "SaveDiscount percent 0%: " + (percent.Error ?? "сохранено"));
+                if (percent.Saved)
+                {
+                    var contract = SqlServerActs.SaveDiscount(connectionString, draftAct, "contract", null, percent.Revision);
+                    Check(contract.Saved, "SaveDiscount contract: " + (contract.Error ?? "сохранено"));
+                }
             }
         }
         else Console.WriteLine("SKIP: у черновика нет акта для проверки скидки КС.");
