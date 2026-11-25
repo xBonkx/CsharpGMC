@@ -43,6 +43,7 @@ internal static class Program
         }
 
         Check("v31: KS2/KS3 discount and fixed total formulas", CheckAdjustments);
+        Check("v31: KS2 section amounts, duplicate names and remainder", CheckSectionAmounts);
         Check("DNS: XLSX formulas preserve half-kopeck round_rows", CheckDnsRoundRows);
         Check("R4: positional SMR is printed as work rows", CheckR4PositionSmr);
         Check("Dneprovsky: external customer KS/PDF template must fail closed",
@@ -218,6 +219,51 @@ internal static class Program
             sheet.Cell(quantity.Address.RowNumber,6).Value=3;
             MoneyEquals(manual?calc.Gross:calc.Gross+95m,(decimal)finalCell.GetDouble(),"recalculated payable");
         }
+    }
+
+    private static void CheckSectionAmounts()
+    {
+        var original=Fixture("standard",2);
+        var act=original.Report.Acts[0] with
+        {
+            SmrBySystem=true,
+            SectionAmountsJson="""{"smr":{"101":10,"102":15,"103":15,"0":10},"transport":{"101":2.25,"103":5,"0":5}}"""
+        };
+        var package=original with
+        {
+            Scope=original.Scope with {Acts=new[]{act}},
+            Report=original.Report with {Acts=new[]{act}},
+            Lines=original.Lines.Select((line,i)=>line with {SystemId=101+i,Section="Одинаковое название"}).ToList(),
+            Sections=new SqlServerKsPrintData.Section[]
+            {
+                new(101,act.ContractId,"Одинаковое название"),
+                new(102,act.ContractId,"Одинаковое название"),
+                new(103,act.ContractId,"Раздел без материалов"),
+                new(999,999,"Чужой договор")
+            }
+        };
+        var sections=package.SectionsFor(act);
+        Assert(sections.Count==3,"three sections, including empty allocated section");
+        Assert(sections[0].Lines.Count==1&&sections[1].Lines.Count==1&&sections[2].Lines.Count==0,
+            "group by ID, not name");
+        MoneyEquals(40m,sections.Sum(s=>s.Smr),"distributed SMR");
+        MoneyEquals(7.25m,sections.Sum(s=>s.Transport),"distributed delivery");
+        using var book=KsCustomerForms.Create(package);
+        var sheet=book.Worksheets.First();
+        var smr=sheet.CellsUsed().Where(c=>c.GetString()=="СМР:").ToList();
+        var delivery=sheet.CellsUsed().Where(c=>c.GetString()=="ТРАНСПОРТНЫЕ РАСХОДЫ:").ToList();
+        Assert(smr.Count==3&&delivery.Count==2,"section rows");
+        MoneyEquals(40m,smr.Sum(c=>(decimal)sheet.Cell(c.Address.RowNumber,8).GetDouble()),"printed SMR");
+        MoneyEquals(7.25m,delivery.Sum(c=>(decimal)sheet.Cell(c.Address.RowNumber,8).GetDouble()),"printed delivery");
+        var workTotal=sheet.CellsUsed().Single(c=>c.GetString()=="СТОИМОСТЬ РАБОТ:");
+        var deliveryTotal=sheet.CellsUsed().Single(c=>c.GetString()=="ИТОГО ТРАНСПОРТНЫЕ РАСХОДЫ:");
+        MoneyEquals(act.Smr,(decimal)sheet.Cell(workTotal.Address.RowNumber,8).GetDouble(),"SMR including remainder");
+        MoneyEquals(act.Transport,(decimal)sheet.Cell(deliveryTotal.Address.RowNumber,8).GetDouble(),"delivery including remainder");
+        MoneyEquals(act.Total,(decimal)book.Worksheets.Last().Cell("G29").GetDouble(),"KS3 no double counting");
+        var pdf=KsPdfForms.Create(package);
+        using var stream=new MemoryStream(pdf);
+        using var loaded=PdfReader.Open(stream,PdfDocumentOpenMode.Import);
+        Assert(loaded.PageCount>=2,"section PDF opens");
     }
 
     private static void CheckDocuments(string form, int count, bool includePdf)
