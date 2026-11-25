@@ -88,7 +88,7 @@ public sealed class ExcelImportResult
 public static partial class ExcelImportParser
 {
     private static readonly Regex NumberRegex = new(@"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$", RegexOptions.Compiled);
-    private static readonly Regex DateRegex = new(@"\b\d{1,2}\.\d{1,2}\.\d{2,4}\b", RegexOptions.Compiled);
+    private static readonly Regex DateRegex = new(@"(?<!\d)\d{1,2}\.\d{1,2}\.\d{2,4}(?!\d)", RegexOptions.Compiled);
     private static readonly Regex VatRegex = new(@"НДС\s*(\d{1,2}(?:[.,]\d+)?)\s*%", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex SystemCode = new(@"^[A-Za-zА-Яа-яЁё]{1,4}\s?\d", RegexOptions.Compiled);
     private static readonly Regex TitleRegex = new(@"^\s*(вариант|раздел|пункт|часть|этап|корпус|секция)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -357,8 +357,10 @@ public static partial class ExcelImportParser
                 }
 
                 if (columns.Work is not null && system is not null && !SystemCode.IsMatch(name) &&
-                    i + 1 < rows.Count && (name.EndsWith(':') ||
-                    Text(Cell(rows[i + 1], columns.Name)).StartsWith("толщ", StringComparison.OrdinalIgnoreCase)))
+                    NextPositionName(rows, i + 1, columns) is { } nextName &&
+                    (name.EndsWith(':') || char.IsLower(nextName[0]) ||
+                     nextName.StartsWith("толщ", StringComparison.OrdinalIgnoreCase) ||
+                     FirstWord(nextName) == FirstWord(name)))
                 {
                     componentCaption = name.TrimEnd(':').Trim();
                     continue;
@@ -595,6 +597,20 @@ public static partial class ExcelImportParser
         h.Work = work; h.WorkTotal = workTotal;
         return true;
     }
+
+    private static string? NextPositionName(IReadOnlyList<IReadOnlyList<object?>> rows, int start, Header columns)
+    {
+        for (var i = start; i < Math.Min(rows.Count, start + 3); i++)
+        {
+            var name = Text(Cell(rows[i], columns.Name));
+            if (name.Length != 0)
+                return Empty(Cell(rows[i], columns.Quantity)) ? null : name;
+        }
+        return null;
+    }
+
+    private static string FirstWord(string text) =>
+        text.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries)[0];
 
     private static void DetectMetadata(IEnumerable<string> meta, ExcelImportBlock block)
     {

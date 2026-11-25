@@ -89,6 +89,32 @@ public sealed class ExcelImportParserTests
     }
 
     [Fact]
+    public void WorkAppendix_PreservesSystemCaptionsAndDateAdjacentToYearSuffix()
+    {
+        var result = Parse(
+            Row("Приложение № 2 к Договору подряда № 42 от 19.10.2026г"),
+            Row("№", "Наименование", "Ед.", "Кол-во", "Стоимость материалов", null, "Стоимость работ", null),
+            Row(null, null, null, null, "за ед. изм", "Всего", "за ед. изм", "Всего"),
+            Row(null, "ВЕ1"),
+            Row(null, "Решётка"),
+            Row(),
+            Row(1, "Решётка настенная", "шт", 2, 100, 200, 20, 40),
+            Row(null, "Воздуховод оцинкованный"),
+            Row(2, "б=0,8 мм", "м", 1, 100, 100, 25, 25),
+            Row(null, "П2"),
+            Row(3, "П2 секция", "шт", 1, 100, 100, 50, 50),
+            Row(null, "Итого", null, null, null, 515));
+
+        var block = Assert.Single(result.Blocks);
+        Assert.Equal("19.10.2026", block.Date);
+        Assert.Equal(new[] { "ВЕ1", "П2" }, block.Sections.Select(section => section.Name));
+        Assert.Equal(new[] { "Решётка настенная", "Воздуховод оцинкованный: б=0,8 мм" },
+            block.Sections[0].Positions.Select(position => position.Name));
+        Assert.Equal(515m, block.CalculatedTotal);
+        Assert.True(block.Ok);
+    }
+
+    [Fact]
     public void MultipleDocumentsOnSameSheet_AreSeparated()
     {
         var result = Parse(
