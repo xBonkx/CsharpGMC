@@ -218,25 +218,26 @@ public static class KsExcelForms
         ws.Row(22).Height=44;
         ws.Row(23).Height=20;
 
-        var lines=p.Lines.Where(x=>x.ActId==act.Id).ToList();
+        var sections=p.SectionsFor(act);
         var perPosition=contract.SmrMode.Equals("pos",StringComparison.OrdinalIgnoreCase);
         var materialRefs=new List<string>();
         var workRefs=new List<string>();
-        decimal materialInput=0m,workInput=0m;
+        var transportRefs=new List<string>();
+        decimal materialInput=0m,workInput=0m,transportInput=0m;
         var row=24; var sequence=0;
-        foreach(var group in lines.GroupBy(x=>x.Section))
+        foreach(var group in sections)
         {
-            if(!string.IsNullOrWhiteSpace(group.Key) && group.Key!="Без системы")
+            if(!string.IsNullOrWhiteSpace(group.Name) && group.Name!="Без системы")
             {
                 ws.Cell(row,1).Value=++sequence;
-                ws.Cell(row,3).Value=group.Key;
+                ws.Cell(row,3).Value=group.Name;
                 ws.Range(row,1,row,8).Style.Font.Bold=true;
                 ws.Range(row,1,row,8).Style.Fill.BackgroundColor=Header;
                 Borders(ws,row,row,8);
                 ws.Row(row).Height=22;
                 row++;
             }
-            foreach(var line in group)
+            foreach(var line in group.Lines)
             {
                 WritePosition(ws,row,++sequence,line.Name,line.PositionNumber,
                     contract.Form=="r4" ? line.WorkCode : "",line.Unit,line.Quantity,line.Price,false,
@@ -253,6 +254,22 @@ public static class KsExcelForms
                     row++;
                 }
             }
+            void SectionAmount(string caption,decimal amount,List<string> refs)
+            {
+                if(amount==0m)return;
+                ws.Cell(row,1).Value=++sequence;
+                ws.Cell(row,3).Value=caption;
+                ws.Cell(row,8).Value=(double)amount;
+                ws.Cell(row,8).Style.NumberFormat.Format=AmountFormat;
+                ws.Range(row,1,row,8).Style.Font.Bold=true;
+                Borders(ws,row,row,8);
+                ws.Row(row).Height=22;
+                refs.Add("H"+row++);
+            }
+            SectionAmount("ТРАНСПОРТНЫЕ РАСХОДЫ:",group.Transport,transportRefs);
+            transportInput+=group.Transport;
+            SectionAmount("СМР:",group.Smr,workRefs);
+            workInput+=group.Smr;
         }
 
         var parts=new List<string>();
@@ -265,8 +282,9 @@ public static class KsExcelForms
                 Sum(workRefs)+Delta(act.Smr-workInput);
             parts.Add("H"+TotalLine(ws,ref row,"СТОИМОСТЬ РАБОТ:",work));
         }
-        if(act.Transport!=0m)
-            parts.Add("H"+TotalLine(ws,ref row,"ТРАНСПОРТНЫЕ РАСХОДЫ:",DecimalText(act.Transport)));
+        if(act.Transport!=0m||transportRefs.Count>0)
+            parts.Add("H"+TotalLine(ws,ref row,transportRefs.Count>0?"ИТОГО ТРАНСПОРТНЫЕ РАСХОДЫ:":"ТРАНСПОРТНЫЕ РАСХОДЫ:",
+                transportRefs.Count>0?Sum(transportRefs)+Delta(act.Transport-transportInput):DecimalText(act.Transport)));
         if(act.Pnr!=0m)
             parts.Add("H"+TotalLine(ws,ref row,"ПУСКО-НАЛАДОЧНЫЕ РАБОТЫ:",DecimalText(act.Pnr)));
 

@@ -104,15 +104,16 @@ public static class KsPdfForms
         }
         StartPage(false);
         var index=0;
-        var lineRows=p.Lines.Where(x=>x.ActId==act.Id).GroupBy(x=>x.Section);
+        var lineRows=p.SectionsFor(act);
+        var perPosition=p.Scope.Documents.Single(d=>d.Id==act.ContractId).SmrMode=="pos";
         foreach(var group in lineRows)
         {
-            if(!string.IsNullOrWhiteSpace(group.Key)&&group.Key!="Без системы")
+            if(!string.IsNullOrWhiteSpace(group.Name)&&group.Name!="Без системы")
             {
                 if(pdf.Y>pdf.Bottom-33) StartPage(true);
-                pdf.Grid(KsColumns,new[]{"","",group.Key,"","","","",""},24,true);
+                pdf.Grid(KsColumns,new[]{"","",group.Name,"","","","",""},24,true);
             }
-            foreach(var line in group)
+            foreach(var line in group.Lines)
             {
                 var height=pdf.RowHeight(line.Name,283);
                 if(pdf.Y>pdf.Bottom-height-5)StartPage(true);
@@ -121,7 +122,23 @@ public static class KsPdfForms
                     line.WorkCode,line.Unit,Qty(line.Quantity),Amount(line.Price),
                     Amount(decimal.Round(line.Quantity*line.Price,2,MidpointRounding.AwayFromZero))
                 },height,false);
+                if(perPosition&&line.WorkPrice!=0m)
+                {
+                    var workHeight=pdf.RowHeight("Монтаж: "+line.Name,283);
+                    if(pdf.Y>pdf.Bottom-workHeight-5)StartPage(true);
+                    pdf.Grid(KsColumns,new[]{(++index).ToString(Invariant()),"","Монтаж: "+line.Name,"",
+                        line.Unit,Qty(line.Quantity),Amount(line.WorkPrice),
+                        Amount(decimal.Round(line.Quantity*line.WorkPrice,2,MidpointRounding.AwayFromZero))},workHeight,false);
+                }
             }
+            void SectionAmount(string caption,decimal amount)
+            {
+                if(amount==0m)return;
+                if(pdf.Y>pdf.Bottom-27)StartPage(true);
+                pdf.Grid(KsColumns,new[]{(++index).ToString(Invariant()),"",caption,"","","","",Amount(amount)},22,true);
+            }
+            SectionAmount("ТРАНСПОРТНЫЕ РАСХОДЫ:",group.Transport);
+            SectionAmount("СМР:",group.Smr);
         }
         // Full authoritative act figures, not merely the sum of material lines.
         var totals=new List<(string Caption,decimal Value)>

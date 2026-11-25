@@ -23,7 +23,7 @@ public static partial class SqlServerActs
         bool RowsExact = false, bool RoundRows = false,
         string DsNo = "", string DsDate = "",
         decimal DiscountPercent = 0m, bool DiscountOverride = false, long ManualTotalCents = -1,
-        string SectionAmountsJson = "");
+        string SectionAmountsJson = "", bool SmrBySystem = false);
 
     /// <summary>
     /// Acts of a document with FULL gross totals matching Python Act.total:
@@ -44,13 +44,14 @@ public static partial class SqlServerActs
         var raw = new List<(long Id, string Number, DateTime Date, DateTime? Start, DateTime? End,
             bool Signed, decimal Smr, decimal Transport, decimal Pnr, bool Exact,
             long Adjustment, decimal VatRate, string Form, string DsNo, string DsDate,
-            decimal Discount, bool Override, long ManualTotal, string SectionJson)>();
+            decimal Discount, bool Override, long ManualTotal, string SectionJson, bool BySystem)>();
         using (var cmd = new SqlCommand(
             "SELECT a.id,a.number,a.[date],a.period_from,a.period_to,a.signed," +
             "ISNULL(a.smr_amount,0),ISNULL(a.transport_amount,0),ISNULL(a.pnr_amount,0)," +
             "ISNULL(a.rows_exact,0),ISNULL(a.gross_adjustment_cents,0)," +
             "ISNULL(c.vat_rate,0),ISNULL(c.form,N''),ISNULL(a.ds_no,N''),ISNULL(a.ds_date,N'')" +
-            (schema31 ? ",a.discount_percent,a.discount_override,a.manual_total_cents,a.section_amounts_json " : " ") +
+            (schema31 ? ",a.discount_percent,a.discount_override,a.manual_total_cents,a.section_amounts_json" : "") +
+            ",a.smr_by_system " +
             "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id " +
             "WHERE a.contract_id=@id ORDER BY a.[date],a.id", conn, transaction))
         {
@@ -74,7 +75,8 @@ public static partial class SqlServerActs
                     schema31 ? DiscountPolicy.ReadPercent(r, 15) : 0m,
                     schema31 && !r.IsDBNull(16) && Convert.ToBoolean(r.GetValue(16)),
                     schema31 && !r.IsDBNull(17) ? Convert.ToInt64(r.GetValue(17)) : -1L,
-                    schema31 && !r.IsDBNull(18) ? r.GetString(18) : ""));
+                    schema31 && !r.IsDBNull(18) ? r.GetString(18) : "",
+                    !r.IsDBNull(schema31?19:15)&&Convert.ToBoolean(r.GetValue(schema31?19:15),CultureInfo.InvariantCulture)));
         }
 
         var lines = new Dictionary<long, List<(decimal Quantity, decimal Price)>>();
@@ -111,7 +113,7 @@ public static partial class SqlServerActs
                 contractId, "", sum.Ks3Net, sum.Vat, sum.Materials,
                 sum.Smr, sum.Transport, sum.Pnr, a.VatRate, vatTop, a.Adjustment,
                 a.Exact, KsFinancialPolicy.HasRule(json, "round_rows"),
-                a.DsNo, a.DsDate, a.Discount, a.Override, a.ManualTotal, a.SectionJson));
+                a.DsNo, a.DsDate, a.Discount, a.Override, a.ManualTotal, a.SectionJson, a.BySystem));
         }
         return acts;
     }

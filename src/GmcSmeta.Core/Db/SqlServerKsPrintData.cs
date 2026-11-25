@@ -15,14 +15,39 @@ public static class SqlServerKsPrintData
 {
     public sealed record Line(long ActId, string Section, string Name, string Unit,
         string PositionNumber, decimal Quantity, decimal Price, decimal WorkPrice,
-        bool OutsideKp, string Basis = "", string WorkCode = "");
+        bool OutsideKp, string Basis = "", string WorkCode = "", long SystemId = 0);
+
+    public sealed record Section(long Id,long ContractId,string Name);
+    public sealed record PrintSection(string Name,IReadOnlyList<Line> Lines,decimal Smr,decimal Transport);
 
     public sealed record Contractor(long DocumentId, string ContractDate,
         string CompanyName, string LegalName, string SignerPosition, string SignerName);
 
     public sealed record Package(SqlServerKsContractScope.Scope Scope,
         KsGroupReport Report, SqlServerKsRequisites.Values Requisites,
-        IReadOnlyList<Line> Lines, IReadOnlyDictionary<long, Contractor> Contractors);
+        IReadOnlyList<Line> Lines, IReadOnlyDictionary<long, Contractor> Contractors)
+    {
+        public IReadOnlyList<Section> Sections {get;init;}=Array.Empty<Section>();
+
+        // Resolve by stable ID, not section caption; include sections with no closed positions.
+        public IReadOnlyList<PrintSection> SectionsFor(SqlServerActs.ActInfo act)
+        {
+            var rows=Lines.Where(l=>l.ActId==act.Id).ToList();
+            var sections=Sections.Where(s=>s.ContractId==act.ContractId).ToList();
+            if(sections.Count==0)
+                return rows.GroupBy(l=>l.Section).Select(g=>new PrintSection(g.Key,g.ToList(),0m,0m)).ToList();
+            var ids=sections.Select(s=>s.Id).ToHashSet();
+            if(rows.Any(l=>!ids.Contains(l.SystemId)))
+                throw new InvalidOperationException("Строка КС ссылается на неизвестный раздел.");
+            var perPosition=Scope.Documents.Single(d=>d.Id==act.ContractId).SmrMode=="pos";
+            var amounts=KsActAllocation.Resolve(rows.Select(l=>new KsActAllocation.Line(l.SystemId,l.Quantity,l.Price,l.WorkPrice)).ToList(),
+                ids,act.Smr,act.Transport,perPosition,act.SmrBySystem,act.SectionAmountsJson,act.RoundRows);
+            var byId=rows.ToLookup(l=>l.SystemId);
+            return sections.Select(s=>new PrintSection(s.Name,byId[s.Id].ToList(),
+                perPosition?0m:amounts.Smr.GetValueOrDefault(s.Id),amounts.Transport.GetValueOrDefault(s.Id)))
+                .Where(s=>s.Lines.Count>0||s.Smr!=0m||s.Transport!=0m).ToList();
+        }
+    }
 
     public static Package Read(string connectionString, long contractId, string groupKey)
     {
@@ -81,7 +106,7 @@ public static class SqlServerKsPrintData
         var parameters = ids.Select((id, i) => "@act" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
         var lines = new List<Line>();
         using (var command = new SqlCommand(
-            "SELECT al.act_id,sy.name,p.name,p.unit,p.num,al.qty,al.price,al.work_price,p.out_of_kp,p.basis,p.extra_json " +
+            "SELECT al.act_id,sy.name,p.name,p.unit,p.num,al.qty,al.price,al.work_price,p.out_of_kp,p.basis,p.extra_json,sy.id " +
             "FROM dbo.act_lines al " +
             "JOIN dbo.acts a ON a.id=al.act_id " +
             "JOIN dbo.positions p ON p.id=al.position_id " +
@@ -120,10 +145,21 @@ public static class SqlServerKsPrintData
                     Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),
                     S(1),S(2),S(3),S(4),D(5),D(6),D(7),
                     !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8),CultureInfo.InvariantCulture),
-                    basis,workCode));
+                    basis,workCode,Convert.ToInt64(r.GetValue(11),CultureInfo.InvariantCulture)));
             }
         }
 
-        return new Package(scope,report,requisites,lines,contractors);
+        var sections=new List<Section>();
+        var docIds=report.Acts.Select(a=>a.ContractId).Distinct().ToArray();
+        using(var cmd=new SqlCommand(
+            "SELECT id,contract_id,name FROM dbo.systems WHERE contract_id IN ("+
+            string.Join(",",docIds.Select((_,i)=>"@d"+i))+") ORDER BY contract_id,[order],id",conn))
+        {
+            for(var i=0;i<docIds.Length;i++)cmd.Parameters.Add("@d"+i,SqlDbType.BigInt).Value=docIds[i];
+            using var reader=cmd.ExecuteReader();
+            while(reader.Read())sections.Add(new(Convert.ToInt64(reader.GetValue(0)),Convert.ToInt64(reader.GetValue(1)),
+                reader.IsDBNull(2)?"":reader.GetString(2)));
+        }
+        return new Package(scope,report,requisites,lines,contractors){Sections=sections};
     }
 }
