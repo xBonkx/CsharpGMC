@@ -175,12 +175,15 @@ public static partial class SqlServerDatabase
             builder.InitialCatalog.Equals("master", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Выбери конкретную тестовую базу SQL Server, не master.");
         SqlSchemaCompatibility.RejectProduction(builder.InitialCatalog, builder.DataSource);
-        if (SqlSchemaCompatibility.IsNetworkCutover(builder.InitialCatalog, builder.DataSource) &&
-            (!builder.IntegratedSecurity || builder.TrustServerCertificate ||
-             !string.IsNullOrWhiteSpace(builder.ServerCertificate) ||
-             !string.IsNullOrWhiteSpace(builder.HostNameInCertificate) ||
-             builder.Encrypt != SqlConnectionEncryptOption.Mandatory))
-            throw new InvalidOperationException("Рабочий SQL Server по сети требует вход Windows и проверяемый TLS.");
+        if (SqlSchemaCompatibility.IsNetworkCutover(builder.InitialCatalog, builder.DataSource))
+        {
+            if (!builder.IntegratedSecurity || builder.TrustServerCertificate ||
+                !string.IsNullOrWhiteSpace(builder.ServerCertificate) ||
+                !string.IsNullOrWhiteSpace(builder.HostNameInCertificate) ||
+                builder.Encrypt != SqlConnectionEncryptOption.Mandatory)
+                throw new InvalidOperationException("Рабочий SQL Server по сети требует вход Windows и проверяемый TLS.");
+            builder.ConnectTimeout = 20;
+        }
         if (SqlSchemaCompatibility.IsWriteTestDatabase(builder.InitialCatalog))
             throw new InvalidOperationException("Специальная база теста записи v31 недоступна обычному приложению.");
         return builder;
