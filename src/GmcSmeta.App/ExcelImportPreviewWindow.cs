@@ -31,7 +31,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         public string Span => $"{Block.FirstRow}–{Block.LastRow}";
         public int Positions => Block.PositionCount;
         public string Materials => Block.MaterialSum.ToString("N2");
-        public string Smr => (Block.Smr ?? 0m).ToString("N2");
+        public string Smr => (Block.HasWork ? Block.WorkSum : Block.Smr ?? 0m).ToString("N2");
         public string Total => (Block.DeclaredTotal ?? Block.CalculatedTotal).ToString("N2");
         public string Check => Block.VolumesOnly ? "объёмы" :
             Block.DeclaredMaterial is null && Block.DeclaredTotal is null ? "нет итогов" :
@@ -209,7 +209,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         foreach (var s in b.Sections)
             info.Add($"  {s.Name} — {s.Positions.Sum(p => 1 + p.Children.Count)} поз., {s.MaterialSum:N2} ₽");
         info.Add("");
-        info.Add($"Материалы {b.MaterialSum:N2} · СМР {b.Smr ?? 0m:N2} · Транспорт {b.Transport ?? 0m:N2}");
+        info.Add($"Материалы {b.MaterialSum:N2} · СМР {row.Smr} · Транспорт {b.Transport ?? 0m:N2}");
         info.Add($"Итого расчётное {b.CalculatedTotal:N2} · в файле {b.DeclaredTotal?.ToString("N2") ?? "не указано"}");
         info.Add($"НДС {b.VatRate:0.##}% · { (b.Form == "dns" ? "начисляется сверху" : "в том числе") }");
         if (b.HasPurchase) info.Add("Закупочные цены будут сохранены отдельно.");

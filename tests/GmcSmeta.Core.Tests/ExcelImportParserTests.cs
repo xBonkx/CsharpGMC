@@ -248,6 +248,7 @@ public sealed class ExcelImportParserTests
         Assert.Equal(2, block.Sections.Count);
         Assert.Equal(0m, block.MaterialSum);
         Assert.Equal("Воздуховод Оц 0,7", block.Sections[0].Positions[0].Name);
+        Assert.Empty(result.Notes);
     }
 
     [Fact]

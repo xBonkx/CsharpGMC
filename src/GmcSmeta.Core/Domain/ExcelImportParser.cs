@@ -128,7 +128,10 @@ public static partial class ExcelImportParser
             }
             var basic = ParseSheetCore(name, rows, false, cancellationToken);
             if (basic.Blocks.Count == 0 && TryParseRevit(name, rows) is { } revit)
-                basic.Blocks.Add(revit);
+            {
+                result.Blocks.Add(revit);
+                continue;
+            }
             if (basic.Blocks.Count > 1 && CountHeaders(rows) == 1)
             {
                 var numberedClosings = NumberedSectionClosings(rows, basic.Blocks);

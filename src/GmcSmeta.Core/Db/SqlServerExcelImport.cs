@@ -137,7 +137,7 @@ public static class SqlServerExcelImport
         using var temp = new SqlCommand(
             @"CREATE TABLE #excel_rows (
                 idx INT NOT NULL PRIMARY KEY, parent_idx INT NULL, system_id BIGINT NOT NULL,
-                row_order INT NOT NULL, catalog_key NVARCHAR(600) NOT NULL,
+                row_order INT NOT NULL, catalog_key NVARCHAR(600) COLLATE DATABASE_DEFAULT NOT NULL,
                 num NVARCHAR(32) NOT NULL, basis NVARCHAR(64) NOT NULL, name NVARCHAR(MAX) NOT NULL,
                 unit NVARCHAR(32) NOT NULL, qty FLOAT NOT NULL, price FLOAT NOT NULL,
                 purchase_price FLOAT NULL, work_price FLOAT NULL, note NVARCHAR(MAX) NOT NULL,
