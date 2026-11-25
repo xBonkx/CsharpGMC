@@ -1495,7 +1495,7 @@ public partial class MainWindow : Window
                 _selectedObject = null;
                 _openDocumentId = contractId;
                 SynchronizeNavigation(doc);
-                StatusText.Text = $"{doc.Title} · проверка актуальности данных…";
+                SetEstimateStatus($"{doc.Title} · проверка актуальности данных…", false);
                 StartupTrace.Mark("estimate_cache_validation_begin");
 
                 // Never discard an editor which still owns local writes/readback.
@@ -1547,7 +1547,7 @@ public partial class MainWindow : Window
             _selectedObject = null;
             _openDocumentId = contractId;
             SynchronizeNavigation(doc);
-            CompleteEstimateOpen(doc, page);
+            CompleteEstimateOpen(doc, page, loading: true);
         }
         catch (OperationCanceledException) when (validation?.IsCancellationRequested == true)
         {
@@ -1587,7 +1587,7 @@ public partial class MainWindow : Window
                 retry.Click += (_, _) => OpenEstimate(contractId, retryFocus);
                 panel.Children.Add(retry);
                 ShowPage(panel);
-                StatusText.Text = "Смета не проверена · редактирование недоступно";
+                SetEstimateStatus("Смета не проверена · редактирование недоступно", true);
                 StartupTrace.Mark("estimate_cache_validation_failed");
                 return;
             }
@@ -1614,9 +1614,19 @@ public partial class MainWindow : Window
         !_startupClosed && request == _estimateOpenGeneration &&
         _openDocumentId == contractId && ReferenceEquals(PageHost.Content, cached);
 
-    private void CompleteEstimateOpen(DocRow doc, EstimateView page)
+    // Both navigation and the editor use the same foreground, so a previous
+    // error does not colour an unrelated document's normal status red.
+    internal void SetEstimateStatus(string message, bool error)
     {
-        StatusText.Text = $"{doc.Title}  ·  SQL Server · редактирование и порядок позиций";
+        StatusText.Text = message;
+        StatusText.Foreground = new System.Windows.Media.SolidColorBrush(error
+            ? System.Windows.Media.Color.FromRgb(0xC5, 0x30, 0x30)
+            : System.Windows.Media.Color.FromRgb(0x64, 0x74, 0x8B));
+    }
+
+    private void CompleteEstimateOpen(DocRow doc, EstimateView page, bool loading = false)
+    {
+        SetEstimateStatus(loading ? $"{doc.Title} · загрузка сметы…" : doc.Title, false);
         if (_pendingEstimateFocus is int position)
         {
             _pendingEstimateFocus = null;
