@@ -364,7 +364,8 @@ public partial class ShipmentsPane : UserControl
         RecipientBox.IsEnabled = editable;
         IssuedByBox.IsEnabled = editable;
         AddRowsButton.IsEnabled = editable;
-        DeleteShipmentButton.IsEnabled = !current.Fixed;
+        // Keep the menu available for a posted shipment so it can explain the restriction.
+        DeleteShipmentButton.IsEnabled = true;
         FixedCheck.IsEnabled = !IsEditingFixed && (current.Fixed || current.Lines > 0);
         RowFilter.IsEnabled = editable;
         StockRowsButton.IsEnabled = RemoveRowsButton.IsEnabled = editable;
@@ -537,12 +538,21 @@ public partial class ShipmentsPane : UserControl
             PlacementTarget = button,
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
         };
-        var delete = ContextMenuIcons.Create("Удалить ведомость…", "Trash", !current.Fixed, danger: true);
+        var canDelete = !current.Fixed && !HeaderDirty();
+        var delete = ContextMenuIcons.Create("Удалить ведомость…", "Trash", canDelete, danger: true);
+        delete.ToolTip = current.Fixed
+            ? "Ведомость уже выдана. Сначала снимите отметку «Ведомость выдана (фиксация)»."
+            : !canDelete
+                ? "Сначала сохраните реквизиты ведомости."
+                : "Удалить текущую черновую ведомость после подтверждения.";
+        ToolTipService.SetShowOnDisabled(delete, true);
         delete.Click += (_, _) =>
         {
             if (CanStartWrite && Current is { Fixed: false } selected &&
                 selected.Id == id && ServerRevision() == revision)
                 DeleteShipment_Click(sender, new RoutedEventArgs());
+            else
+                SetStatus("Ведомость или данные изменились. Откройте меню заново.");
         };
         menu.Items.Add(delete);
         menu.IsOpen = true;
