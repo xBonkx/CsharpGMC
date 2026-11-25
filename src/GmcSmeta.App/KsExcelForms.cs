@@ -286,16 +286,25 @@ public static class KsExcelForms
         }
         else
         {
-            var correction = Money.Round2(act.Total-baseAmount);
-            if (correction != 0m && (act.DiscountPercent != 0m || act.ManualTotalCents >= 0))
+            var adjusted=act.ManualTotalCents>=0||act.DiscountPercent!=0m;
+            grossRow=TotalLine(ws,ref row,"ВСЕГО с НДС "+rate+"%:",
+                Sum(parts)+Delta((adjusted?decimal.Round(baseAmount,2,MidpointRounding.ToEven):act.Total)-baseAmount));
+            if(act.ManualTotalCents>=0)
             {
-                var caption = correction < 0m ? "СКИДКА / КОРРЕКТИРОВКА:" : "ДОПЛАТА / КОРРЕКТИРОВКА:";
-                parts.Add("H"+TotalLine(ws,ref row,caption,DecimalText(correction)));
-                grossRow=TotalLine(ws,ref row,"ВСЕГО с НДС "+rate+"%:",Sum(parts));
+                var target=(act.ManualTotalCents/100m).ToString("0.00",Invariant);
+                var adjustment=TotalLine(ws,ref row,"Корректировка до согласованной суммы:",
+                    "ROUND("+target+"-ROUND(H"+grossRow+",2),2)",false);
+                grossRow=TotalLine(ws,ref row,"ВСЕГО С УЧЁТОМ КОРРЕКТИРОВКИ:",
+                    "ROUND(ROUND(H"+grossRow+",2)+H"+adjustment+",2)");
             }
-            else
-                grossRow=TotalLine(ws,ref row,"ВСЕГО с НДС "+rate+"%:",
-                    Sum(parts)+Delta(act.Total-baseAmount));
+            else if(act.DiscountPercent!=0m)
+            {
+                var pct=act.DiscountPercent.ToString("0.################",Invariant);
+                var discount=TotalLine(ws,ref row,"Скидка "+pct+"%:",
+                    "-ROUND(ROUND(H"+grossRow+",2)*"+pct+"/100,2)",false);
+                grossRow=TotalLine(ws,ref row,"ВСЕГО С УЧЁТОМ СКИДКИ:",
+                    "ROUND(H"+grossRow+"+H"+discount+",2)");
+            }
             var nominal=act.VatRate==0m ? 0m :
                 decimal.Round(act.Total*act.VatRate/(100m+act.VatRate),2,MidpointRounding.AwayFromZero);
             vatRow=TotalLine(ws,ref row,"в том числе НДС "+rate+"%:",

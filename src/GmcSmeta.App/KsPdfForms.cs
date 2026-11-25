@@ -23,7 +23,9 @@ public static class KsPdfForms
     public static byte[] Create(SqlServerKsPrintData.Package p)
     {
         if (p.Report.Acts.Count==0) throw new InvalidOperationException("Нет актов КС-2 для PDF.");
-        if (KsCustomerForms.Resolve(p)==KsCustomerForms.Form.Dneprovsky)
+        var form=KsCustomerForms.Resolve(p);
+        KsCustomerForms.ValidateAdjustments(p,form);
+        if (form==KsCustomerForms.Form.Dneprovsky)
             throw new NotSupportedException("Днепровский: оригинальная форма заказчика отсутствует.");
         using var book=new PdfDocument();
         book.Info.Title="КС-2 + КС-3 №"+p.Report.Key;
@@ -131,8 +133,9 @@ public static class KsPdfForms
         if(!act.VatOnTop && (act.DiscountPercent != 0m || act.ManualTotalCents >= 0))
         {
             var correction = Money.Round2(act.Total-act.Materials-act.Smr-act.Transport-act.Pnr);
-            if (correction != 0m)
-                totals.Add((correction < 0m ? "Скидка / корректировка" : "Доплата / корректировка",correction));
+            totals.Add(("ВСЕГО до корректировки, с НДС",act.Total-correction));
+            totals.Add((act.ManualTotalCents>=0?"Корректировка до согласованной суммы":
+                "Скидка "+act.DiscountPercent.ToString("0.################",Ru)+"%",correction));
         }
         totals.Add((act.VatOnTop?"НДС сверху "+act.VatRate+"%":"В том числе НДС "+act.VatRate+"%",act.Vat));
         totals.Add(("ВСЕГО ПО АКТУ, с НДС",act.Total));

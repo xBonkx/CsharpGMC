@@ -38,6 +38,7 @@ public static class KsCustomerForms
     public static XLWorkbook Create(SqlServerKsPrintData.Package package)
     {
         var form = Resolve(package);
+        ValidateAdjustments(package,form);
         if (form == Form.Dneprovsky)
             throw new NotSupportedException(
                 "Для «Днепровского» Python использует внешний оригинальный бланк с сетевого ресурса. " +
@@ -76,6 +77,16 @@ public static class KsCustomerForms
         {
             book.Dispose();
             throw;
+        }
+    }
+
+    internal static void ValidateAdjustments(SqlServerKsPrintData.Package package,Form form)
+    {
+        foreach(var act in package.Report.Acts)
+        {
+            if(act.DiscountPercent==0m&&!act.DiscountOverride&&act.ManualTotalCents<0&&string.IsNullOrEmpty(act.SectionAmountsJson))continue;
+            if(form!=Form.Standard||act.VatOnTop)
+                throw new InvalidOperationException("Итоговая скидка и ручная разбивка сумм не поддерживаются специальной формой КС.");
         }
     }
 

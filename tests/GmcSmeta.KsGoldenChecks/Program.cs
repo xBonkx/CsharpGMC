@@ -42,6 +42,7 @@ internal static class Program
             Check(form + ": frozen KS3 gross opening balance", () => CheckOpening(frozenForm));
         }
 
+        Check("v31: KS2/KS3 discount and fixed total formulas", CheckAdjustments);
         Check("DNS: XLSX formulas preserve half-kopeck round_rows", CheckDnsRoundRows);
         Check("R4: positional SMR is printed as work rows", CheckR4PositionSmr);
         Check("Dneprovsky: external customer KS/PDF template must fail closed",
@@ -189,6 +190,34 @@ internal static class Program
                 2m, 100m, 0m, false, "БО-1", "БО-1"))).ToList();
         return new SqlServerKsPrintData.Package(scope, report, customer,
             lines, contractors);
+    }
+
+    private static void CheckAdjustments()
+    {
+        foreach(var manual in new[]{false,true})
+        {
+            var original=Fixture("standard",2);
+            var act=original.Report.Acts[0];
+            var calc=KsFinancialPolicy.Calculate(act.Materials,act.Smr,act.Transport,act.Pnr,act.VatRate,false,
+                discountPercent:manual?0m:5m,manualTotalCents:manual?41234:-1);
+            var updated=act with {Total=calc.Gross,Vat=calc.Vat,Ks3Net=calc.Ks3Net,
+                DiscountPercent=manual?0m:5m,DiscountOverride=manual,ManualTotalCents=manual?41234:-1};
+            var scope=original.Scope with {Acts=new[]{updated}};
+            var report=original.Report with {Acts=new[]{updated},PeriodGross=calc.Gross,PeriodVat=calc.Vat,
+                PeriodNet=calc.Ks3Net,YearNet=calc.Ks3Net,SinceStartNet=calc.Ks3Net};
+            using var book=KsCustomerForms.Create(original with{Scope=scope,Report=report});
+            var sheet=book.Worksheets.First();
+            var adjustment=sheet.CellsUsed().Single(c=>c.GetString()==(manual?"Корректировка до согласованной суммы:":"Скидка 5%:"));
+            var final=sheet.CellsUsed().Single(c=>c.GetString()==(manual?"ВСЕГО С УЧЁТОМ КОРРЕКТИРОВКИ:":"ВСЕГО С УЧЁТОМ СКИДКИ:"));
+            var finalCell=sheet.Cell(final.Address.RowNumber,8);
+            Assert(sheet.Cell(adjustment.Address.RowNumber,8).FormulaA1.Contains("ROUND(",StringComparison.Ordinal),"adjustment must be formula");
+            MoneyEquals(calc.Gross,(decimal)finalCell.GetDouble(),"KS2 discounted gross");
+            MoneyEquals(calc.Gross,(decimal)book.Worksheets.Last().Cell("G29").GetDouble(),"KS3 discounted gross");
+            // A manual total remains fixed even when the preceding formula changes.
+            var quantity=sheet.CellsUsed().First(c=>c.GetString().StartsWith("Изделие 1",StringComparison.Ordinal));
+            sheet.Cell(quantity.Address.RowNumber,6).Value=3;
+            MoneyEquals(manual?calc.Gross:calc.Gross+95m,(decimal)finalCell.GetDouble(),"recalculated payable");
+        }
     }
 
     private static void CheckDocuments(string form, int count, bool includePdf)
