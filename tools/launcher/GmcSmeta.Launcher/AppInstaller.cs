@@ -59,7 +59,16 @@ internal sealed class InstalledApp
             "sha256=" + (Sha256 ?? ""),
             "installedUtc=" + InstalledUtc,
         };
-        File.WriteAllLines(paths.StateFile, lines);
+        var temporary = paths.StateFile + ".tmp";
+        try
+        {
+            File.WriteAllLines(temporary, lines);
+            File.Move(temporary, paths.StateFile, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     public void Launch(string? connectionString = null)
@@ -159,6 +168,7 @@ internal sealed class AppInstaller
         if (Directory.Exists(staging)) Directory.Delete(staging, true);
         Directory.CreateDirectory(staging);
 
+        _ui.UpdatePhase($"Подготавливаем версию {release.Version}", "Распаковываем проверенный пакет.");
         _ui.Info("Распаковываю…");
         try
         {
@@ -254,6 +264,7 @@ internal static class LauncherSelfUpdate
 
         try
         {
+            ui.UpdatePhase("Обновляем лаунчер", $"Версия {release.Version}");
             ui.Step($"Обновляю запускающий EXE до {release.Version}…");
             var checksums = releases.TryGetChecksums(release);
             var expected = GitHubReleases.FindChecksum(checksums, asset.Name);

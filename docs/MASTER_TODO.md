@@ -536,4 +536,6 @@
 | PARITY-REVIT-01 | P1 | Распознавание спецификации Revit и предупреждение об отрицательных объёмах | PARTIAL | 25.11.2026: ExcelImportParser.Special.cs, ExcelImportParserTests.cs; Python aa6b34d, статическая сверка | xUnit, реальная спецификация, Windows preview и SQL Pilot |
 | PARITY-KS-FORMULA-01 | P0 | Защита формул объёма КС-2 от склеивания ссылок в число | PARTIAL | 25.11.2026: ActQuantityFormulas.cs, ActQuantityFormulaTests.cs; Python aa6b34d, статическая сверка | xUnit, Windows, массовая правка на SQL Pilot |
 
-Сводка новой активной очереди: 4 PARTIAL, 0 DONE; исторические 400 без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).
+| OFFICE-UPDATE-01 | P1 | Штатный запуск рабочего C# и графическое окно фонового обновления | PARTIAL | 26.11.2026, Codex/main, база 4753825. Ярлык DIMA переведён на штатный EXE. В изолированном каталоге обычный запуск подготовил 1.0.2 поверх синтетического состояния 1.0.1. Окно отрисовано и проверено. | Дождаться обычного запуска на DIMA и включить правку лаунчера в следующий согласованный релиз. |
+
+Сводка новой активной очереди: 5 PARTIAL, 0 DONE; исторические 400 без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).

@@ -320,10 +320,7 @@ internal sealed class GitHubReleases
         var text = total > 0
             ? $"{done / 1048576.0:0.0} / {total / 1048576.0:0.0} МБ ({done * 100 / total}%)"
             : $"{done / 1048576.0:0.0} МБ";
-        var width = 0;
-        try { width = Console.BufferWidth; } catch (IOException) { }
-        if (width > 0 && text.Length + 2 > width) text = text[..Math.Max(0, width - 3)];
-        Console.Write("\r  " + text + "   ");
+        _ui.DownloadProgress(text, total > 0 ? Math.Min(100, done * 100.0 / total) : null);
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string url, string accept)

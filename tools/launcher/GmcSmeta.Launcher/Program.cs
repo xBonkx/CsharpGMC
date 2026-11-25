@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using GmcSmeta.Launcher;
 using GmcSmeta.Core;
 
@@ -8,13 +7,7 @@ StartupTrace.Mark("launcher_start");
 // Скачивает готовую WPF-сборку из GitHub Releases и запускает её.
 // Если релиза нет или GitHub недоступен — собирает локальный git-клон (запасной путь).
 var options = LaunchOptions.Parse(args);
-// The updater is launched without a console; skip console setup and all output.
-if (!options.BackgroundUpdate)
-{
-    Console.OutputEncoding = Encoding.UTF8;
-    Console.Title = "ГМЦ-Смета — обновление и запуск";
-}
-var ui = new ConsoleUi(options.BackgroundUpdate);
+using var ui = new ConsoleUi(options);
 
 try
 {
@@ -28,7 +21,6 @@ try
     var paths = AppPaths.Create(office);
     if (office && OfficeLauncher.InstallLauncher(paths.Root, args))
         return;
-    LauncherSelfUpdate.CleanupOld();
     var installed = InstalledApp.Load(paths);
     StartupTrace.Mark("launcher_installed_state_read");
 
@@ -72,7 +64,7 @@ try
         installed.Launch(office ? OfficeLauncher.ConnectionString : null);
         StartupTrace.Mark("launcher_app_launch_returned");
         if (!TryStartBackgroundUpdate())
-            ui.Warn("Фоновая проверка не запущена. Используйте --update-only для ручного обновления.");
+            ui.Warn("Фоновая проверка не запущена. Проверка повторится при следующем запуске.");
         return;
     }
 
@@ -83,6 +75,8 @@ try
         if (options.BackgroundUpdate) return;
         throw new InvalidOperationException("Обновление уже выполняется. Повторите --update-only позже.");
     }
+
+    LauncherSelfUpdate.CleanupOld();
 
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
     if (office || string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
@@ -99,6 +93,8 @@ try
     string? updateError = null;
     if (!options.NoUpdate)
     {
+        if (installed is null)
+            ui.ShowUpdate("Проверяем доступность программы", "Получаем сведения о выпуске.");
         ui.Step($"1/3  Проверяю обновления на GitHub ({repository})…");
         StartupTrace.Mark("launcher_release_check_begin");
         release = releases.TryGetLatest(out updateError);
@@ -118,11 +114,15 @@ try
                 string.Equals(a.Name, preferredAsset, StringComparison.OrdinalIgnoreCase)) &&
             installed is not null &&
             !string.Equals(installed.Flavor, installer.PreferredFlavor, StringComparison.OrdinalIgnoreCase);
-        if (installed is null ||
+        var appUpdated = installed is null ||
             !string.Equals(installed.Version, release.Version, StringComparison.OrdinalIgnoreCase) ||
             flavorMismatch ||
-            !File.Exists(installed.Exe))
+            !File.Exists(installed.Exe);
+        if (appUpdated)
         {
+            ui.ShowUpdate($"Загружаем версию {release.Version}", options.BackgroundUpdate
+                ? "Программа продолжит работать. Версия будет доступна при следующем запуске."
+                : "Проверяем пакет обновления.");
             ui.Step($"2/3  Устанавливаю версию {release.Version}…");
             StartupTrace.Mark("launcher_install_begin");
             installed = installer.Install(release, installed);
@@ -137,6 +137,8 @@ try
         StartupTrace.Mark("launcher_self_update_begin");
         LauncherSelfUpdate.TryUpdate(releases, release, paths, ui);
         StartupTrace.Mark("launcher_self_update_end");
+        if (options.BackgroundUpdate && appUpdated)
+            ui.FinishUpdate($"Версия {release.Version} готова", "Она откроется при следующем запуске программы.");
     }
     else if (installed is not null)
     {
@@ -151,13 +153,13 @@ try
             ui.Done($"Готово — установлена версия {installed.Version}. Запуск пропущен (--update-only).");
             return;
         }
+        ui.ShowUpdate("Открываем программу", $"Версия {installed.Version}");
         ui.Step("3/3  Запускаю программу…");
         StartupTrace.Mark("launcher_app_launch_begin");
         installed.Launch(office ? OfficeLauncher.ConnectionString : null);
         StartupTrace.Mark("launcher_app_launch_returned");
         Console.WriteLine();
         ui.Done($"Готово — версия {installed.Version} запущена. Это окно можно закрыть.");
-        Thread.Sleep(1200);
         return;
     }
 
@@ -170,19 +172,8 @@ try
 catch (Exception ex)
 {
     StartupTrace.Mark("launcher_error");
-    if (options.BackgroundUpdate)
-    {
-        // A hidden updater must never block on an invisible ReadKey prompt.
-        Environment.ExitCode = 1;
-        return;
-    }
-    ui.Error("");
-    ui.Error("Не удалось: " + ex.Message);
-    Console.WriteLine();
-    Console.Write("Нажмите любую клавишу, чтобы закрыть окно… ");
-    try { Console.ReadKey(intercept: true); }
-    catch (InvalidOperationException) { Thread.Sleep(5000); }   // ввод перенаправлен — просто подождать
-    Environment.Exit(1);
+    ui.Failure(ex.Message);
+    Environment.ExitCode = 1;
 }
 return;
 
