@@ -1,4 +1,4 @@
-﻿# Fail-closed release gate; does not connect to SQL Server.
+# Fail-closed release gate; does not connect to SQL Server.
 [CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 $ErrorActionPreference = 'Stop'
@@ -10,7 +10,7 @@ $approvedRaw = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'approved-sche
 if ($approvedRaw -notmatch '^\d+$') { throw 'Некорректная утверждённая версия SQL-схемы.' }
 $approved = [int]$approvedRaw
 if ($target -ne $approved) {
-    throw "SQL-схема $approved -> $target: выпуск заблокирован. Нужен утверждённый SQL-мигратор с backup/verify и подтверждённая приёмка. Не повышайте approved-schema.txt ради обхода проверки."
+    throw "SQL-схема $approved -> ${target}: выпуск заблокирован. Нужен утверждённый SQL-мигратор с backup/verify и подтверждённая приёмка. Не повышайте approved-schema.txt ради обхода проверки."
 }
-Write-Host "SQL-схема $target: миграция не требуется, БД не затрагивается."
+Write-Host "SQL-схема ${target}: миграция не требуется, БД не затрагивается."
 return $target
