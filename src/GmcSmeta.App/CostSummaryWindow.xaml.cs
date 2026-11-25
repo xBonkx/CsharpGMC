@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace GmcSmeta.App;
 
-/// <summary>Standalone compatibility host; the same live module is also used in the contract tabs.</summary>
+/// <summary>Standalone compatibility host. Main KP and contract tabs use EstimateView instead.</summary>
 public partial class CostSummaryWindow : Window
 {
     public CostSummaryWindow(string connectionString, int contractId, string title, bool readOnly = false)

@@ -22,6 +22,13 @@ public sealed class CostSummaryPreviewRow
     public string CostNote { get; init; } = "";
     public string UCost { get; set; } = "";
     public string UPrice { get; set; } = "";
+    public string OriginalWorkUnitPrice { get; init; } = "";
+    // Keep the shared Materials row unchanged; Summary displays the original KP price.
+    public string SummaryUnitPrice
+    {
+        get => IsWork ? OriginalWorkUnitPrice : UPrice;
+        set { if (!IsWork) UPrice = value; }
+    }
     public string UWcost { get; set; } = "";
     public string UWsell { get; set; } = "";
     public string Name { get; init; } = "";
@@ -333,7 +340,7 @@ public partial class CostSummaryPane : UserControl
         }
     }
 
-    private static List<CostSummaryPreviewRow> BuildSummaryPreview(CostSummaryData data)
+    internal static List<CostSummaryPreviewRow> BuildSummaryPreview(CostSummaryData data)
     {
         var items = new List<CostSummaryPreviewRow>();
         string M(decimal v) => v == 0m ? "—" : Money.Format(v);
@@ -363,6 +370,7 @@ public partial class CostSummaryPane : UserControl
                 Supplier = row.Supplier,
                 UCost = Num(row.UCost),
                 UPrice = row.Work ? "" : Num(row.UPrice),
+                OriginalWorkUnitPrice = row.Work ? Num(row.UPrice) : "",
                 UWcost = Num(row.UWcost),
                 UWsell = Num(row.UWsell),
                 MCost = M(row.MCost),
@@ -377,21 +385,28 @@ public partial class CostSummaryPane : UserControl
                 MarkupPct = Pct(row.MarkupPct),
             });
         }
-        foreach (var (name, cost, sell, _) in data.Extra)
+        foreach (var (name, cost, sell, kind) in data.Extra)
+        {
+            bool works = string.Equals(kind, "works", StringComparison.OrdinalIgnoreCase);
+            bool transport = string.Equals(kind, "trans", StringComparison.OrdinalIgnoreCase);
             items.Add(new CostSummaryPreviewRow
             {
-                Id = name == "Транспорт" ? -1 : 0,
-                IsTransport = name == "Транспорт",
+                Id = transport ? -1 : 0,
+                IsTransport = transport,
                 Name = name,
-                UCost = name == "Транспорт" ? Num(cost) : "",
-                MCost = M(cost),
-                MSell = M(sell),
-                MatMargin = M(sell - cost),
+                UCost = transport ? Num(cost) : "",
+                MCost = works ? "—" : M(cost),
+                MSell = works ? "—" : M(sell),
+                MatMargin = works ? "—" : M(sell - cost),
+                WCost = works ? M(cost) : "—",
+                WSell = works ? M(sell) : "—",
+                WorkMargin = works ? M(sell - cost) : "—",
                 TotalCost = M(cost),
                 TotalSell = M(sell),
                 TotalMargin = M(sell - cost),
                 RowBackground = "#FFF8EF",
             });
+        }
         return items;
     }
 

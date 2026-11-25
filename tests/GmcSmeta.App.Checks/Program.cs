@@ -22,6 +22,11 @@ internal static class Program
                 ColumnMenuChecks.Run();
                 return 0;
             }
+            if (args.Length == 1 && args[0] == "--legacy-summary-check")
+            {
+                LegacySummaryChecks.Run();
+                return 0;
+            }
             CheckEstimateUiSettingsRecovery();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))

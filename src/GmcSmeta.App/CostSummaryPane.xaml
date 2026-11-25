@@ -191,7 +191,7 @@
                 <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty, Mode=TwoWay}" Width="66" ElementStyle="{StaticResource ReportGridCenter}"/>
                 <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="110"/>
                 <DataGridTextColumn Header="Мат: закуп за ед." Binding="{Binding UCost, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
-                <DataGridTextColumn Header="Мат: розн. за ед." Binding="{Binding UPrice, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
+                <DataGridTextColumn Header="Мат: розн. за ед." Binding="{Binding SummaryUnitPrice, Mode=TwoWay}" Width="96" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
                 <DataGridTextColumn Header="Мат: закуп" Binding="{Binding MCost}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
                 <DataGridTextColumn Header="Мат: розница" Binding="{Binding MSell}" Width="88" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMaterialsHeader}"/>
                 <DataGridTextColumn Header="Мат: маржа" Binding="{Binding MatMargin}" Width="82" IsReadOnly="True" ElementStyle="{StaticResource ReportGridRight}" HeaderStyle="{StaticResource ReportGridMarginHeader}"/>
