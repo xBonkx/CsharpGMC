@@ -217,7 +217,7 @@
             </DataGrid>
         </Border>
         <StackPanel Grid.Row="4" Margin="0,12,0,0">
-            <DockPanel>
+            <DockPanel x:Name="LoadStatusPanel" Visibility="Collapsed" Margin="0,0,0,6">
                 <Button x:Name="RetryButton" DockPanel.Dock="Right" Content="Повторить загрузку"
                         Visibility="Collapsed" Style="{StaticResource PythonToolbarButton}" Click="Retry_Click"/>
                 <TextBlock x:Name="LoadStatus" Foreground="#64748B" TextWrapping="Wrap"/>
