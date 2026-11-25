@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Win32;
 using System.Windows;
@@ -13,6 +14,10 @@ namespace GmcSmeta.App;
 
 public partial class MainWindow : Window
 {
+    private static readonly string WindowTitle = "ГМЦ-Смета v" +
+        (typeof(MainWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0] ?? typeof(MainWindow).Assembly.GetName().Version?.ToString(3));
+
     private SqlConnection? _serverConn;
     private volatile bool _startupClosed;
     private bool _startupInProgress;
@@ -68,6 +73,7 @@ public partial class MainWindow : Window
     {
         StartupTrace.Mark("main_initialize_component_begin");
         InitializeComponent();
+        Title = WindowTitle + " — C#";
         _navigationSearchTimer = new System.Windows.Threading.DispatcherTimer(
             System.Windows.Threading.DispatcherPriority.Background)
         {
@@ -182,8 +188,8 @@ public partial class MainWindow : Window
                         (id, target, expected, undo) => SqlServerUndo.Apply(_sqlConnectionString!, id, target, expected, undo));
                     var schema31Preview = SqlSchemaCompatibility.IsPreviewDatabase(_serverConn.Database);
                     Title = schema31Preview
-                        ? "ГМЦ-Смета — C# · схема 31 · ТОЛЬКО ЧТЕНИЕ · суммы не проверены"
-                        : "ГМЦ-Смета — C# · SQL Server";
+                        ? WindowTitle + " — C# · схема 31 · ТОЛЬКО ЧТЕНИЕ · суммы не проверены"
+                        : WindowTitle + " — C# · SQL Server";
                     DatabaseLabel.Text = SqlServerWorkspace.DescribeConnection(_sqlConnectionString!)
                         + (schema31Preview ? " · ПРОСМОТР v31 (не для расчётов и экспорта)" : "");
                     NewObjectButton.IsEnabled = SqlWritesEnabled;
