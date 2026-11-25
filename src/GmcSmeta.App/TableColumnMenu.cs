@@ -37,6 +37,11 @@ public static class TableColumnMenu
     public static void SetStableId(DependencyObject target, string value) => target.SetValue(StableIdProperty, value);
     public static string GetStableId(DependencyObject target) => (string)target.GetValue(StableIdProperty);
 
+    public static readonly DependencyProperty MenuTitleProperty = DependencyProperty.RegisterAttached(
+        "MenuTitle", typeof(string), typeof(TableColumnMenu), new PropertyMetadata(""));
+    public static void SetMenuTitle(DependencyObject target, string value) => target.SetValue(MenuTitleProperty, value);
+    public static string GetMenuTitle(DependencyObject target) => (string)target.GetValue(MenuTitleProperty);
+
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Layout> Layouts = new();
 
     internal static void RefreshDynamic(DataGrid grid, string key, bool ownHeaderMenu)
@@ -100,11 +105,21 @@ public static class TableColumnMenu
     // input before ContextMenuService opens the grid's existing row menu.
     internal static void InstallHeaderMenu(DataGrid grid, Action<FrameworkElement> open)
     {
-        grid.AddHandler(UIElement.PreviewMouseRightButtonUpEvent, new MouseButtonEventHandler((_, e) =>
+        // Use the tunneling mouse event rather than the re-raised direct
+        // right-button event; hit-test the actual point rather than selection.
+        grid.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
         {
-            if (HeaderFrom(e.OriginalSource as DependencyObject, grid) is null) return;
+            if (e.ChangedButton != MouseButton.Right) return;
+            var header = HeaderFrom(grid.InputHitTest(e.GetPosition(grid)) as DependencyObject, grid);
+            if (header is null) return;
             e.Handled = true;
             if (CanChange(grid)) open(grid);
+            else
+            {
+                var notice = new ContextMenu { PlacementTarget = grid, Placement = PlacementMode.MousePoint };
+                notice.Items.Add(new MenuItem { Header = "Завершите редактирование, чтобы настроить столбцы", IsEnabled = false });
+                notice.IsOpen = true;
+            }
         }), true);
     }
 
@@ -124,8 +139,10 @@ public static class TableColumnMenu
         CollectionViewSource.GetDefaultView(grid.ItemsSource ?? grid.Items) is not
             IEditableCollectionView { IsEditingItem: true } and not IEditableCollectionView { IsAddingNew: true };
 
-    private static string Title(DataGridColumn column)
+    internal static string Title(DataGridColumn column)
     {
+        var explicitTitle = GetMenuTitle(column);
+        if (!string.IsNullOrWhiteSpace(explicitTitle)) return explicitTitle;
         static IEnumerable<string> Parts(object? value)
         {
             if (value is TextBlock text) yield return text.Text;

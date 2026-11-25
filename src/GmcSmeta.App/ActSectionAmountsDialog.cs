@@ -65,6 +65,9 @@ internal sealed class ActSectionAmountsDialog : Window
         Column("СМР доступно",nameof(Entry.Limit),new DataGridLength(140),true);
         Column("СМР в этой КС",nameof(Entry.Smr),new DataGridLength(220),_pos);
         Column("Транспорт в этой КС",nameof(Entry.Transport),new DataGridLength(220),false);
+        // Visibility preferences are local; keep allocation inputs and limits visible.
+        TableColumnMenu.SetProtect(_grid, "Раздел|СМР доступно|СМР в этой КС|Транспорт в этой КС");
+        TableColumnMenu.SetKey(_grid, "ks-section-amounts");
         _grid.ItemsSource=_rows;root.Children.Add(_grid);Content=root;
         _grid.CellEditEnding+=(_,_)=>Dispatcher.BeginInvoke(new Action(()=>{Refresh();}));
         _save.Click+=(_,_)=>{if(Commit()&&Refresh())DialogResult=true;};

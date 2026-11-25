@@ -1679,7 +1679,7 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- МАТЕРИАЛЫ: закуп за ед. · розн. за ед. · закуп · розница -->
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_ucost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_ucost" local:TableColumnMenu.MenuTitle="Материалы · закупка за ед."
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
@@ -1709,7 +1709,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_uprice"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_uprice" local:TableColumnMenu.MenuTitle="Материалы · цена клиенту за ед."
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
@@ -1739,7 +1739,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_mcost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_mcost" local:TableColumnMenu.MenuTitle="Материалы · закупка ∑"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
@@ -1759,7 +1759,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_msell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="m_msell" local:TableColumnMenu.MenuTitle="Материалы · клиенту ∑"
                                                 CellStyle="{StaticResource SumCellMat}"
                                                 HeaderStyle="{StaticResource SumHdrMat}">
                             <DataGridTemplateColumn.Header>
@@ -1779,7 +1779,7 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- СМР: закуп за ед. · розн. за ед. · закуп · розница -->
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_ucost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_ucost" local:TableColumnMenu.MenuTitle="СМР · закупка за ед."
                                                 CellStyle="{StaticResource SumCellWork}"
                                                 HeaderStyle="{StaticResource SumHdrWork}">
                             <DataGridTemplateColumn.Header>
@@ -1809,7 +1809,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_usell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="w_usell" local:TableColumnMenu.MenuTitle="СМР · цена клиенту за ед."
                                                 CellStyle="{StaticResource SumCellWork}"
                                                 HeaderStyle="{StaticResource SumHdrWork}">
                             <DataGridTemplateColumn.Header>
@@ -1839,7 +1839,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wcost" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wcost" local:TableColumnMenu.MenuTitle="СМР · закупка ∑" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
                                             Binding="{Binding WCostText}"
@@ -1848,7 +1848,7 @@
                                 <TextBlock Text="Закупка ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wsell" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="80" SortMemberPath="w_wsell" local:TableColumnMenu.MenuTitle="СМР · клиенту ∑" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
                                             Binding="{Binding WSellText}"
@@ -1857,7 +1857,7 @@
                                 <TextBlock Text="Клиенту ∑" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                             </DataGridTextColumn.Header>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="Auto" MinWidth="72" SortMemberPath="markup" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="72" SortMemberPath="markup" local:TableColumnMenu.MenuTitle="СМР · наценка, %" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellWork}"
                                             HeaderStyle="{StaticResource SumHdrWork}"
                                             Binding="{Binding MarkupText}">
@@ -1871,7 +1871,7 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <!-- ИТОГО ПО ПОЗИЦИИ: закуп ∑ · клиенту ∑ -->
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_cost"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_cost" local:TableColumnMenu.MenuTitle="Итого · закупка ∑"
                                                 CellStyle="{StaticResource SumCellTot}"
                                                 HeaderStyle="{StaticResource SumHdrTot}">
                             <DataGridTemplateColumn.Header>
@@ -1890,7 +1890,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_sell"
+                        <DataGridTemplateColumn Width="Auto" MinWidth="80" SortMemberPath="t_sell" local:TableColumnMenu.MenuTitle="Итого · клиенту ∑"
                                                 CellStyle="{StaticResource SumCellTot}"
                                                 HeaderStyle="{StaticResource SumHdrTot}">
                             <DataGridTemplateColumn.Header>
@@ -1910,7 +1910,7 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
                         <!-- маржи: материалы / работы (сиреневый блок) -->
-                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="mat_margin" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="mat_margin" local:TableColumnMenu.MenuTitle="Маржа материалов, ₽" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellMarg}"
                                             HeaderStyle="{StaticResource SumHdrMarg}"
                                             Binding="{Binding MatMarginText}">
@@ -1928,7 +1928,7 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="work_margin" IsReadOnly="True"
+                        <DataGridTextColumn Width="Auto" MinWidth="90" SortMemberPath="work_margin" local:TableColumnMenu.MenuTitle="Маржа работ, ₽" IsReadOnly="True"
                                             CellStyle="{StaticResource SumCellMarg}"
                                             HeaderStyle="{StaticResource SumHdrMarg}"
                                             Binding="{Binding WorkMarginText}">
