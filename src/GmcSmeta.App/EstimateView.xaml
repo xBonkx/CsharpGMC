@@ -421,8 +421,6 @@
                     <Button x:Name="ExportButton" Style="{StaticResource PythonToolbarPrimary}" Content="Сохранить в Excel / PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportExcelPdf_Click"
                             ToolTip="Выгрузка сметы в Excel и PDF (Ctrl+E)"/>
                 </StackPanel>
-                    <TextBlock x:Name="CountText" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
-                               HorizontalAlignment="Right" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -226,15 +226,17 @@ public partial class EstimateView : UserControl
 
         // Python kp_editor._fill_header: crumb = объект, чипы «КП» и организация, заголовок = c.title.
         TitleText.Text = est.Title;
-        TitleText.ToolTip = est.Title;
         SubtitleText.Text = est.ObjectName;
         DocumentKindText.Text = est.KindTitle;
         CompanyText.Text = string.IsNullOrWhiteSpace(est.Company) ? "организация не указана" : est.Company;
         CompanyChip.Visibility = string.IsNullOrWhiteSpace(est.Company)
             ? Visibility.Collapsed : Visibility.Visible;
         LockChip.Visibility = est.Locked ? Visibility.Visible : Visibility.Collapsed;
-        CountText.Text = $"{est.Positions} {CountForm(est.Positions, "позиция", "позиции", "позиций")} · " +
-                         $"{est.Systems} {CountForm(est.Systems, "система", "системы", "систем")}";
+        // Python has no separate counter row in the header. Keep the full
+        // title and counts available without expanding or crowding the toolbar.
+        TitleText.ToolTip = $"{est.Title}\n" +
+            $"{est.Positions} {CountForm(est.Positions, "позиция", "позиции", "позиций")} · " +
+            $"{est.Systems} {CountForm(est.Systems, "система", "системы", "систем")}";
         EditTitleButton.IsEnabled = !est.Locked;
         UpdatePhaseButton();
         TransferRatesButton.Visibility = _isKp ? Visibility.Visible : Visibility.Collapsed;
