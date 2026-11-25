@@ -10,6 +10,48 @@ public sealed class ExcelImportParserTests
             new List<(string Sheet, IReadOnlyList<IReadOnlyList<object?>> Rows)>
             { ("Лист1", rows) });
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public void PythonPricedImport_UnnumberedComponentWithEmptyOrZeroTotalStaysNested(int? componentTotal)
+    {
+        var book = Parse(
+            Row("№", "Наименование", "Ед.", "Кол-во", "Цена", "Всего"),
+            Row(1, "Оборудование", "шт", 1, 100, 100),
+            Row(null, "Крепёж", "компл", 2, null, componentTotal),
+            Row(null, "Платная позиция", "шт", 2, null, 40),
+            Row(null, "Явная нулевая цена", "шт", 1, 0, 0),
+            Row(4, "Нумерованная позиция", "шт", 1, null, 0),
+            Row(null, "Итого", null, null, null, 140));
+        var block = Assert.Single(book.Blocks);
+        var positions = Assert.Single(block.Sections).Positions;
+        Assert.Equal(4, positions.Count);
+        var component = Assert.Single(positions[0].Children);
+        Assert.Equal("Крепёж", component.Name);
+        Assert.Equal(2m, component.Quantity);
+        Assert.Equal(3, component.SourceRow);
+        Assert.Equal(0m, component.Price);
+        Assert.Equal(20m, positions[1].Price);
+        Assert.Equal("Явная нулевая цена", positions[2].Name);
+        Assert.Equal("Нумерованная позиция", positions[3].Name);
+        Assert.Equal(5, block.PositionCount);
+        Assert.Equal(140m, block.MaterialSum);
+        Assert.True(block.Ok);
+    }
+
+    [Fact]
+    public void PythonVolumeOnlyImport_UnnumberedRowRemainsIndependent()
+    {
+        var block = Assert.Single(Parse(
+            Row("№", "Наименование", "Ед.", "Кол-во"),
+            Row(1, "Оборудование", "шт", 1),
+            Row(null, "Комплект крепежа", "компл", 2)).Blocks);
+        var positions = Assert.Single(block.Sections).Positions;
+        Assert.Equal(2, positions.Count);
+        Assert.Equal("Комплект крепежа", positions[1].Name);
+        Assert.All(positions, p => Assert.Empty(p.Children));
+    }
+
     [Fact]
     public void SimpleEstimate_PreservesSectionMoneyAndSourceRows()
     {

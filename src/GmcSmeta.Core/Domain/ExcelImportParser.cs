@@ -391,8 +391,12 @@ public static partial class ExcelImportParser
             var purchase = Number(Cell(row, columns.PurchasePrice));
             var num = Text(Cell(row, columns.Number));
             var hasNum = !Empty(Cell(row, columns.Number));
+            // Python importer treats a zero material total like a blank total for unnumbered components.
+            // Keep the existing behavior for mixed work/material forms until their separate parity check.
+            var emptyComponentTotal = rowSum is null ||
+                (rowSum == 0m && columns.Work is null && columns.WorkTotal is null);
             var isChild = (columns.Price is not null || columns.Total is not null || columns.Work is not null) &&
-                          !hasNum && price is null && rowSum is null && lastTop is not null;
+                          !hasNum && price is null && emptyComponentTotal && lastTop is not null;
             var position = new ExcelImportPosition
             {
                 Number = hasNum ? num : "", Name = name, Unit = unit, Quantity = qty,
