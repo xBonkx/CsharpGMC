@@ -19,11 +19,11 @@ internal sealed class AppPaths
         StateFile = Path.Combine(root, "installed.txt");
     }
 
-    public static AppPaths Create()
+    public static AppPaths Create(bool office = false)
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(baseDir)) baseDir = Path.GetTempPath();
-        var paths = new AppPaths(Path.Combine(baseDir, "GMC-Smeta-Next"));
+        var paths = new AppPaths(Path.Combine(baseDir, office ? "GMC-Smeta-Office" : "GMC-Smeta-Next"));
         Directory.CreateDirectory(paths.Apps);
         Directory.CreateDirectory(paths.Downloads);
         return paths;

@@ -62,13 +62,15 @@ internal sealed class InstalledApp
         File.WriteAllLines(paths.StateFile, lines);
     }
 
-    public void Launch()
+    public void Launch(string? connectionString = null)
     {
         var start = new ProcessStartInfo(Exe)
         {
             WorkingDirectory = Directory,
             UseShellExecute = false,
         };
+        if (connectionString is not null)
+            start.Environment["GMC_SMETA_SQL_CONNECTION"] = connectionString;
         Process.Start(start);
     }
 }
@@ -144,6 +146,8 @@ internal sealed class AppInstaller
 
         var checksums = _releases.TryGetChecksums(release);
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
+        if (OfficeLauncher.IsOfficeExecutable && expected is null)
+            throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
         var zip = Path.Combine(_paths.Downloads, asset.Name);
         if (File.Exists(zip)) File.Delete(zip);
 
@@ -253,6 +257,8 @@ internal static class LauncherSelfUpdate
             ui.Step($"Обновляю запускающий EXE до {release.Version}…");
             var checksums = releases.TryGetChecksums(release);
             var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
+            if (OfficeLauncher.IsOfficeExecutable && expected is null)
+                throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
             var download = Path.Combine(paths.Downloads, "GmcSmeta.Launcher.new.exe");
             if (File.Exists(download)) File.Delete(download);
             releases.Download(asset, download, expected);

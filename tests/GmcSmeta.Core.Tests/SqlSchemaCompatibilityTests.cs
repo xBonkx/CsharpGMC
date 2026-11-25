@@ -35,7 +35,7 @@ public class SqlSchemaCompatibilityTests
     }
 
     [Fact]
-    public void ApprovedCutoverRequiresExactLocalEndpointAndWritableSchema31()
+    public void ApprovedCutoverRequiresExactEndpointAndWritableSchema31()
     {
         var name = SqlSchemaCompatibility.ApprovedCutoverDatabase;
         var local = SqlSchemaCompatibility.ApprovedCutoverDataSource;
@@ -49,9 +49,13 @@ public class SqlSchemaCompatibilityTests
             SqlSchemaCompatibility.Validate("31", name, "READ_ONLY", true, local));
         Assert.Throws<InvalidOperationException>(() =>
             SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", false, local));
-        Assert.False(SqlSchemaCompatibility.Schema31WritesAllowed(name, lan));
+        Assert.True(SqlSchemaCompatibility.Schema31WritesAllowed(name, lan));
+        SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", true, lan);
         Assert.Throws<InvalidOperationException>(() =>
-            SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", true, lan));
+            SqlServerDatabase.Open($"Server={lan};Database={name};Integrated Security=true;Encrypt=true;TrustServerCertificate=true"));
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlServerDatabase.Open($"Server={lan};Database={name};Integrated Security=true;Encrypt=false"));
+        Assert.False(SqlSchemaCompatibility.Schema31WritesAllowed(name, "tcp:192.168.1.47,1433"));
     }
 
     [Fact]

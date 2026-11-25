@@ -21,9 +21,16 @@ public static class SqlSchemaCompatibility
     public const string ApprovedCutoverDatabase = "GmcSmetaPilot_Cutover_20261125";
     public const string ApprovedCutoverDataSource = @".\SQLEXPRESS";
 
+    public const string ApprovedCutoverNetworkSource = "tcp:192.168.1.46,1433";
+
+    public static bool IsNetworkCutover(string? name, string? dataSource) =>
+        string.Equals(name, ApprovedCutoverDatabase, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(dataSource, ApprovedCutoverNetworkSource, StringComparison.OrdinalIgnoreCase);
+
     public static bool IsApprovedCutover(string? name, string? dataSource) =>
         string.Equals(name, ApprovedCutoverDatabase, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(dataSource, ApprovedCutoverDataSource, StringComparison.OrdinalIgnoreCase);
+        (string.Equals(dataSource, ApprovedCutoverDataSource, StringComparison.OrdinalIgnoreCase) ||
+            IsNetworkCutover(name, dataSource));
 
     public static bool IsWriteTestDatabase(string? name) =>
         string.Equals(name, WriteTestDatabase, StringComparison.OrdinalIgnoreCase);

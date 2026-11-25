@@ -51,8 +51,10 @@ public static partial class SqlServerDatabase
             {
                 using var identity = conn.CreateCommand();
                 identity.CommandText = CutoverIdentitySql;
+                identity.Parameters.Add("@transport", SqlDbType.NVarChar, 30).Value =
+                    SqlSchemaCompatibility.IsNetworkCutover(conn.Database, builder.DataSource) ? "TCP" : "Shared memory";
                 if (Convert.ToInt32(identity.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
-                    throw new InvalidOperationException("Рабочий каталог доступен только на локальном DIMA/SQLEXPRESS.");
+                    throw new InvalidOperationException("Подключение открыло другой экземпляр SQL Server или транспорт.");
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
@@ -125,8 +127,10 @@ public static partial class SqlServerDatabase
             {
                 using var identity = conn.CreateCommand();
                 identity.CommandText = CutoverIdentitySql;
+                identity.Parameters.Add("@transport", SqlDbType.NVarChar, 30).Value =
+                    SqlSchemaCompatibility.IsNetworkCutover(conn.Database, builder.DataSource) ? "TCP" : "Shared memory";
                 if (Convert.ToInt32(await identity.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture) != 1)
-                    throw new InvalidOperationException("Рабочий каталог доступен только на локальном DIMA/SQLEXPRESS.");
+                    throw new InvalidOperationException("Подключение открыло другой экземпляр SQL Server или транспорт.");
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
@@ -171,6 +175,12 @@ public static partial class SqlServerDatabase
             builder.InitialCatalog.Equals("master", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Выбери конкретную тестовую базу SQL Server, не master.");
         SqlSchemaCompatibility.RejectProduction(builder.InitialCatalog, builder.DataSource);
+        if (SqlSchemaCompatibility.IsNetworkCutover(builder.InitialCatalog, builder.DataSource) &&
+            (!builder.IntegratedSecurity || builder.TrustServerCertificate ||
+             !string.IsNullOrWhiteSpace(builder.ServerCertificate) ||
+             !string.IsNullOrWhiteSpace(builder.HostNameInCertificate) ||
+             builder.Encrypt != SqlConnectionEncryptOption.Mandatory))
+            throw new InvalidOperationException("Рабочий SQL Server по сети требует вход Windows и проверяемый TLS.");
         if (SqlSchemaCompatibility.IsWriteTestDatabase(builder.InitialCatalog))
             throw new InvalidOperationException("Специальная база теста записи v31 недоступна обычному приложению.");
         return builder;
@@ -178,7 +188,7 @@ public static partial class SqlServerDatabase
 
     private const string CutoverIdentitySql = """
         SELECT CASE WHEN CONVERT(nvarchar(128), SERVERPROPERTY('ServerName')) = N'DIMA\SQLEXPRESS'
-                    AND CONVERT(nvarchar(30), CONNECTIONPROPERTY('net_transport')) = N'Shared memory'
+                    AND CONVERT(nvarchar(30), CONNECTIONPROPERTY('net_transport')) = @transport
                     THEN 1 ELSE 0 END
         """;
 

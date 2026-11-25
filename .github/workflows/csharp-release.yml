@@ -134,6 +134,7 @@ jobs:
           Compress-Archive -Path (Join-Path 'artifacts/app-fx' '*') `
             -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64-fx.zip') -CompressionLevel Optimal
           Copy-Item $exe (Join-Path $out 'GmcSmeta.Launcher.exe')
+          Copy-Item $exe (Join-Path $out 'GMC-Smeta-CSharp-Start.exe')
           Set-Content -Path (Join-Path $out 'version.txt') -Value $env:TAG -Encoding utf8
           Set-Content -Path (Join-Path $out 'sql-schema-version.txt') -Value $env:SQL_SCHEMA_VERSION -Encoding utf8
 

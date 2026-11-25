@@ -24,7 +24,10 @@ try
         return;
     }
 
-    var paths = AppPaths.Create();
+    var office = OfficeLauncher.IsOfficeExecutable;
+    var paths = AppPaths.Create(office);
+    if (office && OfficeLauncher.InstallLauncher(paths.Root, args))
+        return;
     LauncherSelfUpdate.CleanupOld();
     var installed = InstalledApp.Load(paths);
     StartupTrace.Mark("launcher_installed_state_read");
@@ -40,6 +43,7 @@ try
 
     if (options.Dev)
     {
+        if (office) throw new InvalidOperationException("Рабочий запуск использует сборки GitHub Releases.");
         RunDevBuild();
         return;
     }
@@ -54,7 +58,7 @@ try
             throw new InvalidOperationException("Программа ещё не установлена. Запустите лаунчер без --no-update для установки.");
         ui.Info("Запускаю установленную версию " + installed.Version + " без проверки GitHub.");
         StartupTrace.Mark("launcher_app_launch_begin");
-        installed.Launch();
+        installed.Launch(office ? OfficeLauncher.ConnectionString : null);
         StartupTrace.Mark("launcher_app_launch_returned");
         return;
     }
@@ -65,7 +69,7 @@ try
     {
         ui.Info("Запускаю установленную версию " + installed.Version + "; обновления проверятся в фоне.");
         StartupTrace.Mark("launcher_app_launch_begin");
-        installed.Launch();
+        installed.Launch(office ? OfficeLauncher.ConnectionString : null);
         StartupTrace.Mark("launcher_app_launch_returned");
         if (!TryStartBackgroundUpdate())
             ui.Warn("Фоновая проверка не запущена. Используйте --update-only для ручного обновления.");
@@ -81,14 +85,13 @@ try
     }
 
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
-    if (string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
+    if (office || string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
 
     StartupTrace.Mark("launcher_auth_begin");
-    var token = GitHubAuth.Resolve(out var tokenSource);
+    var tokenSource = "";
+    var token = office ? null : GitHubAuth.Resolve(out tokenSource);
     StartupTrace.Mark("launcher_auth_end");
-    if (token is null)
-        ui.Warn("Токен GitHub не найден: закрытый репозиторий не отдаст релиз без авторизации.");
-    else
+    if (token is not null)
         ui.Info("Доступ к GitHub: " + tokenSource);
 
     var releases = new GitHubReleases(repository, token, ui);
@@ -107,6 +110,8 @@ try
 
     if (release is not null)
     {
+        if (office && !OfficeLauncher.SupportsOfficeRelease(release.Version))
+            throw new InvalidOperationException("Рабочая сборка ожидает опубликованный выпуск v0.1.6 или новее.");
         var installer = new AppInstaller(releases, paths, ui);
         var preferredAsset = AppInstaller.AssetNameFor(installer.PreferredFlavor);
         var flavorMismatch = release.Assets.Any(a =>
@@ -148,7 +153,7 @@ try
         }
         ui.Step("3/3  Запускаю программу…");
         StartupTrace.Mark("launcher_app_launch_begin");
-        installed.Launch();
+        installed.Launch(office ? OfficeLauncher.ConnectionString : null);
         StartupTrace.Mark("launcher_app_launch_returned");
         Console.WriteLine();
         ui.Done($"Готово — версия {installed.Version} запущена. Это окно можно закрыть.");
@@ -157,8 +162,8 @@ try
     }
 
     // Ни релиза, ни установленной копии — пробуем локальную сборку.
-    if (options.UpdateOnly)
-        throw new InvalidOperationException("Не удалось установить релиз; --update-only не запускает локальную сборку.");
+    if (office || options.UpdateOnly)
+        throw new InvalidOperationException("Не удалось установить готовую сборку из GitHub Releases. " + updateError);
     ui.Warn("Готовой сборки нет. Пробую собрать локальный git-клон.");
     RunDevBuild();
 }
