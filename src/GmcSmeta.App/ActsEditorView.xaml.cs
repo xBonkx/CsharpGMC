@@ -142,9 +142,11 @@ public partial class ActsEditorView : UserControl
     private int _moveAfter;
     private bool _inSave;
     private bool _signingAct;
+    private bool _exportInProgress;
+    private long _exportAttachmentGeneration;
     private int _pendingActWrites;
     private bool ActWritePending => _inSave || _signingAct || _pendingActWrites > 0;
-    internal bool HasCacheActivity => ActWritePending || _loadingAct ||
+    internal bool HasCacheActivity => ActWritePending || _loadingAct || _exportInProgress ||
         (ActGrid.ItemsSource is System.ComponentModel.IEditableCollectionView { IsEditingItem: true });
 
     /// <summary>Акт сменился или его итоги обновились (список актов слева перечитывает суммы).</summary>
@@ -164,7 +166,11 @@ public partial class ActsEditorView : UserControl
         InitializeComponent();
         InitializeActMenuIcons();
         ApplyTilesVisibility();
-        Unloaded += (_,_) => DetachQuantityEditor();
+        Unloaded += (_,_) =>
+        {
+            _exportAttachmentGeneration++;
+            DetachQuantityEditor();
+        };
     }
 
     /// <summary>Bind the same editor to a document, whether hosted inline or in a legacy window.</summary>
@@ -1742,11 +1748,11 @@ public partial class ActsEditorView : UserControl
     }
 
     /// <summary>«Сохранить КС-2 и КС-3» — Excel (форма заказчика) или PDF этого акта.</summary>
-    private void ExportAct_Click(object sender, RoutedEventArgs e)
+    private async void ExportAct_Click(object sender, RoutedEventArgs e)
     {
         var target = CaptureActCommand();
         var act = Current;
-        if (target is null || act is null) return;
+        if (_exportInProgress || target is null || act is null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Сохранить КС-2 и КС-3",
@@ -1754,43 +1760,18 @@ public partial class ActsEditorView : UserControl
             Filter = "Excel (*.xlsx)|*.xlsx|PDF (*.pdf)|*.pdf",
         };
         if (dlg.ShowDialog() != true) return;
-        try
-        {
-            SetStatus("Сохранение КС-2 и КС-3…");
-            var isPdf = dlg.FileName.ToLowerInvariant().EndsWith(".pdf");
-            RequireCurrentActCommand(target);
-            var package = Task.Run(() => SqlServerKsPrintData.ReadSingle(
-                target.ConnectionString, target.ContractId, target.ActId, target.Revision)).GetAwaiter().GetResult();
-            byte[] bytes;
-            if (isPdf)
-            {
-                bytes = KsPdfForms.Create(package);
-            }
-            else
-            {
-                bytes = Task.Run(() =>
-                {
-                    using var book = KsCustomerForms.Create(package);
-                    using var stream = new MemoryStream();
-                    book.SaveAs(stream);
-                    return stream.ToArray();
-                }).GetAwaiter().GetResult();
-            }
-            System.IO.File.WriteAllBytes(dlg.FileName, bytes);
-            SetStatus("Сохранено: " + System.IO.Path.GetFileName(dlg.FileName));
-        }
-        catch (Exception ex)
-        {
-            SetStatus("Ошибка сохранения: " + ex.Message, true);
-        }
+        var isPdf = dlg.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        await ExportActFileAsync(target, dlg.FileName, "КС-2 и КС-3",
+            () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
+            package => isPdf ? KsPdfForms.Create(package) : SerializeKsWorkbook(() => KsCustomerForms.Create(package)));
     }
 
     /// <summary>«Ведомость объёмов работ (ВОР) по этому акту…».</summary>
-    private void ExportVor_Click(object sender, RoutedEventArgs e)
+    private async void ExportVor_Click(object sender, RoutedEventArgs e)
     {
         var target = CaptureActCommand();
         var act = Current;
-        if (target is null || act is null) return;
+        if (_exportInProgress || target is null || act is null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Ведомость объёмов работ",
@@ -1798,33 +1779,16 @@ public partial class ActsEditorView : UserControl
             Filter = "Excel (*.xlsx)|*.xlsx",
         };
         if (dlg.ShowDialog() != true) return;
-        try
-        {
-            SetStatus("Сохранение ВОР…");
-            RequireCurrentActCommand(target);
-            var package = Task.Run(() => SqlServerKsPrintData.ReadSingle(
-                target.ConnectionString, target.ContractId, target.ActId, target.Revision)).GetAwaiter().GetResult();
-            byte[] bytes = Task.Run(() =>
-            {
-                using var book = KsVorForms.Create(package, act.Id);
-                using var stream = new MemoryStream();
-                book.SaveAs(stream);
-                return stream.ToArray();
-            }).GetAwaiter().GetResult();
-            System.IO.File.WriteAllBytes(dlg.FileName, bytes);
-            SetStatus("Сохранено: " + System.IO.Path.GetFileName(dlg.FileName));
-        }
-        catch (Exception ex)
-        {
-            SetStatus("Ошибка сохранения: " + ex.Message, true);
-        }
+        await ExportActFileAsync(target, dlg.FileName, "ВОР",
+            () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
+            package => SerializeKsWorkbook(() => KsVorForms.Create(package, target.ActId)));
     }
 
     /// <summary>All acts of this document, in one workbook (Python export_all).</summary>
-    private void ExportAll_Click(object sender, RoutedEventArgs e)
+    private async void ExportAll_Click(object sender, RoutedEventArgs e)
     {
         var target = CaptureActCommand();
-        if (target is null) return;
+        if (_exportInProgress || target is null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Все акты в Excel",
@@ -1832,25 +1796,89 @@ public partial class ActsEditorView : UserControl
             Filter = "Excel (*.xlsx)|*.xlsx",
         };
         if (dlg.ShowDialog() != true) return;
+        await ExportActFileAsync(target, dlg.FileName, "всех актов",
+            () => SqlServerKsPrintData.ReadAll(target.ConnectionString, target.ContractId, target.Revision),
+            packages => SerializeKsWorkbook(() => KsCustomerForms.CreateAll(packages)));
+    }
+
+    private static byte[] SerializeKsWorkbook(Func<ClosedXML.Excel.XLWorkbook> create)
+    {
+        using var book = create();
+        using var stream = new MemoryStream();
+        book.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    // The snapshot and output are independent of the live UI. Recheck the
+    // editor context after each await and publish only a complete staged file.
+    private async Task ExportActFileAsync<T>(ActCommandTarget target, string destination,
+        string label, Func<T> read, Func<T, byte[]> render)
+    {
+        if (_exportInProgress) return;
+        _exportInProgress = true;
+        SaveButton.IsEnabled = false;
+        var generation = _actLoadGeneration;
+        var attachment = _exportAttachmentGeneration;
+        bool IsSameView() => IsLoaded && IsVisible &&
+            generation == _actLoadGeneration && attachment == _exportAttachmentGeneration;
+        void RequireExportContext()
+        {
+            if (!IsSameView()) throw new OperationCanceledException();
+            RequireCurrentActCommand(target);
+        }
+
+        string? temporary = null;
+        var timings = new System.Diagnostics.Stopwatch();
         try
         {
-            RequireCurrentActCommand(target);
-            SetStatus("Сохранение всех актов…");
-            var bytes = Task.Run(() =>
-            {
-                var packages = SqlServerKsPrintData.ReadAll(
-                    target.ConnectionString, target.ContractId, target.Revision);
-                using var book = KsCustomerForms.CreateAll(packages);
-                using var stream = new MemoryStream();
-                book.SaveAs(stream);
-                return stream.ToArray();
-            }).GetAwaiter().GetResult();
-            System.IO.File.WriteAllBytes(dlg.FileName, bytes);
-            SetStatus("Сохранено: " + System.IO.Path.GetFileName(dlg.FileName));
+            RequireExportContext();
+            SetStatus("Подготовка " + label + "…");
+            timings.Start();
+            var snapshot = await Task.Run(read);
+            var sqlMs = timings.ElapsedMilliseconds;
+            RequireExportContext();
+
+            timings.Restart();
+            var bytes = await Task.Run(() => render(snapshot));
+            var renderMs = timings.ElapsedMilliseconds;
+            RequireExportContext();
+
+            // Stage beside the final destination; the previous file remains
+            // untouched on rendering, write or context-validation failure.
+            timings.Restart();
+            var folder = Path.GetDirectoryName(Path.GetFullPath(destination))!;
+            temporary = Path.Combine(folder, ".gmc-ks-export-" + Guid.NewGuid().ToString("N") + ".tmp");
+            var staged = temporary;
+            await Task.Run(() => File.WriteAllBytes(staged, bytes));
+            RequireExportContext();
+
+            // Commit point: after the final UI-context check the already
+            // prepared file may be published even if the user navigates away.
+            await Task.Run(() => File.Move(staged, destination, overwrite: true));
+            temporary = null;
+            System.Diagnostics.Trace.WriteLine($"KS export: SQL={sqlMs}ms; render={renderMs}ms; save={timings.ElapsedMilliseconds}ms");
+            if (IsSameView() && IsCurrentActCommand(target))
+                SetStatus("Сохранено: " + Path.GetFileName(destination));
+        }
+        catch (OperationCanceledException)
+        {
+            if (IsSameView()) SetStatus("Экспорт отменён.");
         }
         catch (Exception ex)
         {
-            SetStatus("Ошибка сохранения всех актов: " + ex.Message, true);
+            if (IsSameView()) SetStatus("Ошибка сохранения: " + ex.Message, true);
+            else System.Diagnostics.Trace.WriteLine("KS export failed after navigation: " + ex.GetType().Name);
+        }
+        finally
+        {
+            if (temporary is not null)
+            {
+                var staged = temporary;
+                try { await Task.Run(() => File.Delete(staged)); }
+                catch { /* Do not hide the original export failure. */ }
+            }
+            _exportInProgress = false;
+            SaveButton.IsEnabled = true;
         }
     }
 
@@ -2329,8 +2357,8 @@ public partial class ActsEditorView : UserControl
         var unsigned = ready && current is { Signed: false };
         var editable = unsigned && !_contractLocked;
         var manualSections = !string.IsNullOrEmpty(_details?.SectionAmountsJson);
-        PreSignMenuItem.IsEnabled = VorMenuItem.IsEnabled =
-            ExportAllMenuItem.IsEnabled = ExportGroupMenuItem.IsEnabled = ready;
+        PreSignMenuItem.IsEnabled = ExportGroupMenuItem.IsEnabled = ready;
+        VorMenuItem.IsEnabled = ExportAllMenuItem.IsEnabled = ready && !_exportInProgress;
         DeleteActMenuItem.IsEnabled = unsigned;
         ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;
         RestAllMenuItem.IsEnabled = editable && !manualSections && _totals is not null;
