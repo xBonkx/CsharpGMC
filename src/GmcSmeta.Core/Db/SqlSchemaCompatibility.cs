@@ -18,6 +18,13 @@ public static class SqlSchemaCompatibility
     // the production cutover is approved. Must stay a local, dedicated test copy.
     public const string OrdinarySchema31TestDatabase = "GmcSmetaPilot_Test_Schema31";
 
+    public const string ApprovedCutoverDatabase = "GmcSmetaPilot_Cutover_20261125";
+    public const string ApprovedCutoverDataSource = @".\SQLEXPRESS";
+
+    public static bool IsApprovedCutover(string? name, string? dataSource) =>
+        string.Equals(name, ApprovedCutoverDatabase, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(dataSource, ApprovedCutoverDataSource, StringComparison.OrdinalIgnoreCase);
+
     public static bool IsWriteTestDatabase(string? name) =>
         string.Equals(name, WriteTestDatabase, StringComparison.OrdinalIgnoreCase);
 
@@ -43,7 +50,8 @@ public static class SqlSchemaCompatibility
     /// <summary>True when ordinary (UI) writers may persist schema 31 rows for this
     /// database. Production stays on schema 28 until the owner approves cutover.</summary>
     public static bool Schema31WritesAllowed(string? name, string? dataSource) =>
-        OrdinarySchema31Enabled || IsOrdinarySchema31TestDatabase(name, dataSource);
+        OrdinarySchema31Enabled || IsOrdinarySchema31TestDatabase(name, dataSource) ||
+        IsApprovedCutover(name, dataSource);
 
     public static bool Schema31WritesAllowed(string? connectionString)
     {
@@ -79,6 +87,7 @@ public static class SqlSchemaCompatibility
         conn is Microsoft.Data.SqlClient.SqlConnection sql &&
         (IsPreviewDatabase(sql.Database) || IsWriteTestDatabase(sql.Database) ||
             IsOrdinarySchema31TestDatabase(sql.Database, sql.DataSource) ||
+            IsApprovedCutover(sql.Database, sql.DataSource) ||
             OrdinarySchema31Enabled && IsWritablePilot(sql.Database,sql.DataSource));
 
     public static bool IsPreviewDatabase(string? name) =>
@@ -105,11 +114,11 @@ public static class SqlSchemaCompatibility
 
     public static bool IsWritablePilot(string? name, string? dataSource = null) =>
         (name ?? "").StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase)
-        && !IsProductionCutover(name, dataSource) && !IsPreviewDatabase(name) && !IsWriteTestDatabase(name);
+        && (!IsProductionCutover(name, dataSource) || IsApprovedCutover(name, dataSource)) && !IsPreviewDatabase(name) && !IsWriteTestDatabase(name);
 
     public static void RejectProduction(string? name, string? dataSource = null)
     {
-        if (IsProductionCutover(name, dataSource))
+        if (IsProductionCutover(name, dataSource) && !IsApprovedCutover(name, dataSource))
             throw new InvalidOperationException(
                 "Рабочая база Cutover запрещена для C#. Используйте отдельную восстановленную копию.");
     }
@@ -128,13 +137,12 @@ public static class SqlSchemaCompatibility
                     "Для предпросмотра нужна восстановленная база схемы 31 GmcSmetaPilot_Test_Csharp в режиме READ_ONLY со всеми полями скидок и КС.");
             return;
         }
-        if (IsOrdinarySchema31TestDatabase(name, dataSource))
+        if (IsOrdinarySchema31TestDatabase(name, dataSource) || IsApprovedCutover(name, dataSource))
         {
             if (version != "31" || !requiredColumns ||
                 !string.Equals(updateability, "READ_WRITE", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(
-                    "Для тестовой записи v31 нужна локальная база " + OrdinarySchema31TestDatabase +
-                    " в режиме READ_WRITE со всеми полями скидок и КС.");
+                    "Для записи v31 нужна проверенная база READ_WRITE со всеми полями скидок и КС.");
             return;
         }
         if (version != WritableSchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))

@@ -46,13 +46,21 @@ public static partial class SqlServerDatabase
                 if (!string.Equals(machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Исключение Cutover действует только на локальном SQL Server этого компьютера.");
             }
+            var approvedCutover = SqlSchemaCompatibility.IsApprovedCutover(conn.Database, builder.DataSource);
+            if (approvedCutover)
+            {
+                using var identity = conn.CreateCommand();
+                identity.CommandText = CutoverIdentitySql;
+                if (Convert.ToInt32(identity.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                    throw new InvalidOperationException("Рабочий каталог доступен только на локальном DIMA/SQLEXPRESS.");
+            }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
                 || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (preview || SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            if (preview || approvedCutover || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = cmd.ExecuteReader();
@@ -112,6 +120,14 @@ public static partial class SqlServerDatabase
                 if (!string.Equals(machine, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Исключение Cutover действует только на локальном SQL Server этого компьютера.");
             }
+            var approvedCutover = SqlSchemaCompatibility.IsApprovedCutover(conn.Database, builder.DataSource);
+            if (approvedCutover)
+            {
+                using var identity = conn.CreateCommand();
+                identity.CommandText = CutoverIdentitySql;
+                if (Convert.ToInt32(await identity.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture) != 1)
+                    throw new InvalidOperationException("Рабочий каталог доступен только на локальном DIMA/SQLEXPRESS.");
+            }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
                 || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
@@ -120,7 +136,7 @@ public static partial class SqlServerDatabase
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
             token.ThrowIfCancellationRequested();
-            if (preview || SqlSchemaCompatibility.OrdinarySchema31Enabled)
+            if (preview || approvedCutover || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -159,6 +175,12 @@ public static partial class SqlServerDatabase
             throw new InvalidOperationException("Специальная база теста записи v31 недоступна обычному приложению.");
         return builder;
     }
+
+    private const string CutoverIdentitySql = """
+        SELECT CASE WHEN CONVERT(nvarchar(128), SERVERPROPERTY('ServerName')) = N'DIMA\SQLEXPRESS'
+                    AND CONVERT(nvarchar(30), CONNECTIONPROPERTY('net_transport')) = N'Shared memory'
+                    THEN 1 ELSE 0 END
+        """;
 
     private const string PreviewValidationSql = """
                     SELECT CONVERT(nvarchar(32), DATABASEPROPERTYEX(DB_NAME(), 'Updateability')),

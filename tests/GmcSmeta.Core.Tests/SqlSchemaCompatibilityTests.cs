@@ -35,6 +35,26 @@ public class SqlSchemaCompatibilityTests
     }
 
     [Fact]
+    public void ApprovedCutoverRequiresExactLocalEndpointAndWritableSchema31()
+    {
+        var name = SqlSchemaCompatibility.ApprovedCutoverDatabase;
+        var local = SqlSchemaCompatibility.ApprovedCutoverDataSource;
+        const string lan = "tcp:192.168.1.46,1433";
+
+        Assert.True(SqlSchemaCompatibility.Schema31WritesAllowed(name, local));
+        SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", true, local);
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlSchemaCompatibility.Validate("28", name, "READ_WRITE", true, local));
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlSchemaCompatibility.Validate("31", name, "READ_ONLY", true, local));
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", false, local));
+        Assert.False(SqlSchemaCompatibility.Schema31WritesAllowed(name, lan));
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlSchemaCompatibility.Validate("31", name, "READ_WRITE", true, lan));
+    }
+
+    [Fact]
     public void PreviewRequiresVersion31ReadOnlyAndColumns()
     {
         var name = SqlSchemaCompatibility.PreviewDatabase;
