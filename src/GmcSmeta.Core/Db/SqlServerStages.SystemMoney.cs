@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Text.Json;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
 
@@ -7,6 +8,56 @@ namespace GmcSmeta.Core.Db;
 
 public static partial class SqlServerStages
 {
+    // The caller already holds the revision lock and owns the price transaction.
+    internal static void RefreshLinkedPrices(SqlConnection conn, SqlTransaction tx, long fullId,
+        IReadOnlyCollection<long> sourceIds)
+    {
+        if (sourceIds.Count == 0) return;
+        using var sync = new SqlCommand("""
+            SET NOCOUNT ON;
+            DECLARE @stages TABLE (id BIGINT PRIMARY KEY);
+            INSERT @stages (id)
+            SELECT stage.id
+            FROM dbo.contracts stage
+            JOIN dbo.contracts full_kp ON full_kp.id=stage.stage_of AND full_kp.object_id=stage.object_id
+            JOIN dbo.objects o ON o.id=full_kp.object_id
+            WHERE full_kp.id=@full AND full_kp.kind=N'kp' AND full_kp.stage_of IS NULL
+              AND full_kp.locked=0 AND o.archived=0 AND stage.kind=N'kp'
+              AND stage.stage_sum IS NULL
+              AND (stage.stage_rest=0 AND stage.locked=0 OR stage.stage_rest=1 AND
+                   NOT EXISTS (SELECT 1 FROM dbo.acts a WHERE a.contract_id=stage.id));
+
+            IF EXISTS (SELECT 1 FROM @stages)
+            BEGIN
+                DECLARE @changed TABLE (position_id BIGINT PRIMARY KEY, stage_id BIGINT, price FLOAT);
+                UPDATE p SET price=src.price
+                OUTPUT inserted.id, sy.contract_id, inserted.price INTO @changed
+                FROM dbo.positions p
+                JOIN dbo.systems sy ON sy.id=p.system_id
+                JOIN @stages stage ON stage.id=sy.contract_id
+                JOIN dbo.positions src ON src.id=p.stage_src AND src.stage_src IS NULL
+                JOIN dbo.systems src_sy ON src_sy.id=src.system_id AND src_sy.contract_id=@full
+                JOIN OPENJSON(@ids) changes ON TRY_CONVERT(BIGINT, changes.[value])=src.id
+                WHERE p.price<>src.price;
+
+                UPDATE line SET price=p.price
+                FROM dbo.act_lines line
+                JOIN @changed p ON p.position_id=line.position_id
+                JOIN dbo.acts a ON a.id=line.act_id AND a.contract_id=p.stage_id
+                WHERE a.signed=0;
+            END;
+
+            SELECT id FROM @stages ORDER BY id;
+            """, conn, tx);
+        sync.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
+        sync.Parameters.Add("@ids", SqlDbType.NVarChar, -1).Value = JsonSerializer.Serialize(sourceIds);
+        var stages = new List<long>();
+        using (var reader = sync.ExecuteReader())
+            while (reader.Read()) stages.Add(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture));
+        foreach (var stageId in stages)
+            RefreshMoney(conn, tx, fullId, stageId);
+    }
+
     // Called only after RefreshMoney has checked signed targets and computed rest.
     // Batch reads for the full document and the stage; never touch a different
     // document, locally created systems, or a signed stage.

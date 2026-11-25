@@ -191,6 +191,8 @@ public static class SqlServerPriceLike
                     "Не все одинаковые позиции обновлены — изменения отменены.");
         }
 
+        if (field == "price")
+            SqlServerStages.RefreshLinkedPrices(conn, tx, contractId, plan.TargetIds);
         var next = SqlServerDatabase.BumpPositionRevision(conn, tx);
         tx.Commit();
         return new PriceLikeResult(true, plan.TargetIds.Count, null, next);

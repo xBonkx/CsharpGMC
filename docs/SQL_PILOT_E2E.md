@@ -48,7 +48,7 @@ For a remote SQL instance, obtain the actual SQL server identity with a **read-o
 | Transaction fault / rollback | AFTER INSERT trigger throws during real SaveCell | Check price, unsigned act-line, journal and global revision all restored |
 | Unknown COMMIT | Real successful SaveCell, deliberate lost-acknowledgement simulation, independent reconciliation | **Not** an actual packet loss or TCP outage; no blind retry |
 | Signed acts and prices | Signed act line retains previous price while unsigned updates; locked contract rejects retail-price write; public SetQty/ToggleSigned/Delete; synthetic main/DS with KS-3 opening | Create-act, real document round-trip and goldens still untested |
-| Stage operation | Public CreateStage/StagesOf and isolated CreateRest/SetStageQty/StageTable, child scaling, overflow rejection | Only synthetic, migration-backed stage/posted issue interaction remains untested |
+| Stage operation | Public CreateStage/StagesOf and isolated CreateRest/SetStageQty/StageTable, child scaling, stale rejection and confirmed overflow | Only synthetic, migration-backed stage/posted issue interaction remains untested |
 | Bulk work prices | Public SetWorkPrice, 120 rows with SMR positional mode | Includes the actual Core transaction; no WPF |
 | Persistence after restart | New `dotnet` process opens DB and checks stored note and revision | Does not restart the actual WPF application |
 | Reading / writing / mass operations | 21 warm-cache raw SQL reads and 21 reads each via public BuyRows and ProgressForContract on 2500/10000, 20 SaveCell calls, 1 bulk-write and 1 120-row API batch | Wall time, host-dependent; service latencies exclude WPF |
@@ -94,7 +94,7 @@ acceptance.
 
 | Python reference | C# public SQL API | Pilot E2E evidence | Not established |
 |---|---|---|---|
-| `stages.py`: full/stage/rest, proportional child quantity | `SqlServerStages.CreateStage/CreateRest/SetStageQty/StageTable` | Newly added 2→1 allocation, 4→2 child, 1 rest, negative and over-allocation rejection | All signed/posted stage variants, 10k-row WPF batch |
+| `stages.py`: full/stage/rest, proportional child quantity and inherited prices | `SqlServerStages.CreateStage/CreateRest/SetStageQty/StageTable` | 2→1 allocation, 4→2 child, stale and negative input rejection, confirmed overflow without a negative rest row, four price writers and signed-stage isolation | All signed/posted stage variants, 10k-row WPF batch |
 | `acts.py`: quantities/sign, KS-3 inception | `SqlServerActs.SetQty/ToggleSigned/Delete/ActsOf/Ks3Figures` | SQL-backed signed edits and synthetic main+DS, 2 acts, gross opening marker | Native creation of all real KS/DS, exported golden documents |
 | `procurement.py`: purchase stage/status/movements | `SqlServerProcurement.SetProc/AddMovements/BuyRows` | Two-row receipt, supplier, manual purchase-price preservation, cross-contract rollback | All supplier requests, end-to-end cost/margin |
 | `shipments.py`: fixed issue and movement history | `SqlServerProcurement.IssueViaListBatch` | Two issued rows, FK-backed list, ledger assertions, stale duplicate request blocked by revision | New-revision replay/idempotency key, overspend policy |

@@ -100,21 +100,43 @@ internal static class PilotExtendedCases
             ("@rest", rest), ("@src", src));
         PilotRunner.Check(restQty == 1d, "Rest document not synchronized");
         var before = p.Revision();
-        var over = SqlServerStages.SetStageQty(p.PilotConnection, stage, src, 3m, before);
-        PilotRunner.Check(!over.Saved && p.Revision() == before,
-            "Over-allocation was accepted or advanced the global revision");
-        PilotRunner.Check(SqlServerStages.StageTable(verify, contract)
-            .Rows.Single(x => x.SrcId == src).Rest == 1m,
-            "Rejected over-allocation still changed the rest");
+        var stale = SqlServerStages.SetStageQty(p.PilotConnection, stage, src, 3m, before,
+            expectedStageQty: 1m, expectedRest: 2m);
+        PilotRunner.Check(!stale.Saved && p.Revision() == before,
+            "A stale allocation snapshot was accepted");
         var negative = SqlServerStages.SetStageQty(p.PilotConnection, stage, src, -1m, before);
         PilotRunner.Check(!negative.Saved && p.Revision() == before,
             "Negative stage quantity changed the database");
+        // WPF confirms overflow before passing its current row snapshot to the writer.
+        var over = SqlServerStages.SetStageQty(p.PilotConnection, stage, src, 3m, before,
+            expectedStageQty: 1m, expectedRest: 1m);
+        PilotRunner.Check(over.Saved && p.Revision() != before &&
+            SqlServerStages.StageTable(verify, contract).Rows.Single(x => x.SrcId == src).Rest == -1m,
+            "Confirmed overflow must remain visible in the allocation table");
+        PilotRunner.Check(PilotRunner.Long(verify,
+            "SELECT COUNT_BIG(*) FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id " +
+            "WHERE s.contract_id=@rest AND p.stage_src=@src",
+            ("@rest", rest), ("@src", src)) == 0,
+            "Rest document contains a negative quantity after confirmed overflow");
     }
 
     public static void ProcurementAndIssuedList(PilotRunner p)
     {
-        var ids = FirstIds(p, p.LargeSystem, 2);
-        var contract = checked((int)p.LargeContract);
+        var cs = p.PilotConnection;
+        var contract = checked((int)SqlServerWorkspace.CreateEmptyContract(cs, p.ObjectId,
+            new SqlServerWorkspace.NewContractData("main", "QA-ISSUE", "", "QA issue contract",
+                null, null), p.Revision()));
+        var section = SqlServerDatabase.AddSection(cs, contract, "QA issue system", false, null, p.Revision());
+        PilotRunner.Check(section.Saved && section.SystemId.HasValue, "Cannot prepare issue system");
+        var ids = new List<long>();
+        for (var i = 0; i < 2; i++)
+        {
+            var position = SqlServerDatabase.AddPosition(cs, contract, section.SystemId.Value, null, null, p.Revision());
+            PilotRunner.Check(position.Saved && position.PositionId.HasValue, "Cannot prepare issue position");
+            ids.Add(position.PositionId.Value);
+        }
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, ids[0], "purchase_price", "25", p.Revision()).Saved,
+            "Cannot prepare manual purchase price");
         using var verify = p.Conn();
         var beforeManualPrice = PilotRunner.Double(verify,
             "SELECT purchase_price FROM dbo.positions WHERE id=@id", ("@id", ids[0]));

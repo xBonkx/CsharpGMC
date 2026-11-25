@@ -1,5 +1,6 @@
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
@@ -168,7 +169,7 @@ internal sealed class PilotRunner
         _outcomes.Add(new Outcome(name, "FAIL", detail));
         Console.Error.WriteLine("FAIL " + name + " -- " + detail);
     }
-    internal static void Check(bool predicate, string why)
+    internal static void Check([DoesNotReturnIf(false)] bool predicate, string why)
     {
         if (!predicate) throw new InvalidOperationException(why);
     }

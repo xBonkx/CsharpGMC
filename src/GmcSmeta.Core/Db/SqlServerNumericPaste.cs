@@ -108,6 +108,7 @@ public static partial class SqlServerDatabase
         changes.Columns.Add("new_value", typeof(string));
         var touchedAreaChildren = new List<long>();
         var checkedCount = 0;
+        var changedPrices = new List<long>();
         using (var scan = new SqlCommand(
             "SELECT p.id,p.parent_id,p.formulas,p.qty,p.price,p.purchase_price,p.work_price " +
             "FROM #paste_ids AS ids JOIN dbo.positions AS p WITH (UPDLOCK,HOLDLOCK) ON p.id=ids.id " +
@@ -153,6 +154,7 @@ public static partial class SqlServerDatabase
                 changes.Rows.Add(id, (double)nextValue, nextJson,
                     previous?.ToString(CultureInfo.InvariantCulture) ?? "",
                     nextValue.ToString(CultureInfo.InvariantCulture));
+                if (field == "price" && previous != nextValue) changedPrices.Add(id);
                 if (field == "qty" && isComponent) touchedAreaChildren.Add(id);
             }
         }
@@ -242,6 +244,7 @@ public static partial class SqlServerDatabase
                 throw new DBConcurrencyException("История массовой вставки записана не полностью.");
         }
 
+        SqlServerStages.RefreshLinkedPrices(conn, tx, contractId, changedPrices);
         var nextRevision = BumpPositionRevision(conn, tx);
         tx.Commit();
         return new NumericPasteResult(true, edits.Count, changes.Rows.Count, nextRevision, null);

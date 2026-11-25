@@ -334,6 +334,7 @@ public static partial class SqlServerCostSummary
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови себестоимость.",
                 revision ?? expectedRevision);
         var changed = false;
+        var linkedPriceSources = new List<long>();
         foreach (var edit in prepared)
         {
             if (field is "work_cost" or "work_sell")
@@ -365,11 +366,13 @@ public static partial class SqlServerCostSummary
             else
             {
                 var result = SqlServerDatabase.SaveCellCore(conn, tx, edit.Id, contractId, field,
-                    edit.Input, edit.Numeric, edit.Trimmed, edit.Value, revision, out var rowChanged);
+                    edit.Input, edit.Numeric, edit.Trimmed, edit.Value, revision, out var rowChanged,
+                    linkedPriceSources);
                 if (!result.Saved) return result;
                 changed |= rowChanged;
             }
         }
+        SqlServerStages.RefreshLinkedPrices(conn, tx, contractId, linkedPriceSources);
         var committedRevision = changed ? SqlServerDatabase.BumpPositionRevision(conn, tx) : revision;
         tx.Commit();
         return new SqlServerDatabase.SaveResult(true, null, committedRevision);

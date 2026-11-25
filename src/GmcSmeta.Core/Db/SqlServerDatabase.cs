@@ -276,7 +276,8 @@ public static partial class SqlServerDatabase
     // method: multi-row cost operations can reuse the exact single-cell semantics.
     internal static SaveResult SaveCellCore(SqlConnection conn, SqlTransaction tx,
         long positionId, long? expectedContractId, string field, string input,
-        bool numeric, string trimmed, decimal? value, string currentRev, out bool changed)
+        bool numeric, string trimmed, decimal? value, string currentRev, out bool changed,
+        ICollection<long>? linkedPriceSources = null)
     {
         changed = false;
         using var read = new SqlCommand(
@@ -404,6 +405,13 @@ public static partial class SqlServerDatabase
             acts.Parameters.Add("@v", SqlDbType.Float).Value = (double)(value ?? 0m);
             acts.Parameters.Add("@id", SqlDbType.BigInt).Value = positionId;
             acts.ExecuteNonQuery();
+            if (oldNumber != value)
+            {
+                if (linkedPriceSources is null)
+                    SqlServerStages.RefreshLinkedPrices(conn, tx, contractId, [positionId]);
+                else
+                    linkedPriceSources.Add(positionId);
+            }
         }
 
         if (field is "qty" or "name" or "unit")

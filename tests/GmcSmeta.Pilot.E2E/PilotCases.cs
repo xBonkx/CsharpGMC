@@ -21,6 +21,7 @@ internal static class PilotCases
         p.RunCase("mid-transaction-fault-rollback", () => Rollback(p));
         p.RunCase("unknown-commit-ack-reconciliation-simulation", () => UnknownCommit(p));
         p.RunCase("stage-public-api-and-reopen", () => Stage(p));
+        p.RunCase("stage-linked-price-writers", () => StageLinkedPrices(p));
         p.RunCase("batch-120-work-prices-public-api", () => WorkPrices(p));
         p.RunCase("restart-as-fresh-dotnet-process", p.VerifyViaNewProcess);
         p.RunCase("20-public-save-cell-latencies", () => WriteLatencies(p));
@@ -250,7 +251,7 @@ internal static class PilotCases
             try
             {
                 _ = SqlServerDatabase.SaveCell(p.PilotConnection,
-                    p.FirstPosition, "price", "777", oldRevision);
+                    p.FirstPosition, "price", (oldPrice + 1).ToString("R", CultureInfo.InvariantCulture), oldRevision);
             }
             catch (SqlException ex) when (ex.Errors.Cast<SqlError>()
                 .Any(x => x.Number == 51031)) { interrupted = true; }
@@ -300,6 +301,74 @@ internal static class PilotCases
         using var conn = p.Conn();
         PilotRunner.Check(SqlServerStages.StagesOf(conn, p.SmallContract)
             .Any(x => x.Id == stage), "Public stage disappeared on connection reopen");
+    }
+
+    private static void StageLinkedPrices(PilotRunner p)
+    {
+        var cs = p.PilotConnection;
+        var full = SqlServerWorkspace.CreateEmptyContract(cs, p.ObjectId,
+            new SqlServerWorkspace.NewContractData("kp", "QA-PRICES", "", "QA linked prices",
+                null, null), p.Revision());
+        var section = SqlServerDatabase.AddSection(cs, full, "Linked prices", false, null, p.Revision());
+        PilotRunner.Check(section.Saved && section.SystemId.HasValue, "Could not create source section");
+        var system = section.SystemId!.Value;
+        long Position(string price)
+        {
+            var result = SqlServerDatabase.AddPosition(cs, full, system, null, null, p.Revision());
+            PilotRunner.Check(result.Saved && result.PositionId.HasValue, "Could not create source position");
+            var id = result.PositionId!.Value;
+            foreach (var (field, value) in new[] { ("name", "Equal rows"), ("qty", "4"), ("price", price) })
+                PilotRunner.Check(SqlServerDatabase.SaveCell(cs, id, field, value, p.Revision()).Saved,
+                    "Could not seed source position");
+            return id;
+        }
+        var first = Position("100");
+        var second = Position("80");
+        var open = SqlServerStages.CreateStage(cs, full, p.Revision());
+        var signed = SqlServerStages.CreateStage(cs, full, p.Revision());
+        foreach (var (stage, source) in new[] { (open, first), (open, second), (signed, second) })
+            PilotRunner.Check(SqlServerStages.SetStageQty(cs, stage, source, 1, p.Revision()).Saved,
+                "Could not allocate stage position");
+        PilotRunner.Check(SqlServerWorkspace.SetContractLocked(cs, signed, true, p.Revision()),
+            "Could not sign stage");
+        var rest = SqlServerStages.CreateRest(cs, full, p.Revision());
+
+        using var readback = p.Conn();
+        decimal Price(long stage, long source) => Convert.ToDecimal(PilotRunner.Scalar(readback, """
+            SELECT p.price FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id
+            WHERE s.contract_id=@stage AND p.stage_src=@source
+            """, ("@stage", stage), ("@source", source)), CultureInfo.InvariantCulture);
+        void AssertPrices(decimal expectedFirst, decimal expectedSecond)
+        {
+            PilotRunner.Check(Price(open, first) == expectedFirst && Price(rest, first) == expectedFirst &&
+                Price(open, second) == expectedSecond && Price(rest, second) == expectedSecond &&
+                Price(signed, second) == 80m, "Linked prices or signed snapshot differ on SQL readback");
+        }
+
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, first, "price", "120", p.Revision()).Saved,
+            "Editor price save failed");
+        AssertPrices(120m, 80m);
+        var copied = SqlServerPriceLike.SetPriceLike(cs, full, first, "price", p.Revision());
+        PilotRunner.Check(copied.Saved && copied.Changed == 1, "Copy same price failed");
+        AssertPrices(120m, 120m);
+        PilotRunner.Check(SqlServerCostSummary.SaveSummaryCells(cs, checked((int)full),
+            [(first, "130"), (second, "140")], "price", p.Revision()).Saved, "Summary price save failed");
+        AssertPrices(130m, 140m);
+        var previous = p.Revision();
+        var pasted = SqlServerDatabase.SaveNumericPasteAtomic(cs, full, "price",
+            [new(first, 150m), new(second, 160m)], previous);
+        PilotRunner.Check(pasted.Saved && pasted.Changed == 2, "Numeric price paste failed");
+        AssertPrices(150m, 160m);
+        var stale = SqlServerDatabase.SaveNumericPasteAtomic(cs, full, "price", [new(first, 170m)], previous);
+        PilotRunner.Check(!stale.Saved && p.Revision() == pasted.Revision, "Stale price paste changed revision");
+        AssertPrices(150m, 160m);
+
+        PilotRunner.Execute(readback, "INSERT dbo.acts(contract_id,number) VALUES(@rest,N'Legacy KS')",
+            ("@rest", rest));
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, first, "price", "180", p.Revision()).Saved,
+            "Editor price save failed with legacy KS attached to rest");
+        PilotRunner.Check(Price(open, first) == 180m && Price(rest, first) == 150m,
+            "A rest document with a legacy KS must keep its price");
     }
 
     private static void WorkPrices(PilotRunner p)
