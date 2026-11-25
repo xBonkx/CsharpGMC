@@ -747,29 +747,50 @@ public partial class MainWindow : Window
     /// <summary>Меню «Ещё» страницы объекта.</summary>
     private void ObjectMore_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedObject is not { } obj) return;
+        if (sender is not UIElement anchor || _selectedObject is not { } obj) return;
+        var connection = _sqlConnectionString;
+        var mode = CurrentMode;
         var menu = new ContextMenu();
+
+        void Run(Action<ObjectRow> action, bool writes = true)
+        {
+            var fresh = _objects.FirstOrDefault(o => o.Id == obj.Id);
+            if (!ReferenceEquals(PageHost.Content, ObjectPage) || _selectedObject?.Id != obj.Id ||
+                connection != _sqlConnectionString || mode != CurrentMode ||
+                fresh is null || fresh.Archived != obj.Archived || fresh.ArchivedOn != obj.ArchivedOn ||
+                (writes && !SqlWritesEnabled))
+            {
+                StatusText.Text = "Объект или режим изменились. Откройте меню заново.";
+                return;
+            }
+            action(fresh);
+        }
+
         var import = ContextMenuIcons.Create("Загрузить КП / смету из Excel…", "Upload", SqlWritesEnabled && !obj.Archived);
-        import.Click += (_, _) => _ = ImportExcelForObjectAsync(obj.Id);
+        import.Click += (_, _) => Run(current => _ = ImportExcelForObjectAsync(current.Id));
         menu.Items.Add(import);
-        if (CurrentMode != NavigationMode.Contracts)
+        if (mode != NavigationMode.Contracts)
         {
             var passports = ContextMenuIcons.Create("Паспорта вентиляционных систем…", "File");
-            passports.Click += ObjectPassports_Click;
+            passports.Click += (s, args) => Run(_ => ObjectPassports_Click(s, args), writes: false);
             menu.Items.Add(passports);
         }
         menu.Items.Add(new Separator());
         var finish = ContextMenuIcons.Create(obj.Archived ? "Вернуть в работу" : "Завершить объект (в архив)", "Check", SqlWritesEnabled);
-        finish.Click += (_, _) => FinishSqlServerObject(obj);
+        finish.Click += (_, _) => Run(FinishSqlServerObject);
         menu.Items.Add(finish);
-        var year = ContextMenuIcons.Create("Изменить год в архиве…", "History", SqlWritesEnabled && obj.Archived);
-        year.Click += (_, _) => ChangeSqlServerObjectArchiveYear(obj);
-        menu.Items.Add(year);
+        // Python object_view.act_year is visible only for archived objects.
+        if (obj.Archived)
+        {
+            var year = ContextMenuIcons.Create("Изменить год в архиве…", "History", SqlWritesEnabled);
+            year.Click += (_, _) => Run(ChangeSqlServerObjectArchiveYear);
+            menu.Items.Add(year);
+        }
         menu.Items.Add(new Separator());
         var delete = ContextMenuIcons.Create("Удалить объект…", "Trash", SqlWritesEnabled, danger: true);
-        delete.Click += (_, _) => DeleteSqlServerObjectFlow(obj);
+        delete.Click += (_, _) => Run(DeleteSqlServerObjectFlow);
         menu.Items.Add(delete);
-        menu.PlacementTarget = (UIElement)sender;
+        menu.PlacementTarget = anchor;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
         menu.IsOpen = true;
     }
