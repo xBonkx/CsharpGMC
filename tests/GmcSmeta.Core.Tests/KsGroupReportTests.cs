@@ -38,6 +38,27 @@ public sealed class KsGroupReportTests
     }
 
     [Fact]
+    public void DocumentExportKeepsOnlyLocalCurrentActsButLegalAgreementHistory()
+    {
+        var scope = Example();
+        var group = KsGroupReport.Calculate(scope, "2", selectedDocumentOnly: true);
+        Assert.Single(group.Acts);
+        Assert.Equal(2L, group.Acts[0].Id);
+        Assert.Equal(200m, group.PeriodNet);
+        Assert.Equal(244m, group.PeriodGross);
+        Assert.Equal(44m, group.PeriodVat);
+        Assert.Equal(300m, group.SinceStartNet);
+        Assert.Equal(200m, group.YearNet);
+        Assert.Single(group.Previous);
+        var later = KsGroupReport.Calculate(scope, "3", selectedDocumentOnly: true);
+        Assert.Equal(700m, later.SinceStartNet); // prior legal group includes the annex
+        Assert.Equal(600m, later.YearNet);
+        Assert.Throws<InvalidOperationException>(() =>
+            KsGroupReport.Calculate(scope with { SelectedDocumentId = 11 }, "3", selectedDocumentOnly: true));
+        Assert.Equal(610m, KsGroupReport.Calculate(scope, "2").PeriodGross);
+    }
+
+    [Fact]
     public void PreviousGroupsAreNotIncludedInPeriod()
     {
         var g = KsGroupReport.Calculate(Example(),"3");

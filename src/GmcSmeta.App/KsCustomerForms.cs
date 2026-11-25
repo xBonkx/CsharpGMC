@@ -35,10 +35,22 @@ public static class KsCustomerForms
         };
     }
 
-    public static XLWorkbook Create(SqlServerKsPrintData.Package package)
+    public static XLWorkbook Create(SqlServerKsPrintData.Package package) =>
+        CreateAll(new[] { package });
+
+    // Fill all report pairs directly in one workbook. Cross-workbook copying can
+    // lose sheet references and customer template formatting.
+    public static XLWorkbook CreateAll(IReadOnlyList<SqlServerKsPrintData.Package> packages)
     {
-        var form = Resolve(package);
-        ValidateAdjustments(package,form);
+        if (packages.Count == 0)
+            throw new InvalidOperationException("Нет актов для экспорта.");
+        var form = Resolve(packages[0]);
+        foreach (var package in packages)
+        {
+            if (Resolve(package) != form)
+                throw new InvalidOperationException("В одном файле смешаны разные формы КС.");
+            ValidateAdjustments(package,form);
+        }
         if (form == Form.Dneprovsky)
             throw new NotSupportedException(
                 "Для «Днепровского» Python использует внешний оригинальный бланк с сетевого ресурса. " +
@@ -46,8 +58,14 @@ public static class KsCustomerForms
         if (form == Form.Standard)
         {
             var standard = new XLWorkbook();
-            KsExcelForms.Fill(standard, package);
-            return standard;
+            try
+            {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var package in packages)
+                    KsExcelForms.Fill(standard, package, names);
+                return standard;
+            }
+            catch { standard.Dispose(); throw; }
         }
 
         var book = Load(form == Form.Dns ? "ks_dns_template.xlsx" : "ks_r4_template.xlsx");
@@ -55,20 +73,23 @@ public static class KsCustomerForms
         {
             var ks2 = form == Form.Dns ? book.Worksheet("KS2") : book.Worksheet(1);
             var ks3 = form == Form.Dns ? book.Worksheet("KS3") : book.Worksheet(2);
-            var refs = new List<(string Name, int Total, int Vat)>();
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (act, index) in package.Report.Acts.Select((a, i) => (a, i)))
+            foreach (var package in packages)
             {
-                var name = UniqueName("кс-2 №" + act.Number, names);
-                var sheet = ks2.CopyTo(name);
-                var result = form == Form.Dns
-                    ? FillDnsAct(sheet, package, act)
-                    : FillR4Act(sheet, package, act);
-                refs.Add((name, result.Total, result.Vat));
+                var refs = new List<(string Name, int Total, int Vat)>();
+                foreach (var act in package.Report.Acts)
+                {
+                    var name = UniqueName("кс-2 №" + act.Number, names);
+                    var sheet = ks2.CopyTo(name);
+                    var result = form == Form.Dns
+                        ? FillDnsAct(sheet, package, act)
+                        : FillR4Act(sheet, package, act);
+                    refs.Add((name, result.Total, result.Vat));
+                }
+                var summary = ks3.CopyTo(UniqueName("кс-3 №" + package.Report.Key, names));
+                if (form == Form.Dns) FillDnsSummary(summary, package, refs);
+                else FillR4Summary(summary, package, refs);
             }
-            var summary = ks3.CopyTo(UniqueName("кс-3 №" + package.Report.Key, names));
-            if (form == Form.Dns) FillDnsSummary(summary, package, refs);
-            else FillR4Summary(summary, package, refs);
             ks2.Delete();
             ks3.Delete();
             return book;

@@ -18,7 +18,7 @@ public sealed record KsGroupReport(
     IReadOnlyList<KsPreviousGroup> Previous, bool GrossCumulative = false)
 {
     public static KsGroupReport Calculate(SqlServerKsContractScope.Scope scope,
-        string groupKey)
+        string groupKey, bool selectedDocumentOnly = false)
     {
         var groups = KsWorkspaceProjection.Build(scope.Acts);
         var index = groups.ToList().FindIndex(g => g.Key == groupKey);
@@ -26,7 +26,11 @@ public sealed record KsGroupReport(
             throw new InvalidOperationException("КС-3 № " + groupKey + " не найдена.");
 
         var current = groups[index];
-        var acts = current.Acts.OrderBy(a => a.Date).ThenBy(a => a.Id).ToList();
+        var acts = current.Acts.Where(a => !selectedDocumentOnly ||
+                a.ContractId == scope.SelectedDocumentId)
+            .OrderBy(a => a.Date).ThenBy(a => a.Id).ToList();
+        if (acts.Count == 0)
+            throw new InvalidOperationException("В выбранном документе нет актов этой группы.");
         var end = acts.Max(a => a.Date);
         var previous = groups.Take(index).Select(g =>
             new KsPreviousGroup(g.Key, g.Acts.Max(a => a.Date),

@@ -134,6 +134,30 @@ internal static class Program
             }
             Console.WriteLine("PASS DNS/R4 initial gross opening and print areas");
 
+            // All-document export: two separate reports must keep their own KS-2 references,
+            // even if act numbers repeat. Same book, no SQL or cross-workbook copies.
+            foreach (var (form, name) in new[] { ("default","Обычный объект"),("dns","ДНС"),("r4","Р4") })
+            {
+                var first=Fixture(form,name,2);
+                var second=Fixture(form,name,3);
+                using var book=KsCustomerForms.CreateAll(new[] { first, second });
+                Assert(book.Worksheets.Count==4,"All acts must contain two pairs: "+form);
+                var sheets=book.Worksheets.ToArray();
+                Assert(sheets.Select(w=>w.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count()==4,
+                    "All-act sheet names must be unique: "+form);
+                for(var i=0;i<2;i++)
+                {
+                    var summary=sheets[i*2+1];
+                    var expected=i==0?first:second;
+                    Assert(summary.CellsUsed().Any(cell=>cell.FormulaA1.Contains(
+                        "'"+sheets[i*2].Name.Replace("'","''")+"'!",StringComparison.Ordinal)),
+                        "KS-3 must refer to its own KS-2: "+form);
+                    Assert(Math.Abs(summary.Cell(form=="dns"?"G32":"G29").GetDouble()-
+                        (double)expected.Report.PeriodGross)<0.011,"Wrong KS-3 gross: "+form);
+                }
+                Roundtrip(book);
+            }
+
             var external=Fixture("default","Днепровский",2);
             try
             {
