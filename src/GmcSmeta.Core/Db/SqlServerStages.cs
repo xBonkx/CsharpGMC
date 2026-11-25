@@ -948,6 +948,7 @@ public static partial class SqlServerStages
         fullMaterials = MaterialsOf(conn, tx, fullId);
         stageMaterials = MaterialsOf(conn, tx, stageId);
         var share = fullMaterials > 0.000001m ? stageMaterials / fullMaterials : 0m;
+        if (fullMode == "systems") RefreshSystemMoney(conn, tx, fullId, stageId);
         var updateSmr = fullMode == "sum";
         using (var update = new SqlCommand(
             "UPDATE dbo.contracts SET " +
