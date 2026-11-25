@@ -291,8 +291,14 @@ public static class KpPdfForms
         }
         else
         {
+            var totals = document.Totals;
             Total("ИТОГО с учётом НДС " + Rate(document.VatRate) + "%:",
-                document.Totals.Total, bold: true);
+                totals.Total + totals.DiscountAmount, bold: true);
+            if (totals.DiscountPercent != 0m)
+            {
+                Total("Скидка " + totals.DiscountPercent.ToString("0.################", Ru) + "%:", -totals.DiscountAmount);
+                Total("ИТОГО С УЧЁТОМ СКИДКИ:", totals.Total, bold: true);
+            }
             if (vatLine) Total("в т.ч. НДС:", document.Totals.Vat);
         }
         if (y > bottom - 78) NewPage();

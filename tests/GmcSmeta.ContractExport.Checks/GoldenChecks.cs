@@ -103,7 +103,40 @@ internal static class GoldenChecks
         VerifyPdf(KpPdfForms.Create(positional, header, positional: true),
             "golden-positional-cents.pdf", true, "Радиатор", "12,39", "76,75");
 
-        Console.WriteLine("PASS synthetic golden: 3 XLSX cent/formula/OOXML + 3 PDF open/page-size");
+        // Python 0.67.1: discount is a separate formula, never a price mutation.
+        var discounted = estimate with
+        {
+            VatTop = false,
+            Totals = estimate.Totals with { Total = 48.99m, DiscountPercent = 5m, DiscountAmount = 2.58m, Vat = 8.165m }
+        };
+        foreach (var internalPrices in new[]{false,true})
+        {
+            using var book=KpExcelForms.Create(discounted,header,internalPrices:internalPrices,vatLine:true);
+            var sheet=book.Worksheet("КП");
+            var col=internalPrices?8:6;
+            var disc=Line(sheet,"Скидка 5%:");
+            var final=Line(sheet,"ИТОГО С УЧЁТОМ СКИДКИ:");
+            ExpectClose(sheet.Cell(disc,col).GetDouble(),-2.58d,"discount cents");
+            ExpectClose(sheet.Cell(final,col).GetDouble(),48.99d,"discounted gross cents");
+            Expect(sheet.Cell(final,col).FormulaA1.Contains(XLHelper.GetColumnLetterFromNumber(col)+disc,StringComparison.Ordinal),"final references discount");
+            ExpectClose(sheet.Cell(Line(sheet,"Радиатор"),internalPrices?7:5).GetDouble(),17.19d,"unchanged retail unit");
+            var vat=Line(sheet,"в т.ч. НДС 20%:");
+            Expect(sheet.Cell(vat,col).FormulaA1.Contains(XLHelper.GetColumnLetterFromNumber(col)+final,StringComparison.Ordinal),"VAT references discounted gross");
+        }
+        var discountedPositional=positional with
+        {
+            VatTop=false,
+            Totals=positional.Totals with { Total=60.76m, DiscountPercent=5m,DiscountAmount=3.20m,Vat=10.126666666666666666666666667m }
+        };
+        using(var book=KpExcelForms.Create(discountedPositional,header,positional:true,vatLine:true))
+        {
+            var sheet=book.Worksheet("Материалы и работы");
+            ExpectClose(sheet.Cell(Line(sheet,"Скидка 5%"),6).GetDouble(),-3.20d,"positional discount cents");
+            ExpectClose(sheet.Cell(Line(sheet,"ИТОГО С УЧЁТОМ СКИДКИ"),6).GetDouble(),60.76d,"positional payable");
+        }
+        VerifyPdf(KpPdfForms.Create(discounted,header,vatLine:true),"golden-discount.pdf",false,"Скидка","48,99");
+
+        Console.WriteLine("PASS synthetic golden: KP discounts and existing XLSX/PDF cases");
         Console.WriteLine("NOTE synthetic checks cannot establish approved customer forms or SQL snapshot isolation");
     }
 

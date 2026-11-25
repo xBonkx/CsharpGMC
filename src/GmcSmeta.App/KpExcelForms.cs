@@ -237,6 +237,14 @@ public static class KpExcelForms
         else
         {
             var gross = Total("ИТОГО, с учетом НДС " + Rate(doc.VatRate) + "%:", sum);
+            if (doc.Totals.DiscountPercent != 0m)
+            {
+                var pct = doc.Totals.DiscountPercent.ToString("0.################", CultureInfo.InvariantCulture);
+                var discount = Total("Скидка " + pct + "%:",
+                    "-ROUND(ROUND(" + totalLetter + gross + ",2)*" + pct + "/100,2)", bold: false);
+                gross = Total("ИТОГО С УЧЁТОМ СКИДКИ:",
+                    "ROUND(" + totalLetter + gross + "+" + totalLetter + discount + ",2)");
+            }
             if (vatLine)
                 Total("в т.ч. НДС " + Rate(doc.VatRate) + "%:",
                     "ROUND(" + totalLetter + gross + "*" + Rate(doc.VatRate) + "/(100+" +
@@ -354,6 +362,12 @@ public static class KpExcelForms
         else
         {
             var gross = Total("ВСЕГО С УЧЕТОМ МАТЕРИАЛОВ И СМР С НДС " + Rate(doc.VatRate) + "%", sum);
+            if (doc.Totals.DiscountPercent != 0m)
+            {
+                var pct = doc.Totals.DiscountPercent.ToString("0.################", CultureInfo.InvariantCulture);
+                var discount = Total("Скидка " + pct + "%", "-ROUND(ROUND(F" + gross + ",2)*" + pct + "/100,2)", bold: false);
+                gross = Total("ИТОГО С УЧЁТОМ СКИДКИ", "ROUND(F" + gross + "+F" + discount + ",2)");
+            }
             if (vatLine)
                 Total("в т.ч. НДС " + Rate(doc.VatRate) + "%",
                     "ROUND(F" + gross + "*" + Rate(doc.VatRate) + "/(100+" + Rate(doc.VatRate) + "),2)",
