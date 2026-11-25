@@ -54,10 +54,11 @@ public partial class ProcurementPane
     };
 
     private static void MenuAction(ContextMenu menu, string label, RoutedEventHandler action,
-        string? glyph = null, bool danger = false, string shortcut = "")
+        string? glyph = null, bool danger = false, string shortcut = "", bool enabled = true)
     {
         var item = glyph is null ? new MenuItem { Header = label } :
             ContextMenuIcons.Create(label, glyph, shortcut: shortcut, danger: danger);
+        item.IsEnabled = enabled;
         item.Click += action;
         menu.Items.Add(item);
     }
@@ -71,24 +72,48 @@ public partial class ProcurementPane
 
     private void ProcurementStatusMenu_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedBuyingIds().Count == 0) return;
+        if (!CanStartOperation || SelectedBuyingIds().Count == 0) return;
+        var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var ids = SelectedBuyingIds().OrderBy(id => id).ToArray();
+        bool CurrentSelection()
+        {
+            if (CanStartOperation && _attachmentGeneration == attachment && _revision == revision &&
+                SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids)) return true;
+            SetStatus("Данные или выбор изменились. Откройте меню заново.");
+            return false;
+        }
+
         var menu = ToolbarMenu(sender);
         foreach (var option in StageOptions)
         {
             var code = option.Code;
             MenuAction(menu, option.Label, async (_, _) =>
-                await ApplyBulkProcAsync(null, code == "none" ? "" : code, "Статус обновлён"));
+            {
+                if (CurrentSelection())
+                    await ApplyBulkProcAsync(null, code == "none" ? "" : code, "Статус обновлён");
+            });
         }
         menu.Items.Add(new Separator());
-        MenuAction(menu, "На складе — пришло…", (_, _) => SelectedMovement("in"), "Download");
-        MenuAction(menu, "Выдано на объект…", (_, _) => SelectedMovement("out"), "Upload");
-        MenuAction(menu, "Ожидаем поставку к…", ProcurementBulkDue_Click, "History");
-        menu.IsOpen = true;
-    }
+        void Movement(string label, string kind, string glyph, string document = "") =>
+            MenuAction(menu, label, (_, _) =>
+            {
+                if (CurrentSelection() && BuyGrid.SelectedItem is ProcurementPreviewRow row &&
+                    ids.Contains(row.PositionId))
+                    _ = OpenMovementDialogAsync(row, kind, defaultDocument: document);
+            }, glyph, enabled: BuyGrid.SelectedItem is ProcurementPreviewRow selected &&
+                                ids.Contains(selected.PositionId));
 
-    private void SelectedMovement(string kind)
-    {
-        if (BuyGrid.SelectedItem is ProcurementPreviewRow row) AddMovementFlow(row, kind);
+        Movement("На складе — пришло…", "in", "Download");
+        Movement("Выдано на объект…", "out", "Upload");
+        Movement("Возврат с объекта…", "back", "ArrowBack");
+        Movement("Возврат поставщику…", "back_supplier", "ArrowBack");
+        Movement("Изготовлено → на склад…", "in", "Download", "из цеха");
+        MenuAction(menu, "Ожидаем поставку к…", (s, e) =>
+        {
+            if (CurrentSelection()) ProcurementBulkDue_Click(s, e);
+        }, "History");
+        menu.IsOpen = true;
     }
 
     private async void ProcurementBulkDue_Click(object sender, RoutedEventArgs e)
@@ -133,16 +158,24 @@ public partial class ProcurementPane
 
     private void ProcurementMore_Click(object sender, RoutedEventArgs e)
     {
+        if (_batchBusy) return;
         var menu = ToolbarMenu(sender);
-        MenuAction(menu, "Докупили (нет в смете)…", ProcurementAddExtra_Click, "Plus");
-        MenuAction(menu, "Изменить докупленное…", ProcurementEditExtra_Click, "Edit");
-        MenuAction(menu, "Удалить докупленное…", ProcurementDeleteExtra_Click, "Trash", danger: true);
-        MenuAction(menu, "Допсоглашение из докупленного…", ProcurementExtraDop_Click, "FilePlus");
-        MenuAction(menu, "Отдать в цех…", ProcurementToShop_Click, "FilePlus");
+        var canWrite = CanStartOperation;
+        var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
+        var ids = SelectedBuyingIds();
+        var extraSelected = selected.Any(row => row.OutOfKp && ids.Contains(row.PositionId));
+        var singleExtra = selected.Length == 1 && extraSelected;
+        MenuAction(menu, "Докупили (нет в смете)…", ProcurementAddExtra_Click, "Plus", enabled: canWrite);
+        MenuAction(menu, "Изменить докупленное…", ProcurementEditExtra_Click, "Edit", enabled: canWrite && singleExtra);
+        MenuAction(menu, "Удалить докупленное…", ProcurementDeleteExtra_Click, "Trash", danger: true,
+            enabled: canWrite && extraSelected);
+        MenuAction(menu, "Допсоглашение из докупленного…", ProcurementExtraDop_Click, "FilePlus",
+            enabled: canWrite && _allRows.Any(row => row.OutOfKp));
+        MenuAction(menu, "Отдать в цех…", ProcurementToShop_Click, "FilePlus", enabled: canWrite && ids.Count > 0);
         MenuAction(menu, "Заявка в цех (печать)…", ProcurementShopOrder_Click, "File");
         menu.Items.Add(new Separator());
-        MenuAction(menu, "Заказ / оплата…", ProcurementOrder_Click, "File", shortcut: "F4");
-        MenuAction(menu, "Загрузить контроль оборудования из Excel…", ImportPlan_Click, "Upload");
+        MenuAction(menu, "Заказ / оплата…", ProcurementOrder_Click, "File", shortcut: "F4", enabled: canWrite && ids.Count > 0);
+        MenuAction(menu, "Загрузить контроль оборудования из Excel…", ImportPlan_Click, "Upload", enabled: canWrite);
         MenuAction(menu, "Сохранить в Excel / PDF…", ProcurementExport_Click, "Download");
         MenuAction(menu, "Обновить", ProcurementRefresh_Click, "Refresh");
         menu.Items.Add(new Separator());
