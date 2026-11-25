@@ -2,6 +2,15 @@
 
 Восстановлена документация из CsharpGMC-archive @ fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf. Архивный MASTER_TODO содержит 400 ID; 35 открытых Issues сохранены с описаниями. Архивные статусы не переподтверждены. Активная очередь остаётся Python 0.66.4–0.67.9 / SQL 28→31 / выпуск релиза; предыдущий кодовый коммит 34355f3b65668e28d53a3c2ec0099ee4e9df16c3 — пересчёт СМР по системам этапов. Следующий шаг: интеграция безопасной репетиции/проверки фактической схемы с ReleaseBuilder, потом полноценная миграция только после приёмки. Рабочая БД не тронута. Windows/SQL тесты не выполнены. История: docs/CURRENT_TASK_ARCHIVE_20261125.md.
 
+## 26.11.2026 — Релиз v1.0.2 опубликован
+
+Опубликован публичный релиз `v1.0.2` (non-draft, latest) из коммита `518427f`:
+https://github.com/xBonkx/CsharpGMC/releases/tag/v1.0.2
+Вложения: `GMC-Smeta-Next-win-x64.zip`, `GMC-Smeta-Next-win-x64-fx.zip`, `GmcSmeta.Launcher.exe`, `GMC-Smeta-CSharp-Start.exe`, `SHA256SUMS.txt`, `version.txt`, `sql-schema-version.txt` (схема 28).
+В составе: исправления четырёх check-проектов (Documents golden, DOCX golden, KS golden, People), десктопный лаунчер оффлайн WPF-проверок (`tools/install-offline-checks.ps1`, ярлык «ГМЦ-Смета — оффлайн проверки» на рабочем столе), исправление release-гейта схемы SQL (`tools/sql-migrations/Test-ReleaseSchema.ps1`).
+Тесты перед публикацией: Core 1335/1335, check-проекты PASS, offline-check 8/8, сборка 0 ошибок.
+Рабочая БД не затрагивалась.
+
 ## 25.11.2026 — App.Checks: восстановлена сборка, offline-режим и CI-гейт
 Первый реальный прогон WPF-харнесса `tests/GmcSmeta.App.Checks` на Windows показал, что он не собирался: проект не входил в `GmcSmeta.slnx` и CI, а в `CheckSettingsMenu` было `UIElement.LayoutTransform` (CS1061). Проект добавлен в решение.
 После исправления выяснилось, что `CreateApplication` не работал никогда: ResourceDictionary оборачивался сам в себя («Отсутствует значение ключа для объекта ResourceDictionary»), относительный `Theme/ToolbarIcons.xaml` резолвился в сборке проверок, не копировался `xmlns:x`. Теперь ресурсы берутся из настоящего `App.xaml`, `Source` переводится в pack URI `/GMC-Smeta-Next;component/…`.
