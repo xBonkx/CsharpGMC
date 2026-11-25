@@ -230,39 +230,21 @@ public partial class EstimateView
 
     private void SummarySystemFilter_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || _costSummaryData is null) return;
-        var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        if (sender is not Button button || _costSummaryData is not { } data || _detached) return;
         var options = _summarySystemOptions;
-        var all = new MenuItem { Header = "Все системы", IsCheckable = true, IsChecked = _summarySelectedSystems.Count == 0, StaysOpenOnClick = true };
-        menu.Items.Add(all);
-        menu.Items.Add(new Separator());
-        var items = new List<(long Id, MenuItem Item)>();
-        foreach (var (id, label) in options)
-        {
-            var item = new MenuItem { Header = label, IsCheckable = true,
-                IsChecked = _summarySelectedSystems.Contains(id), StaysOpenOnClick = true };
-            items.Add((id, item));
-            menu.Items.Add(item);
-            item.Click += (_, _) =>
+        var popup = new SummarySystemPickerPopup(button, options, data.SystemParents,
+            _summarySelectedSystems, selected =>
             {
-                if (!ReferenceEquals(options, _summarySystemOptions)) { menu.IsOpen = false; return; }
-                if (item.IsChecked) _summarySelectedSystems.Add(id);
-                else _summarySelectedSystems.Remove(id);
-                all.IsChecked = _summarySelectedSystems.Count == 0;
+                // A refreshed or detached editor must not accept stale popup input.
+                if (_detached || !ReferenceEquals(options, _summarySystemOptions) || _costSummaryData is null)
+                    return false;
+                _summarySelectedSystems.Clear();
+                _summarySelectedSystems.UnionWith(selected);
                 SummarySyncSystemFilter();
                 SummaryRebuild();
-            };
-        }
-        all.Click += (_, _) =>
-        {
-            if (!ReferenceEquals(options, _summarySystemOptions)) { menu.IsOpen = false; return; }
-            _summarySelectedSystems.Clear();
-            foreach (var (_, item) in items) item.IsChecked = false;
-            all.IsChecked = true;
-            SummarySyncSystemFilter();
-            SummaryRebuild();
-        };
-        menu.IsOpen = true;
+                return true;
+            });
+        popup.Open();
     }
 
     /// <summary>Python System.label: parent name › child name.</summary>
@@ -440,10 +422,56 @@ public partial class EstimateView
             WorkMarginNeg = MarginNeg(totWCost, totWSell),
         });
 
-        SummaryGrid.ItemsSource = new ObservableCollection<SummaryRow>(built);
+        SummaryReplaceRows(built);
         SummarySyncViewButtons();
         SummaryFillTiles(totMCost, totMSell, totWCost, totWSell, data, filtered,
             nNocost: recs.Count(r => r.NoCost), shownRows: rows.Count, totalRows: recs.Count);
+    }
+
+    private static string? SummarySelectionKey(SummaryRow row) =>
+        SummarySystemSelection.RowKey(row.Kind, row.SystemId, row.SupplierGroupKey, row.MemberIds);
+
+    private void SummaryReplaceRows(List<SummaryRow> built)
+    {
+        var grid = SummaryGrid;
+        var old = grid.ItemsSource;
+        var selected = grid.SelectedItems.OfType<SummaryRow>()
+            .Select(SummarySelectionKey).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var current = grid.CurrentCell;
+        var currentKey = current.Item is SummaryRow row ? SummarySelectionKey(row) : null;
+        var scroll = grid.Template?.FindName("DG_ScrollViewer", grid) as ScrollViewer;
+        var vertical = scroll?.VerticalOffset ?? 0;
+        var horizontal = scroll?.HorizontalOffset ?? 0;
+        var source = new ObservableCollection<SummaryRow>(built);
+        grid.ItemsSource = source;
+        if (old is null) return;
+
+        // Restore only exact identities, never a different group with new
+        // members or a filtered-out row. No focus change or data operation.
+        SummaryRow? restoredCurrent = null;
+        if (selected.Count != 0 || currentKey is not null)
+        {
+            foreach (var candidate in built)
+            {
+                var key = SummarySelectionKey(candidate);
+                if (key is null) continue;
+                if (selected.Contains(key)) grid.SelectedItems.Add(candidate);
+                if (key == currentKey) restoredCurrent = candidate;
+            }
+        }
+        if (restoredCurrent is not null && current.Column is { Visibility: Visibility.Visible } column &&
+            grid.Columns.Contains(column))
+            grid.CurrentCell = new DataGridCellInfo(restoredCurrent, column);
+
+        // Pixel offsets are restored after the new source is measured. A later
+        // rebuild/invalidated view supersedes this callback.
+        if (scroll is not null && grid.IsVisible)
+            grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                if (_detached || !grid.IsVisible || !ReferenceEquals(grid.ItemsSource, source)) return;
+                scroll.ScrollToHorizontalOffset(horizontal);
+                scroll.ScrollToVerticalOffset(vertical);
+            }));
     }
 
     private void MergeInto(SummaryRec m, SummaryRec r)
