@@ -41,7 +41,7 @@
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="BorderBrush" Value="#E4E8EF"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="MinRowHeight" Value="23"/>
+            <Setter Property="MinRowHeight" Value="{StaticResource LayoutDocumentRowMinHeight}"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
             <Setter Property="HorizontalGridLinesBrush" Value="#E4E8EF"/>
             <Setter Property="VerticalGridLinesBrush" Value="#E4E8EF"/>
@@ -493,18 +493,19 @@
                                     <Thumb x:Name="ThumbElement">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border x:Name="ThumbChrome" CornerRadius="4" Margin="2">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="#D0D7E2"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollBar}}" Value="True">
-                                                                    <Setter Property="Background" Value="#94A3B8"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                </Border>
+                                                <!-- Transparent full-size hit target; only the inset thumb is painted. -->
+                                                <Grid Background="Transparent">
+                                                    <Border x:Name="ThumbChrome" CornerRadius="4" Margin="2"
+                                                            Background="{StaticResource LineStrong}"/>
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledTextBrush}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledTextBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -531,9 +532,6 @@
                     <Setter Property="MinWidth" Value="0"/>
                     <Setter Property="Height" Value="11"/>
                     <Setter Property="MinHeight" Value="11"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="Transparent"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -1142,7 +1140,9 @@
         <Style TargetType="DataGridCell" BasedOn="{StaticResource PythonGridCell}"/>
         <!-- Global TextBox padding (10,7) previously enlarged grid rows on edit. -->
         <Style x:Key="PythonGridEditor" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="Padding" Value="4,1"/>
+            <!-- Cell chrome already supplies the inset; do not apply it twice in edit mode. -->
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="MinHeight" Value="0"/>
@@ -1157,8 +1157,8 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- The grid owns minimum row height; explicit compact/special grids keep their own value. -->
         <Style x:Key="PythonTableRow" TargetType="DataGridRow">
-            <Setter Property="MinHeight" Value="23"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#0F172A"/>
             <Setter Property="BorderBrush" Value="#E4E8EF"/>
@@ -1301,7 +1301,7 @@
         </Style>
         <!-- Block 6: shared PySide6-like table headers / numeric cells / destructive buttons. -->
         <Style x:Key="ReportGridHeader" TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#F7F9FC"/>
+            <Setter Property="Background" Value="{StaticResource TableHeaderSurface}"/>
             <Setter Property="Foreground" Value="#475569"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiHeaderSize}"/>
@@ -1315,7 +1315,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridColumnHeader">
-                        <Grid SnapsToDevicePixels="True">
+                        <Grid SnapsToDevicePixels="True" ClipToBounds="True">
                             <Border x:Name="HeaderChrome" Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                                     Padding="{TemplateBinding Padding}">
@@ -1328,6 +1328,9 @@
                                                       RecognizesAccessKey="True"/>
                                 </DockPanel>
                             </Border>
+                            <!-- Qt final header: normal right gridline, stronger bottom divider. -->
+                            <Border Height="1" VerticalAlignment="Bottom" Background="{StaticResource LineStrong}"
+                                    IsHitTestVisible="False"/>
                             <Thumb x:Name="PART_LeftHeaderGripper" Width="6" HorizontalAlignment="Left" Cursor="SizeWE">
                                 <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="Transparent"/></ControlTemplate></Thumb.Template>
                             </Thumb>
