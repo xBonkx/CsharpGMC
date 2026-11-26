@@ -100,6 +100,12 @@ public partial class HistoryWindow : Window
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
 
+    private void ClearSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
+    }
+
     private void ApplyFilter()
     {
         // Если договор не найден, не затираем сообщение о причине пустой истории.
