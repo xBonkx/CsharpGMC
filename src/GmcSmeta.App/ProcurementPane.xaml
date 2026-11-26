@@ -238,9 +238,15 @@
                                         <Style.Triggers><DataTrigger Binding="{Binding HasProblem}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                                     </Style></TextBlock.Style>
                                 </TextBlock>
-                                <TextBlock Text="{Binding Name}" TextTrimming="None" TextWrapping="Wrap" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
                                     <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
-                                        <Style.Triggers><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1D4ED8"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="TextTrimming" Value="None"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
+                                                <Setter Property="TextWrapping" Value="NoWrap"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            </DataTrigger><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1D4ED8"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
                                     </Style></TextBlock.Style>
                                 </TextBlock>
                             </DockPanel>

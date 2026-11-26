@@ -13,6 +13,16 @@
     <UserControl.Resources>
         <local:LevelIndentConverter x:Key="Indent"/>
         <BooleanToVisibilityConverter x:Key="OnlySystems"/>
+        <Style x:Key="DocumentNameDisplay" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
+                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
 
         <!-- Python cost_view.py / theme.py: secondary tabs are smaller and use
              the light accent, not the primary blue gradient. -->
@@ -801,19 +811,7 @@
                             <DataTemplate>
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
                                            Margin="{Binding NameIndentLevel, Converter={StaticResource Indent}}"
-                                           Padding="0" ToolTip="{Binding Name}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextWrapping" Value="Wrap"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding WrapEstimateNames, RelativeSource={RelativeSource AncestorType=local:EstimateView}}" Value="False">
-                                                    <Setter Property="TextWrapping" Value="NoWrap"/>
-                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                           Padding="0" ToolTip="{Binding Name}" Style="{StaticResource DocumentNameDisplay}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                         <DataGridTemplateColumn.CellEditingTemplate>
@@ -1065,7 +1063,7 @@
                                                 CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource DocumentNameDisplay}"
                                                VerticalAlignment="Center"
                                                ToolTip="{Binding NameTooltip}"/>
                                 </DataTemplate>

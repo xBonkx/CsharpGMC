@@ -142,6 +142,7 @@ public partial class ProcurementPane
             var code = option.Code;
             MenuChoice(menu, option.Label, _viewMode == code, () => { _viewMode = code; ApplyProcurementFilters(); });
         }
+        NameWrapPreference.AddMenuItem(menu);
         menu.IsOpen = true;
     }
 

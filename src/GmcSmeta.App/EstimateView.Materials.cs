@@ -1075,6 +1075,7 @@ public partial class EstimateView
         var reset = ContextMenuIcons.Create("Вернуть как в КП", "X");
         reset.Click += (_, _) => MaterialsSetView("kp", "kp");
         menu.Items.Add(reset);
+        NameWrapPreference.AddMenuItem(menu);
         menu.IsOpen = true;
     }
 

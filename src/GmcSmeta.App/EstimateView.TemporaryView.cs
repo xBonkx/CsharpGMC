@@ -211,19 +211,7 @@ public partial class EstimateView
         menu.Items.Add(new Separator());
         AddViewOption(menu, "Свернуть вложенные строки (комплектующие)", false, CollapseNestedRows);
         AddViewOption(menu, "Развернуть всё", false, ExpandAllRows);
-        menu.Items.Add(new Separator());
-        var wrap = new MenuItem
-        {
-            Header = "Длинные названия в несколько строк",
-            IsCheckable = true,
-            IsChecked = WrapEstimateNames
-        };
-        wrap.Click += (_, _) =>
-        {
-            WrapEstimateNames = _uiSettings.WrapNames = wrap.IsChecked;
-            SaveEstimateUiSettings();
-        };
-        menu.Items.Add(wrap);
+        NameWrapPreference.AddMenuItem(menu);
         menu.IsOpen = true;
     }
 

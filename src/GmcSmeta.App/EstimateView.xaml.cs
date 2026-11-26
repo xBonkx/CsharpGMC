@@ -98,15 +98,6 @@ public partial class EstimateView : UserControl
     private readonly List<DataGridColumn> _defaultEstimateColumns;
     private readonly int[] _defaultDisplayIndexes;
 
-    public static readonly DependencyProperty WrapEstimateNamesProperty = DependencyProperty.Register(
-        nameof(WrapEstimateNames), typeof(bool), typeof(EstimateView), new PropertyMetadata(true));
-
-    public bool WrapEstimateNames
-    {
-        get => (bool)GetValue(WrapEstimateNamesProperty);
-        private set => SetValue(WrapEstimateNamesProperty, value);
-    }
-
     // SQL Server is the single supported storage backend for the C# editor.
     public EstimateView(DbConnection conn, DocRow doc, string sqlConnectionString)
     {
@@ -1105,7 +1096,6 @@ public partial class EstimateView : UserControl
     private void RestoreEstimateUiSettings()
     {
         if (EstimateGrid is null) return;
-        WrapEstimateNames = _uiSettings.WrapNames;
         var columns = EstimateGrid.Columns.ToList();
         var savedWidths = _uiSettings.ColumnWidths ?? new Dictionary<string, double>();
         foreach (var column in columns)
