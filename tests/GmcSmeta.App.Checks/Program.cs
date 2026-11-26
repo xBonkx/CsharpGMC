@@ -167,6 +167,7 @@ internal static class Program
         CheckEstimateCalculatedColumns();
         CheckEstimateRowViewIndex();
         CheckEstimateVisibleRowPresentation();
+        EstimateRowReadbackChecks.Run();
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();

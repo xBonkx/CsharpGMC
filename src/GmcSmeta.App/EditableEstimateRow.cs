@@ -33,6 +33,14 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     private IReadOnlyList<string> _stageDisplay = Array.Empty<string>();
     private bool _stageOverrun;
 
+    // Source is immutable for the lifetime of this view model. Only edited
+    // numeric strings need to be formatted again after an equal SQL readback.
+    [Flags]
+    private enum DirtyText { None = 0, Qty = 1, Price = 2, Purchase = 4, Work = 8 }
+    private DirtyText _dirtyText;
+    private bool _areaInputsDirty = true;
+    private string _authoritativeAreaEdit = "";
+
     private string? _displayNum;
     private int? _displayIndentLevel;
 
@@ -57,10 +65,15 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         if (IsVirtual || Source != row) return false;
         Name = row.Name;
         Unit = row.Unit;
-        QtyText = row.IsSystem ? "" : row.Qty.ToString("0.###", Ru);
-        PriceText = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
-        PurchaseText = row.PurchasePrice?.ToString("N2", Ru) ?? "";
-        WorkText = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
+        if ((_dirtyText & DirtyText.Qty) != 0)
+            QtyText = row.IsSystem ? "" : row.Qty.ToString("0.###", Ru);
+        if ((_dirtyText & DirtyText.Price) != 0)
+            PriceText = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
+        if ((_dirtyText & DirtyText.Purchase) != 0)
+            PurchaseText = row.PurchasePrice?.ToString("N2", Ru) ?? "";
+        if ((_dirtyText & DirtyText.Work) != 0)
+            WorkText = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
+        _dirtyText = DirtyText.None;
         Note = row.Note;
         Basis = row.Basis;
         return true;
@@ -125,14 +138,14 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     public int NameIndentLevel => IsSystem ? DisplayIndentLevel :
         Math.Max(IsSub ? 1 : 0, DisplayIndentLevel - 1);
 
-    public string Name { get => _name; set => Change(ref _name, value); }
-    public string Unit { get => _unit; set => Change(ref _unit, value); }
+    public string Name { get => _name; set => ChangeAreaInput(ref _name, value); }
+    public string Unit { get => _unit; set => ChangeAreaInput(ref _unit, value); }
     public string QtyText
     {
         get => _qty;
         set
         {
-            if (!Change(ref _qty, value)) return;
+            if (!ChangeNumeric(ref _qty, value, DirtyText.Qty)) return;
             OnPropertyChanged(nameof(DisplayAmount));
             OnPropertyChanged(nameof(DisplayAmountText));
         }
@@ -142,20 +155,20 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         get => _price;
         set
         {
-            if (!Change(ref _price, value)) return;
+            if (!ChangeNumeric(ref _price, value, DirtyText.Price)) return;
             OnPropertyChanged(nameof(DisplayAmount));
             OnPropertyChanged(nameof(DisplayAmountText));
             OnPropertyChanged(nameof(HasNoPrice));
             OnPropertyChanged(nameof(DisplayPriceText));
         }
     }
-    public string PurchaseText { get => _purchase; set => Change(ref _purchase, value); }
+    public string PurchaseText { get => _purchase; set => ChangeNumeric(ref _purchase, value, DirtyText.Purchase); }
     public string WorkText
     {
         get => _work;
         set
         {
-            if (Change(ref _work, value))
+            if (ChangeNumeric(ref _work, value, DirtyText.Work))
                 OnPropertyChanged(nameof(WorkDisplayText));
         }
     }
@@ -175,30 +188,41 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
 
     public void FillArea()
     {
-        if (IsSystem || IsVirtual)
+        // Quantity, manual area and summary flag are immutable Source fields.
+        // Name/Unit setters invalidate this presentation even for an optimistic edit.
+        // An edited area text still has to be restored from the last computed value.
+        if (!_areaInputsDirty)
         {
-            _areaUnitEdit = _areaUnitDisplay = _areaTotalDisplay = _areaTip = _areaTotalTip = "";
-            _areaWarning = _areaManualFlag = false;
+            AreaUnitEditText = _authoritativeAreaEdit;
+            return;
         }
-        else
-        {
-            var cell = AreaCellPresentation.For(Name, Unit, Source.Qty,
-                Source.AreaManual, Source.IsAreaSummary);
-            _areaUnitEdit = cell.UnitEditor;
-            _areaUnitDisplay = cell.Unit;
-            _areaTotalDisplay = cell.Total;
-            _areaTip = cell.UnitTip;
-            _areaTotalTip = cell.TotalTip;
-            _areaWarning = cell.Warning;
-            _areaManualFlag = cell.Manual;
-        }
-        OnPropertyChanged(nameof(AreaUnitEditText));
-        OnPropertyChanged(nameof(AreaUnitDisplay));
-        OnPropertyChanged(nameof(AreaTotalDisplay));
-        OnPropertyChanged(nameof(AreaUnitTip));
-        OnPropertyChanged(nameof(AreaTotalTip));
-        OnPropertyChanged(nameof(AreaWarning));
-        OnPropertyChanged(nameof(AreaManualFlag));
+
+        var cell = IsSystem || IsVirtual
+            ? new AreaCellPresentation.Cell("", "", "", "", "", false, false)
+            : AreaCellPresentation.For(Name, Unit, Source.Qty, Source.AreaManual, Source.IsAreaSummary);
+        // As before, publish all fields before raising any binding notification.
+        var editChanged = _areaUnitEdit != cell.UnitEditor;
+        var unitChanged = _areaUnitDisplay != cell.Unit;
+        var totalChanged = _areaTotalDisplay != cell.Total;
+        var tipChanged = _areaTip != cell.UnitTip;
+        var totalTipChanged = _areaTotalTip != cell.TotalTip;
+        var warningChanged = _areaWarning != cell.Warning;
+        var manualChanged = _areaManualFlag != cell.Manual;
+        _authoritativeAreaEdit = _areaUnitEdit = cell.UnitEditor;
+        _areaUnitDisplay = cell.Unit;
+        _areaTotalDisplay = cell.Total;
+        _areaTip = cell.UnitTip;
+        _areaTotalTip = cell.TotalTip;
+        _areaWarning = cell.Warning;
+        _areaManualFlag = cell.Manual;
+        _areaInputsDirty = false;
+        if (editChanged) OnPropertyChanged(nameof(AreaUnitEditText));
+        if (unitChanged) OnPropertyChanged(nameof(AreaUnitDisplay));
+        if (totalChanged) OnPropertyChanged(nameof(AreaTotalDisplay));
+        if (tipChanged) OnPropertyChanged(nameof(AreaUnitTip));
+        if (totalTipChanged) OnPropertyChanged(nameof(AreaTotalTip));
+        if (warningChanged) OnPropertyChanged(nameof(AreaWarning));
+        if (manualChanged) OnPropertyChanged(nameof(AreaManualFlag));
     }
 
     // Inline Python «Этапы» columns are computed from SQL Server stage
@@ -256,6 +280,24 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         (string.IsNullOrWhiteSpace(_price) || NumberText.Parse(_price) == 0m);
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private bool ChangeNumeric(ref string field, string? value, DirtyText flag,
+        [CallerMemberName] string? property = null)
+    {
+        value ??= "";
+        if (field == value) return false;
+        _dirtyText |= flag;
+        return Change(ref field, value, property);
+    }
+
+    private void ChangeAreaInput(ref string field, string? value,
+        [CallerMemberName] string? property = null)
+    {
+        value ??= "";
+        if (field == value) return;
+        _areaInputsDirty = true;
+        Change(ref field, value, property);
+    }
 
     private bool Change(ref string field, string? value, [CallerMemberName] string? property = null)
     {
