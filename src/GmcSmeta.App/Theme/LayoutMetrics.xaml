@@ -24,6 +24,11 @@
     <Thickness x:Key="LayoutCompareDialogMargin">20,16,20,16</Thickness>
     <Thickness x:Key="LayoutCardPadding">18,14,18,14</Thickness>
     <Thickness x:Key="LayoutTilePadding">16,11,16,11</Thickness>
+    <!-- director_view.py root spacing12; tile gap10; object_view.py legend gap14. -->
+    <Thickness x:Key="LayoutDirectorSectionGap">0,12,0,0</Thickness>
+    <Thickness x:Key="LayoutDirectorTileInset">5,5</Thickness>
+    <Thickness x:Key="LayoutDirectorTilesInset">-5,7,-5,-5</Thickness>
+    <Thickness x:Key="LayoutCardLegendGap">0,0,14,0</Thickness>
     <Thickness x:Key="LayoutToolbarPadding">10,4,10,4</Thickness>
     <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>
     <!-- QTabBar: 14/7 padding, pane overlaps the tab strip by one DIP. -->

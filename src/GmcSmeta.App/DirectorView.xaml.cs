@@ -74,6 +74,23 @@ public partial class DirectorView : UserControl
 
     internal void RequestRefresh() => _ = ReloadAsync();
 
+    private void DirectorTiles_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged) UpdateDirectorTileColumns();
+    }
+
+    private void UpdateDirectorTileColumns()
+    {
+        if (DirectorTiles is null || TileClosed is null) return;
+        var count = TileClosed.Visibility == Visibility.Collapsed ? 2 : 4;
+        var width = DirectorTiles.ActualWidth;
+        // A narrow viewport must not squeeze four monetary cards into one row.
+        // On wide screens retain the original one-row Python layout.
+        var columns = width > 0 && width < 460 ? 1
+            : count == 4 && width > 0 && width < 920 ? 2 : count;
+        if (DirectorTiles.Columns != columns) DirectorTiles.Columns = columns;
+    }
+
     private async Task ReloadAsync()
     {
         var generation = ++_loadGeneration;
@@ -97,7 +114,7 @@ public partial class DirectorView : UserControl
         LateColumn.Visibility = TileClosed.Visibility;
         // Python keeps purchase coverage visible in KP mode.
         CoverageColumn.Visibility = Visibility.Visible;
-        DirectorTiles.Columns = kp ? 2 : 4;
+        UpdateDirectorTileColumns();
         TotalColumn.Header = kp ? "КП, ₽" : "Договор,\n₽";
         EarnedColumn.Header = kp ? "Расчётная\nприбыль" : "Заработано";
 

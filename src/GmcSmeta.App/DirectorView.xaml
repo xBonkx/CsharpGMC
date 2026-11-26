@@ -22,6 +22,17 @@
         </Style>
         <Style x:Key="DirectorObjectHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource DirectorHeader}">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value><DataTemplate><TextBlock Text="{Binding}" TextAlignment="Left" TextWrapping="Wrap"/></DataTemplate></Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DirectorTableFrame" TargetType="Border" BasedOn="{StaticResource PythonTile}">
+            <Setter Property="BorderBrush" Value="#E4E8EF"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Effect">
+                <Setter.Value><DropShadowEffect Color="#0F172A" Opacity="0.047" BlurRadius="20" ShadowDepth="2" Direction="270"/></Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="DirectorCell" TargetType="DataGridCell" BasedOn="{StaticResource PythonGridCell}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -107,7 +118,7 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <Grid Margin="24,18,24,14">
+    <Grid Margin="{StaticResource LayoutPageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -122,42 +133,42 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="Главная" Foreground="#64748B" FontSize="{StaticResource UiBodySize}" Margin="0,0,0,2"/>
-                <TextBlock x:Name="HeadingText" Text="Договоры — объекты в работе" FontWeight="Bold" FontSize="{StaticResource UiH1Size}"/>
+                <TextBlock x:Name="HeadingText" Text="Договоры — объекты в работе" FontWeight="Bold" FontSize="{StaticResource UiH1Size}" TextWrapping="Wrap"/>
             </StackPanel>
             <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" Click="Export_Click"
                     VerticalAlignment="Bottom" Style="{StaticResource DirectorExportButton}" ContentTemplate="{StaticResource IconLabelDownload}" ToolTip="Сохранить сводку в Excel"/>
         </Grid>
-        <ComboBox x:Name="ModeCombo" Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Stretch" SelectionChanged="Mode_Changed">
+        <ComboBox x:Name="ModeCombo" Grid.Row="1" Margin="{StaticResource LayoutDirectorSectionGap}" HorizontalAlignment="Stretch" SelectionChanged="Mode_Changed">
             <ComboBoxItem Content="Договоры — в работе" Tag="contracts" IsSelected="True"/>
             <ComboBoxItem Content="КП — просчёты (последнее КП по объекту)" Tag="kp"/>
         </ComboBox>
-        <UniformGrid x:Name="DirectorTiles" Grid.Row="2" Columns="4" Margin="0,12,0,0">
-            <Border Margin="0,0,10,0" Style="{StaticResource PythonTile}">
+        <UniformGrid x:Name="DirectorTiles" Grid.Row="2" Columns="4" Margin="{StaticResource LayoutDirectorTilesInset}" SizeChanged="DirectorTiles_SizeChanged">
+            <Border Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock x:Name="TileTotalCaption" Text="Договоры всего, с НДС" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileTotalValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border x:Name="TileClosed" Margin="0,0,10,0" Style="{StaticResource PythonTile}">
+            <Border x:Name="TileClosed" Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock Text="Сдано по КС" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileClosedValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border x:Name="TileExtra" Margin="0,0,10,0" Style="{StaticResource PythonTile}">
+            <Border x:Name="TileExtra" Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock Text="Докуплено вне сметы" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileExtraValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border Style="{StaticResource PythonTileAccent}">
+            <Border Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTileAccent}">
                 <StackPanel>
                     <TextBlock x:Name="TileEarnedCaption" Text="Заработано (материалы + монтаж)" Style="{StaticResource PythonTileLabel}" Foreground="#DBEAFE"/>
                     <TextBlock x:Name="TileEarnedValue" Style="{StaticResource PythonTileValue}" Foreground="White"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
-        <Border Grid.Row="3" Margin="0,12,0,0" Style="{StaticResource PythonTile}" Padding="1" MinHeight="0">
+        <Border Grid.Row="3" Margin="{StaticResource LayoutDirectorSectionGap}" Style="{StaticResource DirectorTableFrame}">
             <DataGrid local:TableColumnMenu.Key="director" local:TableColumnMenu.Exclude="Сдано по КС|Докуплено вне сметы|Выдано на объект|Просрочено поставок|Закуп известен" local:TableColumnMenu.Protect="Объект" x:Name="DirectorGrid" CellStyle="{StaticResource DirectorCell}" ColumnHeaderStyle="{StaticResource DirectorHeader}"
                       RowStyle="{StaticResource DirectorRow}" MinRowHeight="40" AlternationCount="2" Background="White" BorderThickness="0"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
@@ -171,13 +182,10 @@
                     <DataGridTemplateColumn Header="Объект" Width="3*" MinWidth="180" HeaderStyle="{StaticResource DirectorObjectHeader}" SortMemberPath="DisplayObject">
                         <DataGridTemplateColumn.CellTemplate><DataTemplate>
                             <DockPanel LastChildFill="True" ToolTip="{Binding WarningTip}">
-                                <Viewbox DockPanel.Dock="Left" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"
-                                         Visibility="{Binding Incomplete, Converter={StaticResource DirectorBoolVisibility}}">
-                                    <Canvas Width="24" Height="24">
-                                        <Path Data="M12 3 L2 21 H22 Z" Fill="#FACC15" Stroke="#B45309" StrokeThickness="1.2" StrokeLineJoin="Round"/>
-                                        <Path Data="M12 9v5 M12 17h.01" Stroke="#78350F" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
-                                    </Canvas>
-                                </Viewbox>
+                                <!-- director_view.py uses the literal warning character, not an SVG. -->
+                                <TextBlock DockPanel.Dock="Left" Text="⚠" Margin="0,0,4,0"
+                                           Visibility="{Binding Incomplete, Converter={StaticResource DirectorBoolVisibility}}"
+                                           Style="{StaticResource DirectorObjectText}" AutomationProperties.Name="Неполные данные"/>
                                 <TextBlock Text="{Binding DisplayObject}" Style="{StaticResource DirectorObjectText}"/>
                             </DockPanel>
                         </DataTemplate></DataGridTemplateColumn.CellTemplate>
@@ -216,13 +224,13 @@
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
-        <StackPanel Grid.Row="4" Margin="0,12,0,0">
+        <StackPanel Grid.Row="4" Margin="{StaticResource LayoutDirectorSectionGap}">
             <DockPanel x:Name="LoadStatusPanel" Visibility="Collapsed" Margin="0,0,0,6">
                 <Button x:Name="RetryButton" DockPanel.Dock="Right" Content="Повторить загрузку"
                         Visibility="Collapsed" Style="{StaticResource PythonToolbarButton}" Click="Retry_Click"/>
                 <TextBlock x:Name="LoadStatus" Foreground="#64748B" TextWrapping="Wrap"/>
             </DockPanel>
-            <TextBlock Foreground="#64748B" TextWrapping="Wrap"
+            <TextBlock Foreground="#64748B" TextWrapping="Wrap" FontSize="{StaticResource UiBodySize}"
                        Text="Двойной щелчок — открыть объект. ⚠ — данные неполные: закуп известен не по всем позициям или не внесены затраты на монтаж (вкладка «Себестоимость» в КП). Суммы с НДС."/>
         </StackPanel>
     </Grid>
