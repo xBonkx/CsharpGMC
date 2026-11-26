@@ -473,7 +473,9 @@ public partial class EstimateView
         if (!_inlineStagesOn || _inlineStagesData is null ||
             InlineStagesFilter.SelectedItem is not ComboBoxItem item)
             return;
-        _inlineStagesFilter = item.Tag as string ?? StageAllocationPresentation.All;
+        var filter = item.Tag as string ?? StageAllocationPresentation.All;
+        if (_inlineStagesFilter == filter) return;
+        _inlineStagesFilter = filter;
         ApplyFilter();
     }
 
@@ -512,27 +514,18 @@ public partial class EstimateView
         foreach (var row in rows) FillInlineStageCells(row);
         if (_inlineStagesFilter == StageAllocationPresentation.All) return rows;
 
-        var keep = new bool[rows.Count];
-        for (var i = 0; i < rows.Count; i++)
-        {
-            var row = rows[i];
-            if (row.IsSystem || row.IsSub || row.IsTypeHeader) continue;
-            var ids = row.IsGroup ? row.GroupMemberIds : new[] { (long)row.Id };
-            var matches = ids.Any(id => _inlineStagesData.Rows.TryGetValue(checked((int)id),
-                out var source) && StageAllocationPresentation.Matches(
-                    source.Rest, source.PerStage, _inlineStagesFilter));
-            if (!matches) continue;
-            keep[i] = true;
-            var previousDepth = row.DisplayIndentLevel;
-            for (var j = i - 1; j >= 0 && previousDepth > 0; j--)
+        var keep = StageFilterAncestors.Mark(rows.Count,
+            i => rows[i].DisplayIndentLevel,
+            i => rows[i].IsSystem || rows[i].IsGroup || rows[i].IsTypeHeader,
+            i =>
             {
-                var parent = rows[j];
-                if (parent.DisplayIndentLevel >= previousDepth) continue;
-                if (!parent.IsSystem && !parent.IsGroup && !parent.IsTypeHeader) continue;
-                keep[j] = true;
-                previousDepth = parent.DisplayIndentLevel;
-            }
-        }
+                var row = rows[i];
+                if (row.IsSystem || row.IsSub || row.IsTypeHeader) return false;
+                bool Matches(long id) => _inlineStagesData.Rows.TryGetValue(checked((int)id),
+                    out var source) && StageAllocationPresentation.Matches(
+                        source.Rest, source.PerStage, _inlineStagesFilter);
+                return row.IsGroup ? row.GroupMemberIds.Any(Matches) : Matches(row.Id);
+            });
         return rows.Where((_, i) => keep[i]).ToList();
     }
 

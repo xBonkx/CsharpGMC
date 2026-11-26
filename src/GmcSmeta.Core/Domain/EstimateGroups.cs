@@ -59,7 +59,8 @@ public static class EstimateGroups
             or EstimateViewProjection.ByQuantity))
             throw new ArgumentOutOfRangeException(nameof(sort));
 
-        var allowed = EstimateFilter.Apply(rows, query ?? "").Select(r => r.SortKey).ToHashSet();
+        var allowed = string.IsNullOrWhiteSpace(query) ? null
+            : EstimateFilter.Apply(rows, query).Select(r => r.SortKey).ToHashSet();
         var components = rows.Where(r => r.IsSub && r.ParentPositionId is not null)
             .GroupBy(r => r.ParentPositionId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(r => r.SortKey).ToArray());
@@ -71,19 +72,25 @@ public static class EstimateGroups
                 var members = g.OrderBy(r => r.SortKey).ToArray();
                 var allChildren = members.SelectMany(r =>
                     components.GetValueOrDefault(r.Id) ?? Array.Empty<EstimateRow>()).ToArray();
-                var prices = members.Select(x => x.Price).Distinct().ToArray();
-                var purchases = members.Select(x => x.PurchasePrice).Distinct().ToArray();
-                var works = members.Select(x => x.WorkPrice).Distinct().ToArray();
-                return new Group(g.Key, TypeOf(members[0].Name),
-                    members[0].Name, members[0].Unit, members, allChildren,
-                    members.Sum(r => r.Qty), members.Sum(r => r.Amount),
-                    prices.Length == 1 ? prices[0] : null,
-                    purchases.Length == 1 ? purchases[0] : null,
-                    works.Length == 1 ? works[0] : null,
-                    members.Any(r => r.HasNoPrice), members[0].SortKey);
+                var first = members[0];
+                decimal quantity = 0, amount = 0;
+                decimal? price = first.Price, purchase = first.PurchasePrice, work = first.WorkPrice;
+                bool missing = false;
+                foreach (var member in members)
+                {
+                    quantity += member.Qty;
+                    amount += member.Amount;
+                    if (price != member.Price) price = null;
+                    if (purchase != member.PurchasePrice) purchase = null;
+                    if (work != member.WorkPrice) work = null;
+                    missing |= member.HasNoPrice;
+                }
+                return new Group(g.Key, TypeOf(first.Name),
+                    first.Name, first.Unit, members, allChildren, quantity, amount,
+                    price, purchase, work, missing, first.SortKey);
             })
             .Where(g => !missingOnly || g.MissingPrice)
-            .Where(g => string.IsNullOrWhiteSpace(query) ||
+            .Where(g => allowed is null ||
                 g.Members.Any(r => allowed.Contains(r.SortKey)) ||
                 g.Components.Any(r => allowed.Contains(r.SortKey)))
             .ToArray();
@@ -115,7 +122,7 @@ public static class EstimateGroups
         }
 
         // Type = first alphabetic word in title, Python _build_view.
-        return groups.GroupBy(g => g.TypeKey, StringComparer.Ordinal)
+        var sections = groups.GroupBy(g => g.TypeKey, StringComparer.Ordinal)
             .Select(g =>
             {
                 var ordered = g.OrderBy(row => row, Comparer<Group>.Create((a, b) =>
@@ -124,16 +131,20 @@ public static class EstimateGroups
                 var title = CultureInfo.GetCultureInfo("ru-RU").TextInfo.ToTitleCase(type);
                 return new Section(type, $"{title} — {g.Sum(x => x.Members.Count)} строк",
                     g.Sum(x => x.Amount), g.Min(x => x.FirstSortKey), ordered);
-            })
-            .OrderBy(group => group, Comparer<Section>.Create((a, b) =>
+            }).ToArray();
+        var numericKeys = sort is EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice
+            ? sections.ToDictionary(section => section.TypeKey, section => sort == EstimateViewProjection.ByQuantity
+                ? section.Groups.Sum(x => x.Quantity)
+                : section.Groups.Max(x => x.CommonPrice ?? 0), StringComparer.Ordinal)
+            : null;
+        return sections.OrderBy(group => group, Comparer<Section>.Create((a, b) =>
             {
                 var result = sort switch
                 {
                     EstimateViewProjection.ByName => EstimateViewProjection.NaturalCompare(a.Title, b.Title),
                     EstimateViewProjection.ByAmount => b.Amount.CompareTo(a.Amount),
-                    EstimateViewProjection.ByQuantity => b.Groups.Sum(x => x.Quantity).CompareTo(a.Groups.Sum(x => x.Quantity)),
-                    EstimateViewProjection.ByPrice => (b.Groups.Count == 0 ? 0 : b.Groups.Max(x => x.CommonPrice ?? 0))
-                        .CompareTo(a.Groups.Count == 0 ? 0 : a.Groups.Max(x => x.CommonPrice ?? 0)),
+                    EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice =>
+                        numericKeys![b.TypeKey].CompareTo(numericKeys[a.TypeKey]),
                     _ => a.FirstSortKey.CompareTo(b.FirstSortKey)
                 };
                 return result != 0 ? result : a.FirstSortKey.CompareTo(b.FirstSortKey);

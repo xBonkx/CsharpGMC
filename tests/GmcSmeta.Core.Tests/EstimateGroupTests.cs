@@ -101,6 +101,39 @@ public sealed class EstimateGroupTests
     }
 
     [Fact]
+    public void MixedNullablePricesDoNotBecomeCommonAgain()
+    {
+        var rows = new[]
+        {
+            Pos(1, 11, 1, "Труба", "шт", 1, 10, 5) with { WorkPrice = 3 },
+            Pos(2, 12, 1, "Труба", "шт", 2, 20, null) with { WorkPrice = null },
+            Pos(3, 13, 1, "Труба", "шт", 3, 10, 5) with { WorkPrice = 3 }
+        };
+        var group = Assert.Single(Assert.Single(EstimateGroups.Build(rows, EstimateGroups.Same)).Groups);
+        Assert.Null(group.CommonPrice);
+        Assert.Null(group.CommonPurchase);
+        Assert.Null(group.CommonWork);
+        Assert.Equal(6m, group.Quantity);
+        Assert.Equal(80m, group.Amount);
+    }
+
+    [Fact]
+    public void TypeQuantityAndPriceSortRetainTieOrder()
+    {
+        var rows = new[]
+        {
+            Pos(1, 11, 1, "Клапан 1", "шт", 3, 20),
+            Pos(2, 12, 1, "Труба 1", "шт", 4, 10),
+            Pos(3, 13, 1, "Клапан 2", "шт", 1, 20),
+            Pos(4, 14, 1, "Фильтр", "шт", 2, 50)
+        };
+        Assert.Equal(new[] { "клапан", "труба", "фильтр" },
+            EstimateGroups.Build(rows, EstimateGroups.Type, EstimateViewProjection.ByQuantity).Select(s => s.TypeKey));
+        Assert.Equal(new[] { "фильтр", "клапан", "труба" },
+            EstimateGroups.Build(rows, EstimateGroups.Type, EstimateViewProjection.ByPrice).Select(s => s.TypeKey));
+    }
+
+    [Fact]
     public void MatchingGroupIds_MustCoverWholeCurrentGroup()
     {
         var rows = new (long, string, string, bool, bool)[]

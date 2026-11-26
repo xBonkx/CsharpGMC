@@ -66,12 +66,13 @@ public partial class EstimateView
                     _frozenGroupedOrder.Add(group.Key, _frozenGroupedOrder.Count);
 
                 var depth = typeMode ? 1 : 0;
-                var components = group.Components.ToLookup(x => x.ParentPositionId);
+                var components = group.Components.Count == 0 ? null
+                    : group.Components.ToLookup(x => x.ParentPositionId);
                 if (group.Members.Count <= 1)
                 {
                     var only = group.Members[0];
                     ShowPosition(only, depth);
-                    foreach (var child in components[only.Id])
+                    foreach (var child in components?[only.Id] ?? Enumerable.Empty<EstimateRow>())
                         if (!only.IsAreaSummary || _expandedAreaSummaries.Contains(only.Id) ||
                             !string.IsNullOrWhiteSpace(EstimateSearch.Text))
                             ShowPosition(child, depth + 1);
@@ -113,7 +114,7 @@ public partial class EstimateView
                 foreach (var member in group.Members)
                 {
                     ShowPosition(member, depth + 1);
-                    foreach (var child in components[member.Id])
+                    foreach (var child in components?[member.Id] ?? Enumerable.Empty<EstimateRow>())
                         if (!member.IsAreaSummary || _expandedAreaSummaries.Contains(member.Id) ||
                             !string.IsNullOrWhiteSpace(EstimateSearch.Text))
                             ShowPosition(child, depth + 2);
@@ -133,13 +134,8 @@ public partial class EstimateView
             EstimateGrid.SelectedItem = projected.FirstOrDefault(row =>
                 !row.IsVirtual && !row.IsSystem && row.Id == selections.Id);
 
-        // Other tabs remain based on the unmodified source document.
-        if (MaterialsGrid is { } materialsGrid)
-            materialsGrid.ItemsSource = EstimateFilter.Apply(_estimate.Rows, EstimateSearch.Text)
-                .Select(row => index.BySortKey[row.SortKey])
-                .Where(row => row.IsSystem ||
-                    (!row.IsSub && !EstimateStatistics.IsWorkName(row.Name)))
-                .ToList();
+        // Materials has its own SQL snapshot, filter and row type.
+        // Never publish the estimate's temporary projection to that grid.
 
         RefreshTemporaryViewControls();
         return true;

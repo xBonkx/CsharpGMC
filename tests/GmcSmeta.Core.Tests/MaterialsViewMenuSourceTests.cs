@@ -22,6 +22,12 @@ public sealed class MaterialsViewMenuSourceTests
         Assert.Contains("data.Positions.ToLookup(p => p.SystemId)", code);
         Assert.Contains("_materialsTop.ToLookup(p => p.SystemId)", code);
         Assert.Contains("MaterialsVisibleRows.SameReferences(existing, result)", code);
+        var grouped = File.ReadAllText(Path.Combine(app, "EstimateView.Groups.cs"));
+        Assert.DoesNotContain("materialsGrid.ItemsSource", grouped);
+        Assert.DoesNotContain("MaterialsGrid.ItemsSource", grouped);
+        var stages = File.ReadAllText(Path.Combine(app, "EstimateView.InlineStages.cs"));
+        Assert.Contains("StageFilterAncestors.Mark(rows.Count,", stages);
+        Assert.Contains("if (_inlineStagesFilter == filter) return;", stages);
         Assert.Contains("if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;", code);
         Assert.Contains("ContextMenuIcons.Create(\"Вернуть как в КП\", \"X\")", code);
         var icons = File.ReadAllText(Path.Combine(app, "Theme", "ToolbarIcons.xaml"));
