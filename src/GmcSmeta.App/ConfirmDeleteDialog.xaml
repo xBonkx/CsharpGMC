@@ -24,6 +24,7 @@
                     </Button.Template>
                 </Button>
             </UniformGrid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <TextBlock x:Name="HeadingText" Text="Удалить объект навсегда?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Foreground="#DC2626"/>
                 <TextBlock x:Name="NameText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
@@ -35,6 +36,7 @@
                 <TextBox x:Name="AnswerBox" Style="{StaticResource PythonSearch}" MaxWidth="160" TextAlignment="Center" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="0,10,0,0"
                          Padding="10,6" ToolTip="ответ цифрами" KeyDown="AnswerBox_KeyDown" TextChanged="AnswerBox_TextChanged"/>
             </StackPanel>
+            </ScrollViewer>
         </DockPanel>
     </Border>
 </Window>

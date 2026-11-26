@@ -37,7 +37,7 @@
             </Setter.Value></Setter>
         </Style>
     </Window.Resources>
-    <Border Padding="22,18,22,16">
+    <Border Padding="{StaticResource LayoutFormDialogMargin}">
         <StackPanel>
             <TextBlock Text="В какой год архива отнести объект?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
             <TextBlock x:Name="ObjectName" Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,0"/>

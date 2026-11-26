@@ -1,15 +1,16 @@
 <Window x:Class="GmcSmeta.App.ContractDialog" UseLayoutRounding="True" SnapsToDevicePixels="True"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Документ" Width="620" SizeToContent="Height" ResizeMode="NoResize"
+        Title="Документ" Width="620" MinWidth="540" SizeToContent="Height" ResizeMode="CanResize"
+        MaxHeight="{Binding Height, Source={x:Static SystemParameters.WorkArea}}"
         WindowStartupLocation="CenterOwner" Background="#F4F6FA" ShowInTaskbar="False"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         Foreground="#0F172A" TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType">
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="{StaticResource LayoutFormDialogMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -18,7 +19,8 @@
             <TextBlock x:Name="ObjectText" Foreground="#64748B" Margin="0,3,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
-        <Grid Grid.Row="1">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="138"/>
                 <ColumnDefinition Width="*"/>
@@ -38,39 +40,47 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Тип" Margin="0,4,12,10"/>
-            <ComboBox x:Name="KindCombo" Grid.Row="0" Grid.Column="1" Margin="0,2,0,8"
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Тип" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="KindCombo" Grid.Row="0" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"
                       SelectionChanged="Kind_SelectionChanged"/>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Номер" Margin="0,4,12,10"/>
-            <TextBox x:Name="NumberBox" Grid.Row="1" Grid.Column="1" Margin="0,2,0,8"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Номер" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="NumberBox" Grid.Row="1" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"/>
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Дата" Margin="0,4,12,10"/>
-            <TextBox x:Name="DateBox" Grid.Row="2" Grid.Column="1" Margin="0,2,0,8" ToolTip="дд.мм.гггг"/>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Дата" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="DateBox" Grid.Row="2" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}" ToolTip="дд.мм.гггг"/>
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Название" Margin="0,4,12,10"/>
-            <TextBox x:Name="NameBox" Grid.Row="3" Grid.Column="1" Margin="0,2,0,8"
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Название" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="NameBox" Grid.Row="3" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"
                      ToolTip="например: вариант 2, парковка, раздел 1"/>
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Организация" Margin="0,4,12,10"/>
-            <ComboBox x:Name="CompanyCombo" Grid.Row="4" Grid.Column="1" Margin="0,2,0,0"
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Организация" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="CompanyCombo" Grid.Row="4" Grid.Column="1" Margin="0"
                       SelectionChanged="Company_SelectionChanged"/>
 
             <TextBlock x:Name="VatHint" Grid.Row="5" Grid.Column="1" Foreground="#64748B"
-                       FontSize="{StaticResource UiCaptionSize}" Margin="0,3,0,8" TextWrapping="Wrap"/>
+                       FontSize="{StaticResource UiCaptionSize}" Margin="0,3,0,9" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
-            <TextBlock Grid.Row="6" Grid.Column="0" Text="К договору" Margin="0,4,12,10"/>
-            <ComboBox x:Name="BaseCombo" Grid.Row="6" Grid.Column="1" Margin="0,2,0,8"/>
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="К договору" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="BaseCombo" Grid.Row="6" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"/>
 
-            <TextBlock Grid.Row="7" Grid.Column="0" x:Name="VatLabel" Text="НДС (внутри цен)" Margin="0,4,12,10"/>
-            <TextBox x:Name="VatBox" Grid.Row="7" Grid.Column="1" Margin="0,2,0,8" Width="100"
+            <TextBlock Grid.Row="7" Grid.Column="0" x:Name="VatLabel" Text="НДС (внутри цен)" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="VatBox" Grid.Row="7" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}" Width="100"
                      HorizontalAlignment="Left"/>
 
-            <TextBlock Grid.Row="8" Grid.Column="0" x:Name="TagLabel" Text="Тег заказчика" Margin="0,4,12,10"/>
-            <ComboBox x:Name="TagCombo" Grid.Row="8" Grid.Column="1" Margin="0,2,0,8"/>
+            <TextBlock Grid.Row="8" Grid.Column="0" x:Name="TagLabel" Text="Тег заказчика" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <ComboBox x:Name="TagCombo" Grid.Row="8" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"/>
 
-            <TextBlock Grid.Row="9" Grid.Column="0" x:Name="NoteLabel" Text="Примечание" Margin="0,4,12,10"/>
-            <TextBox x:Name="NoteBox" Grid.Row="9" Grid.Column="1" Margin="0,2,0,8" Height="58"
+            <TextBlock Grid.Row="9" Grid.Column="0" x:Name="NoteLabel" Text="Примечание" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBox x:Name="NoteBox" Grid.Row="9" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}" Height="58"
                      AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
 
             <StackPanel x:Name="ContentPanel" Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2"
@@ -78,17 +88,19 @@
                 <TextBlock Text="Содержимое" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <RadioButton x:Name="EmptyRadio" Content="Пустое — начну с нуля" IsChecked="True"
                              GroupName="Content" Checked="Content_Changed"/>
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <RadioButton x:Name="CopyRadio" Content="Копия документа:" GroupName="Content"
                                  VerticalAlignment="Center" Checked="Content_Changed"/>
-                    <ComboBox x:Name="SourceCombo" Margin="8,0,0,0" MinWidth="320"/>
-                </StackPanel>
+                    <ComboBox x:Name="SourceCombo" Grid.Column="1" Margin="8,0,0,0" MinWidth="0"/>
+                </Grid>
             </StackPanel>
 
             <TextBlock x:Name="TagNote" Grid.Row="11" Grid.Column="1" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
                        TextWrapping="Wrap" Margin="0,0,0,4"
                        Text="Тег — правила заказчика: НДС сверху, нумерация, форма КС."/>
         </Grid>
+        </ScrollViewer>
 
         <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
             <Button x:Name="ImportExcelButton" DockPanel.Dock="Left" Content="Из Excel…"
