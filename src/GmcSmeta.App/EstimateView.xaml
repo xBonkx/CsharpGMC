@@ -2099,10 +2099,9 @@
             </Grid>
         </Border>
 
+        <!-- Create the KS workspace only when the contract's Acts tab is opened. -->
         <Border x:Name="ContractActsPanel" Grid.Row="4" Visibility="Collapsed"
-                Background="#F4F6FA">
-            <local:ContractActsWorkspace x:Name="ContractActsControl"/>
-        </Border>
+                Background="#F4F6FA"/>
         <!-- The original three SQL Server editors now live inside the contract.
              Controls are created lazily when their tab is first selected. -->
         <Border x:Name="ContractCostsPanel" Grid.Row="4" Visibility="Collapsed"

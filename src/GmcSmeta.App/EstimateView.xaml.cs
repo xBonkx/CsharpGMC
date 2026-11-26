@@ -38,7 +38,7 @@ public partial class EstimateView : UserControl
         _summaryLoading || _totalsLoading || _materialsLoading || _inlineStagesLoading ||
         _contractProcurementPane?.HasCacheActivity == true ||
         _contractShipmentsPane?.HasCacheActivity == true ||
-        ContractActsControl.HasCacheActivity ||
+        ContractActsControl?.HasCacheActivity == true ||
         HasGridEdit(SummaryGrid) || HasGridEdit(TotalsGrid) || HasGridEdit(MaterialsGrid);
 
     private static bool HasGridEdit(DataGrid grid) =>
@@ -329,6 +329,15 @@ public partial class EstimateView : UserControl
     private string _activeContractWorkspace => _contractTabs.Page;
     private ProcurementPane? _contractProcurementPane;
     private ShipmentsPane? _contractShipmentsPane;
+    private ContractActsWorkspace? ContractActsControl => ContractActsPanel?.Child as ContractActsWorkspace;
+
+    internal static ContractActsWorkspace EnsureContractActsWorkspace(Border host)
+    {
+        if (host.Child is ContractActsWorkspace existing) return existing;
+        var workspace = new ContractActsWorkspace();
+        host.Child = workspace;
+        return workspace;
+    }
 
     private void ContractEstimate_Checked(object sender, RoutedEventArgs e) =>
         SetContractWorkspace("estimate");
@@ -394,7 +403,7 @@ public partial class EstimateView : UserControl
                     if (was != "estimate") _ = ReloadDocumentAsync(allowUnchanged: true);
                     break;
                 case "acts":
-                    ContractActsControl.Bind(_sqlConnectionString, _contractId, _estimate.Title);
+                    EnsureContractActsWorkspace(ContractActsPanel).Bind(_sqlConnectionString, _contractId, _estimate.Title);
                     break;
                 case "costs":
                     // Keep the selected subsection when returning from another main tab.
@@ -1082,12 +1091,13 @@ public partial class EstimateView : UserControl
     {
         _uiSettings.EstimateHintHidden = false;
         _uiSettings.MaterialsHintHidden = false;
+        _uiSettings.KsHintHidden = false;
         HintBar.Visibility = _visibleEstimateMode == "estimate"
             ? Visibility.Visible : Visibility.Collapsed;
         if (MaterialsHintBar is not null)
             MaterialsHintBar.Visibility = _visibleEstimateMode == "materials"
                 ? Visibility.Visible : Visibility.Collapsed;
-        ContractActsControl.ShowHintsAgain();
+        ContractActsControl?.ShowHintsAgain();
         _uiSettings.Save();
     }
 

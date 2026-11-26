@@ -65,6 +65,8 @@ internal static class Program
                 throw new Exception("Document did not open in the SQL Server editor.");
             var grid = (DataGrid)page.FindName("EstimateGrid");
             PumpUntil(() => grid.Items.Count > 0, "estimate rows");
+            if (page.FindName("ContractActsPanel") is not Border { Child: null })
+                throw new Exception("Initial estimate must not create the hidden KS workspace.");
             foreach (var width in new[] { 1366d, 1920d })
             {
                 var element = (FrameworkElement)window.Content;
@@ -173,6 +175,7 @@ internal static class Program
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();
+        LazyContractActsChecks.Run();
         CheckKsReferenceHighlights();
         KsRowNotificationChecks.Run();
         CheckSummaryTableFrame();
