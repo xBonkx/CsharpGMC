@@ -48,16 +48,25 @@ public static partial class SqlServerCostSummary
     public static CostSummaryData Summary(SqlConnection conn, int contractId) =>
         Summary(conn, contractId, out _, out _);
 
+    /// <summary>Cancellable read-only summary on a guarded SQL connection.</summary>
+    public static CostSummaryData Summary(SqlConnection conn, int contractId, CancellationToken token) =>
+        Summary(conn, contractId, out _, out _, token);
+
     internal static CostSummaryData Summary(SqlConnection conn, int contractId,
-        out ContractTotals? documentTotals, out TagRules rules)
+        out ContractTotals? documentTotals, out TagRules rules, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var command = new SqlCommand(CostSummaryReadBatchSql, conn);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var r = command.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(command, token);
+        using var r = (SqlDataReader)SqlReadCancellation.ExecuteReader(command, token);
 
         void Next()
         {
-            if (!r.NextResult())
+            token.ThrowIfCancellationRequested();
+            var hasNext = r.NextResult();
+            token.ThrowIfCancellationRequested();
+            if (!hasNext)
                 throw new InvalidOperationException("Неполный пакет себестоимости SQL Server.");
         }
 
@@ -66,6 +75,7 @@ public static partial class SqlServerCostSummary
         {
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 var isSub = !r.IsDBNull(2);
                 systems.Add((id, r.IsDBNull(1) ? "" : r.GetString(1), isSub));
@@ -80,6 +90,8 @@ public static partial class SqlServerCostSummary
             decimal? Dec(int i) => r.IsDBNull(i)
                 ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(i), CultureInfo.InvariantCulture));
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 rows.Add(new CostSummaryRow(
                     Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                     Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
@@ -96,6 +108,7 @@ public static partial class SqlServerCostSummary
                     false,
                     EstimateStatistics.IsWorkName(Text(2)), Text(14), Text(15),
                     Dec(11)));
+            }
         }
 
         // Комплектующие: их закуп прибавляется к своей строке; вне КП — в «Куплено вне КП».
@@ -107,6 +120,7 @@ public static partial class SqlServerCostSummary
         {
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var isOutOfKp = !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture);
                 var cost = CostOf(r, 6, 4);
                 var qty = r.IsDBNull(2) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(2), CultureInfo.InvariantCulture));
@@ -131,6 +145,7 @@ public static partial class SqlServerCostSummary
         // Pure projection: assigning to List<T>[i] during foreach invalidates its enumerator.
         // Child component costs have already been folded into their parent's MCost.
         // FinalizeRows already materializes the financial projection.
+        token.ThrowIfCancellationRequested();
         var finalized = FinalizeRows(rows);
 
         var extra = new List<(string, decimal, decimal, string)>();
@@ -161,11 +176,14 @@ public static partial class SqlServerCostSummary
 
         // СМР документа — из проверенного Totals (Contract.stats()["smr"] эталона).
         // Release the reader before the existing contract totals query. No MARS required.
+        token.ThrowIfCancellationRequested();
         r.Close();
+        token.ThrowIfCancellationRequested();
         rules = new TagRules();
         documentTotals = contractId > 0
-            ? Totals.ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out rules).SingleOrDefault()
+            ? Totals.ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out rules, token: token).SingleOrDefault()
             : null;
+        token.ThrowIfCancellationRequested();
         return new CostSummaryData(systems, finalized, extra, notes, documentTotals?.Smr ?? 0m)
             { SystemParents = systemParents };
     }

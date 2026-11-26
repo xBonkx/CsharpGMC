@@ -59,8 +59,10 @@ public static partial class Totals
                 ReadPositions(conn), ReadPositionCounts(conn));
 
     internal static IReadOnlyList<ContractTotals> ReadSqlBatch(DbConnection conn,
-        ContractReadScope? scope, out TagRules rules, int? rehearsalSchema = null)
+        ContractReadScope? scope, out TagRules rules, int? rehearsalSchema = null,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var schema31 = rehearsalSchema is int version ? version >= 29 : SqlSchemaCompatibility.HasPreviewColumns(conn);
         string Where(string column) => scope is null ? "" : " WHERE " + scope.Predicate(column);
         string And(string column) => scope is null ? "" : " AND " + scope.Predicate(column);
@@ -78,20 +80,25 @@ public static partial class Totals
             "SELECT sy.contract_id,COUNT(*) FROM systems sy JOIN positions p ON p.system_id=sy.id" +
             Where("sy.contract_id") + " GROUP BY sy.contract_id;";
         scope?.Bind(cmd);
-        using var r = cmd.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         rules = TagRules.Read(r);
         void Next()
         {
-            if (!r.NextResult()) throw new InvalidOperationException("Неполный пакет итогов SQL Server.");
+            token.ThrowIfCancellationRequested();
+            var hasNext = r.NextResult();
+            token.ThrowIfCancellationRequested();
+            if (!hasNext) throw new InvalidOperationException("Неполный пакет итогов SQL Server.");
         }
         Next();
         var contracts = ReadContractRows(r, schema31);
         Next();
         var systems = ReadSystemRows(r);
         Next();
-        var sums = ReadSqlSums(r, rules, contracts, systems);
+        var sums = ReadSqlSums(r, rules, contracts, systems, token);
         Next();
         var counts = ReadCountRows(r);
+        token.ThrowIfCancellationRequested();
         return FinishSqlSums(rules, contracts, systems, sums, counts);
     }
 

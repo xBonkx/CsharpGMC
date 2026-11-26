@@ -8,6 +8,15 @@ public sealed class CostSummaryBatchValidationTests
     private const string Production = "Server=invalid;Database=GmcSmeta;Integrated Security=true;Connect Timeout=1";
 
     [Fact]
+    public void CancelledReadDoesNotAttemptToUseClosedConnection()
+    {
+        using var connection = new Microsoft.Data.SqlClient.SqlConnection(Pilot);
+        var token = new CancellationToken(canceled: true);
+        Assert.Throws<OperationCanceledException>(() => SqlServerCostSummary.Summary(connection, 1, token));
+        Assert.Equal(System.Data.ConnectionState.Closed, connection.State);
+    }
+
+    [Fact]
     public void BatchRefusesProductionBeforeOpeningConnection()
     {
         Assert.Throws<InvalidOperationException>(() => SqlServerCostSummary.SaveSummaryCells(

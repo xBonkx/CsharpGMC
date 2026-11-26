@@ -136,6 +136,7 @@ public partial class EstimateView
     private bool _summaryBusy;
     private bool _summaryLoading;
     private int _summaryLoadVersion;
+    private CancellationTokenSource? _summaryLoadCancellation;
     private string _summaryRevision = "";
     private bool SummarySnapshotReady => !_detached && !_summaryLoading && !_summaryBusy &&
         !_serverConflict && Volatile.Read(ref _pendingWrites) == 0 &&
@@ -157,14 +158,24 @@ public partial class EstimateView
     private HashSet<string> SummaryMissingSelected() => _summaryMissingChecked;
 
     // ------------------------------------------------------------------ load
+    private void CancelSummaryRead()
+    {
+        // Only read requests are cancelled here. The write queue and its
+        // mandatory estimate readback have a separate lifetime.
+        _summaryLoadVersion++;
+        var cancellation = _summaryLoadCancellation;
+        _summaryLoadCancellation = null;
+        _summaryLoading = false;
+        cancellation?.Cancel();
+    }
+
     private void InvalidateCostSummary()
     {
-        _summaryLoadVersion++;
+        CancelSummaryRead();
         _summaryRevision = "";
         _costSummaryData = null;
         _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
         _summarySearchIndex = null;
-        _summaryLoading = false;
         if (SummaryGrid is { } grid)
         {
             // Reload after a write clears the source before the asynchronous read.
@@ -196,21 +207,29 @@ public partial class EstimateView
         _summaryLoading = true;
         _summaryRevision = "";
         var version = ++_summaryLoadVersion;
+        using var cancellation = new CancellationTokenSource();
+        _summaryLoadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
-            var snapshot = await Task.Run(() =>
+            var snapshot = await Task.Run(async () =>
             {
-                using var conn = SqlServerDatabase.Open(_sqlConnectionString);
-                var before = SqlServerDatabase.Revision(conn);
+                using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
+                var before = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
                 var data = CostFinancialSnapshot.CanReuse(cachedSummary, cachedRevision, before)
-                    ? cachedSummary! : SqlServerCostSummary.Summary(conn, _contractId);
-                if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
+                    ? cachedSummary! : SqlServerCostSummary.Summary(conn, _contractId, token);
+                if (string.IsNullOrWhiteSpace(before) ||
+                    before != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились во время чтения сводной. Повтори обновление.");
+                token.ThrowIfCancellationRequested();
                 var labels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);
-                return (Data: data, Revision: before, Missing: new CostMissingPriceIndex(data.Rows),
-                    Labels: labels, Search: new CostSummarySearchIndex(data.Rows, labels));
-            });
-            if (version != _summaryLoadVersion || _detached) return;
+                var missing = new CostMissingPriceIndex(data.Rows);
+                token.ThrowIfCancellationRequested();
+                var search = new CostSummarySearchIndex(data.Rows, labels);
+                token.ThrowIfCancellationRequested();
+                return (Data: data, Revision: before, Missing: missing, Labels: labels, Search: search);
+            }, token);
+            if (token.IsCancellationRequested || version != _summaryLoadVersion || _detached) return;
             _costSummaryData = snapshot.Data;
             _summaryMissingIndex = snapshot.Missing;
             _summaryLabels = snapshot.Labels;
@@ -222,6 +241,10 @@ public partial class EstimateView
             SummaryRebuild();
             _summaryRevision = snapshot.Revision;
         }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            // SqlClient can report cancellation as SqlException as well as OCE.
+        }
         catch (Exception ex)
         {
             if (version == _summaryLoadVersion)
@@ -229,7 +252,11 @@ public partial class EstimateView
         }
         finally
         {
-            if (version == _summaryLoadVersion) _summaryLoading = false;
+            if (ReferenceEquals(_summaryLoadCancellation, cancellation))
+            {
+                _summaryLoadCancellation = null;
+                _summaryLoading = false;
+            }
         }
     }
 

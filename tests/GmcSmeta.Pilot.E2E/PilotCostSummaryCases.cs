@@ -70,6 +70,21 @@ internal static class PilotCostSummaryCases
             data.TotalCost == 175m && data.TotalSell == 305m,
             "Extra order, null transport, SMR or monetary totals changed");
         var contractId = checked((int)contract);
+        using var readCancellation = new CancellationTokenSource();
+        var cancellable = SqlServerCostSummary.Summary(conn, contractId, readCancellation.Token);
+        PilotRunner.Check(cancellable.Rows.SequenceEqual(data.Rows) &&
+            cancellable.Systems.SequenceEqual(data.Systems) && cancellable.Extra.SequenceEqual(data.Extra) &&
+            cancellable.Notes.SequenceEqual(data.Notes) && cancellable.SmrContract == data.SmrContract &&
+            SqlServerDatabase.Revision(conn) == before,
+            "Cancellable summary changed the read-only projection");
+        readCancellation.Cancel();
+        try
+        {
+            SqlServerCostSummary.Summary(conn, contractId, readCancellation.Token);
+            throw new InvalidOperationException("Cancelled summary read did not throw.");
+        }
+        catch (OperationCanceledException) { }
+        PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled read changed revision");
         var standaloneTotals = SqlServerCostTotals.Totals(conn, contractId, data);
         var combined = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
         PilotRunner.Check(combined.Summary.Rows.SequenceEqual(data.Rows) &&

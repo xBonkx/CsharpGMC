@@ -154,6 +154,7 @@ public partial class EstimateView : UserControl
                 _reloadTimer.Stop();
                 _reloadGate.NextRequest(); // discard an in-flight read of a detached, clean editor
                 _reloadCancellation?.Cancel(); // preserve mandatory readback on detach
+                CancelSummaryRead();
             }
         };
         Loaded += (_, _) =>
@@ -165,6 +166,9 @@ public partial class EstimateView : UserControl
                 _reloadAfterAttach = false;
                 RequestRefresh();
             }
+            else if (_visibleEstimateMode == "summary" && _estimate is not null &&
+                string.IsNullOrWhiteSpace(_summaryRevision) && !HasUnsettledCacheWrites)
+                _ = LoadCostSummaryAsync();
         };
         SetStatus("Загрузка сметы из SQL Server…", false);
         _ = ReloadDocumentAsync();

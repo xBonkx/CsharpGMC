@@ -14,7 +14,8 @@ public static partial class Totals
     }
 
     private static SqlSums ReadSqlSums(DbDataReader reader, TagRules rules,
-        IReadOnlyList<ContractRow> contracts, IReadOnlyDictionary<int, List<SystemRow>> systems)
+        IReadOnlyList<ContractRow> contracts, IReadOnlyDictionary<int, List<SystemRow>> systems,
+        CancellationToken token = default)
     {
         var ownership = new Dictionary<int, (int ContractId, bool RoundRows)>();
         foreach (var contract in contracts)
@@ -28,6 +29,7 @@ public static partial class Totals
         var sums = new SqlSums();
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var systemId = Convert.ToInt32(reader.GetValue(0));
             if (!ownership.TryGetValue(systemId, out var owner)) continue;
             var qty = Dec(reader, 1);
