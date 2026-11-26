@@ -153,7 +153,7 @@ public partial class ActsEditorView : UserControl
 
     public void RefreshFromServer()
     {
-        if (_contractId == 0 || _building || ActWritePending) return;
+        if (_contractId == 0 || _building || ActWritePending || _actLoadRequired) return;
         if (_sheet is not null && (!ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) || ActWritePending)) return;
         _revision = string.Empty;
@@ -245,15 +245,12 @@ public partial class ActsEditorView : UserControl
             {
                 _loadingAct = false;
                 _building = false;
+                // A cancelled probe can return directly from the try block.
+                // Resume here, even if its continuation never reaches the code below.
+                if (token.IsCancellationRequested) ResumeActReadIfNeeded();
             }
         }
-        if (generation != _actLoadGeneration) return;
-        if (token.IsCancellationRequested)
-        {
-            ResumeActReadIfNeeded();
-            return;
-        }
-        if (!IsLoaded || !IsVisible) return;
+        if (generation != _actLoadGeneration || token.IsCancellationRequested || !IsLoaded || !IsVisible) return;
         if (!hit) await ReloadAsync(actId, reuseList: false, requiredReadback: false);
     }
 

@@ -26,6 +26,8 @@ public sealed class KsActReadLifecycleSourceTests
         Assert.Contains("token.IsCancellationRequested || generation != _actLoadGeneration", loader);
         Assert.Contains("token.IsCancellationRequested || generation != _actLoadGeneration", editor);
         Assert.Contains("SqlServerDatabase.RevisionAsync(conn, token)", editor);
+        Assert.Contains("if (token.IsCancellationRequested) ResumeActReadIfNeeded();", editor);
+        Assert.Contains("if (_contractId == 0 || _building || ActWritePending || _actLoadRequired) return;", editor);
         Assert.Contains("ReloadAsync(actId, reuseList: true, requiredReadback: false)", editor);
         Assert.Contains("await ReloadAsync(actId, reuseList: false);", editor);
         Assert.Contains("await ReloadAsync(actId, reuseList: false);", extra);
