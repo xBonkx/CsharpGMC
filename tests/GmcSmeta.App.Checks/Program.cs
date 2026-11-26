@@ -165,6 +165,7 @@ internal static class Program
         CheckComboBoxDisplayMemberPath();
         CheckCatalogPageSelection();
         CheckEstimateCalculatedColumns();
+        CheckEstimateRowViewIndex();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -301,6 +302,49 @@ internal static class Program
         if (TableColumnMenu.Title(column) != "СМР · закупка ∑" || column.SortMemberPath != "w_wcost")
             throw new Exception("Column menu title must distinguish the financial group without changing identity.");
         Console.WriteLine("Summary table clip, group affordances and column labels OK.");
+    }
+
+    private static void CheckEstimateRowViewIndex()
+    {
+        static EditableEstimateRow Section(int key, int id, string name) =>
+            new(new GmcSmeta.Core.Domain.EstimateRow(
+                GmcSmeta.Core.Domain.RowKind.System, 0, key, 0, false, "",
+                name, "", 0, 0, 0, null, false, "") { SystemId = id });
+        static EditableEstimateRow Position(int key, int id, int section, bool area = false) =>
+            new(new GmcSmeta.Core.Domain.EstimateRow(
+                GmcSmeta.Core.Domain.RowKind.Position, 1, key, id, false, "1",
+                "Строка " + id, "шт", 1, 1, 1, null, false, "")
+                { SystemId = section, IsAreaSummary = area });
+
+        var section = Section(0, 5, "П1");
+        var second = Section(1, 6, "В1");
+        var rows = new List<EditableEstimateRow> { section, second };
+        rows.AddRange(Enumerable.Range(1, 2500)
+            .Select(id => Position(id + 1, id, 5, area: id == 10)));
+        var index = new EstimateRowViewIndex(rows);
+        if (index.BySortKey.Count != 2502 || index.ByPositionId.Count != 2500 ||
+            !ReferenceEquals(index.BySortKey[11], index.ByPositionId[10]) ||
+            !index.AreaSummaryIds.SetEquals(new[] { 10 }) ||
+            !ReferenceEquals(index.BySortKey, index.BySortKey) ||
+            !ReferenceEquals(index.ByPositionId, index.ByPositionId) ||
+            !ReferenceEquals(index.AreaSummaryIds, index.AreaSummaryIds))
+            throw new Exception("Estimate structural lookups must be reused for the same snapshot.");
+
+        if (index.SectionName(5, "?") != "П1" || index.SectionName(6, "?") != "В1" ||
+            index.SectionName(7, "?") != "?")
+            throw new Exception("Section names must use system IDs, not the shared row ID.");
+        section.Name = "П1 изменена";
+        if (index.SectionName(5, "?") != section.Name)
+            throw new Exception("Section labels must not cache editable text.");
+
+        var replacement = Position(2, 3000, 6, area: true);
+        var next = new EstimateRowViewIndex(new[] { Section(0, 6, "В2"), replacement });
+        if (ReferenceEquals(next.Rows, index.Rows) || next.ByPositionId.ContainsKey(10) ||
+            !next.AreaSummaryIds.SetEquals(new[] { 3000 }) ||
+            next.SectionName(6, "?") != "В2" || next.SectionName(5, "?") != "?" ||
+            !ReferenceEquals(next.BySortKey[2], replacement))
+            throw new Exception("Reloaded estimates must not retain old structural lookups.");
+        Console.WriteLine("Estimate row snapshot index and live section labels OK.");
     }
 
     private static void CheckEstimateCalculatedColumns()

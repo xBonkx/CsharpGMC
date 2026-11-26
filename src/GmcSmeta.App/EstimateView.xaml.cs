@@ -73,6 +73,10 @@ public partial class EstimateView : UserControl
     private bool _detached;
     private bool _reloadAfterAttach;
     private List<EditableEstimateRow> _rows = new();
+    private EstimateRowViewIndex? _rowViewIndex;
+    private EstimateRowViewIndex RowViewIndex =>
+        _rowViewIndex is { } index && ReferenceEquals(index.Rows, _rows)
+            ? index : (_rowViewIndex = new EstimateRowViewIndex(_rows));
     private readonly EstimateUiSettings _uiSettings = EstimateUiSettings.Load();
     private bool _uiSettingsReady;
     private string _visibleEstimateMode = "estimate";
@@ -190,6 +194,7 @@ public partial class EstimateView : UserControl
                 ? previousRows[i] : new EditableEstimateRow(source));
         }
         _rows = nextRows;
+        _rowViewIndex = null;
         foreach (var section in _rows.Where(r => r.IsSystem))
             section.IsCollapsed = _collapsedSectionIds.Contains(section.Source.SystemId);
         foreach (var summary in _rows.Where(r => r.IsAreaSummary))
@@ -653,14 +658,13 @@ public partial class EstimateView : UserControl
             foreach (var row in projected.Where(row => !row.IsSystem && !row.IsSub))
                 if (!_frozenTemporaryOrder.ContainsKey(row.Id))
                     _frozenTemporaryOrder[row.Id] = _frozenTemporaryOrder.Count;
-        var byKey = _rows.ToDictionary(row => row.SortKey);
-        var sectionNames = _rows.Where(row => row.IsSystem)
-            .ToDictionary(row => row.Source.SystemId, row => row.Name);
+        var index = RowViewIndex;
+        var byKey = index.BySortKey;
 
         foreach (var row in _rows)
         {
             var displayNum = _flatTemporaryView && !row.IsSystem
-                ? sectionNames.GetValueOrDefault(row.Source.SystemId, row.Num)
+                ? index.SectionName(row.Source.SystemId, row.Num)
                 : row.Num;
             var indent = _flatTemporaryView ? (row.IsSub ? 1 : 0) : row.Level;
             if (row.DisplayNum != displayNum) row.DisplayNum = displayNum;
@@ -676,7 +680,7 @@ public partial class EstimateView : UserControl
         var rootFolded = false;
         var subFolded = false;
         var visible = new List<EditableEstimateRow>(projected.Count);
-        var areaSummaryIds = _rows.Where(r => r.IsAreaSummary).Select(r => r.Id).ToHashSet();
+        var areaSummaryIds = index.AreaSummaryIds;
         foreach (var original in projected)
         {
             var row = byKey[original.SortKey];

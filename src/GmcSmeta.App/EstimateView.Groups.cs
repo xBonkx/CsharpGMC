@@ -28,16 +28,15 @@ public partial class EstimateView
             _temporarySort, EstimateSearch.Text, _noPriceTemporaryView,
             _frozenGroupedOrder);
 
-        var byId = _rows.Where(row => !row.IsSystem).ToDictionary(row => row.Id);
-        var labels = _rows.Where(row => row.IsSystem)
-            .ToDictionary(row => row.Source.SystemId, row => row.Name);
+        var index = RowViewIndex;
+        var byId = index.ByPositionId;
         var projected = new List<EditableEstimateRow>(_rows.Count);
         var virtualKey = -1;
 
         void ShowPosition(EstimateRow source, int depth)
         {
             var original = byId[source.Id];
-            original.DisplayNum = labels.GetValueOrDefault(source.SystemId, original.Num);
+            original.DisplayNum = index.SectionName(source.SystemId, original.Num);
             original.DisplayIndentLevel = depth;
             projected.Add(original);
         }
@@ -80,7 +79,7 @@ public partial class EstimateView
                 }
 
                 var systems = group.Members
-                    .Select(p => labels.GetValueOrDefault(p.SystemId, ""))
+                    .Select(p => index.SectionName(p.SystemId, ""))
                     .Where(label => label.Length > 0)
                     .Distinct(StringComparer.Ordinal).ToArray();
                 var note = $"{group.Members.Count} строк: " +
@@ -135,10 +134,8 @@ public partial class EstimateView
                 !row.IsVirtual && !row.IsSystem && row.Id == selections.Id);
 
         // Other tabs remain based on the unmodified source document.
-        var visibleKeys = EstimateFilter.Apply(_estimate.Rows, EstimateSearch.Text)
-            .Select(row => row.SortKey).ToHashSet();
-        MaterialsGrid.ItemsSource = _rows
-            .Where(row => visibleKeys.Contains(row.SortKey))
+        MaterialsGrid.ItemsSource = EstimateFilter.Apply(_estimate.Rows, EstimateSearch.Text)
+            .Select(row => index.BySortKey[row.SortKey])
             .Where(row => row.IsSystem ||
                 (!row.IsSub && !EstimateStatistics.IsWorkName(row.Name)))
             .ToList();
