@@ -134,16 +134,18 @@ public static class EstimateFilter
 /// Чтение сметы документа: системы (включая подсистемы) и позиции (включая подпозиции)
 /// в том же порядке, в каком их показывает Python-версия.
 /// </summary>
-public static class EstimateReader
+public static partial class EstimateReader
 {
     // Один батч вместо последовательных LoadHead/TagRules/Systems/Positions.
     // Только простые SELECT: одинаково работает на SQL Server и SQLite (офлайн-тесты).
-    private const string BatchSql =
+    private const string HeadSql =
         "SELECT c.id, c.kind, c.number, c.[date], c.name, o.name, COALESCE(co.name, ''), " +
         "       c.form, c.smr_mode, c.vat_rate, c.locked, c.locked_by, COALESCE(c.kp_phase, ''), " +
         "       c.smr_amount, c.smr_percent, c.transport_amount, c.pnr_amount, c.declared_material, c.declared_total " +
         "FROM contracts c JOIN objects o ON o.id = c.object_id " +
-        "LEFT JOIN companies co ON co.id = c.company_id WHERE c.id = @id;" +
+        "LEFT JOIN companies co ON co.id = c.company_id WHERE c.id = @id;";
+
+    private const string BatchSql = HeadSql +
         "SELECT [key], rules FROM tags;" +
         "SELECT id, name, parent_id, \"order\", smr_amount, source_num FROM systems " +
         "WHERE contract_id = @id ORDER BY \"order\", id;" +
@@ -233,9 +235,7 @@ public static class EstimateReader
     private static DbCommand CreateLoadCommand(DbConnection conn, int contractId)
     {
         var cmd = conn.CreateCommand();
-        cmd.CommandText = SqlSchemaCompatibility.HasPreviewColumns(conn)
-            ? BatchSql.Replace("c.declared_total ", "c.declared_total, c.discount_percent ", StringComparison.Ordinal)
-            : BatchSql;
+        cmd.CommandText = WithDiscountColumn(conn, BatchSql);
         var parameter = cmd.CreateParameter();
         parameter.ParameterName = "@id";
         parameter.Value = contractId;
@@ -243,6 +243,11 @@ public static class EstimateReader
 
         return cmd;
     }
+
+    private static string WithDiscountColumn(DbConnection conn, string sql) =>
+        SqlSchemaCompatibility.HasPreviewColumns(conn)
+            ? sql.Replace("c.declared_total ", "c.declared_total, c.discount_percent ", StringComparison.Ordinal)
+            : sql;
 
     private static EstimateDocument BuildDocument(int contractId, Head head, TagRules rules,
         List<SystemRow> systems, List<PositionRow> positions, CancellationToken token = default)
@@ -346,13 +351,7 @@ public static class EstimateReader
         }
 
         token.ThrowIfCancellationRequested();
-        var totals = Totals.CalculateOne(rules,
-            new TotalsContract(head.ContractId, head.Kind, head.Form, head.VatRate,
-                head.SmrMode, head.SmrAmount, head.SmrPercent, head.Transport, head.Pnr, head.DiscountPercent),
-            systems.Select(s => new TotalsSystem(s.Id, s.SmrAmount)).ToList(),
-            positions.Select(p => new TotalsPosition(p.SystemId, p.Qty, p.Price,
-                p.WorkPrice ?? 0m, p.OutOfKp, p.ParentId is not null)).ToList(),
-            positions.Count);
+        var totals = CalculateTotals(head, rules, systems, positions);
 
         // SortKey is assigned monotonically as rows are appended.
         var inOrder = rows.Where(r => r.Kind == RowKind.Position).ToList();
@@ -372,6 +371,16 @@ public static class EstimateReader
             DeclaredTotal = head.DeclaredTotal
         };
     }
+
+    private static ContractTotals CalculateTotals(Head head, TagRules rules,
+        IReadOnlyList<SystemRow> systems, IReadOnlyList<PositionRow> positions) =>
+        Totals.CalculateOne(rules,
+            new TotalsContract(head.ContractId, head.Kind, head.Form, head.VatRate,
+                head.SmrMode, head.SmrAmount, head.SmrPercent, head.Transport, head.Pnr, head.DiscountPercent),
+            systems.Select(s => new TotalsSystem(s.Id, s.SmrAmount)).ToList(),
+            positions.Select(p => new TotalsPosition(p.SystemId, p.Qty, p.Price,
+                p.WorkPrice ?? 0m, p.OutOfKp, p.ParentId is not null)).ToList(),
+            positions.Count);
 
     private static EstimateStatistics Statistics(ContractTotals totals, IReadOnlyList<PositionRow> positions)
     {

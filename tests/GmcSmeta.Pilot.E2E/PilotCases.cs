@@ -46,6 +46,7 @@ internal static class PilotCases
 
         p.RunCase("estimate-indexed-hierarchy-and-financial-parity",
             () => EstimateHierarchy(p));
+        p.RunCase("batched-object-card-projection-parity", () => PilotObjectCardCases.Run(p));
 
         p.Skip("full-production-v28-schema-and-migrations",
             "Only a synthetic v28 subset is available in this repository; " +

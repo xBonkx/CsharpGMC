@@ -41,8 +41,11 @@ public sealed record DocRow(
         ? "\nПодготовка КП: " + Navigation.Phase(KpPhase).Title : "") + $"\nИТОГО: {Total:N2} ₽";
 }
 
-public sealed record ObjectDocumentCard(DocRow Document, EstimateDocument Estimate, string BaseTitle, string TagName)
+public sealed record ObjectDocumentCard(DocRow Document, EstimateCardData Estimate, string BaseTitle, string TagName)
 {
+    public ObjectDocumentCard(DocRow document, EstimateDocument estimate, string baseTitle, string tagName)
+        : this(document, EstimateCardData.FromEstimate(estimate), baseTitle, tagName) { }
+
     public int Id => Document.Id;
     public string KindTitle => Document.KindTitle;
     public string Title => Document.Title;
@@ -227,11 +230,17 @@ public static class Workspace
             using var reader = cmd.ExecuteReader();
             while (reader.Read()) tags[Str(reader, 0)] = Str(reader, 1);
         }
-        var cards = new List<ObjectDocumentCard>();
+        var estimates = conn is Microsoft.Data.SqlClient.SqlConnection cardSql
+            ? EstimateReader.LoadCardsSql(cardSql, docs.Select(doc => doc.Id))
+            : null;
+        var docsById = docs.ToDictionary(d => d.Id);
+        var cards = new List<ObjectDocumentCard>(docs.Count);
         foreach (var doc in OrderDocumentCards(docs))
         {
-            var estimate = EstimateReader.Load(conn, doc.Id);
-            var baseDoc = docs.FirstOrDefault(d => d.Id == doc.BaseContractId);
+            var estimate = estimates is null
+                ? EstimateCardData.FromEstimate(EstimateReader.Load(conn, doc.Id))
+                : estimates[doc.Id];
+            var baseDoc = doc.BaseContractId is int baseId ? docsById.GetValueOrDefault(baseId) : null;
             var baseTitle = baseDoc is null ? "" : baseDoc.Title.Split(" — ", 2)[^1];
             cards.Add(new ObjectDocumentCard(doc, estimate, doc.Kind == "dop" ? baseTitle : "",
                 tags.GetValueOrDefault(estimate.Form, estimate.Form)) { Finance = finances[doc.Id] });
