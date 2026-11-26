@@ -63,3 +63,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-019 / ARCH-SIZE-02: ActsEditorView.xaml.cs 2463→2436, ActsEditorView.QuantityReferences.cs 28→62, новый KsReferenceHighlights.cs 50, Program.cs (App.Checks) 581→633 строк. Выделен компонент KsReferenceHighlights и перенесены обработчики ссылок; крупный редактор уменьшен, рост тестового runner — один проверочный сценарий. Общая декомпозиция остаётся отдельной задачей; сборка/тесты не запускались.
 
 - 26.11.2026, PERF-019 / ARCH-SIZE-02: ActsEditorView.xaml.cs 2436→2345, новый KsRowVm.cs 104, Program.cs (App.Checks) 634→635, новый KsRowNotificationChecks.cs 70 строк. KsRowVm извлечён как самостоятельная модель, проверка вынесена из runner. Общая декомпозиция редактора остаётся отдельной задачей; сборка/тесты не запускались.
+
+- 26.11.2026, PERF-026 / ARCH-SIZE: EstimateView.CostSummary.cs 1359→1364, CostMissingPriceIndex.cs 41→52, CostMissingPriceIndexTests.cs 44→66 строк. Встроенная Сводная переиспользует существующий Core-индекс; рост крупного файла — только интеграция/lookup, отдельная декомпозиция остаётся в архитектурной очереди. Сборка/тесты не запускались.

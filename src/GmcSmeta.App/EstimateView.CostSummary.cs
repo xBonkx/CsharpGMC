@@ -123,6 +123,7 @@ public partial class EstimateView
     // ------------------------------------------------------------------ state
     private CostSummaryData? _costSummaryData;
     private List<CostSummaryRow> _summaryRecs = new();
+    private CostMissingPriceIndex _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
     private Dictionary<long, string> _summaryLabels = new();
     private string _summaryMode = "kp";
     private string _summarySort = "kp";
@@ -161,6 +162,7 @@ public partial class EstimateView
         _summaryRevision = "";
         _costSummaryData = null;
         _summaryRecs = new();
+        _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
         _summaryLoading = false;
         if (SummaryGrid is { } grid)
         {
@@ -193,11 +195,12 @@ public partial class EstimateView
                 var data = SqlServerCostSummary.Summary(conn, _contractId);
                 if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new InvalidOperationException("Данные изменились во время чтения сводной. Повтори обновление.");
-                return (Data: data, Revision: before);
+                return (Data: data, Revision: before, Missing: new CostMissingPriceIndex(data.Rows));
             });
             if (version != _summaryLoadVersion || _detached) return;
             _costSummaryData = snapshot.Data;
             _summaryRecs = snapshot.Data.Rows.ToList();
+            _summaryMissingIndex = snapshot.Missing;
             if (SummaryTransferSmrButton is not null)
                 SummaryTransferSmrButton.IsEnabled = !_estimate.Locked;
             if (SummaryExcelButton is not null) SummaryExcelButton.IsEnabled = true;
@@ -276,6 +279,7 @@ public partial class EstimateView
         if (data is null || SummaryGrid is null) return;
         var recs = _summaryRecs;
         var chosen = SummaryMissingSelected();
+        var missingMask = chosen.Aggregate(CostMissingPrice.None, (mask, key) => mask | SummaryFlag(key));
         // пометки «—» на пропусках: nocost — всегда, остальные — при включённом фильтре
         var markKinds = _summaryMissingOn ? chosen : new HashSet<string>();
 
@@ -283,10 +287,10 @@ public partial class EstimateView
         foreach (var item in _summaryMissingItems)
         {
             var key = (string)item.Tag!;
-            var count = recs.Count(r => SummaryFlag(r, key));
+            var count = _summaryMissingIndex.CountAny(SummaryFlag(key));
             item.Header = $"{SummaryMissingKinds.First(k => k.Key == key).Text}: {count}";
         }
-        int missingCount = recs.Count(r => chosen.Any(k => SummaryFlag(r, k)));
+        int missingCount = _summaryMissingIndex.CountAny(missingMask);
         if (SummaryMissingText is not null)
             SummaryMissingText.Text = chosen.Count == 1 && chosen.Contains("nocost")
                 ? $"Без закупочных цен: {missingCount}"
@@ -303,7 +307,7 @@ public partial class EstimateView
         foreach (var r in recs)
         {
             if (systemIds is not null && !systemIds.Contains(r.SystemId)) continue;
-            if (_summaryMissingOn && !chosen.Any(k => SummaryFlag(r, k))) continue;
+            if (_summaryMissingOn && !CostMissingPriceIndex.MatchesAny(r, missingMask)) continue;
             if (words.Length > 0)
             {
                 var hay = $"{r.Name} {_summaryLabels.GetValueOrDefault(r.SystemId, "")} {r.Supplier}".ToLowerInvariant();
@@ -363,9 +367,10 @@ public partial class EstimateView
             }
             else
             {
+                var bySystem = rows.ToLookup(r => r.SystemId);
                 foreach (var (id, label, _) in data.Systems)
                 {
-                    var items = rows.Where(r => r.SystemId == id).ToList();
+                    var items = bySystem[id].ToList();
                     if (items.Count > 0)
                         groups.Add((_summaryLabels.GetValueOrDefault(id, label), id, null, items));
                 }
@@ -603,13 +608,13 @@ public partial class EstimateView
         Supplier = r.Supplier,
     };
 
-    private static bool SummaryFlag(CostSummaryRow r, string key) => key switch
+    private static CostMissingPrice SummaryFlag(string key) => key switch
     {
-        "noprice" => r.NoPrice,
-        "nocost" => r.NoCost,
-        "nowsell" => r.NowSell,
-        "nowcost" => r.NowCost,
-        _ => false,
+        "noprice" => CostMissingPrice.MaterialPrice,
+        "nocost" => CostMissingPrice.MaterialCost,
+        "nowsell" => CostMissingPrice.WorkSell,
+        "nowcost" => CostMissingPrice.WorkCost,
+        _ => CostMissingPrice.None,
     };
 
     private List<SummaryRec> SortRecs(List<SummaryRec> list)
@@ -821,7 +826,7 @@ public partial class EstimateView
         {
             var item = new MenuItem
             {
-                Header = $"{text}: {_summaryRecs.Count(r => SummaryFlag(r, key))}", IsCheckable = true, StaysOpenOnClick = true, Tag = key,
+                Header = $"{text}: {_summaryMissingIndex.CountAny(SummaryFlag(key))}", IsCheckable = true, StaysOpenOnClick = true, Tag = key,
                 IsChecked = _summaryMissingChecked.Contains(key),
             };
             item.Click += (_, _) =>

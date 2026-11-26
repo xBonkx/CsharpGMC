@@ -16,14 +16,25 @@ public sealed class CostMissingPriceIndex
     {
         foreach (var row in rows)
         {
-            var flags = (row.NoPrice ? CostMissingPrice.MaterialPrice : CostMissingPrice.None)
-                | (row.NoCost ? CostMissingPrice.MaterialCost : CostMissingPrice.None)
-                | (row.NowSell ? CostMissingPrice.WorkSell : CostMissingPrice.None)
-                | (row.NowCost ? CostMissingPrice.WorkCost : CostMissingPrice.None);
+            var flags = FlagsOf(row);
             _byId[row.Id] = _byId.GetValueOrDefault(row.Id) | flags;
             _histogram[(int)flags]++;
         }
     }
+
+    public static CostMissingPrice FlagsOf(CostSummaryRow row) =>
+        (row.NoPrice ? CostMissingPrice.MaterialPrice : CostMissingPrice.None)
+        | (row.NoCost ? CostMissingPrice.MaterialCost : CostMissingPrice.None)
+        | (row.NowSell ? CostMissingPrice.WorkSell : CostMissingPrice.None)
+        | (row.NowCost ? CostMissingPrice.WorkCost : CostMissingPrice.None);
+
+    // Embedded summary's enabled-but-empty missing-price filter matches
+    // nothing, unlike the standalone pane's unfiltered None selection.
+    public int CountAny(CostMissingPrice selected) =>
+        selected == CostMissingPrice.None ? 0 : Count(selected);
+
+    public static bool MatchesAny(CostSummaryRow row, CostMissingPrice selected) =>
+        (FlagsOf(row) & selected) != 0;
 
     public int Count(CostMissingPrice selected)
     {
