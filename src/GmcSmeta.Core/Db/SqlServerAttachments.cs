@@ -11,35 +11,51 @@ public static class SqlServerAttachments
     public sealed record Snapshot(string Revision, string Folder, IReadOnlyList<Entry> Entries);
     public sealed record NewFile(string Name, string Path, long Size);
 
-    public static Snapshot Read(string connectionString, long contractId)
+    public static Snapshot Read(string connectionString, long contractId, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
-        var revision = SqlServerDatabase.Revision(conn);
-        var folder = Folder(conn, null, contractId);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
+        var revision = Revision();
+        var folder = Folder(conn, null, contractId, token);
         var entries = new List<Entry>();
         using (var cmd = new SqlCommand(
             "SELECT id,name,path,size,COALESCE(added_by,''),COALESCE(added_at,GETDATE()),COALESCE(note,'')," +
             "COALESCE(role,''),COALESCE(is_primary,0) FROM dbo.attachments WHERE contract_id=@c ORDER BY added_at,id", conn))
         {
             cmd.Parameters.Add("@c", SqlDbType.BigInt).Value = contractId;
-            using var reader = cmd.ExecuteReader();
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
             while (reader.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 entries.Add(new Entry(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
                     Convert.ToInt64(reader.GetValue(3)), reader.GetString(4), reader.GetDateTime(5),
                     reader.GetString(6), reader.GetString(7), Convert.ToBoolean(reader.GetValue(8))));
+            }
         }
-        if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
+        token.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(revision) || revision != Revision())
             throw new DBConcurrencyException("Вложения изменились при чтении. Обновите список.");
+        token.ThrowIfCancellationRequested();
         return new Snapshot(revision, folder, entries);
     }
 
-    private static string Folder(SqlConnection conn, SqlTransaction? tx, long contractId)
+    private static string Folder(SqlConnection conn, SqlTransaction? tx, long contractId, CancellationToken token = default)
     {
         using var cmd = new SqlCommand(
             "SELECT COALESCE(o.folder,N'') FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@c", conn, tx);
         cmd.Parameters.Add("@c", SqlDbType.BigInt).Value = contractId;
-        return cmd.ExecuteScalar() as string ??
-            throw new InvalidOperationException("Документ не найден.");
+        token.ThrowIfCancellationRequested();
+        var value = token.CanBeCanceled
+            ? cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult()
+            : cmd.ExecuteScalar();
+        token.ThrowIfCancellationRequested();
+        return value as string ?? throw new InvalidOperationException("Документ не найден.");
     }
 
     private static string Check(SqlConnection conn, SqlTransaction tx, long contractId, string expected)

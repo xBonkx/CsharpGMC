@@ -1,5 +1,4 @@
 using System;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -42,13 +41,16 @@ public sealed class AttachmentWindow : Window
     private readonly long _contractId;
     private readonly bool _signedOnly;
     private bool _loading;
+    private bool _closed;
+    private bool _allowCloseDuringRead;
+    private CancellationTokenSource? _readCancellation;
     private string _revision = "";
     private string _objectFolder = "";
     private readonly List<(Button Button, Func<bool> Available)> _commands = new();
     private bool CanWrite => !_loading && !string.IsNullOrWhiteSpace(_revision) &&
         SqlSchemaCompatibility.IsWritablePilot(new SqlConnectionStringBuilder(_connectionString).InitialCatalog,
             new SqlConnectionStringBuilder(_connectionString).DataSource);
-    private readonly ObservableCollection<AttachmentRow> _rows = new();
+    private IReadOnlyList<AttachmentRow> _rows = Array.Empty<AttachmentRow>();
     private readonly DataGrid _grid = new()
     {
         AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
@@ -101,7 +103,7 @@ public sealed class AttachmentWindow : Window
             {
                 if (_loading) return;
                 new AttachmentWindow(_connectionString, _contractId, Title) { Owner = this }.ShowDialog();
-                await ReloadAsync();
+                await ReloadAsync(allowClose: true);
             };
             footer.Children.Add(existing);
         }
@@ -149,8 +151,13 @@ public sealed class AttachmentWindow : Window
         DockPanel.SetDock(_grid, Dock.Top);
         root.Children.Add(_grid);
 
-        Loaded += async (_, _) => await ReloadAsync();
-        Closing += (_, e) => { if (_loading) e.Cancel = true; };
+        Loaded += async (_, _) => await ReloadAsync(allowClose: true);
+        Closing += (_, e) => { if (_loading && !_allowCloseDuringRead) e.Cancel = true; };
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _readCancellation?.Cancel();
+        };
     }
 
     private void UpdateCommands()
@@ -158,28 +165,52 @@ public sealed class AttachmentWindow : Window
         foreach (var command in _commands) command.Button.IsEnabled = command.Available();
     }
 
-    private async System.Threading.Tasks.Task ReloadAsync()
+    private async Task ReloadAsync(bool allowClose = false)
     {
+        if (_closed || _readCancellation is not null) return;
+        using var cancellation = new CancellationTokenSource();
+        _readCancellation = cancellation;
+        var token = cancellation.Token;
+        _loading = true;
+        _allowCloseDuringRead = allowClose;
+        _revision = "";
+        _objectFolder = "";
+        UpdateCommands();
         try
         {
-            _loading = true;
-            _revision = "";
-            UpdateCommands();
-            var snapshot = await System.Threading.Tasks.Task.Run(() => SqlServerAttachments.Read(_connectionString, _contractId));
+            var snapshot = await Task.Run(() =>
+            {
+                var data = SqlServerAttachments.Read(_connectionString, _contractId, token);
+                var rows = new List<AttachmentRow>(data.Entries.Count);
+                foreach (var entry in data.Entries)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!_signedOnly || entry.Role == "signed_contract") rows.Add(ToRow(entry));
+                }
+                return (Rows: rows.AsReadOnly(), data.Folder, data.Revision);
+            }, token);
+            if (_closed || token.IsCancellationRequested) return;
             var selected = (_grid.SelectedItem as AttachmentRow)?.Id;
-            var rows = snapshot.Entries.Select(ToRow).Where(row => !_signedOnly || row.Role == "signed_contract").ToList();
-            _rows.Clear();
-            foreach (var row in rows) _rows.Add(row);
-            _grid.SelectedItem = rows.FirstOrDefault(row => row.Id == selected);
+            _rows = snapshot.Rows;
+            _grid.ItemsSource = _rows;
+            _grid.SelectedItem = _rows.FirstOrDefault(row => row.Id == selected);
             _objectFolder = snapshot.Folder;
             _revision = snapshot.Revision;
         }
         catch (Exception ex)
         {
-            _rows.Clear();
+            if (_closed || token.IsCancellationRequested) return;
+            _rows = Array.Empty<AttachmentRow>();
+            _grid.ItemsSource = _rows;
             MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        finally { _loading = false; UpdateCommands(); }
+        finally
+        {
+            _readCancellation = null;
+            _allowCloseDuringRead = false;
+            _loading = false;
+            if (!_closed) UpdateCommands();
+        }
     }
 
     private static AttachmentRow ToRow(SqlServerAttachments.Entry item) => new()
