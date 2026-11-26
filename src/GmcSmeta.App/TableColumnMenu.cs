@@ -75,6 +75,11 @@ public static class TableColumnMenu
             }));
     }
 
+    internal static void RequestSummaryFit(DataGrid grid)
+    {
+        if (Layouts.TryGetValue(grid, out var layout)) layout.RequestSummaryFit();
+    }
+
     internal static void AppendDynamicMenu(DataGrid grid, ItemsControl menu)
     {
         if (!Layouts.TryGetValue(grid, out var layout)) return;
@@ -190,6 +195,17 @@ public static class TableColumnMenu
     private sealed class Layout(DataGrid grid, string key)
     {
         private Entry[] _entries = Array.Empty<Entry>();
+        private SummaryColumnFit? _summaryFit;
+
+        internal void RequestSummaryFit() => _summaryFit?.Request();
+
+        private double SummaryPreferred(DataGridColumn column)
+        {
+            var entry = _entries.FirstOrDefault(e => e.Column == column);
+            return entry is not null && _prefs.Widths.TryGetValue(entry.Id, out var width) &&
+                double.IsFinite(width) && width is >= 36 and <= 2000
+                ? width : SummaryColumnFit.DefaultPreferred(column.SortMemberPath);
+        }
 
         internal void Rebuild(string newKey)
         {
@@ -323,6 +339,11 @@ public static class TableColumnMenu
                 }
             }
             finally { _applying = false; }
+            if (key == "estimate-summary")
+            {
+                _summaryFit ??= new SummaryColumnFit(grid, SummaryPreferred);
+                RequestSummaryFit();
+            }
         }
 
         private bool CanHide(DataGridColumn column) => column.Visibility != Visibility.Visible ||
@@ -394,6 +415,7 @@ public static class TableColumnMenu
                 if (!Current()) return;
                 foreach (var entry in _entries.Where(x => !x.Excluded)) entry.Column.Width = entry.Width;
                 Save(prefs => prefs.Widths.Clear());
+                RequestSummaryFit();
             };
             menu.Items.Add(widths);
             var order = new MenuItem { Header = "Вернуть порядок столбцов", IsEnabled = grid.CanUserReorderColumns };
@@ -425,6 +447,7 @@ public static class TableColumnMenu
                     .Concat(changed.Where(x => GetDefaultHidden(x.Column) && x.Column.Visibility == Visibility.Visible)
                         .Select(x => x.Id)).Distinct().ToList();
             });
+            RequestSummaryFit();
         }
 
         internal void SaveOrder()
@@ -444,6 +467,7 @@ public static class TableColumnMenu
         {
             if (!Ready() || HeaderFrom(e.OriginalSource as DependencyObject, grid) is null) return;
             _resizeStart = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
+            if (_summaryFit is not null) _summaryFit.Suspended = true;
         }
 
         internal void ResizeCompleted(object sender, DragCompletedEventArgs e)
@@ -451,13 +475,24 @@ public static class TableColumnMenu
             var before = _resizeStart;
             _resizeStart = null;
             if (before is not null && !e.Canceled) SaveWidths(before);
+            if (_summaryFit is not null) _summaryFit.Suspended = false;
+            RequestSummaryFit();
         }
 
         internal void HeaderDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount != 2 || e.OriginalSource is not Thumb thumb || HeaderFrom(thumb, grid) is null || !Ready()) return;
             var before = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
-            grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => SaveWidths(before)));
+            if (_summaryFit is not null) _summaryFit.Suspended = true;
+            grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                try { SaveWidths(before); }
+                finally
+                {
+                    if (_summaryFit is not null) _summaryFit.Suspended = false;
+                    RequestSummaryFit();
+                }
+            }));
         }
 
         private void SaveWidths(Dictionary<DataGridColumn, DataGridLength> before)

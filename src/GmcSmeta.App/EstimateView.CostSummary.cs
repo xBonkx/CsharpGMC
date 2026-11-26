@@ -518,6 +518,7 @@ public partial class EstimateView
         _summaryPendingView = null;
         var source = new ObservableCollection<SummaryRow>(built);
         grid.ItemsSource = source;
+        TableColumnMenu.RequestSummaryFit(grid);
         if (state is null) return;
 
         // Use exact stable keys; duplicate/ambiguous keys must not carry selection.

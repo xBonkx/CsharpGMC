@@ -172,6 +172,7 @@ internal static class Program
         CheckSignedActTabReuse();
         CheckKsReferenceHighlights();
         CheckSummaryTableFrame();
+        SummaryColumnFitChecks.Run();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
         LegacySummaryChecks.Run();
