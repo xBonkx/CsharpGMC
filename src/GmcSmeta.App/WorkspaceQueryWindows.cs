@@ -370,15 +370,8 @@ public sealed class CatalogWindow : Window
             var search = _filter.Text;
             var skip = _page * 200;
             // 201st row is a cheap look-ahead; no expensive COUNT over a 50k-item catalog.
-            var result = await Task.Run(() =>
-            {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                var before = SqlServerDatabase.Revision(conn);
-                var rows = SqlServerWorkspaceNavigation.Catalog(_connectionString, search, skip, 201);
-                if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
-                    throw new System.Data.DBConcurrencyException("Каталог обновлён другим сотрудником. Повтори поиск.");
-                return (Rows: rows, Revision: before);
-            });
+            var result = await Task.Run(() => SqlServerWorkspaceNavigation.CatalogSnapshot(
+                _connectionString, search, skip, 201));
             if (_closed || generation != _request) return;
             var rows = result.Rows;
             _revision = result.Revision;

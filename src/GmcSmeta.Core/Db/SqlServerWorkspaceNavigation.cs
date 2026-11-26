@@ -144,10 +144,42 @@ public static class SqlServerWorkspaceNavigation
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take));
         using var conn = SqlServerDatabase.Open(connectionString);
+        return ReadCatalogPage(conn, query, skip, take, includeUsageCount: true, token: default);
+    }
+
+    /// <summary>One guarded connection for the page and both revision checks.
+    /// The picker does not need the usage count; management still displays it.</summary>
+    public static (IReadOnlyList<CatalogEntry> Rows, string Revision) CatalogSnapshot(
+        string connectionString, string? query, int skip, int take,
+        string? expectedRevision = null, bool includeUsageCount = true, CancellationToken token = default)
+    {
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take));
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
+        var before = Revision();
+        if (string.IsNullOrWhiteSpace(before) || (expectedRevision is not null && before != expectedRevision))
+            throw new DBConcurrencyException("Смета или каталог изменились. Обновите данные и повторите поиск.");
+        var rows = ReadCatalogPage(conn, query, skip, take, includeUsageCount, token);
+        if (before != Revision())
+            throw new DBConcurrencyException("Каталог обновлён другим сотрудником. Повторите поиск.");
+        token.ThrowIfCancellationRequested();
+        return (rows, before);
+    }
+
+    private static IReadOnlyList<CatalogEntry> ReadCatalogPage(SqlConnection conn, string? query,
+        int skip, int take, bool includeUsageCount, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         var words = Words(query);
         using var cmd = new SqlCommand(
             "SELECT c.id,c.name,c.unit,COALESCE(latest.price,0),COALESCE(latest.purchase_price,0)," +
-            "(SELECT COUNT_BIG(*) FROM dbo.positions p WHERE p.catalog_item_id=c.id) " +
+            (includeUsageCount ? "(SELECT COUNT_BIG(*) FROM dbo.positions p WHERE p.catalog_item_id=c.id) " : "CAST(0 AS bigint) ") +
             "FROM dbo.catalog_items c OUTER APPLY " +
             "(SELECT TOP (1) p.price,p.purchase_price FROM dbo.positions p " +
             " WHERE p.catalog_item_id=c.id AND p.price>0 ORDER BY p.id DESC) latest " +
@@ -156,13 +188,18 @@ public static class SqlServerWorkspaceNavigation
         AddWords(cmd, words);
         cmd.Parameters.Add("@skip", SqlDbType.Int).Value = skip;
         cmd.Parameters.Add("@take", SqlDbType.Int).Value = take;
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var rows = new List<CatalogEntry>();
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             rows.Add(new CatalogEntry(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1), r.IsDBNull(2) ? "" : r.GetString(2),
                 r.IsDBNull(3) ? 0m : Convert.ToDecimal(r.GetValue(3), CultureInfo.InvariantCulture),
                 r.IsDBNull(4) ? 0m : Convert.ToDecimal(r.GetValue(4), CultureInfo.InvariantCulture),
                 Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture)));
+        }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 

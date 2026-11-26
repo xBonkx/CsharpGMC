@@ -54,6 +54,7 @@ public sealed class CatalogPickerWindow : Window
     private readonly Button _next;
     private int _page;
     private int _request;
+    private CancellationTokenSource? _pageCancellation;
     private bool _closed;
     private bool _pageReady;
     private readonly string _expectedRevision;
@@ -151,6 +152,7 @@ public sealed class CatalogPickerWindow : Window
             _closed = true;
             _delay.Stop();
             ++_request;
+            _pageCancellation?.Cancel();
             _pageReady = false;
             ReleasePage();
             _chosen.Clear();
@@ -172,6 +174,7 @@ public sealed class CatalogPickerWindow : Window
     private void InvalidatePage()
     {
         ++_request;
+        _pageCancellation?.Cancel();
         _pageReady = false;
         _prev.IsEnabled = _next.IsEnabled = false;
     }
@@ -206,23 +209,20 @@ public sealed class CatalogPickerWindow : Window
         SavePageState();
         ReleasePage();
         var generation = _request;
+        using var cancellation = new CancellationTokenSource();
+        _pageCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             _count.Text = "Загрузка…";
             var search = _filter.Text;
             var skip = _page * PageSize;
             // 201st row is a cheap look-ahead; no expensive COUNT over the catalog.
-            var rows = await Task.Run(() =>
-            {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                if (SqlServerDatabase.Revision(conn) != _expectedRevision)
-                    throw new InvalidOperationException("Смета или каталог изменились. Закройте окно и обновите смету.");
-                var result = SqlServerWorkspaceNavigation.Catalog(_connectionString, search, skip, PageSize + 1);
-                if (SqlServerDatabase.Revision(conn) != _expectedRevision)
-                    throw new InvalidOperationException("Смета или каталог изменились во время поиска. Откройте справочник заново.");
-                return result;
-            });
-            if (_closed || generation != _request) return;
+            var snapshot = await Task.Run(() => SqlServerWorkspaceNavigation.CatalogSnapshot(
+                _connectionString, search, skip, PageSize + 1, _expectedRevision,
+                includeUsageCount: false, token: token), token);
+            if (_closed || token.IsCancellationRequested || generation != _request) return;
+            var rows = snapshot.Rows;
             foreach (var entry in rows.Take(PageSize))
             {
                 var row = _chosen.TryGetValue(entry.Id, out var kept) ? kept : new CatalogPickRow
@@ -242,11 +242,15 @@ public sealed class CatalogPickerWindow : Window
         }
         catch (Exception ex)
         {
-            if (!_closed && generation == _request)
+            if (!_closed && !token.IsCancellationRequested && generation == _request)
             {
                 _count.Text = "Поиск не завершён. Измените запрос или откройте справочник заново.";
                 WorkspaceWindowUi.Error(this, ex, Title);
             }
+        }
+        finally
+        {
+            if (ReferenceEquals(_pageCancellation, cancellation)) _pageCancellation = null;
         }
     }
 
