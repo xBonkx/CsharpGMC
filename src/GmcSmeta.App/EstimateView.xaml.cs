@@ -272,7 +272,10 @@ public partial class EstimateView : UserControl
         TransportEdit.Text = est.Totals.Transport == 0m ? "0" : N2(est.Totals.Transport);
         PnrCard.Visibility = Visibility.Visible;
         PnrEdit.Text = est.Totals.Pnr == 0m ? "0" : N2(est.Totals.Pnr);
-        SmrEdit.Text = N2(est.SmrMode == "sum" ? est.Statistics.Smr : est.Totals.Smr);
+        SmrEdit.Text = est.SmrMode == "percent"
+            ? NumberText.QtyText(est.SmrPercent)
+            : N2(string.IsNullOrWhiteSpace(est.SmrMode) || est.SmrMode == "sum"
+                ? est.Statistics.Smr : est.Totals.Smr);
 
         var sourceCheck=est.SourceCheck;
         SourceCheckChip.Visibility=sourceCheck.Matches==false?Visibility.Visible:Visibility.Collapsed;

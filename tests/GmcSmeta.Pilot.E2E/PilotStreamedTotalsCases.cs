@@ -44,7 +44,10 @@ internal static class PilotStreamedTotalsCases
             PilotRunner.Execute(conn, "UPDATE dbo.contracts SET form=@form,smr_mode=@mode WHERE id=@id",
                 ("@form", form), ("@mode", mode), ("@id", id));
             var revision = SqlServerDatabase.Revision(conn);
-            var reference = EstimateReader.Load(conn, contractId).Totals;
+            var document = EstimateReader.Load(conn, contractId);
+            var reference = document.Totals;
+            PilotRunner.Check(document.SmrMode == mode && document.SmrPercent == 13.25m,
+                $"Stored SMR mode/percent differs for {form}/{mode}");
             var all = Totals.ReadAll(conn).Single(t => t.Id == contractId);
             var one = Totals.ReadOne(conn, contractId);
             PilotRunner.Check(all == reference && one == reference && all.Positions == 6,

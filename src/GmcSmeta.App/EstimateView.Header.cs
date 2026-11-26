@@ -282,7 +282,7 @@ public partial class EstimateView
         SmrEdit.ToolTip = byPos
             ? "СМР по позициям: сумма работ по строкам — правится в колонке «Работа за ед.»"
             : bySys ? "СМР по системам: правится в строках систем"
-            : pct ? $"Процент от материалов = {N2(est.Totals.Smr)} ₽"
+            : pct ? $"Сохранённый процент от материалов (только просмотр): {NumberText.QtyText(est.SmrPercent)}% = {N2(est.Totals.Smr)} ₽"
             : "СМР: общая сумма (Enter — сохранить)";
         switch (mode)
         {

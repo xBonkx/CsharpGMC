@@ -68,6 +68,7 @@ public sealed record EstimateDocument(
 {
     public EstimateStatistics Statistics { get; init; } = new(0, 0, 0);
     public string SmrMode { get; init; } = "";
+    public decimal SmrPercent { get; init; }
     public bool BasisAllowed { get; init; }
     // Этап подготовки КП (kp_workflow.PHASES эталона): volumes / prices / review / ready / sent.
     public string KpPhase { get; init; } = "";
@@ -367,6 +368,7 @@ public static partial class EstimateReader
             rows, inOrder, totals)
         {
             SmrMode = head.SmrMode,
+            SmrPercent = head.SmrPercent,
             BasisAllowed = AreaCellPresentation.IsBasisAllowed(head.Form, rules.Has(head.Form, "basis")),
             Statistics = Statistics(totals, positions),
             KpPhase = head.KpPhase,

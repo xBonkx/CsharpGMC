@@ -62,4 +62,22 @@ public sealed class EstimateMoneyCardSourceTests
         Assert.Contains("(pct || bySys || byPos) && est.Statistics.WorkRows != 0", header);
         Assert.Contains("SmrHintText.Visibility = string.IsNullOrEmpty(SmrHintText.Text)", header);
     }
+
+    [Fact]
+    public void PercentModeDisplaysStoredPercentAndCannotSaveItAsMoney()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var code = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        var header = File.ReadAllText(Path.Combine(app, "EstimateView.Header.cs"));
+        Assert.Contains("SmrEdit.Text = est.SmrMode == \"percent\"", code);
+        Assert.Contains("NumberText.QtyText(est.SmrPercent)", code);
+        Assert.Contains("SmrEdit.IsReadOnly = est.Locked || pct || bySys || byPos", header);
+        Assert.Contains("box.IsReadOnly) return;", header);
+        Assert.Contains("TransportEdit.Text = est.Totals.Transport == 0m ? \"0\" : N2(est.Totals.Transport)", code);
+        Assert.Contains("PnrEdit.Text = est.Totals.Pnr == 0m ? \"0\" : N2(est.Totals.Pnr)", code);
+    }
 }
