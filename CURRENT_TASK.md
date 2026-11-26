@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — значок превышения в таблице выдачи (SHIP-VIS-05)
+
+27.11.2026 ChatGPT / main (база 6340bd9) — SHIP-VIS-05 PARTIAL: Python aa6b34dcf0314df93086a297f01d549ff58cf705 ship_view.py `_set_row` icon("alert", C["warn"], 14), theme.py alert path/stroke 1.9 round/#B45309. В ShipmentNowCell добавлен штатный GlyphAlert 14 DIP, видимый только при StockOverrun; при выделении белый для контраста, при редактировании скрыт. Сохранены DataGridTextColumn, TextBox editor, ContentPresenter, focus overlay и обработчики записи. Без изменений SQL/БД, фильтров/выбора/виртуализации. Source regression проверяет размер/ресурс/условия/редактор/focus. Статическая сверка, Windows build/xUnit/GUI не запускались; проверить DPI, клавиатуру, edit/cancel, 2500+ строк и readback превышение→норма→превышение. Цвет выделения — адаптация WPF.
+
 ## 26.11.2026 — палитра подсистем выдачи (SHIP-VIS-05)
 
 26.11.2026 ChatGPT / main (база 6c1be85) — SHIP-VIS-05 PARTIAL: по Python aa6b34dcf0314df93086a297f01d549ff58cf705 ship_view.py `_fill`, theme.py system_row/subsystem_row, заголовок подсистемы #E8F5FC (обычной #F1F4F9). В существующий SELECT IssuableRows добавлен sy.parent_id (столбец уже используется SqlServerProcurement); p.parent_id остаётся отдельным признаком комплектующей. IsSubsystem передан через IssuableRow/ShipmentPreviewRow/ShipmentSystemGroup, исторические строки по умолчанию false; при изменении признака incremental readback переходит на полное чтение. Не добавлены запросы/параметры, DDL, записи или миграции. Обработчики групп и существующие конструкторы IssuableRow сохранены; source regression дополнена. Статически сверены индексы 11/12, XAML, full/incremental. Windows build/xUnit/SQL Pilot/GUI не запускались. Приёмка: обычная система с комплектующей, подсистема без/с комплектующей, одинаковые названия, перенос системы, фильтр/массовый выбор/раскрытие, 2500+ строк, DPI. Иконки без изменений.

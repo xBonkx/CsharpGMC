@@ -51,6 +51,49 @@
         </Style>
         <Style x:Key="ShipmentNowCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
             <Setter Property="ToolTip" Value="{Binding QtyHint}"/>
+            <!-- Keep the native DataGridTextColumn editor and the PythonGridCell focus overlay. -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}">
+                                <DockPanel LastChildFill="True">
+                                    <Viewbox x:Name="StockAlert" DockPanel.Dock="Left" Width="14" Height="14"
+                                             Margin="0,0,4,0" VerticalAlignment="Center"
+                                             Visibility="Collapsed" IsHitTestVisible="False">
+                                        <Canvas Width="24" Height="24">
+                                            <Path x:Name="StockAlertPath" Style="{StaticResource SvgGlyphPath}"
+                                                  Data="{StaticResource GlyphAlert}" Stroke="#B45309"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <ContentPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                </DockPanel>
+                            </Border>
+                            <Rectangle x:Name="CurrentCellFrame" Stroke="Transparent"
+                                       StrokeThickness="2" Margin="1" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding StockOverrun}" Value="True">
+                                <Setter TargetName="StockAlert" Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="StockAlertPath" Property="Stroke" Value="{StaticResource GridSelectionTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="CurrentCellFrame" Property="Stroke" Value="{StaticResource GridFocusBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEditing" Value="True">
+                                <Setter TargetName="StockAlert" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="CurrentCellFrame" Property="Stroke" Value="{StaticResource GridFocusBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding InShipment}" Value="False">
                     <Setter Property="Background" Value="#EEF4FF"/>

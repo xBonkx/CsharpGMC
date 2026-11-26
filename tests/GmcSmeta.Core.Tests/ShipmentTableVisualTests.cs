@@ -41,6 +41,26 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("StockOverrun", nowCell);
         Assert.Contains("GridSelectionTextBrush", nowCell);
         Assert.Contains("{Binding QtyHint}", nowCell);
+        var cellTemplate = Assert.Single(Style("ShipmentNowCell").Descendants(p + "ControlTemplate"));
+        var alert = Assert.Single(cellTemplate.Descendants(p + "Viewbox"));
+        Assert.Equal("14", (string?)alert.Attribute("Width"));
+        Assert.Equal("14", (string?)alert.Attribute("Height"));
+        Assert.Equal("Collapsed", (string?)alert.Attribute("Visibility"));
+        Assert.Equal("False", (string?)alert.Attribute("IsHitTestVisible"));
+        var alertPath = Assert.Single(alert.Descendants(p + "Path"));
+        Assert.Equal("{StaticResource GlyphAlert}", (string?)alertPath.Attribute("Data"));
+        Assert.Equal("#B45309", (string?)alertPath.Attribute("Stroke"));
+        Assert.Single(cellTemplate.Descendants(p + "ContentPresenter"));
+        var triggers = cellTemplate.Descendants(p + "Trigger").ToArray();
+        Assert.Contains(triggers, e => (string?)e.Attribute("Property") == "IsEditing" &&
+            e.Elements(p + "Setter").Any(s => (string?)s.Attribute("TargetName") == "StockAlert" &&
+                (string?)s.Attribute("Value") == "Collapsed"));
+        Assert.Contains(triggers, e => (string?)e.Attribute("Property") == "IsKeyboardFocusWithin" &&
+            e.Elements(p + "Setter").Any(s => (string?)s.Attribute("TargetName") == "CurrentCellFrame"));
+        var stockTrigger = Assert.Single(cellTemplate.Descendants(p + "DataTrigger"));
+        Assert.Equal("{Binding StockOverrun}", (string?)stockTrigger.Attribute("Binding"));
+        Assert.Contains(stockTrigger.Elements(p + "Setter"), s => (string?)s.Attribute("TargetName") == "StockAlert" &&
+            (string?)s.Attribute("Value") == "Visible");
         Assert.Contains("{Binding QtyHint}", Style("ShipmentNowText").ToString());
         var leftStyle = Style("ShipmentLeftText").ToString();
         Assert.Contains("всё", leftStyle);
