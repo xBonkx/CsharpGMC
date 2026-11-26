@@ -12,7 +12,8 @@ namespace GmcSmeta.App;
 public static class KsVorForms
 {
     private sealed record Row(string? Heading, SqlServerKsPrintData.Line? Line);
-    private const string QuantityFormat="#,##0.####";
+    private const string WholeQuantityFormat="#,##0";
+    private const string FractionalQuantityFormat="#,##0.####";
 
     public static XLWorkbook Create(SqlServerKsPrintData.Package package, long actId)
     {
@@ -84,8 +85,13 @@ public static class KsVorForms
 
     private static void SetQuantity(IXLWorksheet ws,int row,int col,decimal qty)
     {
-        ws.Cell(row,col).Value=(double)decimal.Round(qty,4,MidpointRounding.AwayFromZero);
-        ws.Cell(row,col).Style.NumberFormat.Format=QuantityFormat;
+        var rounded=decimal.Round(qty,4,MidpointRounding.AwayFromZero);
+        var cell=ws.Cell(row,col);
+        cell.Value=(double)rounded;
+        // Excel retains the decimal separator in "0.####" even for whole values.
+        // Decide from the exported rounded number, not the original quantity.
+        cell.Style.NumberFormat.Format=rounded==decimal.Truncate(rounded)
+            ?WholeQuantityFormat:FractionalQuantityFormat;
     }
 
     private static void FillStandard(IXLWorksheet ws,SqlServerKsPrintData.Package p,

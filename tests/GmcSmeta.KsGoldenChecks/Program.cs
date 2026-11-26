@@ -35,6 +35,8 @@ internal static class Program
                 () => CheckDocuments(frozenForm, 300, includePdf: false));
             Check(form + ": signed/unsigned multi-DS group and formulas",
                 () => CheckMultiDs(frozenForm));
+            Check(form + ": VOR numeric quantities without dangling separator",
+                () => CheckVorQuantityFormat(frozenForm));
         }
 
         foreach (var form in new[] { "dns", "r4" })
@@ -401,6 +403,47 @@ internal static class Program
                 label + " Python gross");
             MoneyEquals(item.GetProperty("vat").GetDecimal(), calculated.Vat,
                 label + " Python VAT");
+        }
+    }
+
+    private static void CheckVorQuantityFormat(string form)
+    {
+        var cases = new (decimal Input, decimal Expected, string Display, string Format)[]
+        {
+            (648m, 648m, "648", "#,##0"),
+            (680m, 680m, "680", "#,##0"),
+            (562m, 562m, "562", "#,##0"),
+            (344m, 344m, "344", "#,##0"),
+            (1m, 1m, "1", "#,##0"),
+            (993.6m, 993.6m, "993.6", "#,##0.####"),
+            (1142.64m, 1142.64m, "1,142.64", "#,##0.####"),
+            (0.12345m, 0.1235m, "0.1235", "#,##0.####"),
+            (999.99996m, 1000m, "1,000", "#,##0"),
+            (0.00001m, 0m, "0", "#,##0"),
+        };
+        var original=Fixture(form,cases.Length);
+        var lines=original.Lines.Select((line,i)=>line with
+            { Name="VOR-QTY-"+i, Quantity=cases[i].Input }).ToList();
+        var package=original with { Lines=lines };
+        using var book=KsVorForms.Create(package,package.Report.Acts[0].Id);
+        using var stream=new MemoryStream();
+        book.SaveAs(stream);
+        stream.Position=0;
+        using var reopened=new XLWorkbook(stream);
+        var sheet=form=="r4"?reopened.Worksheet("ВОР"):reopened.Worksheet(1);
+        var nameCol=form=="r4"?6:form=="dns"?4:2;
+        var qtyCol=form=="r4"?8:form=="dns"?6:4;
+        for(var i=0;i<cases.Length;i++)
+        {
+            var label="VOR-QTY-"+i;
+            var name=sheet.Column(nameCol).CellsUsed().Single(c=>c.GetString()==label);
+            var cell=sheet.Cell(name.Address.RowNumber,qtyCol);
+            var expected=cases[i];
+            Assert(cell.DataType==XLDataType.Number,label+" must remain numeric");
+            Assert((decimal)cell.GetDouble()==expected.Expected,label+" quantity changed");
+            Assert(cell.Style.NumberFormat.Format==expected.Format,label+" number format");
+            Assert(cell.GetFormattedString(CultureInfo.InvariantCulture)==expected.Display,
+                label+" displayed as "+cell.GetFormattedString(CultureInfo.InvariantCulture));
         }
     }
 

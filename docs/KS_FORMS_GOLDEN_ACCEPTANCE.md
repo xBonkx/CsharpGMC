@@ -196,3 +196,7 @@ second-engine checks, compare a frozen Python/C# source contract, then
 SQL Pilot and manually rendered forms. Escalate any necessary API hook or
 cross-owner change to coordinator before editing it. Coordinator alone
 merges the PR to `main`.
+
+## 27.11.2026 — BUG-F55: VOR quantity format regression
+
+27.11.2026 ChatGPT / main (база c1bb96f) — BUG-F55 CODE READY: пользователь сообщил о завершающей точке в Excel ВОР (648., 680., 562., 344., 1.). KsVorForms.SetQuantity уже записывал число, но общий формат #,##0.#### оставляет десятичный разделитель у целых. Для всех стандартного/DNS/R4 шаблонов выбирается #,##0 для целого результата после существующего округления до 4 знаков AwayFromZero и #,##0.#### для дробного. Тип ячейки числовой, группировка разрядов, шаблоны, исходные данные и расчёты сохранены. Python export_vor.py aa6b34d: standard/DNS round(qty,4), R4 numeric write; правила C# округления не изменены. Добавлены три offline golden сценария (10 значений на форму), XLSX save/reopen, числовой тип, значение, формат и GetFormattedString, включая 993.6, 1142.64, округление до целого/нуля. Статическая сверка исходников; .NET/ClosedXML golden, Excel desktop и печать не запускались. Проверить новую выгрузку всех форм в Excel; уже созданные файлы автоматически не исправляются. SQL/БД и релиз не менялись.
