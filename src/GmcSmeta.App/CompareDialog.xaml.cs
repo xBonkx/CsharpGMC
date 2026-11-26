@@ -33,6 +33,9 @@ public partial class CompareDialog : Window
     private readonly int _currentId;
     private readonly List<(int Id, string Title)> _docs = new();
     private CompareResult? _result;
+    private CancellationTokenSource? _loadCancellation;
+    private bool _initializing = true;
+    private bool _closed;
 
     public CompareDialog(string connectionString, int contractId, IReadOnlyList<(int Id, string Title)> docs)
     {
@@ -48,7 +51,15 @@ public partial class CompareDialog : Window
         var me = _docs.FindIndex(d => d.Id == contractId);
         ComboB.SelectedIndex = me;
         ComboA.SelectedIndex = me > 0 ? me - 1 : (_docs.Count > 1 ? 1 : 0);
-        Refresh();
+        ExportButton.IsEnabled = false;
+        InfoText.Text = "Загрузка сравнения…";
+        _initializing = false;
+        Loaded += async (_, _) => await RefreshAsync();
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _loadCancellation?.Cancel();
+        };
     }
 
     private sealed record ComboItem(int Id, string Title)
@@ -56,32 +67,67 @@ public partial class CompareDialog : Window
         public override string ToString() => Title;
     }
 
-    private void Swap_Click(object sender, RoutedEventArgs e)
+    private async void Swap_Click(object sender, RoutedEventArgs e)
     {
-        (ComboA.SelectedIndex, ComboB.SelectedIndex) = (ComboB.SelectedIndex, ComboA.SelectedIndex);
+        _initializing = true;
+        try
+        {
+            (ComboA.SelectedIndex, ComboB.SelectedIndex) = (ComboB.SelectedIndex, ComboA.SelectedIndex);
+        }
+        finally { _initializing = false; }
+        await RefreshAsync();
     }
 
-    private void Combo_Changed(object sender, SelectionChangedEventArgs e) => Refresh();
-    private void Refresh_Changed(object sender, RoutedEventArgs e) => Refresh();
-
-    private void Refresh()
+    private async void Combo_Changed(object sender, SelectionChangedEventArgs e)
     {
+        if (!_initializing && IsLoaded) await RefreshAsync();
+    }
+
+    private void Refresh_Changed(object sender, RoutedEventArgs e)
+    {
+        // This is a presentation filter, not a new database comparison.
+        if (!_initializing && _result is not null) ShowResult();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_closed) return;
+        _loadCancellation?.Cancel();
+        _loadCancellation = null;
+        _result = null;
+        ExportButton.IsEnabled = false;
+        CompareGrid.ItemsSource = null;
+        TileMatValue.Text = TileSmrValue.Text = TileTotalValue.Text = TileCountValue.Text = "—";
         if (ComboA.SelectedItem is not ComboItem a || ComboB.SelectedItem is not ComboItem b || a.Id == b.Id)
         {
-            CompareGrid.ItemsSource = new ObservableCollection<ComparePreviewRow>();
             InfoText.Text = "Выберите два разных документа.";
             return;
         }
+
+        InfoText.Text = "Загрузка сравнения…";
+        using var cancellation = new CancellationTokenSource();
+        _loadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
-            _result = SqlServerCompare.Compare(_connectionString, a.Id, b.Id);
+            var result = await Task.Run(() =>
+                SqlServerCompare.Compare(_connectionString, a.Id, b.Id, token), token);
+            if (_closed || token.IsCancellationRequested || !ReferenceEquals(_loadCancellation, cancellation)) return;
+            _result = result;
+            ShowResult();
+            ExportButton.IsEnabled = true;
         }
         catch (Exception ex)
         {
+            if (_closed || token.IsCancellationRequested || !ReferenceEquals(_loadCancellation, cancellation)) return;
+            _result = null;
+            ExportButton.IsEnabled = false;
             InfoText.Text = "Не удалось сравнить: " + ex.Message;
-            return;
         }
-        ShowResult();
+        finally
+        {
+            if (ReferenceEquals(_loadCancellation, cancellation)) _loadCancellation = null;
+        }
     }
 
     private static string Arrow(decimal? a, decimal? b, Func<decimal, string> fmt)
