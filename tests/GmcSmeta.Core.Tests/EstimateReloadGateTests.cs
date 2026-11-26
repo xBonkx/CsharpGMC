@@ -40,6 +40,20 @@ public sealed class EstimateReloadGateTests
         Assert.True(gate.CanApply(ticket, 0, "rev-a", "rev-a", "rev-b"));
     }
 
+    [Theory]
+    [InlineData("a", "a", "a", false, true)]
+    [InlineData("a", "b", "b", false, false)]
+    [InlineData("a", "a", "b", false, false)]
+    [InlineData("a", "b", "a", false, false)]
+    [InlineData("a", "a", "a", true, false)]
+    [InlineData("", "", "", false, false)]
+    [InlineData(" ", " ", " ", false, false)]
+    [InlineData("a", "a", "", false, false)]
+    public void TabReuseRequiresActuallyPublishedCleanRevision(string published,
+        string local, string observed, bool readback, bool expected) =>
+        Assert.Equal(expected, EstimateReloadGate.CanReusePublishedRevision(
+            published, local, observed, readback));
+
     [Fact]
     public void InvalidTokensNeverApply()
     {

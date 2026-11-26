@@ -64,6 +64,9 @@ public partial class EstimateView
     private void EstimateGrid_PreparingCellForEdit(object sender,
         DataGridPreparingCellForEditEventArgs e)
     {
+        // Even a cancelled edit can leave transient TwoWay binding values.
+        // Require a full reconciliation before taking the tab cache shortcut.
+        _publishedEstimateRevision = "";
         // Python GridDelegate selects the entire raw value in a group cell.
         // The label «разные» is only a visual placeholder, never SQL input.
         if (e.Row.Item is EditableEstimateRow row &&

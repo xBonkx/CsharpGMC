@@ -23,6 +23,9 @@ public partial class EstimateView : UserControl
     private static readonly CultureInfo Ru = CultureInfo.GetCultureInfo("ru-RU");
     private readonly string _sqlConnectionString;
     private string _serverRevision = "";
+    // A SQL write receipt can advance _serverRevision before the visible
+    // estimate has been reconciled. Only a completed full readback sets this.
+    private string _publishedEstimateRevision = "";
     /// <summary>Текущая серверная ревизия сметы (для кэша документов).</summary>
     public string ServerRevision => _serverRevision;
     internal bool CacheReadOrWriteInProgress => _refreshing || _reloadCancellation is not null || Volatile.Read(ref _pendingWrites) > 0 ||
@@ -390,9 +393,9 @@ public partial class EstimateView : UserControl
             switch (page)
             {
                 case "estimate":
-                    // Changes in procurement/costs/shipments can affect the
-                    // estimate, so re-read the authoritative server snapshot.
-                    if (was != "estimate") _ = ReloadDocumentAsync();
+                    // Revalidate the published estimate on SQL Server. A clean
+                    // unchanged snapshot need not be mapped and rebound again.
+                    if (was != "estimate") _ = ReloadDocumentAsync(allowUnchanged: true);
                     break;
                 case "acts":
                     ContractActsControl.Bind(_sqlConnectionString, _contractId, _estimate.Title);
@@ -734,7 +737,7 @@ public partial class EstimateView : UserControl
     /// write that completed while SQL was loading invalidates the stale
     /// snapshot. Never overwrite an optimistic edit with an earlier read.
     /// </summary>
-    private async Task ReloadDocumentAsync()
+    private async Task ReloadDocumentAsync(bool allowUnchanged = false)
     {
         if (_detached && !HasUnsettledCacheWrites) { _reloadAfterAttach = true; return; }
         var request = _reloadGate.NextRequest();
@@ -759,6 +762,8 @@ public partial class EstimateView : UserControl
             var localRevisionAtStart = _serverRevision;
             // Undo is lazy: only a document edited locally needs its snapshot.
             var needUndoCheckpoint = Volatile.Read(ref _undoCheckpointNeeded) != 0;
+            var reusableRevision = allowUnchanged && CanReusePublishedEstimate(_publishedEstimateRevision)
+                ? _publishedEstimateRevision : "";
             try
             {
                 var loaded = await Task.Run(async () =>
@@ -773,6 +778,10 @@ public partial class EstimateView : UserControl
                         for (var attempt = 0; attempt < 2; attempt++)
                         {
                             var before = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                            if (EstimateReloadGate.CanReusePublishedRevision(
+                                reusableRevision, localRevisionAtStart, before, needUndoCheckpoint))
+                                return (Estimate: (EstimateDocument?)null, Revision: before,
+                                    Undo: (UndoSnapshot?)null, SpecHead: (SpecRevisionHead?)null);
                             StartupTrace.Mark("estimate_read_begin");
                             var document = await EstimateReader.LoadSqlAsync(read, _contractId, token).ConfigureAwait(false);
                             StartupTrace.Mark("estimate_read_end");
@@ -788,7 +797,7 @@ public partial class EstimateView : UserControl
                             }
                             var after = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
                             if (before == after)
-                                return (Estimate: document, Revision: after,
+                                return (Estimate: (EstimateDocument?)document, Revision: after,
                                     Undo: checkpoint, SpecHead: specHead);
                         }
                         throw new InvalidOperationException(
@@ -814,6 +823,17 @@ public partial class EstimateView : UserControl
                     return;
                 }
 
+                if (loaded.Estimate is null)
+                {
+                    // Recheck local state after await: an edit, pending focus,
+                    // nested operation or newer revision may have appeared.
+                    if (CanReusePublishedEstimate(loaded.Revision))
+                        StartupTrace.Mark("estimate_tab_revision_hit");
+                    else if (_reloadGate.IsLatest(request))
+                        _reloadTimer.Start(); // retry via mandatory full readback
+                    return;
+                }
+
                 // A remote revision must never become a new local Undo step.
                 // Local writes update _serverRevision before queuing a reload;
                 // a different observed revision belongs to another writer.
@@ -827,6 +847,7 @@ public partial class EstimateView : UserControl
                 _serverRevision = loaded.Revision;
                 _serverConflict = false;
                 var firstLoad = _estimate is null;
+                _publishedEstimateRevision = "";
                 StartupTrace.Mark("estimate_publish_begin");
                 SetDocument(loaded.Estimate);
                 StartupTrace.Mark("estimate_publish_end");
@@ -856,6 +877,7 @@ public partial class EstimateView : UserControl
                 _saveAwaitingReadback = false;
                 _saveError = null;
                 SelectPositionFromSearch();
+                _publishedEstimateRevision = loaded.Revision;
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -864,7 +886,10 @@ public partial class EstimateView : UserControl
             catch (Exception ex)
             {
                 if (_reloadGate.IsLatest(request) && !token.IsCancellationRequested)
+                {
+                    _publishedEstimateRevision = "";
                     SetStatus("Ошибка обновления: " + ex.Message, true);
+                }
             }
             finally
             {
@@ -882,6 +907,17 @@ public partial class EstimateView : UserControl
             if (acquired) _reloadLock.Release();
         }
     }
+
+    // Only the return-to-estimate tab may use this shortcut. Explicit
+    // refresh, pending writes, stage views and recovery still read everything.
+    private bool CanReusePublishedEstimate(string observedRevision) =>
+        _estimate is not null && !_detached && !_serverConflict && !_inlineStagesOn &&
+        !HasUnsettledCacheWrites && !HasActiveEstimateEdit() && !HasNestedCacheActivity &&
+        !_reloadTimer.IsEnabled && !_reloadAfterAttach &&
+        _focusAfterReload is null && _focusSystemAfterReload is null &&
+        !_editAfterReload && _positionFromSearch is null &&
+        EstimateReloadGate.CanReusePublishedRevision(_publishedEstimateRevision,
+            _serverRevision, observedRevision, Volatile.Read(ref _undoCheckpointNeeded) != 0);
 
     private bool HasActiveEstimateEdit() =>
         System.Windows.Data.CollectionViewSource.GetDefaultView(EstimateGrid.ItemsSource)
