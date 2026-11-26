@@ -89,91 +89,22 @@ public static partial class SqlServerActs
             string S(int i) => r.IsDBNull(i) ? "" :
                 Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             while (r.Read())
+            {
+                var positionId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 positions.Add(new ActSheetRow(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    positionId,
                     Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
                     S(2), S(3), S(4), D(5), D(6), D(7),
                     !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture),
                     S(9),
                     r.IsDBNull(10) ? null : Convert.ToInt64(r.GetValue(10), CultureInfo.InvariantCulture),
                     D(11), S(12), D(13), D(14),
-                    closedByOthers.GetValueOrDefault(0), 0m, false));
-        }
-        // закрыто другими актами / выдано / признак «следим за выдачей» — по позиции
-        positions = positions.Select(p => p with
-        {
-            ClosedByOthers = closedByOthers.GetValueOrDefault(p.PositionId),
-            Issued = issued.GetValueOrDefault(p.PositionId),
-            TrackIssues = tracked.Contains(p.PositionId),
-        }).ToList();
-
-        // «№» позиции сметы (kp_numbers): «Без системы» не считается, вне КП пропускается
-        var kpNumbers = new Dictionary<long, int>();
-        var num = 1;
-        foreach (var sy in systemRows)
-        {
-            if (sy.Name != "Без системы")
-                num += 1;
-            foreach (var p in positions)
-            {
-                if (p.SystemId != sy.Id || p.OutOfKp)
-                    continue;
-                kpNumbers[p.PositionId] = num;
-                num += 1;
+                    closedByOthers.GetValueOrDefault(positionId),
+                    issued.GetValueOrDefault(positionId), tracked.Contains(positionId)));
             }
         }
 
-        // номера строк вне сметы этого акта (extra_numbers): «якорь.счётчик»
-        var extraNumbers = new Dictionary<long, string>();
-        var anchorNumber = "";
-        var suffix = 0;
-        foreach (var sy in systemRows)
-        {
-            foreach (var p in positions)
-            {
-                if (p.SystemId != sy.Id)
-                    continue;
-                if (!p.OutOfKp)
-                {
-                    anchorNumber = (numManual ? p.NumText.Trim() : "") is { Length: > 0 } m ? m
-                        : kpNumbers.GetValueOrDefault(p.PositionId).ToString(CultureInfo.InvariantCulture);
-                    suffix = 0;
-                }
-                else if (p.LineId is not null)
-                {
-                    suffix += 1;
-                    extraNumbers[p.PositionId] = $"{anchorNumber}.{suffix}";
-                }
-            }
-        }
-
-        // Ссылки формул «КN»: только однозначные, целиком числовые номера
-        var refNumbers = new Dictionary<long, string>();
-        foreach (var p in positions)
-        {
-            if (p.OutOfKp)
-                continue;
-            var manual = numManual ? p.NumText.Trim() : "";
-            refNumbers[p.PositionId] = (manual.Length > 0 ? manual
-                    : kpNumbers.GetValueOrDefault(p.PositionId).ToString(CultureInfo.InvariantCulture))
-                .Replace(',', '.').Trim();
-        }
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var v in refNumbers.Values)
-            counts[v] = counts.GetValueOrDefault(v) + 1;
-        var refDisplay = new Dictionary<long, string>();
-        foreach (var (pid, v) in refNumbers)
-            if (counts[v] == 1 && System.Text.RegularExpressions.Regex.IsMatch(v, @"^\d+(\.\d+)*$"))
-                refDisplay[pid] = v;
-
-        var rows = new List<ActSheetRow>(positions.Count);
-        foreach (var p in positions)
-        {
-            var numText = p.OutOfKp
-                ? extraNumbers.GetValueOrDefault(p.PositionId, "")
-                : (numManual ? p.NumText : kpNumbers.GetValueOrDefault(p.PositionId).ToString(CultureInfo.InvariantCulture));
-            rows.Add(p with { NumText = numText });
-        }
+        var (rows, refNumbers, refDisplay) = KsActSheetProjection.NumberRows(systemRows, positions, numManual);
         return new ActSheetData(systems, rows, refNumbers, refDisplay, numManual, form);
     }
 

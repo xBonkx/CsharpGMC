@@ -507,12 +507,12 @@ public partial class ActsEditorView : UserControl
             var positionsBySystem = sheet.Positions.ToLookup(p => p.SystemId);
             foreach (var system in sheet.Systems)
             {
-                var positions = positionsBySystem[system.SystemId].ToList();
+                var positions = positionsBySystem[system.SystemId];
                 var works = !_isPosSmr ? manual?.Smr.GetValueOrDefault(system.SystemId) ?? 0m : 0m;
                 var transport = manual?.Transport.GetValueOrDefault(system.SystemId) ?? 0m;
-                if (positions.Count == 0 && works == 0m && transport == 0m)
+                if (!positions.Any() && works == 0m && transport == 0m)
                     continue;
-                items.Add(new KsRowVm
+                var sectionRow = new KsRowVm
                 {
                     IsSection = true,
                     IsSub = system.IsSub,
@@ -522,13 +522,16 @@ public partial class ActsEditorView : UserControl
                     InAct = works != 0m || transport != 0m,
                     RowBack = system.IsSub ? "#E8F5FC" : "#F1F4F9",
                     NowCellBack = system.IsSub ? "#E8F5FC" : "#F1F4F9",
-                });
+                };
+                items.Add(sectionRow);
+                decimal materialSum = 0m;
                 foreach (var p in positions)
+                {
                     items.Add(PositionRow(p));
-                var sum = positions.Where(p => p.LineId is not null)
-                    .Sum(p => LineAmount(p.LineQty, p.LinePrice)) + works + transport;
-                if (sum != 0m)
-                    items[items.Count - positions.Count - 1].Amount = Money.Format(sum);
+                    if (p.LineId is not null) materialSum += LineAmount(p.LineQty, p.LinePrice);
+                }
+                var sum = materialSum + works + transport;
+                if (sum != 0m) sectionRow.Amount = Money.Format(sum);
             }
             if (manual is not null)
             {

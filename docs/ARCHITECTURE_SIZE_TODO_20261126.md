@@ -109,3 +109,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-045/GRID-21: App.xaml 1559→1565, EstimateView.xaml 1027→1030, EstimateScrollPolicy.cs 18, EstimateView.ColumnLayout.cs 207→207, Program.cs 681→682, EstimateScrollingChecks.cs 82 строк. Политика большого грида вынесена в небольшой converter, шаблон scrollbar изменён на месте (6 строк, не отдельный рефакторинг темы). Build/test не запускались.
 
 - 26.11.2026, PERF-045: EstimateView.xaml 1030→1029, EstimateScrollingChecks.cs 82→78 строк; удалён EstimateScrollPolicy.cs (18 строк), вместо условной политики один штатный XAML property. Build/test не запускались.
+
+- 26.11.2026, PERF-041/046: SqlServerActs.Grid.cs 222→153, KsActSheetProjection.cs 84, ActsEditorView.xaml.cs 2345→2348, KsActSheetProjectionTests.cs 99 строк. NumberRows выделен как pure компонент, крупный ActsEditorView изменён точечно, без новых обязанностей. Build/test не запускались.
