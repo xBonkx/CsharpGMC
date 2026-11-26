@@ -55,6 +55,13 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (!UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
+        {
+            MessageBox.Show("Предыдущий процесс не завершился. Откройте программу с ярлыка после его закрытия.",
+                "ГМЦ-Смета — обновление", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Shutdown(1);
+            return;
+        }
         StartupTrace.Mark("app_startup_enter");
         InstallWindowBranding();
         ContextMenuIcons.InstallSeparatorNormalization();
@@ -110,5 +117,6 @@ public partial class App : Application
         window.Show();
         StartupTrace.Mark("app_main_show_returned");
         ShutdownMode = ShutdownMode.OnMainWindowClose;
+        UpdateRestartCoordinator.Attach(window);
     }
 }

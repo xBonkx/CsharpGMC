@@ -71,7 +71,7 @@ internal sealed class InstalledApp
         }
     }
 
-    public void Launch(string? connectionString = null)
+    public void Launch(string? connectionString = null, bool autoRestart = false)
     {
         var start = new ProcessStartInfo(Exe)
         {
@@ -80,6 +80,7 @@ internal sealed class InstalledApp
         };
         if (connectionString is not null)
             start.Environment["GMC_SMETA_SQL_CONNECTION"] = connectionString;
+        start.Environment["GMC_SMETA_AUTO_RESTART"] = autoRestart ? "1" : "0";
         Process.Start(start);
     }
 }

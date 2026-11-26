@@ -61,7 +61,7 @@ try
     {
         ui.Info("Запускаю установленную версию " + installed.Version + "; обновления проверятся в фоне.");
         StartupTrace.Mark("launcher_app_launch_begin");
-        installed.Launch(office ? OfficeLauncher.ConnectionString : null);
+        installed.Launch(office ? OfficeLauncher.ConnectionString : null, autoRestart: true);
         StartupTrace.Mark("launcher_app_launch_returned");
         if (!TryStartBackgroundUpdate())
             ui.Warn("Фоновая проверка не запущена. Проверка повторится при следующем запуске.");
@@ -121,7 +121,7 @@ try
         if (appUpdated)
         {
             ui.ShowUpdate($"Загружаем версию {release.Version}", options.BackgroundUpdate
-                ? "Программа продолжит работать. Версия будет доступна при следующем запуске."
+                ? "Программа продолжит работать до завершения загрузки и текущих операций."
                 : "Проверяем пакет обновления.");
             ui.Step($"2/3  Устанавливаю версию {release.Version}…");
             StartupTrace.Mark("launcher_install_begin");
@@ -138,7 +138,7 @@ try
         LauncherSelfUpdate.TryUpdate(releases, release, paths, ui);
         StartupTrace.Mark("launcher_self_update_end");
         if (options.BackgroundUpdate && appUpdated)
-            ui.FinishUpdate($"Версия {release.Version} готова", "Она откроется при следующем запуске программы.");
+            ui.FinishUpdate($"Версия {release.Version} готова", "Программа с поддержкой автоперезапуска откроет новую версию автоматически после завершения операций.");
     }
     else if (installed is not null)
     {
@@ -156,7 +156,7 @@ try
         ui.ShowUpdate("Открываем программу", $"Версия {installed.Version}");
         ui.Step("3/3  Запускаю программу…");
         StartupTrace.Mark("launcher_app_launch_begin");
-        installed.Launch(office ? OfficeLauncher.ConnectionString : null);
+        installed.Launch(office ? OfficeLauncher.ConnectionString : null, autoRestart: true);
         StartupTrace.Mark("launcher_app_launch_returned");
         Console.WriteLine();
         ui.Done($"Готово — версия {installed.Version} запущена. Это окно можно закрыть.");
