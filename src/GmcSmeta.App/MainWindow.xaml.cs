@@ -143,13 +143,9 @@ public partial class MainWindow : Window
         {
             StartupTrace.Mark("main_sql_open_end");
             if (_startupClosed) throw new OperationCanceledException();
-            StartupTrace.Mark("main_objects_read_begin");
-            var objects = Workspace.Objects(connection);
-            StartupTrace.Mark("main_objects_read_end");
-            if (_startupClosed) throw new OperationCanceledException();
-            StartupTrace.Mark("main_documents_read_begin");
-            var documents = Workspace.Documents(connection);
-            StartupTrace.Mark("main_documents_read_end");
+            StartupTrace.Mark("main_navigation_read_begin");
+            var (objects, documents) = Workspace.ReadNavigation(connection);
+            StartupTrace.Mark("main_navigation_read_end");
             if (_startupClosed) throw new OperationCanceledException();
             return (connection, objects, documents);
         }
@@ -703,8 +699,7 @@ public partial class MainWindow : Window
     {
         var reader = _serverConn
             ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
-        var objects = Workspace.Objects(reader);
-        var documents = Workspace.Documents(reader);
+        var (objects, documents) = Workspace.ReadNavigation(reader);
         _objects.Clear(); _objects.AddRange(objects);
         _docs.Clear(); _docs.AddRange(documents);
     }
@@ -899,9 +894,7 @@ public partial class MainWindow : Window
         try { if (NavigationTree.SelectedItem is TreeViewItem selected) selected.IsSelected = false; }
         finally { _syncingNavigation = false; }
         _selectedObject = null;
-        var reader = _serverConn ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
-        _objects.Clear(); _objects.AddRange(Workspace.Objects(reader));
-        _docs.Clear(); _docs.AddRange(Workspace.Documents(reader));
+        ReloadNavigationData();
         RefreshNavigation();
         ShowEmptyPage();
     }

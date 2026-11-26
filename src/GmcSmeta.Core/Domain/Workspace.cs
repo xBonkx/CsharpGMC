@@ -81,15 +81,22 @@ public static class Workspace
 
     public static List<ObjectRow> Objects(DbConnection conn) => ReadObjects(conn, null);
 
+    private static string ObjectQuery(int? objectId) =>
+        "SELECT id, name, customer, address, archived, archived_on, created_at, folder " +
+        "FROM objects " + (objectId.HasValue ? "WHERE id=@object " : "") + "ORDER BY archived, name";
+
     private static List<ObjectRow> ReadObjects(DbConnection conn, int? objectId)
     {
-        var list = new List<ObjectRow>();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "SELECT id, name, customer, address, archived, archived_on, created_at, folder " +
-            "FROM objects " + (objectId.HasValue ? "WHERE id=@object " : "") + "ORDER BY archived, name";
+        cmd.CommandText = ObjectQuery(objectId);
         if (objectId is int id) AddObjectParameter(cmd, id);
         using var r = cmd.ExecuteReader();
+        return ReadObjectRows(r);
+    }
+
+    private static List<ObjectRow> ReadObjectRows(DbDataReader r)
+    {
+        var list = new List<ObjectRow>();
         while (r.Read())
         {
             list.Add(new ObjectRow(
@@ -105,16 +112,23 @@ public static class Workspace
 
     public static List<DocRow> Documents(DbConnection conn) => ReadDocuments(conn, null, true);
 
+    private static string DocumentQuery(int? objectId) =>
+        "SELECT id, object_id, kind, number, [date], name, locked, stage_of, stage_no, stage_rest, kp_phase, base_contract_id, \"order\" FROM contracts " +
+        (objectId.HasValue ? "WHERE object_id=@object " : "") + "ORDER BY object_id, \"order\", id";
+
     private static List<DocRow> ReadDocuments(DbConnection conn, int? objectId, bool includeTotals)
     {
         var totals = includeTotals ? Totals.ReadAll(conn).ToDictionary(t => t.Id) : null;
-        var list = new List<DocRow>();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "SELECT id, object_id, kind, number, [date], name, locked, stage_of, stage_no, stage_rest, kp_phase, base_contract_id, \"order\" FROM contracts " +
-            (objectId.HasValue ? "WHERE object_id=@object " : "") + "ORDER BY object_id, \"order\", id";
+        cmd.CommandText = DocumentQuery(objectId);
         if (objectId is int scopeId) AddObjectParameter(cmd, scopeId);
         using var reader = cmd.ExecuteReader();
+        return ReadDocumentRows(reader, totals);
+    }
+
+    private static List<DocRow> ReadDocumentRows(DbDataReader reader, IReadOnlyDictionary<int, ContractTotals>? totals)
+    {
+        var list = new List<DocRow>();
         while (reader.Read())
         {
             var id = Convert.ToInt32(reader.GetValue(0));
@@ -147,6 +161,28 @@ public static class Workspace
         return list;
     }
 
+    /// <summary>One metadata batch plus the existing financial batch; no MARS required.</summary>
+    public static (List<ObjectRow> Objects, List<DocRow> Documents) ReadNavigation(
+        Microsoft.Data.SqlClient.SqlConnection conn)
+    {
+        var totals = Totals.ReadAll(conn).ToDictionary(t => t.Id);
+        return ReadNavigationMetadata(conn, null, totals);
+    }
+
+    private static (List<ObjectRow> Objects, List<DocRow> Documents) ReadNavigationMetadata(
+        Microsoft.Data.SqlClient.SqlConnection conn, int? objectId,
+        IReadOnlyDictionary<int, ContractTotals>? totals)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = ObjectQuery(objectId) + ";" + DocumentQuery(objectId);
+        if (objectId is int id) AddObjectParameter(cmd, id);
+        using var reader = cmd.ExecuteReader();
+        var objects = ReadObjectRows(reader);
+        if (!reader.NextResult())
+            throw new InvalidOperationException("Неполный пакет навигации SQL Server.");
+        return (objects, ReadDocumentRows(reader, totals));
+    }
+
     private static void AddObjectParameter(DbCommand command, int id)
     {
         var parameter = command.CreateParameter();
@@ -161,12 +197,15 @@ public static class Workspace
     public static bool ObjectCardMetadataMatches(DbConnection conn, ObjectRow obj,
         IReadOnlyList<DocRow> navigationDocuments)
     {
-        var current = ReadObjects(conn, obj.Id).SingleOrDefault();
-        if (current != obj) return false;
+        // The surrounding caller still checks the revision before and after the read.
+        var metadata = conn is Microsoft.Data.SqlClient.SqlConnection sql
+            ? ReadNavigationMetadata(sql, obj.Id, null)
+            : (Objects: ReadObjects(conn, obj.Id), Documents: ReadDocuments(conn, obj.Id, false));
+        if (metadata.Objects.SingleOrDefault() != obj) return false;
         static DocRow Metadata(DocRow d) => d with { Materials = 0m, Smr = 0m, Total = 0m, Positions = 0 };
         var expected = navigationDocuments.Where(d => d.ObjectId == obj.Id)
             .OrderBy(d => d.Id).Select(Metadata);
-        var actual = ReadDocuments(conn, obj.Id, false).OrderBy(d => d.Id).Select(Metadata);
+        var actual = metadata.Documents.OrderBy(d => d.Id).Select(Metadata);
         return expected.SequenceEqual(actual);
     }
 
