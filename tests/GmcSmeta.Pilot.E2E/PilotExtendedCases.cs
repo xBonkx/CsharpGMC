@@ -15,7 +15,7 @@ internal static class PilotExtendedCases
             "The SQL Server fixture is not labelled v28");
         var mandatory = new[] { "meta", "objects", "contracts", "systems", "positions",
             "catalog_items", "acts", "act_lines", "change_log", "tags", "suppliers",
-            "procurement", "movements", "shipments", "shipment_lines", "__pilot_provenance" };
+            "procurement", "movements", "shipments", "shipment_lines", "smr_costs", "__pilot_provenance" };
         foreach (var name in mandatory)
             PilotRunner.Check(PilotRunner.Long(conn,
                 "SELECT COUNT_BIG(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id " +
@@ -410,6 +410,8 @@ internal static class PilotExtendedCases
         });
         Measure("public_procurement_full_snapshot_batched", () =>
             SqlServerProcurement.ReadBuySnapshot(p.PilotConnection, contract).Rows.Count);
+        Measure("public_cost_summary_batched", () =>
+            SqlServerCostSummary.Summary(p.PilotConnection, contract).Rows.Count);
         Measure("public_ks_progress_for_contract", () =>
             SqlServerActs.ProgressForContract(p.PilotConnection, contractId).Count);
     }

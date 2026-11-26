@@ -135,6 +135,14 @@ CREATE TABLE dbo.procurement (
     updated_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
     updated_by nvarchar(64) NOT NULL DEFAULT N''
 );
+-- Synthetic read surface for cost-summary QA; not a production migration.
+CREATE TABLE dbo.smr_costs (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    contract_id bigint NOT NULL REFERENCES dbo.contracts(id),
+    [date] date NULL, kind nvarchar(255) NOT NULL DEFAULT N'',
+    who nvarchar(255) NOT NULL DEFAULT N'', amount float NOT NULL DEFAULT 0,
+    note nvarchar(max) NOT NULL DEFAULT N'', created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
 CREATE TABLE dbo.shipments (
     id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
     object_id bigint NOT NULL REFERENCES dbo.objects(id),

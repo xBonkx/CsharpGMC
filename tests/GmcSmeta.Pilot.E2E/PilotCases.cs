@@ -41,6 +41,8 @@ internal static class PilotCases
         p.RunCase("10000-public-sql-services-benchmark",
             () => PilotExtendedCases.RealServicesBenchmark(p, p.LargeContract, 10000));
 
+        p.RunCase("batched-cost-summary-financial-parity", () => PilotCostSummaryCases.Run(p));
+
         p.RunCase("estimate-indexed-hierarchy-and-financial-parity",
             () => EstimateHierarchy(p));
 
