@@ -124,6 +124,7 @@ public partial class EstimateView
     private CostSummaryData? _costSummaryData;
     private List<CostSummaryRow> _summaryRecs = new();
     private CostMissingPriceIndex _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
+    private CostSummarySearchIndex? _summarySearchIndex;
     private Dictionary<long, string> _summaryLabels = new();
     private string _summaryMode = "kp";
     private string _summarySort = "kp";
@@ -163,6 +164,7 @@ public partial class EstimateView
         _costSummaryData = null;
         _summaryRecs = new();
         _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
+        _summarySearchIndex = null;
         _summaryLoading = false;
         if (SummaryGrid is { } grid)
         {
@@ -195,16 +197,19 @@ public partial class EstimateView
                 var data = SqlServerCostSummary.Summary(conn, _contractId);
                 if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new InvalidOperationException("Данные изменились во время чтения сводной. Повтори обновление.");
-                return (Data: data, Revision: before, Missing: new CostMissingPriceIndex(data.Rows));
+                var labels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);
+                return (Data: data, Revision: before, Missing: new CostMissingPriceIndex(data.Rows),
+                    Labels: labels, Search: new CostSummarySearchIndex(data.Rows, labels));
             });
             if (version != _summaryLoadVersion || _detached) return;
             _costSummaryData = snapshot.Data;
             _summaryRecs = snapshot.Data.Rows.ToList();
             _summaryMissingIndex = snapshot.Missing;
+            _summaryLabels = snapshot.Labels;
+            _summarySearchIndex = snapshot.Search;
             if (SummaryTransferSmrButton is not null)
                 SummaryTransferSmrButton.IsEnabled = !_estimate.Locked;
             if (SummaryExcelButton is not null) SummaryExcelButton.IsEnabled = true;
-            SummaryComputeLabels();
             SummaryFillSystemFilter();
             SummaryRebuild();
             _summaryRevision = snapshot.Revision;
@@ -265,13 +270,6 @@ public partial class EstimateView
         popup.Open();
     }
 
-    /// <summary>Python System.label: parent name › child name.</summary>
-    private void SummaryComputeLabels()
-    {
-        var data = _costSummaryData!;
-        _summaryLabels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);
-    }
-
     // ------------------------------------------------------------------ build
     private void SummaryRebuild()
     {
@@ -299,22 +297,10 @@ public partial class EstimateView
         // still be able to select a different kind of missing price.
 
         // фильтр (show_data): системы, «без цен», поиск
-        var words = (SummarySearch?.Text ?? "")
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(w => w.ToLowerInvariant()).ToArray();
         var systemIds = SummarySystemSelection.Expand(_summarySelectedSystems, data.SystemParents);
-        var rows = new List<SummaryRec>();
-        foreach (var r in recs)
-        {
-            if (systemIds is not null && !systemIds.Contains(r.SystemId)) continue;
-            if (_summaryMissingOn && !CostMissingPriceIndex.MatchesAny(r, missingMask)) continue;
-            if (words.Length > 0)
-            {
-                var hay = $"{r.Name} {_summaryLabels.GetValueOrDefault(r.SystemId, "")} {r.Supplier}".ToLowerInvariant();
-                if (!words.All(w => hay.Contains(w))) continue;
-            }
-            rows.Add(ToRec(r));
-        }
+        var rows = (_summarySearchIndex ??= new CostSummarySearchIndex(recs, _summaryLabels))
+            .Filter(SummarySearch?.Text, systemIds, _summaryMissingOn, missingMask)
+            .Select(ToRec).ToList();
         bool filtered = rows.Count != recs.Count;
 
         var built = new List<SummaryRow>();
@@ -455,7 +441,7 @@ public partial class EstimateView
         SummaryReplaceRows(built);
         SummarySyncViewButtons();
         SummaryFillTiles(totMCost, totMSell, totWCost, totWSell, data, filtered,
-            nNocost: recs.Count(r => r.NoCost), shownRows: rows.Count, totalRows: recs.Count);
+            nNocost: _summaryMissingIndex.CountAny(CostMissingPrice.MaterialCost), shownRows: rows.Count, totalRows: recs.Count);
     }
 
     private static string? SummarySelectionKey(SummaryRow row) =>
@@ -619,7 +605,7 @@ public partial class EstimateView
 
     private List<SummaryRec> SortRecs(List<SummaryRec> list)
     {
-        if (_summarySort == "kp") return list.ToList();
+        if (_summarySort == "kp") return list; // already in document order, callers only read
         IEnumerable<SummaryRec> sorted = _summarySort switch
         {
             "name" => list.OrderBy(r => r.Name.ToLowerInvariant(), StringComparer.Ordinal),
