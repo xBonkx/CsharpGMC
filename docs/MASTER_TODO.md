@@ -549,3 +549,18 @@ PARITY-STAGES-01 закрыт 26.11.2026. Из активного чек-лис�
 PARITY-KS-FORMULA-01 закрыт после сверки вычислений с Python, приёмки SQL и WPF. [Результаты](PYTHON_0664_TO_0679_PARITY.md#приёмка-формул-объёмов-кс-2--26112026).
 
 Сводка активной очереди: 3 PARTIAL, 0 DONE. Исторические 400 ID без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).
+
+## Архитектурная очередь — размер исходников и классов (26.11.2026)
+
+По указанию владельца зарегистрированы 8 отдельных задач; не прибавлять к историческим 400 ID и текущей очереди переноса/SQL. Сводка этой очереди: 8 NOT STARTED, 0 DONE. Приоритеты внутри очереди; текущий приоритет владельца не меняется. Подробный исходный аудит, размеры и критерии — [ARCHITECTURE_SIZE_TODO](ARCHITECTURE_SIZE_TODO_20261126.md).
+
+| ID | P | Задача | Статус |
+|---|---|---|---|
+| ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | NOT STARTED |
+| ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | NOT STARTED |
+| ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | NOT STARTED |
+| ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | NOT STARTED |
+| ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | NOT STARTED |
+| ARCH-SIZE-06 | P2 | App.xaml — тематические словари ресурсов | NOT STARTED |
+| ARCH-SIZE-07 | P2 | SqlServerStages/Acts/Workspace — аудит границ ответственности | NOT STARTED |
+| ARCH-SIZE-08 | P2 | Автоматический отчёт и контроль роста исходников | NOT STARTED |
