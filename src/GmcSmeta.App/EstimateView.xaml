@@ -12,6 +12,7 @@
 
     <UserControl.Resources>
         <local:LevelIndentConverter x:Key="Indent"/>
+        <local:EstimateScrollPolicy x:Key="EstimateScrollPolicy"/>
         <BooleanToVisibilityConverter x:Key="OnlySystems"/>
         <Style x:Key="DocumentNameDisplay" TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap"/>
@@ -751,7 +752,9 @@
                       VirtualizingPanel.VirtualizationMode="Recycling"
                       VirtualizingPanel.ScrollUnit="Pixel"
                       EnableRowVirtualization="True"
-                      ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      ScrollViewer.CanContentScroll="True"
+                      ScrollViewer.IsDeferredScrollingEnabled="{Binding Items.Count, RelativeSource={RelativeSource Self}, Converter={StaticResource EstimateScrollPolicy}}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                        ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <DataGrid.Resources>
                     <Style TargetType="TextBox" BasedOn="{StaticResource EstimateGridEditor}"/>

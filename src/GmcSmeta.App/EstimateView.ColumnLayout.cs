@@ -45,9 +45,9 @@ public partial class EstimateView
     private void EstimateGridViewportChanged(object sender, ScrollChangedEventArgs e)
     {
         // Ignore nested TextBox scroll viewers and ordinary scrolling.
-        if (e.OriginalSource is ScrollViewer scroll &&
-            ReferenceEquals(scroll, EstimateScrollViewer()) &&
-            Math.Abs(e.ViewportWidthChange) > 0.1)
+        if (Math.Abs(e.ViewportWidthChange) > 0.1 &&
+            e.OriginalSource is ScrollViewer scroll &&
+            ReferenceEquals(scroll, EstimateScrollViewer()))
             RequestEstimateColumnFit();
     }
 
