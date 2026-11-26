@@ -23,25 +23,21 @@ internal static class EstimateScrollingChecks
         VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
         VirtualizingPanel.SetScrollUnit(grid, ScrollUnit.Pixel);
         ScrollViewer.SetCanContentScroll(grid, true);
-        grid.SetBinding(ScrollViewer.IsDeferredScrollingEnabledProperty, new Binding("Items.Count")
-        {
-            Source = grid, Mode = BindingMode.OneWay, Converter = new EstimateScrollPolicy(),
-        });
-        foreach (var count in new[] { 300, 2500, 10000, 25000, 300 })
+        ScrollViewer.SetIsDeferredScrollingEnabled(grid, true);
+        foreach (var count in new[] { 0, 30, 300, 1000, 2499, 2500, 10000, 25000, 300 })
         {
             grid.ItemsSource = Enumerable.Range(1, count).ToArray();
             Layout(grid, new Size(800, 500));
-            var deferred = count >= EstimateScrollPolicy.DeferredRowThreshold;
-            Require(ScrollViewer.GetIsDeferredScrollingEnabled(grid) == deferred,
+            Require(ScrollViewer.GetIsDeferredScrollingEnabled(grid),
                 $"Wrong deferred policy for {count} rows.");
             var viewer = grid.Template.FindName("DG_ScrollViewer", grid) as ScrollViewer;
-            Require(viewer is not null && viewer.IsDeferredScrollingEnabled == deferred,
+            Require(viewer is not null && viewer.IsDeferredScrollingEnabled,
                 $"DataGrid template did not forward deferred policy for {count} rows.");
             Require(grid.EnableRowVirtualization && grid.EnableColumnVirtualization &&
                 VirtualizingPanel.GetVirtualizationMode(grid) == VirtualizationMode.Recycling,
                 "Scrolling policy disabled virtualization.");
         }
-        Console.WriteLine("Estimate scroll thumb geometry and large/small deferred policy checks passed (no SQL).");
+        Console.WriteLine("Estimate scroll thumb geometry and all-size deferred policy checks passed (no SQL).");
     }
 
     private static void CheckThumb(Orientation orientation, double minimum)
@@ -68,7 +64,7 @@ internal static class EstimateScrollingChecks
 
     private static void Layout(FrameworkElement element, Size size)
     {
-        // Flush the asynchronous Items.Count and template-parent bindings.
+        // Flush template-parent bindings before checking the inner viewer.
         element.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
         element.Measure(size);
         element.Arrange(new Rect(new Point(), size));

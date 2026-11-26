@@ -107,3 +107,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-046/012: ContractActsWorkspace.xaml.cs 645→678, SqlServerActs.Grid.cs 451→222, SqlServerActs.ProgressSummary.cs 274, SqlServerActs.cs 1257→1152, SqlServerActs.ActList.cs 130, Totals.cs 381→389, KsActsParityTests.cs 103→116, PilotFinanceBatchCases.cs 132→159 строк. Чтение списка актов и сводной по выполнению выделено в SqlServerActs.ActList/ProgressSummary; старые финансовые формулы и транзакционные вызовы сохранены. Сборка/тесты не запускались.
 
 - 26.11.2026, PERF-045/GRID-21: App.xaml 1559→1565, EstimateView.xaml 1027→1030, EstimateScrollPolicy.cs 18, EstimateView.ColumnLayout.cs 207→207, Program.cs 681→682, EstimateScrollingChecks.cs 82 строк. Политика большого грида вынесена в небольшой converter, шаблон scrollbar изменён на месте (6 строк, не отдельный рефакторинг темы). Build/test не запускались.
+
+- 26.11.2026, PERF-045: EstimateView.xaml 1030→1029, EstimateScrollingChecks.cs 82→78 строк; удалён EstimateScrollPolicy.cs (18 строк), вместо условной политики один штатный XAML property. Build/test не запускались.
