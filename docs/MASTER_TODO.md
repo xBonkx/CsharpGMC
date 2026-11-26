@@ -289,6 +289,7 @@ WIN-26 сняты с активного контроля. Итог провер�
 | ID | Приоритет | Задача | Статус | Доказательство | Остаток |
 |---|---|---|---|---|---|
 | [SUM-VIS-01](COST_SUMMARY_VISUAL_TODO_20261125.md) | P1 | Сводная стоимость: детальный визуальный и UX-паритет | PARTIAL | Блоки 1–9: основная сводная, static guards, legacy projection extra/цена монтажа, тесты; 26.11 C01/C03/C10/B05: адаптивный SummaryColumnFit, проверки добавлены (не запускались) | Windows build/GUI/DPI, C12 на копии/округление, C10/anchor, E01–06 (подтверждение legacy route); CTX-022 связан |
+| [PRC-VIS-01](UI_VISUAL_TODO_20261124.md#закупки--prc-vis) | P1 | Закупки: очистка поиска и состояние фильтра систем | PARTIAL | 26.11.2026: ProcurementPane.xaml, Navigation.cs, xaml.cs, ProcurementFilterVisualSourceTests; Python proc_view/SystemPicker | Windows/DPI, clear/focus/selected popup, narrow/large list |
 | [S-27](SMALL_TASKS.md) | P1 | WPF-харнесс `tests/GmcSmeta.App.Checks`: сборка, `--offline-check`, CI | CODE READY | 25.11.2026: проект в `GmcSmeta.slnx`, исправлены CS1061 и разбор `App.xaml`, шаг в `csharp-build.yml`; Windows/.NET 10.0.401: build 0 ошибок, Core 1335/1335, offline 8/8, Export.Checks PASS | Полный SQL-режим на `GmcSmetaPilot_*` и фактический ПКМ/WPF-GUI |
 
 ## Быстродействие
@@ -477,7 +478,7 @@ WIN-26 сняты с активного контроля. Итог провер�
 | [WIN-03](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L693) — Сводная — EstimateView.CostSummary | UNVERIFIED: парная приёмка по матрице |
 | [WIN-04](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L694) — Себестоимость — CostSummaryPane | UNVERIFIED: парная приёмка по матрице |
 | [WIN-05](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L695) — Монтаж — CostSummaryPane.Smr | UNVERIFIED: парная приёмка по матрице |
-| [WIN-06](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L696) — Закупки — ProcurementPane | UNVERIFIED: парная приёмка по матрице |
+| [WIN-06](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L696) — Закупки — ProcurementPane | PARTIAL: PRC-VIS-01, парная приёмка остальных частей по матрице |
 | [WIN-07](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L697) — Выдача — ShipmentsPane | UNVERIFIED: парная приёмка по матрице |
 | [WIN-08](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L698) — КС-2/КС-3 — ActsEditorView | UNVERIFIED: парная приёмка по матрице |
 | [WIN-09](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L699) — Все КС договора — AllContractActsWindow | UNVERIFIED: парная приёмка по матрице |

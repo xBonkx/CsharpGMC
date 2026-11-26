@@ -27,6 +27,33 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ProcurementSystemPicker" TargetType="ToggleButton" BasedOn="{StaticResource PythonToolToggle}">
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <Viewbox Grid.Column="1" Width="12" Height="12" Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Grid>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="filtered">
+                    <Setter Property="Background" Value="#E8F0FE"/>
+                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                    <Setter Property="Foreground" Value="#1E40AF"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="ProcurementGroupSelect" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#0F172A"/>
@@ -84,9 +111,9 @@
             <Grid x:Name="ProcurementFilterTail" Grid.Column="1" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <ToggleButton x:Name="ProcurementSystemToggle" Content="Все системы  ▾"
-                              Height="32" MinWidth="140" MaxWidth="220" Padding="9,3"
-                              Background="White" Foreground="#334155" BorderBrush="#CBD5E1"
+                    <ToggleButton x:Name="ProcurementSystemToggle" Content="Все системы"
+                              Style="{StaticResource ProcurementSystemPicker}"
+                              Height="32" MinWidth="150" MaxWidth="220"
                               ToolTip="Показать одну или несколько систем (родитель включает подразделы)"
                               VerticalAlignment="Center" Margin="0,0,8,4"/>
                 <Popup PlacementTarget="{Binding ElementName=ProcurementSystemToggle}"
@@ -134,10 +161,10 @@
                           ToolTip="Все поставщики, не указан или конкретный поставщик"/>
                 <Grid Grid.Column="2" MinWidth="100" Margin="0,0,0,4">
                     <TextBox x:Name="ProcurementSearchBox" Style="{StaticResource PythonSearch}" Height="32"
-                             Padding="30,5,8,5" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
+                             Padding="30,5,32,5" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
                              ToolTip="Поиск по названию, системе, поставщику, заявке и счёту"/>
                     <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,8,0"
+                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,32,0"
                                VerticalAlignment="Center" IsHitTestVisible="False">
                         <TextBlock.Style><Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -146,6 +173,23 @@
                             </DataTrigger></Style.Triggers>
                         </Style></TextBlock.Style>
                     </TextBlock>
+                    <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}"
+                            Click="ClearProcurementSearch_Click" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Width="26" Height="26" Padding="0" ToolTip="Очистить поиск по закупкам"
+                            AutomationProperties.Name="Очистить поиск по закупкам">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                <Setter Property="MinHeight" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=ProcurementSearchBox}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </Grid>
             </Grid>
         </Grid>

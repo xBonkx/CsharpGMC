@@ -352,11 +352,12 @@ public partial class ProcurementPane : UserControl
             .Select(choice => choice.Label).ToList();
         ProcurementSystemToggle.Content = selected.Count switch
         {
-            0 => "Все системы  ▾",
-            1 => selected[0] + "  ▾",
-            2 => string.Join(", ", selected) + "  ▾",
-            _ => $"Систем: {selected.Count}  ▾",
+            0 => "Все системы",
+            1 => selected[0],
+            2 => string.Join(", ", selected),
+            _ => $"Систем: {selected.Count}",
         };
+        ProcurementSystemToggle.Tag = selected.Count > 0 ? "filtered" : null;
         ProcurementSystemToggle.ToolTip = selected.Count == 0
             ? "Показать только выбранные системы (можно несколько)"
             : string.Join(", ", selected);

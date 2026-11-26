@@ -37,6 +37,12 @@ public partial class ProcurementPane
         else _collapsedProcurementGroups.Add(key);
     }
 
+    private void ClearProcurementSearch_Click(object sender, RoutedEventArgs e)
+    {
+        ProcurementSearchBox.Clear();
+        ProcurementSearchBox.Focus();
+    }
+
     private void ProcurementFilterLayout_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (ProcurementChips is null || ProcurementFilterTail is null) return;
