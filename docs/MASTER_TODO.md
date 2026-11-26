@@ -561,6 +561,8 @@ PARITY-KS-FORMULA-01 закрыт после сверки вычислений �
 
 26.11.2026 (этот блок): паритет палитры формул КС 0.67.9 проверен и зафиксирован. Добавлены Core `KsFormulaReferenceColors` (палитра из 8 цветов в порядке Python, alpha 30, рамка 2), `KsFormulaReferenceColorsTests` (7), App использует константу вместо дублированных hex, `CheckKsFormulaReferenceHighlight` в App.Checks. Визуальная заливка 30-alpha в WPF пока только рамкой — полный визуальный паритет остаётся открытым. Сборка Release и 1350 Core-тестов + offline WPF checks прошли.
 
+26.11.2026 (заливка 30-alpha, база 137bc05): закрыт оставшийся разрыв — WPF теперь рисует заливку, а не только рамку. Core `ShadeOver` считает непрозрачный эквивалент Qt-смешивания `(src*30 + dst*225 + 127)/255`; App хранит кисти над фоном ячейки `#DCE8FF` и над фактическим фоном выделения; `KsNowCell` применяет их через `HasReference` и `MultiDataTrigger` (выделение + ссылка), рамка 2px сохранена. Добавлены 4 Core-теста (1462/1462), `CheckKsFormulaReferenceHighlight` расширен, добавлен режим `--ks-reference-check`; целевой набор прошёл на 25000 строках. Полный `--offline-check` по-прежнему падает на известном `EstimateScrollingChecks` (шаблон тестового DataGrid) — не связано с блоком. Визуальная приёмка Windows/DPI остаётся; SQL, версия и релиз не менялись.
+
 Сводка активной очереди: 3 PARTIAL, 0 DONE. Исторические 400 ID без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).
 
 ## Архитектурная очередь — размер исходников и классов (26.11.2026)

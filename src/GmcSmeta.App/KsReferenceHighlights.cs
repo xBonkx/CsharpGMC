@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Media;
 using GmcSmeta.Core.Domain;
 
@@ -10,12 +11,10 @@ namespace GmcSmeta.App;
 internal sealed class KsReferenceHighlights
 {
     private static readonly Brush[] Colors = KsFormulaReferenceColors.Palette
-        .Select(hex =>
-        {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-            brush.Freeze();
-            return (Brush)brush;
-        }).ToArray();
+        .Select(Freeze)
+        .ToArray();
+    private static readonly Brush[] Fills = BuildFills(KsFormulaReferenceColors.NowCellBackground);
+    private static readonly Brush[] SelectedFills = BuildFills(SelectionBackground());
 
     private readonly ILookup<long, KsRowVm> _byId;
     private HashSet<KsRowVm> _highlighted = new();
@@ -30,21 +29,52 @@ internal sealed class KsReferenceHighlights
         var next = new HashSet<KsRowVm>();
         for (var i = 0; i < references.Count; i++)
         {
-            var brush = Colors[i % Colors.Length];
+            var slot = i % Colors.Length;
             foreach (var row in _byId[references[i]])
             {
                 next.Add(row);
-                row.ReferenceBrush = brush;
+                row.ReferenceBrush = Colors[slot];
+                row.ReferenceFillBrush = Fills[slot];
+                row.ReferenceSelectedFillBrush = SelectedFills[slot];
             }
         }
         foreach (var row in _highlighted)
-            if (!next.Contains(row)) row.ReferenceBrush = null;
+            if (!next.Contains(row)) ClearRow(row);
         _highlighted = next;
     }
 
     public void Clear()
     {
-        foreach (var row in _highlighted) row.ReferenceBrush = null;
+        foreach (var row in _highlighted) ClearRow(row);
         _highlighted.Clear();
+    }
+
+    private static void ClearRow(KsRowVm row)
+    {
+        row.ReferenceBrush = null;
+        row.ReferenceFillBrush = null;
+        row.ReferenceSelectedFillBrush = null;
+    }
+
+    private static Brush[] BuildFills(string background) =>
+        Enumerable.Range(0, KsFormulaReferenceColors.Palette.Count)
+            .Select(i => Freeze(KsFormulaReferenceColors.ShadeOver(i, background)))
+            .ToArray();
+
+    // Python paints the alpha-30 shade over the cell, including when it is
+    // selected. WPF cannot layer it over the cell background, so the same
+    // blend is pre-composited over the real base and selection colours.
+    private static string SelectionBackground()
+    {
+        if (Application.Current?.TryFindResource("GridSelectionBrush") is SolidColorBrush brush)
+            return $"#{brush.Color.R:X2}{brush.Color.G:X2}{brush.Color.B:X2}";
+        return "#C9DBFB"; // App.xaml GridSelectionBrush fallback
+    }
+
+    private static Brush Freeze(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
     }
 }

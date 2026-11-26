@@ -35,6 +35,16 @@ internal static class Program
                 offline.Shutdown();
                 return 0;
             }
+            if (args.Length == 1 && args[0] == "--ks-reference-check")
+            {
+                var ksApp = CreateApplication();
+                CheckKsReferenceHighlights();
+                KsRowNotificationChecks.Run();
+                CheckKsFormulaReferenceHighlight();
+                Console.WriteLine("KS reference highlight checks passed (no SQL).");
+                ksApp.Shutdown();
+                return 0;
+            }
             var app = CreateApplication();
             RunOfflineChecks();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
@@ -664,6 +674,11 @@ internal static class Program
             throw new Exception("KS formula reference shade alpha does not match Python setAlpha(30).");
         if (GmcSmeta.Core.Domain.KsFormulaReferenceColors.BorderThickness != 2)
             throw new Exception("KS formula reference border thickness does not match Python pen width 2.");
+        if (GmcSmeta.Core.Domain.KsFormulaReferenceColors.NowCellBackground != "#DCE8FF")
+            throw new Exception("KS now-cell base does not match Python col_tint #DCE8FF.");
+        if (GmcSmeta.Core.Domain.KsFormulaReferenceColors.ShadeOver(
+                0, GmcSmeta.Core.Domain.KsFormulaReferenceColors.NowCellBackground) != "#C6D8FD")
+            throw new Exception("KS alpha-30 fill is not composited over the now-cell base.");
 
         var view = new ActsEditorView();
         var style = view.Resources["KsNowCell"] as System.Windows.Style
@@ -677,6 +692,35 @@ internal static class Program
         if (!setters.Any(s => s.Property == System.Windows.Controls.Control.BorderThicknessProperty &&
                               s.Value is System.Windows.Thickness t && t == new System.Windows.Thickness(2)))
             throw new Exception("HasReference trigger border thickness is not 2.");
-        Console.WriteLine("KS formula reference palette/border parity OK (Python 0.67.9).");
+        if (!setters.Any(s => s.Property == System.Windows.Controls.Control.BackgroundProperty &&
+                              s.Value is System.Windows.Data.Binding { Path.Path: "ReferenceFillBrush" }))
+            throw new Exception("HasReference trigger does not paint the alpha-30 fill.");
+
+        var selected = style.Triggers.OfType<System.Windows.MultiDataTrigger>()
+            .FirstOrDefault(t => t.Conditions.Count == 2 &&
+                                 t.Conditions.Any(c => c.Binding is System.Windows.Data.Binding { Path.Path: "HasReference" }) &&
+                                 t.Conditions.Any(c => c.Binding is System.Windows.Data.Binding { Path.Path: "IsSelected" }))
+            ?? throw new Exception("Selected referenced cells do not keep the shade over the selection.");
+        if (!selected.Setters.OfType<System.Windows.Setter>().Any(
+                s => s.Property == System.Windows.Controls.Control.BackgroundProperty &&
+                     s.Value is System.Windows.Data.Binding { Path.Path: "ReferenceSelectedFillBrush" }))
+            throw new Exception("Selected referenced cells do not bind the selection shade.");
+
+        var row = new GmcSmeta.App.KsRowVm();
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        row.ReferenceBrush = System.Windows.Media.Brushes.Red;
+        row.ReferenceFillBrush = System.Windows.Media.Brushes.LightBlue;
+        row.ReferenceSelectedFillBrush = System.Windows.Media.Brushes.LightCyan;
+        if (!row.HasReference ||
+            !changed.Contains("ReferenceFillBrush") ||
+            !changed.Contains("ReferenceSelectedFillBrush"))
+            throw new Exception("KS row does not notify the reference fill brushes.");
+        row.ReferenceBrush = null;
+        row.ReferenceFillBrush = null;
+        row.ReferenceSelectedFillBrush = null;
+        if (row.HasReference)
+            throw new Exception("KS row reference highlight did not clear.");
+        Console.WriteLine("KS formula reference palette/fill/border parity OK (Python 0.67.9).");
     }
 }

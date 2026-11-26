@@ -23,6 +23,9 @@ public static class KsFormulaReferenceColors
     /// <summary>QPen(QColor(color), 2) border drawn around a referenced cell.</summary>
     public const int BorderThickness = 2;
 
+    /// <summary>ks_view.py col_tint for S_NOW ("В этом акте"): the fill base.</summary>
+    public const string NowCellBackground = "#DCE8FF";
+
     public static string ColorAt(int index) => Palette[Wrap(index)];
 
     public static (byte R, byte G, byte B) RgbAt(int index)
@@ -39,6 +42,29 @@ public static class KsFormulaReferenceColors
         var (r, g, b) = RgbAt(index);
         return (ShadeAlpha, r, g, b);
     }
+
+    /// <summary>
+    /// Opaque equivalent of Python's <c>fillRect</c> with <c>setAlpha(30)</c> over
+    /// <paramref name="backgroundHex"/>. Qt blends as
+    /// <c>(src*alpha + dst*(255-alpha)) / 255</c> with half-up rounding; WPF cannot
+    /// layer the translucent fill over the cell's own background, so the editor
+    /// binds this pre-composited colour instead.
+    /// </summary>
+    public static string ShadeOver(int index, string backgroundHex)
+    {
+        if (backgroundHex is not { Length: 7 } || backgroundHex[0] != '#')
+            throw new ArgumentException("Expected #RRGGBB.", nameof(backgroundHex));
+        var (r, g, b) = RgbAt(index);
+        return $"#{Blend(r, Parse(backgroundHex, 1)):X2}" +
+               $"{Blend(g, Parse(backgroundHex, 3)):X2}" +
+               $"{Blend(b, Parse(backgroundHex, 5)):X2}";
+    }
+
+    private static byte Parse(string hex, int start) =>
+        Convert.ToByte(hex.Substring(start, 2), 16);
+
+    private static byte Blend(byte source, byte background) =>
+        (byte)((source * ShadeAlpha + background * (255 - ShadeAlpha) + 127) / 255);
 
     private static int Wrap(int index)
     {

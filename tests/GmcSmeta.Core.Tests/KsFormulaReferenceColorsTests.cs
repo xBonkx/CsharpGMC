@@ -26,6 +26,43 @@ public sealed class KsFormulaReferenceColorsTests
     }
 
     [Fact]
+    public void NowCellBackground_MatchesPythonColTint()
+    {
+        // ks_view.py: col_tint = {S_NOW: "#DCE8FF"}
+        Assert.Equal("#DCE8FF", KsFormulaReferenceColors.NowCellBackground);
+    }
+
+    [Fact]
+    public void ShadeOver_CompositesAlpha30LikeQt()
+    {
+        // Qt: (src*30 + dst*225 + 127) / 255 per channel.
+        Assert.Equal("#C6D8FD", KsFormulaReferenceColors.ShadeOver(0, KsFormulaReferenceColors.NowCellBackground));
+        Assert.Equal("#D4D8E1", KsFormulaReferenceColors.ShadeOver(7, KsFormulaReferenceColors.NowCellBackground));
+        Assert.Equal("#B6CDF9", KsFormulaReferenceColors.ShadeOver(0, "#C9DBFB"));
+        Assert.Equal(
+            KsFormulaReferenceColors.ShadeOver(0, KsFormulaReferenceColors.NowCellBackground),
+            KsFormulaReferenceColors.ShadeOver(-8, KsFormulaReferenceColors.NowCellBackground));
+    }
+
+    [Fact]
+    public void ShadeOver_AllPaletteEntries_AreOpaqueTintsOfTheCellBase()
+    {
+        for (var i = 0; i < PythonPalette.Length; i++)
+            Assert.Equal(
+                BlendHex(PythonPalette[i], 0xDC, 0xE8, 0xFF),
+                KsFormulaReferenceColors.ShadeOver(i, KsFormulaReferenceColors.NowCellBackground));
+    }
+
+    [Fact]
+    public void ShadeOver_RejectsMalformedBackground()
+    {
+        Assert.Throws<ArgumentException>(() => KsFormulaReferenceColors.ShadeOver(0, "DCE8FF"));
+        Assert.Throws<ArgumentException>(() => KsFormulaReferenceColors.ShadeOver(0, "#DCE8F"));
+        Assert.Throws<ArgumentException>(() => KsFormulaReferenceColors.ShadeOver(0, ""));
+        Assert.Throws<ArgumentException>(() => KsFormulaReferenceColors.ShadeOver(0, null!));
+    }
+
+    [Fact]
     public void BorderThickness_MatchesPythonPenWidth2()
     {
         Assert.Equal(2, KsFormulaReferenceColors.BorderThickness);
@@ -63,5 +100,14 @@ public sealed class KsFormulaReferenceColorsTests
     public void ColorAt_NegativeIndex_Wraps()
     {
         Assert.Equal(KsFormulaReferenceColors.ColorAt(0), KsFormulaReferenceColors.ColorAt(-8));
+    }
+
+    private static string BlendHex(string source, int backgroundR, int backgroundG, int backgroundB)
+    {
+        static int Channel(string hex, int start) => Convert.ToInt32(hex.Substring(start, 2), 16);
+        static int Mix(int src, int dst) => (src * 30 + dst * 225 + 127) / 255;
+        return $"#{Mix(Channel(source, 1), backgroundR):X2}" +
+               $"{Mix(Channel(source, 3), backgroundG):X2}" +
+               $"{Mix(Channel(source, 5), backgroundB):X2}";
     }
 }

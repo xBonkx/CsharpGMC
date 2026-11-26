@@ -21,6 +21,8 @@ public sealed class KsRowVm : INotifyPropertyChanged
     private string _price = "";
     private string _amount = "";
     private Brush? _referenceBrush;
+    private Brush? _referenceFill;
+    private Brush? _referenceSelectedFill;
     private bool _inAct;
     private bool _warn;
     private bool _overLeft;
@@ -70,6 +72,30 @@ public sealed class KsRowVm : INotifyPropertyChanged
         }
     }
     public bool HasReference => ReferenceBrush is not null;
+
+    /// <summary>Alpha-30 reference shade pre-composited over the S_NOW cell base.</summary>
+    public Brush? ReferenceFillBrush
+    {
+        get => _referenceFill;
+        set
+        {
+            if (ReferenceEquals(_referenceFill, value)) return;
+            _referenceFill = value;
+            Raise(nameof(ReferenceFillBrush));
+        }
+    }
+
+    /// <summary>Same shade over the selection background, as Python paints over selection.</summary>
+    public Brush? ReferenceSelectedFillBrush
+    {
+        get => _referenceSelectedFill;
+        set
+        {
+            if (ReferenceEquals(_referenceSelectedFill, value)) return;
+            _referenceSelectedFill = value;
+            Raise(nameof(ReferenceSelectedFillBrush));
+        }
+    }
 
     public string RowBack { get; init; } = "#FFFFFF";
     public string NowCellBack { get; init; } = "#DCE8FF";
