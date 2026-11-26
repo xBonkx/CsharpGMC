@@ -178,6 +178,7 @@ internal static class Program
         CheckSummaryTableFrame();
         SummaryColumnFitChecks.Run();
         CheckNumericPastePlanning();
+        CheckKsFormulaReferenceHighlight();
         ColumnMenuChecks.Run();
         LegacySummaryChecks.Run();
         SummaryRowSequenceChecks.Run();
@@ -635,5 +636,34 @@ internal static class Program
             if (next is not null) return next;
         }
         return null;
+    }
+
+    private static void CheckKsFormulaReferenceHighlight()
+    {
+        var pythonPalette = new[]
+        {
+            "#2563EB", "#DC2626", "#16803C", "#9333EA",
+            "#C2410C", "#087F8C", "#A21CAF", "#946200"
+        };
+        if (!GmcSmeta.Core.Domain.KsFormulaReferenceColors.Palette.SequenceEqual(pythonPalette))
+            throw new Exception("KS formula reference palette does not match Python 0.67.9 REFERENCE_COLORS.");
+        if (GmcSmeta.Core.Domain.KsFormulaReferenceColors.ShadeAlpha != 30)
+            throw new Exception("KS formula reference shade alpha does not match Python setAlpha(30).");
+        if (GmcSmeta.Core.Domain.KsFormulaReferenceColors.BorderThickness != 2)
+            throw new Exception("KS formula reference border thickness does not match Python pen width 2.");
+
+        var view = new ActsEditorView();
+        var style = view.Resources["KsNowCell"] as System.Windows.Style
+            ?? throw new Exception("KsNowCell style is missing.");
+        var trigger = style.Triggers.OfType<System.Windows.DataTrigger>()
+            .FirstOrDefault(t => t.Binding is System.Windows.Data.Binding b && b.Path?.Path == "HasReference")
+            ?? throw new Exception("HasReference DataTrigger is missing in KsNowCell.");
+        var setters = trigger.Setters.OfType<System.Windows.Setter>().ToList();
+        if (!setters.Any(s => s.Property == System.Windows.Controls.Control.BorderBrushProperty))
+            throw new Exception("HasReference trigger does not set BorderBrush.");
+        if (!setters.Any(s => s.Property == System.Windows.Controls.Control.BorderThicknessProperty &&
+                              s.Value is System.Windows.Thickness t && t == new System.Windows.Thickness(2)))
+            throw new Exception("HasReference trigger border thickness is not 2.");
+        Console.WriteLine("KS formula reference palette/border parity OK (Python 0.67.9).");
     }
 }

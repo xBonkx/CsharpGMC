@@ -1,4 +1,5 @@
 using System.Windows.Media;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -8,8 +9,7 @@ namespace GmcSmeta.App;
 /// </summary>
 internal sealed class KsReferenceHighlights
 {
-    private static readonly Brush[] Colors =
-        new[] { "#2563EB", "#DC2626", "#16803C", "#9333EA", "#C2410C", "#087F8C", "#A21CAF", "#946200" }
+    private static readonly Brush[] Colors = KsFormulaReferenceColors.Palette
         .Select(hex =>
         {
             var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));

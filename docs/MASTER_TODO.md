@@ -548,6 +548,8 @@ PARITY-STAGES-01 закрыт 26.11.2026. Из активного чек-лис�
 
 PARITY-KS-FORMULA-01 закрыт после сверки вычислений с Python, приёмки SQL и WPF. [Результаты](PYTHON_0664_TO_0679_PARITY.md#приёмка-формул-объёмов-кс-2--26112026).
 
+26.11.2026 (этот блок): паритет палитры формул КС 0.67.9 проверен и зафиксирован. Добавлены Core `KsFormulaReferenceColors` (палитра из 8 цветов в порядке Python, alpha 30, рамка 2), `KsFormulaReferenceColorsTests` (7), App использует константу вместо дублированных hex, `CheckKsFormulaReferenceHighlight` в App.Checks. Визуальная заливка 30-alpha в WPF пока только рамкой — полный визуальный паритет остаётся открытым. Сборка Release и 1350 Core-тестов + offline WPF checks прошли.
+
 Сводка активной очереди: 3 PARTIAL, 0 DONE. Исторические 400 ID без изменения. См. [SQL migration TODO](SQL_MIGRATION_RELEASE_TODO.md).
 
 ## Архитектурная очередь — размер исходников и классов (26.11.2026)

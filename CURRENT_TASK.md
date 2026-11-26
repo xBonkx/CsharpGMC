@@ -2,7 +2,14 @@
 
 Восстановлена документация из CsharpGMC-archive @ fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf. Архивный MASTER_TODO содержит 400 ID; 35 открытых Issues сохранены с описаниями. Архивные статусы не переподтверждены. Активная очередь остаётся Python 0.66.4–0.67.9 / SQL 28→31 / выпуск релиза; предыдущий кодовый коммит 34355f3b65668e28d53a3c2ec0099ee4e9df16c3 — пересчёт СМР по системам этапов. Следующий шаг: интеграция безопасной репетиции/проверки фактической схемы с ReleaseBuilder, потом полноценная миграция только после приёмки. Рабочая БД не тронута. Windows/SQL тесты не выполнены. История: docs/CURRENT_TASK_ARCHIVE_20261125.md.
 
-## 26.11.2026 — Релиз v1.0.2 опубликован
+## 26.11.2026 — Паритет палитры формул КС 0.67.9 + публикация релиза v1.0.3
+
+Кодовый блок: константы палитры формул КС (Python 0.67.9 `ks_view.REFERENCE_COLORS`) вынесены из App в Core `KsFormulaReferenceColors`; App берёт палитру оттуда вместо дублированных hex. Добавлены `KsFormulaReferenceColorsTests` (7) и `CheckKsFormulaReferenceHighlight` в App.Checks. Парное сравнение палитры выполнено: 8 цветов и порядок совпадают, alpha 30 и толщина 2. Визуальная заливка 30-alpha в WPF по-прежнему только рамкой — полный визуальный паритет остаётся открытым для Windows/DPI.
+Файлы: `src/GmcSmeta.Core/Domain/KsFormulaReferenceColors.cs`, `tests/.../KsFormulaReferenceColorsTests.cs`, `src/GmcSmeta.App/ActsEditorView.xaml.cs`, `tests/GmcSmeta.App.Checks/Program.cs`, доки.
+Проверки: `dotnet build GmcSmeta.slnx -c Release` — 0 ошибок; `dotnet test tests/GmcSmeta.Core.Tests` — 1350/1350; `--offline-check` — PASS (включая новый CheckKsFormulaReferenceHighlight).
+Рабочая БД не затрагивалась; схема 28, approved-schema 28.
+
+Публикация релиза: `RELEASE_VERSION` поднят с `v1.0.1` до `v1.0.3`; коммит отправлен в `main`, что запускает `.github/workflows/csharp-release.yml` (push trigger по пути `RELEASE_VERSION`). Релиз публикуется CI: build, unit-тесты, self-contained/framework-dependent архивы, лаунчер, SHA256SUMS. Локальный `gh` недоступен, поэтому публикация выполняется workflow на GitHub.
 
 Опубликован публичный релиз `v1.0.2` (non-draft, latest) из коммита `518427f`:
 https://github.com/xBonkx/CsharpGMC/releases/tag/v1.0.2
