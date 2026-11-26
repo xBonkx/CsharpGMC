@@ -10,18 +10,21 @@ public static class KsActSheetProjection
     public static (IReadOnlyList<SqlServerActs.ActSheetRow> Rows,
         IReadOnlyDictionary<long, string> RefNumbers, IReadOnlyDictionary<long, string> RefDisplay)
         NumberRows(IReadOnlyList<(long Id, string Name, long Parent)> systemRows,
-            IReadOnlyList<SqlServerActs.ActSheetRow> positions, bool numManual)
+            IReadOnlyList<SqlServerActs.ActSheetRow> positions, bool numManual, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         // «№» позиции сметы (kp_numbers): «Без системы» не считается, вне КП пропускается
         var positionsBySystem = positions.ToLookup(p => p.SystemId);
         var kpNumbers = new Dictionary<long, int>();
         var num = 1;
         foreach (var sy in systemRows)
         {
+            token.ThrowIfCancellationRequested();
             if (sy.Name != "Без системы")
                 num += 1;
             foreach (var p in positionsBySystem[sy.Id])
             {
+                token.ThrowIfCancellationRequested();
                 if (p.OutOfKp)
                     continue;
                 kpNumbers[p.PositionId] = num;
@@ -35,8 +38,10 @@ public static class KsActSheetProjection
         var suffix = 0;
         foreach (var sy in systemRows)
         {
+            token.ThrowIfCancellationRequested();
             foreach (var p in positionsBySystem[sy.Id])
             {
+                token.ThrowIfCancellationRequested();
                 if (!p.OutOfKp)
                 {
                     anchorNumber = (numManual ? p.NumText.Trim() : "") is { Length: > 0 } m ? m
@@ -55,6 +60,7 @@ public static class KsActSheetProjection
         var refNumbers = new Dictionary<long, string>();
         foreach (var p in positions)
         {
+            token.ThrowIfCancellationRequested();
             if (p.OutOfKp)
                 continue;
             var manual = numManual ? p.NumText.Trim() : "";
@@ -70,15 +76,17 @@ public static class KsActSheetProjection
             if (counts[v] == 1 && System.Text.RegularExpressions.Regex.IsMatch(v, @"^\d+(\.\d+)*$"))
                 refDisplay[pid] = v;
 
-        var rows = new List<ActSheetRow>(positions.Count);
+        var rows = new List<SqlServerActs.ActSheetRow>(positions.Count);
         foreach (var p in positions)
         {
+            token.ThrowIfCancellationRequested();
             var numText = p.OutOfKp
                 ? extraNumbers.GetValueOrDefault(p.PositionId, "")
                 : (numManual ? p.NumText : kpNumbers.GetValueOrDefault(p.PositionId).ToString(CultureInfo.InvariantCulture));
             rows.Add(string.Equals(p.NumText, numText, StringComparison.Ordinal)
                 ? p : p with { NumText = numText });
         }
+        token.ThrowIfCancellationRequested();
         return (rows, refNumbers, refDisplay);
     }
 }

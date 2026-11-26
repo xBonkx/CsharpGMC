@@ -172,21 +172,25 @@ public static partial class SqlServerActs
 
     /// <summary>Закрыто другими актами (acts.closed_by_acts): {позиция: Σ количеств}.</summary>
     public static Dictionary<long, decimal> ClosedByActs(SqlConnection conn, long contractId, long excludeActId,
-        SqlTransaction? transaction = null)
+        SqlTransaction? transaction = null, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var map = new Dictionary<long, decimal>();
         using var cmd = new SqlCommand(
             "SELECT al.position_id, al.qty FROM dbo.act_lines al " +
             "JOIN dbo.acts a ON a.id=al.act_id WHERE a.contract_id=@cid AND a.id != @exclude", conn, transaction);
         cmd.Parameters.Add("@cid", SqlDbType.BigInt).Value = contractId;
         cmd.Parameters.Add("@exclude", SqlDbType.BigInt).Value = excludeActId;
-        using var r = cmd.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var pid = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
             var qty = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
             map[pid] = map.GetValueOrDefault(pid) + qty;
         }
+        token.ThrowIfCancellationRequested();
         return map;
     }
 

@@ -34,16 +34,18 @@ public static partial class SqlServerActs
     /// как kp_numbers/extra_numbers в export_ks.py; RefNumbers/RefDisplay —
     /// ссылки формул «КN» (act_qty.bind/display).
     /// </summary>
-    public static ActSheetData ActSheet(SqlConnection conn, long actId, long contractId)
+    public static ActSheetData ActSheet(SqlConnection conn, long actId, long contractId,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var form = "";
         using (var read = new SqlCommand("SELECT ISNULL(form,N'') FROM dbo.contracts WHERE id=@id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            var value = read.ExecuteScalar();
+            var value = token.CanBeCanceled ? read.ExecuteScalarAsync(token).GetAwaiter().GetResult() : read.ExecuteScalar();
             form = value is null or DBNull ? "" : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
-        var rules = TagRules.Load(conn);
+        var rules = TagRules.Load(conn, token);
         var numManual = rules.Has(form, "num_manual");
 
         var systemRows = new List<(long Id, string Name, long Parent)>();
@@ -52,12 +54,16 @@ public static partial class SqlServerActs
             "WHERE s.contract_id=@id ORDER BY s.[order], s.id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 systemRows.Add((
                     Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                     r.IsDBNull(1) ? "" : r.GetString(1),
                     Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture)));
+            }
         }
         var nameById = systemRows.ToDictionary(s => s.Id, s => s.Name);
         // System.label: «П1 › отметка +0,000» — подразделы с родителем
@@ -67,9 +73,9 @@ public static partial class SqlServerActs
                 s.Parent != 0, s.Parent))
             .ToList();
 
-        var closedByOthers = ClosedByActs(conn, contractId, actId);
-        var issued = ReadIssued(conn, contractId);
-        var tracked = ReadTracked(conn, contractId);
+        var closedByOthers = ClosedByActs(conn, contractId, actId, token: token);
+        var issued = ReadIssued(conn, contractId, token: token);
+        var tracked = ReadTracked(conn, contractId, token);
 
         var positions = new List<ActSheetRow>();
         using (var read = new SqlCommand(
@@ -83,13 +89,15 @@ public static partial class SqlServerActs
         {
             read.Parameters.Add("@act", SqlDbType.BigInt).Value = actId;
             read.Parameters.Add("@cid", SqlDbType.BigInt).Value = contractId;
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             decimal D(int i) => r.IsDBNull(i) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(i), CultureInfo.InvariantCulture));
             string S(int i) => r.IsDBNull(i) ? "" :
                 Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var positionId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 positions.Add(new ActSheetRow(
                     positionId,
@@ -104,7 +112,8 @@ public static partial class SqlServerActs
             }
         }
 
-        var (rows, refNumbers, refDisplay) = KsActSheetProjection.NumberRows(systemRows, positions, numManual);
+        var (rows, refNumbers, refDisplay) = KsActSheetProjection.NumberRows(systemRows, positions, numManual, token);
+        token.ThrowIfCancellationRequested();
         return new ActSheetData(systems, rows, refNumbers, refDisplay, numManual, form);
     }
 
@@ -135,8 +144,9 @@ public static partial class SqlServerActs
     }
 
     /// <summary>Позиции с движениями или этапом закупки — по ним «сдаём больше, чем выдано».</summary>
-    private static HashSet<long> ReadTracked(SqlConnection conn, long contractId)
+    private static HashSet<long> ReadTracked(SqlConnection conn, long contractId, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var set = new HashSet<long>();
         using var cmd = new SqlCommand(
             "SELECT DISTINCT p.id FROM dbo.positions p " +
@@ -145,9 +155,13 @@ public static partial class SqlServerActs
             "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id " +
             "WHERE sy.contract_id=@id AND (m.id IS NOT NULL OR (pr.id IS NOT NULL AND ISNULL(pr.stage,N'')<>N''))", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var r = cmd.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             set.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+        }
         return set;
     }
 }

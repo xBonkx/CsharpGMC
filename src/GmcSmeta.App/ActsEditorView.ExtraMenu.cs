@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using GmcSmeta.Core.Db;
@@ -10,8 +11,9 @@ public partial class ActsEditorView
     private HashSet<long> _sharedExtraIds = new();
 
     // Read once per confirmed act snapshot, not once per context-menu opening.
-    private static HashSet<long> ReadSharedExtras(SqlConnection conn, long actId)
+    private static HashSet<long> ReadSharedExtras(SqlConnection conn, long actId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ids = new HashSet<long>();
         if (actId == 0) return ids;
         using var cmd = new SqlCommand(
@@ -21,8 +23,11 @@ public partial class ActsEditorView
             "AND EXISTS(SELECT 1 FROM dbo.act_lines other " +
             "WHERE other.position_id=p.id AND other.act_id<>@act)", conn);
         cmd.Parameters.Add("@act", System.Data.SqlDbType.BigInt).Value = actId;
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read()) ids.Add(Convert.ToInt64(reader.GetValue(0)));
+        using var reader = token.CanBeCanceled
+            ? cmd.ExecuteReaderAsync(token).GetAwaiter().GetResult() : cmd.ExecuteReader();
+        while (token.CanBeCanceled ? reader.ReadAsync(token).GetAwaiter().GetResult() : reader.Read())
+            ids.Add(Convert.ToInt64(reader.GetValue(0)));
+        token.ThrowIfCancellationRequested();
         return ids;
     }
 

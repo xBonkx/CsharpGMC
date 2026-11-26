@@ -111,3 +111,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-045: EstimateView.xaml 1030→1029, EstimateScrollingChecks.cs 82→78 строк; удалён EstimateScrollPolicy.cs (18 строк), вместо условной политики один штатный XAML property. Build/test не запускались.
 
 - 26.11.2026, PERF-041/046: SqlServerActs.Grid.cs 222→153, KsActSheetProjection.cs 84, ActsEditorView.xaml.cs 2345→2348, KsActSheetProjectionTests.cs 99 строк. NumberRows выделен как pure компонент, крупный ActsEditorView изменён точечно, без новых обязанностей. Build/test не запускались.
+
+- 26.11.2026, PERF-046/012: ActsEditorView.xaml.cs 2348→2257, ActsEditorView.Loading.cs 120, ActsEditorView.ExtraMenu.cs 125→130, SqlServerActs.Grid.cs 153→167, SqlServerActs.cs 1152→1156, SqlServerActs.Parity.cs 241→245, TagRules.cs 84→101, KsActSheetProjection.cs 84→92, SqlServerActs.ActList.cs 130→133, KsActsParityTests.cs 116→122, PilotFinanceBatchCases.cs 159→184 строк. Из крупного code-behind выделен тематический loader/snapshot; дальнейшая декомпозиция редактора нужна. Build/test не запускались.

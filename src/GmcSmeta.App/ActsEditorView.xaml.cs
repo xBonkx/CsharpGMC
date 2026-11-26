@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -31,6 +32,7 @@ public partial class ActsEditorView : UserControl
     private bool _loadingAct;
     private bool _loadFailed;
     private long _actLoadGeneration;
+    private CancellationTokenSource? _actLoadCancellation;
     private string _actsRevision = "";
     private string _publishedActRevision = "";
     private long _publishedActId;
@@ -287,99 +289,6 @@ public partial class ActsEditorView : UserControl
     public void Reload() => Reload(null);
 
     private void Reload(long? requestedActId) => _ = ReloadAsync(requestedActId, reuseList: false);
-
-    private sealed record ActLoadSnapshot(
-        List<SqlServerActs.ActInfo> Acts, long ActId, string Revision,
-        SqlServerActs.ActSheetData? Sheet, SqlServerActs.ActDetails? Details,
-        ContractTotals? Totals, TagRules? Rules, HashSet<long> SharedExtraIds);
-
-    private static ActLoadSnapshot ReadActSnapshot(string connectionString, int contractId,
-        long requestedId, List<SqlServerActs.ActInfo>? cachedActs, string cachedRevision)
-    {
-        using var conn = SqlServerDatabase.Open(connectionString);
-        for (var attempt = 0; attempt < 2; attempt++)
-        {
-            var before = SqlServerDatabase.Revision(conn);
-            var acts = cachedActs is not null && !string.IsNullOrEmpty(cachedRevision) &&
-                string.Equals(before, cachedRevision, StringComparison.Ordinal)
-                ? cachedActs : SqlServerActs.ActsOf(conn, contractId);
-            var id = KsWorkspaceProjection.ResolveActId(acts, requestedId);
-            var sheet = id == 0 ? null : SqlServerActs.ActSheet(conn, id, contractId);
-            var details = id == 0 ? null : SqlServerActs.ReadDetails(conn, id);
-            var totals = id == 0 ? null : Totals.ReadOne(conn, contractId);
-            var rules = id == 0 ? null : TagRules.Load(conn);
-            var sharedExtras = sheet is not null && sheet.Positions.Any(p => p.OutOfKp)
-                ? ReadSharedExtras(conn, id) : new HashSet<long>();
-            var after = SqlServerDatabase.Revision(conn);
-            if (!string.IsNullOrWhiteSpace(before) && before == after)
-                return new ActLoadSnapshot(acts, id, after, sheet, details, totals, rules, sharedExtras);
-            cachedActs = null; // A concurrent change invalidates the cached list too.
-        }
-        throw new InvalidOperationException("КС-2 изменилась во время чтения. Повторите загрузку.");
-    }
-
-    private async Task ReloadAsync(long? requestedActId, bool reuseList)
-    {
-        if (_contractId == 0 || ActWritePending) return;
-        var generation = ++_actLoadGeneration;
-        var connectionString = _connectionString;
-        var contractId = _contractId;
-        var requested = requestedActId ?? _actId;
-        var cachedActs = reuseList ? _acts.ToList() : null;
-        var cachedRevision = _actsRevision;
-        _loadingAct = true;
-        _loadFailed = false;
-        _publishedActRevision = "";
-        _revision = "";
-        // Clear the old sheet before publishing the target ID. Selection remains
-        // available in the surrounding contract list while this editor is hidden.
-        _building = true;
-        try
-        {
-            ShowActUnavailable(null);
-            EmptyTitle.Text = "Загрузка КС-2…";
-            EmptyDescription.Text = "Чтение данных из SQL Server.";
-            if (_acts.Any(a => a.Id == requested)) _actId = requested;
-            SyncActSelector();
-        }
-        finally { _building = false; }
-
-        try
-        {
-            var loaded = await Task.Run(() => ReadActSnapshot(connectionString, contractId,
-                requested, cachedActs, cachedRevision));
-            if (generation != _actLoadGeneration || contractId != _contractId ||
-                connectionString != _connectionString) return;
-            _building = true;
-            _acts = loaded.Acts;
-            _actId = loaded.ActId;
-            _actsRevision = loaded.Revision;
-            _revision = loaded.Revision;
-            ApplyActSnapshot(loaded);
-            _publishedActId = loaded.ActId;
-            _publishedActRevision = loaded.Revision;
-        }
-        catch (Exception ex)
-        {
-            if (generation != _actLoadGeneration) return;
-            _building = true;
-            _revision = "";
-            _actsRevision = "";
-            _loadFailed = true;
-            ShowActUnavailable(ex.Message);
-            SetStatus("Ошибка чтения акта: " + ex.Message, true);
-        }
-        finally
-        {
-            if (generation == _actLoadGeneration)
-            {
-                _loadingAct = false;
-                _building = false;
-                UpdateSelectionQty();
-                ActsChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-    }
 
     private sealed record ActItem(SqlServerActs.ActInfo Info)
     {

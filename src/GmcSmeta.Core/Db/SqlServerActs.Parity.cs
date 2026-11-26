@@ -31,8 +31,9 @@ public static partial class SqlServerActs
         return ReadDetails(conn, actId);
     }
 
-    public static ActDetails ReadDetails(SqlConnection conn, long actId)
+    public static ActDetails ReadDetails(SqlConnection conn, long actId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
         using var cmd = new SqlCommand(
             "SELECT a.id,a.contract_id,a.number,a.[date],a.period_from,a.period_to," +
@@ -44,8 +45,11 @@ public static partial class SqlServerActs
             (schema31 ? "JOIN dbo.objects o ON o.id=c.object_id LEFT JOIN dbo.tags t ON t.[key]=c.form " : "")+
             "WHERE a.id=@id",conn);
         cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=actId;
-        using var r=cmd.ExecuteReader();
-        if (!r.Read()) throw new InvalidOperationException("Акт не найден.");
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        var found = r.Read();
+        token.ThrowIfCancellationRequested();
+        if (!found) throw new InvalidOperationException("Акт не найден.");
         decimal D(int i) => r.IsDBNull(i) ? 0m :
             Money.FromDouble(Convert.ToDouble(r.GetValue(i),CultureInfo.InvariantCulture));
         var date = r.IsDBNull(3) ? DateTime.Today : r.GetDateTime(3);

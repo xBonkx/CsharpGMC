@@ -15,7 +15,10 @@ public static partial class SqlServerActs
     /// </summary>
     public static List<ActInfo> ActsOf(SqlConnection conn, long contractId, SqlTransaction? transaction = null,
         CancellationToken token = default)
-        => ActsOfVersion(conn,contractId,transaction,SqlSchemaCompatibility.HasPreviewColumns(conn)?31:28,token);
+    {
+        token.ThrowIfCancellationRequested();
+        return ActsOfVersion(conn,contractId,transaction,SqlSchemaCompatibility.HasPreviewColumns(conn)?31:28,token);
+    }
 
     // Internal explicit-version projection for isolated migration finance snapshots.
     // The normal application still uses the existing guarded Open and name policy.

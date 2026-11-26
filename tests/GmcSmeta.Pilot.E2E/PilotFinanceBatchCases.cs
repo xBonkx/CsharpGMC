@@ -81,6 +81,7 @@ internal static class PilotFinanceBatchCases
             "Read-only finance batch changed revision or retained an active reader");
 
         CheckProgressRead(conn, contractId, unit, signed, revision);
+        CheckActSheetRead(conn, contractId, pending, unit, revision);
         CheckLargeActs(p, conn, id, unit);
     }
 
@@ -108,6 +109,30 @@ internal static class PilotFinanceBatchCases
         }
         catch (OperationCanceledException) { }
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision, "Progress read changed revision");
+    }
+
+    private static void CheckActSheetRead(SqlConnection conn, int contractId, long actId,
+        long positionId, string revision)
+    {
+        var original = SqlServerActs.ActSheet(conn, actId, contractId);
+        using var cancellation = new CancellationTokenSource();
+        var current = SqlServerActs.ActSheet(conn, actId, contractId, cancellation.Token);
+        PilotRunner.Check(current.Systems.SequenceEqual(original.Systems) &&
+            current.Positions.SequenceEqual(original.Positions) &&
+            current.RefNumbers.OrderBy(p => p.Key).SequenceEqual(original.RefNumbers.OrderBy(p => p.Key)) &&
+            current.RefDisplay.OrderBy(p => p.Key).SequenceEqual(original.RefDisplay.OrderBy(p => p.Key)) &&
+            current.NumManual == original.NumManual && current.Form == original.Form &&
+            current.Positions.Single(p => p.PositionId == positionId).ClosedByOthers == 1m &&
+            SqlServerActs.ReadDetails(conn, actId, cancellation.Token) == SqlServerActs.ReadDetails(conn, actId),
+            "Cancellable act sheet changed order, references, quantities or details");
+        cancellation.Cancel();
+        try
+        {
+            SqlServerActs.ActSheet(conn, actId, contractId, cancellation.Token);
+            throw new InvalidOperationException("Cancelled act sheet read did not throw.");
+        }
+        catch (OperationCanceledException) { }
+        PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision, "Act sheet read changed revision");
     }
 
     private static void CheckLargeActs(PilotRunner p, SqlConnection conn, long contractId, long position)

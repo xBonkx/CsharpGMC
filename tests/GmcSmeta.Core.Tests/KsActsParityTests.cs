@@ -14,6 +14,12 @@ public sealed class KsActsParityTests
         Assert.Throws<OperationCanceledException>(() => SqlServerActs.SummaryWithExtras(conn, 1, token));
         Assert.Throws<OperationCanceledException>(() => SqlServerActs.ActsOf(conn, 1, token: token));
         Assert.Throws<OperationCanceledException>(() => SqlServerActs.ReadIssued(conn, 1, token: token));
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.ActSheet(conn, 1, 1, token));
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.ReadDetails(conn, 1, token));
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.ClosedByActs(conn, 1, 1, token: token));
+        Assert.Throws<OperationCanceledException>(() => TagRules.Load(conn, token));
+        Assert.Throws<OperationCanceledException>(() => KsActSheetProjection.NumberRows(
+            Array.Empty<(long, string, long)>(), Array.Empty<SqlServerActs.ActSheetRow>(), false, token));
         Assert.Throws<OperationCanceledException>(() => Totals.ReadOne(conn, 1, token));
         Assert.Equal(System.Data.ConnectionState.Closed, conn.State);
     }

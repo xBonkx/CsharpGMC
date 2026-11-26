@@ -20,6 +20,23 @@ public sealed class TagRules
         return Read(r);
     }
 
+    public static TagRules Load(Microsoft.Data.SqlClient.SqlConnection conn, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT [key], rules FROM tags";
+        using var cancellation = GmcSmeta.Core.Db.SqlReadCancellation.Register(cmd, token);
+        using var reader = GmcSmeta.Core.Db.SqlReadCancellation.ExecuteReader(cmd, token);
+        var result = new TagRules();
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            result.ReadCurrent(reader);
+        }
+        token.ThrowIfCancellationRequested();
+        return result;
+    }
+
     // Object cards need names and exactly the same rule snapshot for both
     // estimate and finance projections. Read both in one SQL Server command.
     internal static TagRules LoadWithNames(Microsoft.Data.SqlClient.SqlConnection conn,
