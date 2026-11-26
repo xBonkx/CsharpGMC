@@ -168,59 +168,48 @@ public static class FinanceReader
     {
         var contracts = contractTotals.ToDictionary(c => c.Id);
         var costs = contracts.Keys.ToDictionary(id => id, _ => new Costs());
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "SELECT sy.contract_id, p.parent_id, p.name, parent.name, p.qty, p.price, " +
-                "p.purchase_price, pr.cost_price, p.out_of_kp, p.work_cost " +
-                "FROM positions p JOIN systems sy ON sy.id=p.system_id " +
-                "LEFT JOIN positions parent ON parent.id=p.parent_id " +
-                "LEFT JOIN procurement pr ON pr.position_id=p.id" +
-                (scope is null ? "" : " WHERE " + scope.Predicate("sy.contract_id")) +
-                " ORDER BY sy.\"order\",sy.id,p.\"order\",p.id";
-            scope?.Bind(cmd);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var id = Id(r, 0);
-                var c = costs[id];
-                var qty = Number(r, 4);
-                var outside = Number(r, 8) != 0;
-                var top = r.IsDBNull(1);
-                if (top && !outside) c.Work.Add(qty * Number(r, 9));
-                double? price = !r.IsDBNull(7) ? r.GetDouble(7) : !r.IsDBNull(6) ? r.GetDouble(6) : null;
-                if (outside)
-                {
-                    if (price is not null) c.Outside.Add(qty * price.Value);
-                    continue;
-                }
-                if (EstimateStatistics.IsWorkName(Text(r, 2)) ||
-                    !r.IsDBNull(3) && EstimateStatistics.IsWorkName(Text(r, 3))) continue;
-                var amount = top ? qty * Number(r, 5) : 0;
-                var revenue = rules.Has(contracts[id].Form, "round_rows") ? HalfUp(amount) : PythonRound(amount);
-                c.Revenue.Add(revenue);
-                if (price is null)
-                {
-                    if (revenue != 0) c.Missing++;
-                    continue;
-                }
-                c.Cost.Add(qty * price.Value);
-                c.Covered.Add(revenue);
-            }
-        }
         var extraWork = costs.Keys.ToDictionary(id => id, _ => new FloatSum());
-        using (var cmd = conn.CreateCommand())
+        IReadOnlyList<ActSummary> acts;
+
+        if (conn is Microsoft.Data.SqlClient.SqlConnection)
         {
-            cmd.CommandText = "SELECT contract_id,amount FROM smr_costs" +
-                (scope is null ? "" : " WHERE " + scope.Predicate("contract_id")) + " ORDER BY id";
+            // One round trip per bounded scope. Keep independent result sets
+            // and the original order; MARS and server-side money rounding are not needed.
+            var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = FinancePositionsSql(scope) + ";" + ExtraWorkSql(scope) + ";" +
+                ActLinesSql(scope) + ";" + ActsSql(scope, schema31);
             scope?.Bind(cmd);
             using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var id = Id(r, 0);
-                var sum = extraWork[id]; sum.Add(Number(r, 1)); extraWork[id] = sum;
-            }
+            ReadFinancePositions(r, contracts, costs, rules);
+            NextFinanceResult(r);
+            ReadExtraWork(r, extraWork);
+            NextFinanceResult(r);
+            var lines = ReadActLines(r);
+            NextFinanceResult(r);
+            acts = ReadActRows(r, contracts, rules, lines, schema31);
         }
-        foreach (var act in ReadActsCore(conn, contractTotals, rules, scope))
+        else
+        {
+            // Preserve the existing offline fixture route and use the same parsers.
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = FinancePositionsSql(scope);
+                scope?.Bind(cmd);
+                using var r = cmd.ExecuteReader();
+                ReadFinancePositions(r, contracts, costs, rules);
+            }
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = ExtraWorkSql(scope);
+                scope?.Bind(cmd);
+                using var r = cmd.ExecuteReader();
+                ReadExtraWork(r, extraWork);
+            }
+            acts = ReadActsCore(conn, contractTotals, rules, scope);
+        }
+
+        foreach (var act in acts)
         {
             if (act.Signed) costs[act.ContractId].Signed += act.Total;
             else costs[act.ContractId].Pending += act.Total;
@@ -229,6 +218,77 @@ public static class FinanceReader
             Cents(x.Value.Cost.Value), Cents(x.Value.Covered.Value), Cents(x.Value.Outside.Value),
             Cents(x.Value.Work.Value + extraWork[x.Key].Value), x.Value.Missing)
         { MaterialRevenue = Cents(x.Value.Revenue.Value) });
+    }
+
+    private static void NextFinanceResult(DbDataReader reader)
+    {
+        if (!reader.NextResult())
+            throw new InvalidOperationException("Неполный финансовый пакет SQL Server.");
+    }
+
+    private static string FinancePositionsSql(ContractReadScope? scope) =>
+        "SELECT sy.contract_id, p.parent_id, p.name, parent.name, p.qty, p.price, " +
+        "p.purchase_price, pr.cost_price, p.out_of_kp, p.work_cost " +
+        "FROM positions p JOIN systems sy ON sy.id=p.system_id " +
+        "LEFT JOIN positions parent ON parent.id=p.parent_id " +
+        "LEFT JOIN procurement pr ON pr.position_id=p.id" +
+        (scope is null ? "" : " WHERE " + scope.Predicate("sy.contract_id")) +
+        " ORDER BY sy.\"order\",sy.id,p.\"order\",p.id";
+
+    private static string ExtraWorkSql(ContractReadScope? scope) =>
+        "SELECT contract_id,amount FROM smr_costs" +
+        (scope is null ? "" : " WHERE " + scope.Predicate("contract_id")) + " ORDER BY id";
+
+    private static string ActLinesSql(ContractReadScope? scope) =>
+        scope is null
+        ? "SELECT act_id,qty,price FROM act_lines ORDER BY act_id,id"
+        : "SELECT al.act_id,al.qty,al.price FROM act_lines al JOIN acts a ON a.id=al.act_id WHERE " +
+            scope.Predicate("a.contract_id") + " ORDER BY al.act_id,al.id";
+
+    private static string ActsSql(ContractReadScope? scope, bool schema31) =>
+        "SELECT id,contract_id,smr_amount,transport_amount,pnr_amount,rows_exact,gross_adjustment_cents,signed,number,date,period_from,period_to,note" +
+        (schema31 ? ",discount_percent,manual_total_cents" : "") + " FROM acts" +
+        (scope is null ? "" : " WHERE " + scope.Predicate("contract_id")) + " ORDER BY id";
+
+    private static void ReadFinancePositions(DbDataReader r,
+        Dictionary<int, ContractTotals> contracts, Dictionary<int, Costs> costs, TagRules rules)
+    {
+        while (r.Read())
+        {
+            var id = Id(r, 0);
+            var c = costs[id];
+            var qty = Number(r, 4);
+            var outside = Number(r, 8) != 0;
+            var top = r.IsDBNull(1);
+            if (top && !outside) c.Work.Add(qty * Number(r, 9));
+            double? price = !r.IsDBNull(7) ? r.GetDouble(7) : !r.IsDBNull(6) ? r.GetDouble(6) : null;
+            if (outside)
+            {
+                if (price is not null) c.Outside.Add(qty * price.Value);
+                continue;
+            }
+            if (EstimateStatistics.IsWorkName(Text(r, 2)) ||
+                !r.IsDBNull(3) && EstimateStatistics.IsWorkName(Text(r, 3))) continue;
+            var amount = top ? qty * Number(r, 5) : 0;
+            var revenue = rules.Has(contracts[id].Form, "round_rows") ? HalfUp(amount) : PythonRound(amount);
+            c.Revenue.Add(revenue);
+            if (price is null)
+            {
+                if (revenue != 0) c.Missing++;
+                continue;
+            }
+            c.Cost.Add(qty * price.Value);
+            c.Covered.Add(revenue);
+        }
+    }
+
+    private static void ReadExtraWork(DbDataReader r, Dictionary<int, FloatSum> extraWork)
+    {
+        while (r.Read())
+        {
+            var id = Id(r, 0);
+            var sum = extraWork[id]; sum.Add(Number(r, 1)); extraWork[id] = sum;
+        }
     }
 
     public static IReadOnlyList<ActSummary> ReadActs(DbConnection conn, IReadOnlyList<ContractTotals>? knownTotals = null)
@@ -240,58 +300,66 @@ public static class FinanceReader
         IReadOnlyList<ContractTotals> totals, TagRules rules, ContractReadScope? scope)
     {
         var contracts = totals.ToDictionary(c => c.Id);
-        var result = new List<ActSummary>();
-        var lines = new Dictionary<int, List<(double Qty, double Price)>>();
+        Dictionary<int, List<(double Qty, double Price)>> lines;
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = scope is null
-                ? "SELECT act_id,qty,price FROM act_lines ORDER BY act_id,id"
-                : "SELECT al.act_id,al.qty,al.price FROM act_lines al JOIN acts a ON a.id=al.act_id WHERE " +
-                    scope.Predicate("a.contract_id") + " ORDER BY al.act_id,al.id";
+            cmd.CommandText = ActLinesSql(scope);
             scope?.Bind(cmd);
             using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var id = Id(r, 0);
-                if (!lines.TryGetValue(id, out var list)) lines[id] = list = new();
-                list.Add((Number(r, 1), Number(r, 2)));
-            }
+            lines = ReadActLines(r);
         }
-        using (var cmd = conn.CreateCommand())
+
+        var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
+        using var read = conn.CreateCommand();
+        read.CommandText = ActsSql(scope, schema31);
+        scope?.Bind(read);
+        using var reader = read.ExecuteReader();
+        return ReadActRows(reader, contracts, rules, lines, schema31);
+    }
+
+    private static Dictionary<int, List<(double Qty, double Price)>> ReadActLines(DbDataReader r)
+    {
+        var lines = new Dictionary<int, List<(double Qty, double Price)>>();
+        while (r.Read())
         {
-            var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
-            cmd.CommandText = "SELECT id,contract_id,smr_amount,transport_amount,pnr_amount,rows_exact,gross_adjustment_cents,signed,number,date,period_from,period_to,note" +
-                (schema31 ? ",discount_percent,manual_total_cents" : "") + " FROM acts" +
-                (scope is null ? "" : " WHERE " + scope.Predicate("contract_id")) + " ORDER BY id";
-            scope?.Bind(cmd);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var contractId = Id(r, 1);
-                var contract = contracts[contractId];
-                var sum = new FloatSum();
-                var exact = Number(r, 5) != 0;
-                foreach (var (qty, price) in lines.GetValueOrDefault(Id(r, 0)) ?? new())
-                    sum.Add(exact ? qty * price : rules.Has(contract.Form, "round_rows") ? HalfUp(qty * price) : PythonRound(qty * price));
-                var material = exact ? HalfUp(sum.Value) : PythonRound(sum.Value);
-                var net = PythonRound(material + Number(r, 2) + Number(r, 3) + Number(r, 4));
-                var total = rules.Has(contract.Form, "vat_top")
-                    ? PythonRound(net + PythonRound(net * (double)contract.VatRate / 100) + Number(r, 6) / 100) : net;
-                if (schema31)
-                    total = (double)DiscountPolicy.Payable((decimal)total,
-                        DiscountPolicy.ReadPercent(r, 13), r.IsDBNull(14) ? -1 : Convert.ToInt64(r.GetValue(14)));
-                var vat = rules.Has(contract.Form, "vat_top")
-                    ? PythonRound(net * (double)contract.VatRate / 100)
-                    : PythonRound(total * (double)contract.VatRate / (100 + (double)contract.VatRate));
-                DateOnly? Day(int index) => r.IsDBNull(index) ? null :
-                    r.GetValue(index) is DateTime date ? DateOnly.FromDateTime(date) :
-                    r.GetValue(index) is DateOnly day ? day :
-                    DateOnly.Parse(Text(r, index), CultureInfo.InvariantCulture);
-                result.Add(new ActSummary(Id(r, 0), contractId, Text(r, 8),
-                    Day(9), Day(10), Day(11), Number(r, 7) != 0, (decimal)material, (decimal)net, (decimal)total,
-                    (decimal)vat, (decimal)Number(r, 2), (decimal)Number(r, 3), (decimal)Number(r, 4),
-                    (int)Number(r, 6), Text(r, 12)));
-            }
+            var id = Id(r, 0);
+            if (!lines.TryGetValue(id, out var list)) lines[id] = list = new();
+            list.Add((Number(r, 1), Number(r, 2)));
+        }
+        return lines;
+    }
+
+    private static IReadOnlyList<ActSummary> ReadActRows(DbDataReader r,
+        Dictionary<int, ContractTotals> contracts, TagRules rules,
+        Dictionary<int, List<(double Qty, double Price)>> lines, bool schema31)
+    {
+        var result = new List<ActSummary>();
+        while (r.Read())
+        {
+            var contractId = Id(r, 1);
+            var contract = contracts[contractId];
+            var sum = new FloatSum();
+            var exact = Number(r, 5) != 0;
+            foreach (var (qty, price) in lines.GetValueOrDefault(Id(r, 0)) ?? new())
+                sum.Add(exact ? qty * price : rules.Has(contract.Form, "round_rows") ? HalfUp(qty * price) : PythonRound(qty * price));
+            var material = exact ? HalfUp(sum.Value) : PythonRound(sum.Value);
+            var net = PythonRound(material + Number(r, 2) + Number(r, 3) + Number(r, 4));
+            var total = rules.Has(contract.Form, "vat_top")
+                ? PythonRound(net + PythonRound(net * (double)contract.VatRate / 100) + Number(r, 6) / 100) : net;
+            if (schema31)
+                total = (double)DiscountPolicy.Payable((decimal)total,
+                    DiscountPolicy.ReadPercent(r, 13), r.IsDBNull(14) ? -1 : Convert.ToInt64(r.GetValue(14)));
+            var vat = rules.Has(contract.Form, "vat_top")
+                ? PythonRound(net * (double)contract.VatRate / 100)
+                : PythonRound(total * (double)contract.VatRate / (100 + (double)contract.VatRate));
+            DateOnly? Day(int index) => r.IsDBNull(index) ? null :
+                r.GetValue(index) is DateTime date ? DateOnly.FromDateTime(date) :
+                r.GetValue(index) is DateOnly day ? day :
+                DateOnly.Parse(Text(r, index), CultureInfo.InvariantCulture);
+            result.Add(new ActSummary(Id(r, 0), contractId, Text(r, 8),
+                Day(9), Day(10), Day(11), Number(r, 7) != 0, (decimal)material, (decimal)net, (decimal)total,
+                (decimal)vat, (decimal)Number(r, 2), (decimal)Number(r, 3), (decimal)Number(r, 4),
+                (int)Number(r, 6), Text(r, 12)));
         }
         return result;
     }
