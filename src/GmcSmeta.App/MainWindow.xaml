@@ -342,33 +342,32 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="#2563EB" x:Name="DocumentIcon"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Grid.Column="1" Text="{Binding NavigationName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="6,0,4,0"/>
-                <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding PhaseColor}" CornerRadius="9" Width="17" Height="17"
+                <TextBlock Grid.Column="1" Text="{Binding Document.NavigationName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                <!-- Python NavDelegate: 10pt body × 0.88 = 8.8pt (11.733 DIP). -->
+                <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" Width="17" Height="17"
                         Padding="0" Margin="0,0,6,0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding PhaseNumber}" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding Document.PhaseNumber}" FontSize="11.733333333333333"
                                Foreground="White" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Grid.Column="3" Text="{Binding NavigationDate}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
+                <TextBlock Grid.Column="3" Text="{Binding Document.NavigationDate}" Foreground="#64748B" FontSize="11.733333333333333"
                            VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,4,0"/>
             </Grid>
             <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Kind}" Value="main"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#15803D"/></DataTrigger>
-                <DataTrigger Binding="{Binding Kind}" Value="dop"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#B45309"/></DataTrigger>
-                <DataTrigger Binding="{Binding IsStage}" Value="True">
+                <DataTrigger Binding="{Binding Document.Kind}" Value="main"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#15803D"/></DataTrigger>
+                <DataTrigger Binding="{Binding Document.Kind}" Value="dop"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#B45309"/></DataTrigger>
+                <DataTrigger Binding="{Binding IconRole}" Value="Stage">
                     <Setter TargetName="DocumentIcon" Property="Data" Value="{StaticResource GlyphStage}"/>
                     <Setter TargetName="DocumentIcon" Property="Stroke" Value="#2563EB"/>
                 </DataTrigger>
-                <DataTrigger Binding="{Binding StageRest}" Value="True"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#64748B"/></DataTrigger>
-                <!-- Visual-only rule: a full document that contains stage nodes uses the layers icon. -->
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding IsStage}" Value="False"/>
-                        <Condition Binding="{Binding HasItems, RelativeSource={RelativeSource AncestorType={x:Type TreeViewItem}}}" Value="True"/>
-                    </MultiDataTrigger.Conditions>
+                <DataTrigger Binding="{Binding IconRole}" Value="Remainder">
+                    <Setter TargetName="DocumentIcon" Property="Data" Value="{StaticResource GlyphStage}"/>
+                    <Setter TargetName="DocumentIcon" Property="Stroke" Value="#64748B"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IconRole}" Value="Parent">
                     <Setter TargetName="DocumentIcon" Property="Data" Value="{StaticResource GlyphLayers}"/>
                     <Setter TargetName="DocumentIcon" Property="Stroke" Value="#2563EB"/>
-                </MultiDataTrigger>
-                <DataTrigger Binding="{Binding PhaseNumber}" Value=""><Setter TargetName="PhaseBadge" Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Document.PhaseNumber}" Value=""><Setter TargetName="PhaseBadge" Property="Visibility" Value="Collapsed"/></DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
         <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ReportGridHeader}">

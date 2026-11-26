@@ -78,6 +78,25 @@ public class NavigationTests
         Assert.Equal(new[] { 2, 3, 4 }, roots[0].Children.Select(n => n.Document.Id));
     }
 
+    [Theory]
+    [InlineData(false, false, false, false, "File", false)]
+    [InlineData(false, false, true, false, "Parent", false)]
+    [InlineData(true, true, false, false, "Stage", false)]
+    [InlineData(true, true, false, true, "Remainder", true)]
+    [InlineData(true, false, false, false, "File", false)]
+    [InlineData(true, false, false, true, "File", false)]
+    [InlineData(true, false, true, true, "Parent", false)]
+    [InlineData(true, true, true, false, "Stage", false)]
+    public void NavigationHeader_UsesVisibleHierarchy(bool hasStageOf, bool nested,
+        bool hasChildren, bool remainder, string role, bool italic)
+    {
+        var doc = Doc(7, 1, "kp") with { StageOf = hasStageOf ? 1 : null, StageRest = remainder };
+        var header = new NavigationDocumentHeader(doc, nested, hasChildren);
+        Assert.Equal(role, header.IconRole);
+        Assert.Equal(italic, header.IsItalic);
+        Assert.Same(doc, header.Document);
+    }
+
     [Fact]
     public void Search_MatchesVisibleDocumentsButKeepsWholeObject()
     {

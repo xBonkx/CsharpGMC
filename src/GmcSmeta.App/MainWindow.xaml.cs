@@ -381,13 +381,14 @@ public partial class MainWindow : Window
 
     private TreeViewItem DocumentNode(NavigationDocument entry, HashSet<string>? opened, int depth)
     {
+        var header = new NavigationDocumentHeader(entry.Document, depth > 2, entry.Children.Count > 0);
         var node = new TreeViewItem
         {
-            Header = entry.Document, Tag = entry.Document,
+            Header = header, Tag = entry.Document,
             Padding = NavigationRowPadding(depth),
             HeaderTemplate = (DataTemplate)FindResource("DocumentNavigationTemplate"),
             ToolTip = entry.Document.NavigationTip,
-            FontStyle = entry.Document.StageRest ? FontStyles.Italic : FontStyles.Normal
+            FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal
         };
         System.Windows.Automation.AutomationProperties.SetName(node, entry.Document.NavigationName);
         node.IsExpanded = entry.Children.Count > 0 || opened?.Contains(NodeKey(node)) == true;

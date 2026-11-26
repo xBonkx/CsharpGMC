@@ -6,6 +6,16 @@ public sealed record NavigationObject(ObjectRow Object, IReadOnlyList<DocRow> Do
 public sealed record NavigationYear(string Year, IReadOnlyList<NavigationObject> Objects);
 public sealed record NavigationDocument(DocRow Document, List<NavigationDocument> Children);
 
+// Presentation follows the actual visible hierarchy, not just StageOf in storage.
+// A stage whose parent is absent from this navigation mode is displayed as a file.
+public sealed record NavigationDocumentHeader(DocRow Document, bool IsNested, bool HasChildren)
+{
+    public string IconRole => IsNested
+        ? (Document.StageRest ? "Remainder" : "Stage")
+        : (HasChildren ? "Parent" : "File");
+    public bool IsItalic => IsNested && Document.StageRest;
+}
+
 /// <summary>Списки боковой панели как MainWindow._object_lists / _docs_for_mode в Python.</summary>
 public static class Navigation
 {
