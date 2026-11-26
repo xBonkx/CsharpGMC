@@ -156,6 +156,7 @@ public partial class EstimateView : UserControl
                 _reloadCancellation?.Cancel(); // preserve mandatory readback on detach
                 CancelSummaryRead();
                 CancelMaterialsRead();
+                CancelTotalsRead();
             }
         };
         Loaded += (_, _) =>
@@ -174,6 +175,10 @@ public partial class EstimateView : UserControl
                 !_materialsBusy && !HasUnsettledCacheWrites &&
                 (string.IsNullOrWhiteSpace(_materialsRevision) || _materialsRevision != _serverRevision))
                 _ = LoadMaterialsAsync();
+            else if (_visibleEstimateMode == "totals" && _estimate is not null &&
+                !_totalsBusy && !HasUnsettledCacheWrites &&
+                (string.IsNullOrWhiteSpace(_totalsRevision) || _totalsRevision != _serverRevision))
+                _ = LoadCostTotalsAsync();
         };
         SetStatus("Загрузка сметы из SQL Server…", false);
         _ = ReloadDocumentAsync();

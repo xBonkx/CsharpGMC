@@ -118,6 +118,29 @@ internal static class PilotCostSummaryCases
             (hit.Totals with { Lines = miss.Totals.Lines }) == miss.Totals &&
             miss.Summary.Rows.SequenceEqual(data.Rows) && emptyRevision.Summary.Rows.SequenceEqual(data.Rows),
             "Revision-fenced summary reuse accepted stale cache or changed money");
+        using var totalsCancellation = new CancellationTokenSource();
+        var asyncHit = CostFinancialSnapshot.ReadTotalsAsync(conn, contractId, data, before, totalsCancellation.Token)
+            .GetAwaiter().GetResult();
+        var asyncMiss = CostFinancialSnapshot.ReadTotalsAsync(conn, contractId, data, "stale", totalsCancellation.Token)
+            .GetAwaiter().GetResult();
+        PilotRunner.Check(ReferenceEquals(asyncHit.Summary, data) && asyncHit.Revision == before &&
+            !ReferenceEquals(asyncMiss.Summary, data) && asyncMiss.Revision == before &&
+            asyncMiss.Summary.Rows.SequenceEqual(data.Rows) &&
+            asyncMiss.Summary.Extra.SequenceEqual(data.Extra) &&
+            asyncHit.Totals.Lines.SequenceEqual(hit.Totals.Lines) &&
+            asyncMiss.Totals.Lines.SequenceEqual(miss.Totals.Lines) &&
+            (asyncHit.Totals with { Lines = hit.Totals.Lines }) == hit.Totals &&
+            (asyncMiss.Totals with { Lines = miss.Totals.Lines }) == miss.Totals,
+            "Cancellable totals cache hit/miss changed the monetary projection");
+        totalsCancellation.Cancel();
+        try
+        {
+            CostFinancialSnapshot.ReadTotalsAsync(conn, contractId, data, before, totalsCancellation.Token)
+                .GetAwaiter().GetResult();
+            throw new InvalidOperationException("Cancelled totals read did not throw.");
+        }
+        catch (OperationCanceledException) { }
+        PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled totals read changed revision");
         var missingDoc = SqlServerCostSummary.Summary(conn, int.MaxValue);
         PilotRunner.Check(missingDoc.Rows.Count == 0 && missingDoc.Systems.Count == 0 &&
             missingDoc.Extra.SequenceEqual(new[] { ("Транспорт", 0m, 0m, "trans") }) &&

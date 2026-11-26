@@ -26,6 +26,20 @@ public sealed class CostSummaryBatchValidationTests
     }
 
     [Fact]
+    public async Task CancelledTotalsReadDoesNotAttemptToUseClosedConnection()
+    {
+        using var connection = new Microsoft.Data.SqlClient.SqlConnection(Pilot);
+        var token = new CancellationToken(canceled: true);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            CostFinancialSnapshot.ReadTotalsAsync(connection, 1, null, "", token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            CostFinancialSnapshot.ReadTotalsAsync(Pilot, 1, null, "", token));
+        Assert.Throws<OperationCanceledException>(() =>
+            SqlServerCostTotals.SummaryAndTotals(connection, 1, token));
+        Assert.Equal(System.Data.ConnectionState.Closed, connection.State);
+    }
+
+    [Fact]
     public void BatchRefusesProductionBeforeOpeningConnection()
     {
         Assert.Throws<InvalidOperationException>(() => SqlServerCostSummary.SaveSummaryCells(

@@ -30,32 +30,40 @@ public static class SqlServerCostTotals
     // Both projections use one calculation of the contract totals and its tag rules.
     // The caller must fence the entire operation with the SQL revision.
     public static (CostSummaryData Summary, CostTotalsData Totals) SummaryAndTotals(
-        SqlConnection conn, int contractId)
+        SqlConnection conn, int contractId, CancellationToken token = default)
     {
-        var summary = SqlServerCostSummary.Summary(conn, contractId, out var documentTotals, out var rules);
-        return (summary, BuildTotals(conn, contractId, summary, documentTotals, rules));
+        token.ThrowIfCancellationRequested();
+        var summary = SqlServerCostSummary.Summary(conn, contractId, out var documentTotals, out var rules, token);
+        return (summary, BuildTotals(conn, contractId, summary, documentTotals, rules, token));
     }
 
     // Caller supplies the summary from the same revision-checked read.
-    public static CostTotalsData Totals(SqlConnection conn, int contractId, CostSummaryData summary)
+    public static CostTotalsData Totals(SqlConnection conn, int contractId, CostSummaryData summary,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (contractId <= 0) throw new ArgumentException("Документ не найден.");
         var documentTotals = GmcSmeta.Core.Domain.Totals.ReadSqlBatch(
-            conn, new ContractReadScope(new[] { contractId }), out var rules).SingleOrDefault();
-        return BuildTotals(conn, contractId, summary, documentTotals, rules);
+            conn, new ContractReadScope(new[] { contractId }), out var rules, token: token).SingleOrDefault();
+        return BuildTotals(conn, contractId, summary, documentTotals, rules, token);
     }
 
     private static CostTotalsData BuildTotals(SqlConnection conn, int contractId,
-        CostSummaryData summary, ContractTotals? totals, TagRules rules)
+        CostSummaryData summary, ContractTotals? totals, TagRules rules, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         decimal matCost = 0m, smrCost = 0m;
+        var noCost = 0;
         foreach (var row in summary.Rows)
         {
+            token.ThrowIfCancellationRequested();
+            if (row.NoCost) noCost++;
             if (row.Work) smrCost += row.MCost + row.WCost;
             else { matCost += row.MCost; smrCost += row.WCost; }
         }
         foreach (var (_, cost, _, kind) in summary.Extra)
         {
+            token.ThrowIfCancellationRequested();
             if (kind == "works") smrCost += cost;
             else if (kind == "mat") matCost += cost;
         }
@@ -72,8 +80,11 @@ public static class SqlServerCostTotals
                 "transport_amount, consumables_cost, other_cost, reserve_cost FROM dbo.contracts WHERE id=@id", conn))
             {
                 read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-                using var r = read.ExecuteReader();
-                if (!r.Read()) throw new ArgumentException("Документ не найден.");
+                using var cancellation = SqlReadCancellation.Register(read, token);
+                using var r = SqlReadCancellation.ExecuteReader(read, token);
+                var found = r.Read();
+                token.ThrowIfCancellationRequested();
+                if (!found) throw new ArgumentException("Документ не найден.");
                 locked = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
                 stageOf = r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
                 smrMode = r.IsDBNull(2) ? "sum" : r.GetString(2);
@@ -91,7 +102,11 @@ public static class SqlServerCostTotals
                 "AND ISNULL(stage_rest,0)=0", conn))
             {
                 check.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-                fromStages = check.ExecuteScalar() is not null;
+                token.ThrowIfCancellationRequested();
+                fromStages = (token.CanBeCanceled
+                    ? check.ExecuteScalarAsync(token).GetAwaiter().GetResult()
+                    : check.ExecuteScalar()) is not null;
+                token.ThrowIfCancellationRequested();
             }
             var smrEditable = !locked && smrMode == "sum" && (stageOf is not null || !fromStages);
 
@@ -111,7 +126,7 @@ public static class SqlServerCostTotals
                 new("other", "Прочие расходы", other == 0m ? null : other, null, true, false),
                 new("reserve", "Непредвиденные", reserve == 0m ? null : reserve, null, true, false),
             };
-            var noCost = summary.Rows.Count(r => r.NoCost);
+            token.ThrowIfCancellationRequested();
             return new CostTotalsData(lines, noCost, vatTop, vatRate, vat, total, locked, smrEditable);
         }
     }

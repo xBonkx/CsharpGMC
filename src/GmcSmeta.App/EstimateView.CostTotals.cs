@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -54,6 +55,7 @@ public partial class EstimateView
     private bool _totalsLoading;
     private bool _totalsBusy;
     private int _totalsLoadVersion;
+    private CancellationTokenSource? _totalsLoadCancellation;
 
     // ------------------------------------------------------------------ lazy UI
     private EstimateTotalsPanel? TotalsView => TotalsPanel?.Child as EstimateTotalsPanel;
@@ -71,19 +73,36 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ load
+    private void SupersedeTotalsRead(bool cancel)
+    {
+        ++_totalsLoadVersion;
+        var cancellation = _totalsLoadCancellation;
+        _totalsLoadCancellation = null;
+        _totalsLoading = false;
+        if (cancel) cancellation?.Cancel();
+    }
+
+    private void CancelTotalsRead()
+    {
+        // Navigation must not cancel the forced readback of an active mutation.
+        if (_totalsLoading && !_totalsBusy) SupersedeTotalsRead(cancel: true);
+    }
+
     private void InvalidateCostTotals()
     {
-        _totalsLoadVersion++;
+        // An authoritative estimate supersedes the old projection. If a
+        // mutation owns the read, let it finish without publishing stale data.
+        SupersedeTotalsRead(cancel: !_totalsBusy);
         _costTotalsData = null;
         _totalsSourceSummary = null;
         _totalsRevision = "";
-        _totalsLoading = false;
         if (TotalsGrid is { } grid) grid.ItemsSource = null;
     }
 
     private async Task LoadCostTotalsAsync(bool force = false)
     {
-        if (_estimate is null || TotalsPanel is null) return;
+        if (_estimate is null || TotalsPanel is null ||
+            (_detached && !(force && _totalsBusy))) return;
         if (_totalsLoading) return;
         // Refreshes and cache checks must not instantiate an unopened tab.
         if (TotalsView is null && _visibleEstimateMode != "totals") return;
@@ -94,16 +113,24 @@ public partial class EstimateView
         _totalsLoading = true;
         _totalsRevision = "";
         var version = ++_totalsLoadVersion;
+        using var cancellation = new CancellationTokenSource();
+        _totalsLoadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             EnsureTotalsView();
-            var snapshot = await Task.Run(() => CostFinancialSnapshot.ReadTotals(
-                _sqlConnectionString, _contractId, cachedSummary, cachedRevision));
-            if (version != _totalsLoadVersion || _detached) return;
+            var snapshot = await Task.Run(() => CostFinancialSnapshot.ReadTotalsAsync(
+                _sqlConnectionString, _contractId, cachedSummary, cachedRevision, token), token);
+            if (token.IsCancellationRequested || version != _totalsLoadVersion ||
+                (_detached && !(force && _totalsBusy))) return;
             _costTotalsData = snapshot.Totals;
             _totalsSourceSummary = snapshot.Summary;
             TotalsShow();
             _totalsRevision = snapshot.Revision;
+        }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            // Cancelled read is not a failed save.
         }
         catch (Exception ex)
         {
@@ -112,7 +139,11 @@ public partial class EstimateView
         }
         finally
         {
-            if (version == _totalsLoadVersion) _totalsLoading = false;
+            if (ReferenceEquals(_totalsLoadCancellation, cancellation))
+            {
+                _totalsLoadCancellation = null;
+                _totalsLoading = false;
+            }
         }
     }
 
