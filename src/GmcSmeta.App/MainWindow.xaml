@@ -401,19 +401,11 @@
         </Style>
     </Window.Resources>
     <DockPanel x:Name="RootLayout" Background="#F4F6FA">
-        <Border DockPanel.Dock="Bottom" Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="0,1,0,0" Padding="14,6" MinHeight="32">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="StatusText" Foreground="#64748B" FontSize="{StaticResource UiBodySize}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                <!-- Постоянная подпись базы: защита от правок «не в той» базе SQL Server. -->
-                <TextBlock x:Name="DatabaseLabel" Grid.Column="1" Margin="16,0,0,0" Foreground="#94A3B8"
-                           FontSize="{StaticResource UiBodySize}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" ToolTip="Текущая база SQL Server. Запись разрешена только в GmcSmetaPilot_*."/>
-            </Grid>
-        </Border>
+        <!-- Status values remain available to diagnostics, but never reserve workspace height. -->
+        <Grid Visibility="Collapsed">
+            <TextBlock x:Name="StatusText"/>
+            <TextBlock x:Name="DatabaseLabel"/>
+        </Grid>
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="300" MinWidth="270"/>

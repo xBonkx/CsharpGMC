@@ -85,6 +85,8 @@ public partial class MainWindow
             settings.Items.Add(Item("Показать подсказки снова", ShowHintsAgain));
             settings.Items.Add(new Separator());
             settings.Items.Add(Item("Сведения о подключении SQL Server", ShowConnectionDetails, "Database"));
+            settings.Items.Add(Item("Последнее сообщение программы", () =>
+                MessageBox.Show(this, StatusText.Text, "Сообщение программы", MessageBoxButton.OK, MessageBoxImage.Information)));
             settings.Items.Add(Item("Обновить", RefreshWorkspaceNavigation, "Refresh", "F5"));
             settings.Items.Add(new Separator());
             settings.Items.Add(Item("Резервные копии SQL Server", ShowServerBackupInfo, "Download"));
