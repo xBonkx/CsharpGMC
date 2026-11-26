@@ -219,6 +219,7 @@ public partial class ShipmentsPane : UserControl
         EditFixedButton.Visibility = FinishFixedButton.Visibility = Visibility.Collapsed;
         ExportExcelButton.IsEnabled = ExportPdfButton.IsEnabled = false;
         LinesTile.Text = OverTile.Text = TotalTile.Text = "—";
+        UpdateShipmentSteps(null);
         SetStatus(message);
     }
 
@@ -273,6 +274,7 @@ public partial class ShipmentsPane : UserControl
         LinesGrid.ItemsSource = view;
         if (gridState is not null) RestoreGridState(gridState);
         var over = UpdateSummary(snapshot.LineCount);
+        UpdateShipmentSteps(current);
         FooterText.Text = IsEditingFixed
             ? "Изменяете выданную ведомость — правки сразу проводятся в закупках."
             : current.Fixed
@@ -377,6 +379,7 @@ public partial class ShipmentsPane : UserControl
             ExportExcelButton.IsEnabled = ExportPdfButton.IsEnabled = changes.Shipment.Lines > 0;
             FixedCheck.IsEnabled = !IsEditingFixed && (current.Fixed || changes.Shipment.Lines > 0);
             UpdateSummary(changes.Shipment.Lines);
+            UpdateShipmentSteps(changes.Shipment);
             RestoreGridState(state);
             _objectSnapshot = null; // incremental writes invalidate object-wide stock/header cache
             _shipmentSnapshotMayReuse = false;
@@ -781,12 +784,13 @@ public partial class ShipmentsPane : UserControl
         var revision = _revision;
         var name = "Ведомость № " + current.Number + " — " +
             CaptionText.Text.Replace("Выдача на объект: ", "");
-        await ContractDocumentSave.XlsxAsync(Window.GetWindow(this), name, () =>
+        var saved = await ContractDocumentSave.XlsxAsync(Window.GetWindow(this), name, () =>
         {
             using var conn = SqlServerDatabase.Open(_connectionString);
             var snapshot = SqlServerShipmentPrintData.Read(conn, _objectId, current.Id, revision);
             return ShipmentExcelForms.Create(snapshot);
         });
+        if (saved) MarkShipmentExported(current.Id);
     }
 
     private async void ExportPdf_Click(object sender, RoutedEventArgs e)
@@ -797,11 +801,12 @@ public partial class ShipmentsPane : UserControl
         var revision = _revision;
         var name = "Ведомость № " + current.Number + " — " +
             CaptionText.Text.Replace("Выдача на объект: ", "");
-        await ContractDocumentSave.PdfAsync(Window.GetWindow(this), name, () =>
+        var saved = await ContractDocumentSave.PdfAsync(Window.GetWindow(this), name, () =>
         {
             using var conn = SqlServerDatabase.Open(_connectionString);
             return ShipmentPdfForms.Create(SqlServerShipmentPrintData.Read(conn, _objectId, current.Id, revision));
         });
+        if (saved) MarkShipmentExported(current.Id);
     }
 
 }
