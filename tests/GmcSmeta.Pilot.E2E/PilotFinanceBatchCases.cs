@@ -79,5 +79,54 @@ internal static class PilotFinanceBatchCases
             "Director aggregates changed after finance batching");
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision,
             "Read-only finance batch changed revision or retained an active reader");
+
+        CheckLargeActs(p, conn, id, unit);
+    }
+
+    private static void CheckLargeActs(PilotRunner p, SqlConnection conn, long contractId, long position)
+    {
+        p.RequireOwned(conn);
+        var exact = PilotRunner.Long(conn,
+            "INSERT dbo.acts(contract_id,signed,rows_exact) OUTPUT inserted.id VALUES(@id,1,1)",
+            ("@id", contractId));
+        var rounded = PilotRunner.Long(conn,
+            "INSERT dbo.acts(contract_id,signed,rows_exact) OUTPUT inserted.id VALUES(@id,0,0)",
+            ("@id", contractId));
+        var empty = PilotRunner.Long(conn,
+            "INSERT dbo.acts(contract_id,signed,rows_exact) OUTPUT inserted.id VALUES(@id,0,0)",
+            ("@id", contractId));
+        // Synthetic repeated frozen lines stress the financial reader, not the editor.
+        const string digits = "(VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9))";
+        PilotRunner.Execute(conn, "INSERT dbo.act_lines(act_id,position_id,qty,price) " +
+            "SELECT TOP (25000) @act,@position,1,0.125 FROM " + digits + " a(n) CROSS JOIN " +
+            digits + " b(n) CROSS JOIN " + digits + " c(n) CROSS JOIN " + digits +
+            " d(n) CROSS JOIN " + digits + " e(n)", ("@act", exact), ("@position", position));
+        PilotRunner.Execute(conn, "INSERT dbo.act_lines(act_id,position_id,qty,price) " +
+            "VALUES(@act,@position,1,0.125),(@act,@position,1,0.125),(@act,@position,-1,0.125)",
+            ("@act", rounded), ("@position", position));
+        PilotRunner.Check(PilotRunner.Long(conn, "SELECT COUNT_BIG(*) FROM dbo.act_lines WHERE act_id=@id",
+            ("@id", exact)) == 25000, "Large frozen-act fixture incomplete");
+        PilotRunner.Execute(conn, "INSERT dbo.tags([key],name,rules) VALUES(N'qa_fin_stream',N'QA',@rules)",
+            ("@rules", "{\"round_rows\":true}"));
+
+        foreach (var form in new[] { "", "qa_fin_stream" })
+        {
+            PilotRunner.Execute(conn, "UPDATE dbo.contracts SET form=@form WHERE id=@id",
+                ("@form", form), ("@id", contractId));
+            var revision = SqlServerDatabase.Revision(conn);
+            var summaries = FinanceReader.ReadActs(conn).Where(a => a.ContractId == contractId).ToArray();
+            PilotRunner.Check(summaries.Select(a => a.Id).SequenceEqual(summaries.Select(a => a.Id).OrderBy(id => id)),
+                "Act header order changed");
+            PilotRunner.Check(summaries.Single(a => a.Id == exact).Materials == 3125m &&
+                summaries.Single(a => a.Id == rounded).Materials == (form.Length == 0 ? 0.12m : 0.13m) &&
+                summaries.Single(a => a.Id == empty).Materials == 0m,
+                "Large/exact/rounded/empty act material sums changed");
+            var finance = FinanceReader.ReadSelected(conn, new[] { checked((int)contractId) }, out _)
+                [checked((int)contractId)];
+            PilotRunner.Check(finance.Signed == summaries.Where(a => a.Signed).Sum(a => a.Total) &&
+                finance.Pending == summaries.Where(a => !a.Signed).Sum(a => a.Total),
+                "Streamed act summaries and finance totals diverged");
+            PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision, "Act reads changed revision");
+        }
     }
 }

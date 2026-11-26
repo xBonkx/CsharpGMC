@@ -43,7 +43,7 @@ public sealed record ContractFinance(decimal Signed = 0, decimal Pending = 0, de
 }
 
 /// <summary>Read-only port of Contract.cost_summary/smr_cost and Act.total for object cards.</summary>
-public static class FinanceReader
+public static partial class FinanceReader
 {
     private sealed class Costs
     {
@@ -178,16 +178,17 @@ public static class FinanceReader
             var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = FinancePositionsSql(scope) + ";" + ExtraWorkSql(scope) + ";" +
-                ActLinesSql(scope) + ";" + ActsSql(scope, schema31);
+                ActsSql(scope, schema31) + ";" + ActLinesSql(scope);
             scope?.Bind(cmd);
             using var r = cmd.ExecuteReader();
             ReadFinancePositions(r, contracts, costs, rules);
             NextFinanceResult(r);
             ReadExtraWork(r, extraWork);
             NextFinanceResult(r);
-            var lines = ReadActLines(r);
+            var headers = ReadActHeaders(r, contracts, rules, schema31);
             NextFinanceResult(r);
-            acts = ReadActRows(r, contracts, rules, lines, schema31);
+            ReadActAmounts(r, headers);
+            acts = FinishActs(headers);
         }
         else
         {
@@ -289,79 +290,6 @@ public static class FinanceReader
             var id = Id(r, 0);
             var sum = extraWork[id]; sum.Add(Number(r, 1)); extraWork[id] = sum;
         }
-    }
-
-    public static IReadOnlyList<ActSummary> ReadActs(DbConnection conn, IReadOnlyList<ContractTotals>? knownTotals = null)
-    {
-        return ReadActsCore(conn, knownTotals ?? Totals.ReadAll(conn), TagRules.Load(conn), null);
-    }
-
-    private static IReadOnlyList<ActSummary> ReadActsCore(DbConnection conn,
-        IReadOnlyList<ContractTotals> totals, TagRules rules, ContractReadScope? scope)
-    {
-        var contracts = totals.ToDictionary(c => c.Id);
-        Dictionary<int, List<(double Qty, double Price)>> lines;
-        using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = ActLinesSql(scope);
-            scope?.Bind(cmd);
-            using var r = cmd.ExecuteReader();
-            lines = ReadActLines(r);
-        }
-
-        var schema31 = SqlSchemaCompatibility.HasPreviewColumns(conn);
-        using var read = conn.CreateCommand();
-        read.CommandText = ActsSql(scope, schema31);
-        scope?.Bind(read);
-        using var reader = read.ExecuteReader();
-        return ReadActRows(reader, contracts, rules, lines, schema31);
-    }
-
-    private static Dictionary<int, List<(double Qty, double Price)>> ReadActLines(DbDataReader r)
-    {
-        var lines = new Dictionary<int, List<(double Qty, double Price)>>();
-        while (r.Read())
-        {
-            var id = Id(r, 0);
-            if (!lines.TryGetValue(id, out var list)) lines[id] = list = new();
-            list.Add((Number(r, 1), Number(r, 2)));
-        }
-        return lines;
-    }
-
-    private static IReadOnlyList<ActSummary> ReadActRows(DbDataReader r,
-        Dictionary<int, ContractTotals> contracts, TagRules rules,
-        Dictionary<int, List<(double Qty, double Price)>> lines, bool schema31)
-    {
-        var result = new List<ActSummary>();
-        while (r.Read())
-        {
-            var contractId = Id(r, 1);
-            var contract = contracts[contractId];
-            var sum = new FloatSum();
-            var exact = Number(r, 5) != 0;
-            foreach (var (qty, price) in lines.GetValueOrDefault(Id(r, 0)) ?? new())
-                sum.Add(exact ? qty * price : rules.Has(contract.Form, "round_rows") ? HalfUp(qty * price) : PythonRound(qty * price));
-            var material = exact ? HalfUp(sum.Value) : PythonRound(sum.Value);
-            var net = PythonRound(material + Number(r, 2) + Number(r, 3) + Number(r, 4));
-            var total = rules.Has(contract.Form, "vat_top")
-                ? PythonRound(net + PythonRound(net * (double)contract.VatRate / 100) + Number(r, 6) / 100) : net;
-            if (schema31)
-                total = (double)DiscountPolicy.Payable((decimal)total,
-                    DiscountPolicy.ReadPercent(r, 13), r.IsDBNull(14) ? -1 : Convert.ToInt64(r.GetValue(14)));
-            var vat = rules.Has(contract.Form, "vat_top")
-                ? PythonRound(net * (double)contract.VatRate / 100)
-                : PythonRound(total * (double)contract.VatRate / (100 + (double)contract.VatRate));
-            DateOnly? Day(int index) => r.IsDBNull(index) ? null :
-                r.GetValue(index) is DateTime date ? DateOnly.FromDateTime(date) :
-                r.GetValue(index) is DateOnly day ? day :
-                DateOnly.Parse(Text(r, index), CultureInfo.InvariantCulture);
-            result.Add(new ActSummary(Id(r, 0), contractId, Text(r, 8),
-                Day(9), Day(10), Day(11), Number(r, 7) != 0, (decimal)material, (decimal)net, (decimal)total,
-                (decimal)vat, (decimal)Number(r, 2), (decimal)Number(r, 3), (decimal)Number(r, 4),
-                (int)Number(r, 6), Text(r, 12)));
-        }
-        return result;
     }
 
 }
