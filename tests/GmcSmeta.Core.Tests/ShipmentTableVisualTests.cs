@@ -49,5 +49,13 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("ShipmentCardText.PositionCount(planned - done)", code);
         Assert.Contains("StockWarningText.Visibility = over == 0 ?", code);
         Assert.Contains("TotalTile.ToolTip =", code);
+        // The transient status line must not retain a second, stale stock warning.
+        // Both full load and incremental readback update the dedicated warning.
+        Assert.Contains("private void UpdateSummary(int lineCount)", code);
+        Assert.Contains("UpdateSummary(snapshot.LineCount);", code);
+        Assert.Contains("UpdateSummary(changes.Shipment.Lines);", code);
+        Assert.DoesNotContain("превышают складской остаток", code);
+        Assert.Contains("StockWarningText.Text = over == 0 ?", code);
+        Assert.Contains("StockWarningText.Text = \"\";", code);
     }
 }

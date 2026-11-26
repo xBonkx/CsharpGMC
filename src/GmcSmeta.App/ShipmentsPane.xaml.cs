@@ -283,14 +283,13 @@ public partial class ShipmentsPane : UserControl
         view.Filter = RowVisible;
         LinesGrid.ItemsSource = view;
         if (gridState is not null) RestoreGridState(gridState);
-        var over = UpdateSummary(snapshot.LineCount);
+        UpdateSummary(snapshot.LineCount);
         UpdateShipmentSteps(current);
         FooterText.Text = IsEditingFixed
             ? "Изменяете выданную ведомость — правки сразу проводятся в закупках."
             : current.Fixed
             ? "Ведомость выдана. Нажмите «Изменить» для правок или снимите отметку для отмены выдачи."
-            : "Заполните количества; «Ведомость выдана» проведёт движения по каждой строке." +
-                (over > 0 ? $" Внимание: {over} поз. превышают складской остаток." : "");
+            : "Заполните количества; «Ведомость выдана» проведёт движения по каждой строке.";
     }
 
     private static ShipmentPreviewRow BuildPreviewRow(SqlServerShipments.IssuableRow row,
@@ -329,7 +328,7 @@ public partial class ShipmentsPane : UserControl
         };
     }
 
-    private int UpdateSummary(int lineCount)
+    private void UpdateSummary(int lineCount)
     {
         var over = 0;
         var planned = 0;
@@ -350,7 +349,6 @@ public partial class ShipmentsPane : UserControl
         TotalTile.Text = planned == 0 ? "нет позиций" :
             $"выдано {100m * done / planned:0}% · осталось {ShipmentCardText.PositionCount(planned - done)}";
         TotalTile.ToolTip = $"Выдано полностью {done} из {planned} позиций всех документов объекта";
-        return over;
     }
 
     private async Task<bool> TryApplyChangedRowsAsync(IReadOnlyList<long> positionIds, string committedRevision)
