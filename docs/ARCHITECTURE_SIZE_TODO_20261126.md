@@ -85,3 +85,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-041 / ARCH-SIZE-03: EditableEstimateRow.cs 271→313, Program.cs (App.Checks) 636→637, новый EstimateRowReadbackChecks.cs 79 строк. Изменения локальны в модели, новый сценарий выделен из runner; build/test не запускались.
 
 - 26.11.2026, PERF-041 / ARCH-SIZE-03: EstimateView.xaml.cs 1158→1163, новый EstimateGridRowUpdates.cs 70, Program.cs (App.Checks) 637→638, новый EstimateGridRowUpdateChecks.cs 60 строк. Изолирован компонент публикации строк, интеграция в крупный класс минимальна; build/test не запускались.
+
+- 26.11.2026, PERF-041 / ARCH-SIZE-03: EstimateView.xaml.cs 1163→1155, EstimateRowViewIndex.cs 45→112, Program.cs (App.Checks) 638→639, новый EstimateRowIndexReadbackChecks.cs 70 строк. Логика согласования моделей/индексов вынесена из крупного view в существующий индекс; build/test не запускались.

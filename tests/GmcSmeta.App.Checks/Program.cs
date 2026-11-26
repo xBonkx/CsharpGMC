@@ -166,6 +166,7 @@ internal static class Program
         CheckCatalogPageSelection();
         CheckEstimateCalculatedColumns();
         CheckEstimateRowViewIndex();
+        EstimateRowIndexReadbackChecks.Run();
         CheckEstimateVisibleRowPresentation();
         EstimateRowReadbackChecks.Run();
         EstimateGridRowUpdateChecks.Run();

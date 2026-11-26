@@ -187,17 +187,11 @@ public partial class EstimateView : UserControl
         var selectedId = (EstimateGrid.SelectedItem as EditableEstimateRow)?.Id;
         // Full authoritative readback stays mandatory. Reuse only equal
         // source records, never infer a committed value from the editor.
-        var previousRows = _rows;
-        var canReuse = !_inlineStagesOn && previousRows.Count == est.Rows.Count;
-        var nextRows = new List<EditableEstimateRow>(est.Rows.Count);
-        for (var i = 0; i < est.Rows.Count; i++)
-        {
-            var source = est.Rows[i];
-            nextRows.Add(canReuse && previousRows[i].TryReuseAuthoritative(source)
-                ? previousRows[i] : new EditableEstimateRow(source));
-        }
+        var nextRows = EstimateRowViewIndex.Reconcile(_rows, est.Rows, !_inlineStagesOn);
+        if (_rowViewIndex is { } index &&
+            (!ReferenceEquals(index.Rows, _rows) || !index.TryAdvance(nextRows)))
+            _rowViewIndex = null;
         _rows = nextRows;
-        _rowViewIndex = null;
         foreach (var section in _rows.Where(r => r.IsSystem))
             section.IsCollapsed = _collapsedSectionIds.Contains(section.Source.SystemId);
         foreach (var summary in _rows.Where(r => r.IsAreaSummary))
@@ -664,7 +658,6 @@ public partial class EstimateView : UserControl
                 if (!_frozenTemporaryOrder.ContainsKey(row.Id))
                     _frozenTemporaryOrder[row.Id] = _frozenTemporaryOrder.Count;
         var index = RowViewIndex;
-        var byKey = index.BySortKey;
 
         // A stage filter must still reveal rows hidden inside collapsed
         // systems, or the user could see a blank result with no expandable
@@ -676,9 +669,8 @@ public partial class EstimateView : UserControl
         var subFolded = false;
         var visible = new List<EditableEstimateRow>(projected.Count);
         var areaSummaryIds = index.AreaSummaryIds;
-        foreach (var original in projected)
+        foreach (var row in index.Project(projected, _estimate.Rows))
         {
-            var row = byKey[original.SortKey];
             if (row.IsSystem && row.Level == 0)
             {
                 rootFolded = honorFolds && _collapsedSectionIds.Contains(row.Source.SystemId);
