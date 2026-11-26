@@ -9,38 +9,54 @@
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <TextBlock x:Name="ArchivePath" Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,10"/>
             <WrapPanel Margin="0,0,0,10">
-                <Button Style="{StaticResource PrimaryButton}" Content="Новое письмо" ContentTemplate="{StaticResource IconLabelPlus}" Click="New_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button Content="Открыть" ContentTemplate="{StaticResource IconLabelFile}" Click="Open_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button Content="Копировать" ContentTemplate="{StaticResource IconLabelCopy}" Click="Copy_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button Content="Выбрать архив…" ContentTemplate="{StaticResource IconLabelFile}" Click="Root_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button Content="Резервная копия…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Backup_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button Content="Восстановить…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Restore_Click" Padding="12,7" Margin="0,0,8,6"/>
-                <Button x:Name="AttachExistingButton" Content="Добавить ранее созданное письмо…" ContentTemplate="{StaticResource IconLabelPlus}" Click="AttachExisting_Click" Visibility="Collapsed" Padding="12,7" Margin="0,0,8,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Новое письмо" Click="New_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="Open_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать" Click="Copy_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" Click="Root_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Резервная копия…" Click="Backup_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Восстановить…" Click="Restore_Click" Padding="14,6" Margin="0,0,6,6"/>
+                <Button Style="{StaticResource PythonToolbarButton}" x:Name="AttachExistingButton" Content="Добавить ранее созданное письмо…" Click="AttachExisting_Click" Visibility="Collapsed" Padding="14,6" Margin="0,0,6,6"/>
             </WrapPanel>
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="175"/></Grid.ColumnDefinitions>
-                <TextBox x:Name="SearchBox" Grid.Column="0" Margin="0,0,10,0" Padding="10,7"
-                         ToolTip="Поиск по номеру, теме, объекту, адресату" TextChanged="Search_Changed"/>
-                <ComboBox x:Name="StatusFilter" Grid.Column="1" Height="34" SelectionChanged="Search_Changed">
+                <Grid Grid.Column="0" Margin="0,0,10,0">
+                    <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" Height="32"
+                             Background="#FFFFFF" BorderBrush="#D0D7E2" Padding="10,5"
+                             VerticalContentAlignment="Center" AutomationProperties.Name="Поиск писем"
+                             ToolTip="Поиск по номеру, теме, объекту, адресату" TextChanged="Search_Changed"/>
+                    <TextBlock Text="Номер, тема, объект, адресат…" Foreground="#94A3B8" Margin="10,0,10,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+                <ComboBox x:Name="StatusFilter" Grid.Column="1" Height="32" SelectionChanged="Search_Changed">
                     <ComboBoxItem Content="Все"/>
                     <ComboBoxItem Content="Черновик"/>
                     <ComboBoxItem Content="Отправлено"/>
                 </ComboBox>
             </Grid>
-            <TextBlock Text="Поиск: исходящий №, тема, объект, кому" Foreground="#8A94A6" Margin="3,6,0,0"/>
         </StackPanel>
         <DataGrid local:TableColumnMenu.Key="letters" x:Name="LetterList" AutoGenerateColumns="False" IsReadOnly="True"
                   SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False"
                   Background="White" BorderBrush="#E4E8EF" GridLinesVisibility="All"
-                  MinRowHeight="24" HeadersVisibility="Column" MouseDoubleClick="List_DoubleClick" Style="{StaticResource DocumentTable}">
+                  MinRowHeight="27" AlternationCount="0" RowStyle="{StaticResource PythonTableRow}" HeadersVisibility="Column" MouseDoubleClick="List_DoubleClick" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Исходящий №" Width="110" Binding="{Binding Number}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Дата" Width="105" Binding="{Binding Date}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn Header="Исходящий №" Width="110" Binding="{Binding Number}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn Header="Дата" Width="105" Binding="{Binding Date}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                 <DataGridTextColumn Header="Тема" Width="2*" Binding="{Binding Subject}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Объект" Width="*" Binding="{Binding Object}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Кому" Width="2*" Binding="{Binding Recipient}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Статус" Width="115" Binding="{Binding Status}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Отправлено" Width="110" Binding="{Binding Sent.Date}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn Header="Статус" Width="115" Binding="{Binding Status}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn Header="Отправлено" Width="110" Binding="{Binding Sent.Date}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

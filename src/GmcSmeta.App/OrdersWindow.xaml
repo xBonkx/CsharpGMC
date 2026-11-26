@@ -1,21 +1,68 @@
 <Window x:Class="GmcSmeta.App.OrdersWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Приказы на объект" Width="820" Height="790" MinWidth="690" MinHeight="600"
+        Title="Приказы на объект" Width="820" Height="790" MinWidth="780" MinHeight="600"
         WindowStartupLocation="CenterOwner" FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         Background="#F4F6FA" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <Window.Resources>
+        <Style x:Key="OrderMakeButtonStyle" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Background" Value="#F97316"/>
+            <Setter Property="BorderBrush" Value="#F97316"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#EA580C"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E40AF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Background" Value="#E4E8EF"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                                <Setter Property="Foreground" Value="#64748B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <DataTemplate x:Key="OrderFolderLabel">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Viewbox Width="18" Height="18" Margin="0,0,6,0" IsHitTestVisible="False">
+                    <Canvas Width="24" Height="24">
+                        <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFolder}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </Canvas>
+                </Viewbox>
+                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
+        <Style x:Key="OrderFlatButton" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+    </Window.Resources>
     <DockPanel Margin="22,18,22,16">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <TextBlock Text="Приказы на объект" FontSize="23" FontWeight="SemiBold"
-                       Foreground="#1F2937"/>
-            <TextBlock x:Name="ObjectName" Margin="0,4,0,0" Foreground="#64748B"
+            <TextBlock Text="Приказы на объект" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
+                       Foreground="#0F172A"/>
+            <TextBlock x:Name="ObjectName" Margin="0,10,0,0" Foreground="#64748B"
                        TextWrapping="Wrap"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Name="MakeButton" Content="Сформировать приказы" ContentTemplate="{StaticResource IconLabelFile}" Click="Make_Click"
-                    Padding="16,8" Background="#F97316" Foreground="White"
-                    BorderBrush="#F97316" FontWeight="SemiBold" Margin="0,0,10,0"/>
-            <Button x:Name="CloseButton" Content="Закрыть" Click="Close_Click" Padding="14,8"/>
+                    Style="{StaticResource OrderMakeButtonStyle}" Margin="0,0,10,0"/>
+            <Button x:Name="CloseButton" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="14,6"/>
         </WrapPanel>
         <ScrollViewer x:Name="OrderContent" VerticalScrollBarVisibility="Auto">
             <StackPanel>
@@ -34,8 +81,31 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="Ответственный" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="PersonBox" Height="32"
-                              DisplayMemberPath="Fio" SelectionChanged="Person_Changed"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="PersonBox" Height="32" MinWidth="440"
+                              SelectionChanged="Person_Changed">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text">
+                                                <Setter.Value>
+                                                    <MultiBinding StringFormat="{}{0}  —  {1}">
+                                                        <Binding Path="Fio"/><Binding Path="Post"/>
+                                                    </MultiBinding>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Post}" Value="">
+                                                    <Setter Property="Text" Value="{Binding Fio}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="InflectionPreview"
                                Margin="0,4,0,11" TextWrapping="Wrap" Foreground="#64748B"/>
                     <TextBlock Grid.Row="2" Text="Дата приказов" HorizontalAlignment="Right"
@@ -49,13 +119,13 @@
                     <TextBlock Grid.Row="4" Text="Договор подряда" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
                     <TextBox Grid.Row="4" Grid.Column="1" x:Name="ContractBox" Height="32"
-                             Padding="7,5"/>
+                             Padding="7,5" ToolTip="№8 от 02 марта 2026 г."/>
                     <TextBlock Grid.Row="5" Text="Объект" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="SiteBox" Height="68"
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="SiteBox" Height="64" ToolTip="Как объект называется в приказах. Берётся из «Свойств объекта» → «Стройка»"
                              Padding="7,5" AcceptsReturn="True" TextWrapping="Wrap"/>
                 </Grid>
-                <TextBlock Text="КАКИЕ ПРИКАЗЫ" FontWeight="SemiBold" Foreground="#475569"
+                <TextBlock Text="КАКИЕ ПРИКАЗЫ" FontWeight="Bold" FontSize="{StaticResource UiSectionSize}" Foreground="#94A3B8"
                            Margin="0,18,0,8"/>
                 <ItemsControl x:Name="TemplateList">
                     <ItemsControl.ItemTemplate>
@@ -66,9 +136,10 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <WrapPanel Margin="0,10,0,8">
-                    <Button Content="Папка шаблонов" Click="Templates_Click" ContentTemplate="{StaticResource IconLabelFile}"
+                    <Button Content="Папка шаблонов" Click="Templates_Click" Style="{StaticResource OrderFlatButton}" ContentTemplate="{StaticResource OrderFolderLabel}"
+                            ToolTip="Шаблоны — обычные файлы Word. Можно поправить текст или положить свой шаблон с полями."
                             Padding="10,6" Margin="0,0,8,0"/>
-                    <Button Content="Выбрать папку выдачи…" Click="OutputFolder_Click"
+                    <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать папку выдачи…" Click="OutputFolder_Click"
                             Padding="10,6" Margin="0,0,8,0"/>
                     <TextBlock x:Name="FolderInfo" TextWrapping="Wrap" VerticalAlignment="Center"
                                Foreground="#64748B" MaxWidth="420"/>
@@ -79,7 +150,7 @@
                            Foreground="#475569" Margin="0,14,0,7"/>
                 <ListBox x:Name="OrderHistory" Height="120" DisplayMemberPath="Label"
                          SelectionChanged="History_SelectionChanged"/>
-                <Button x:Name="OpenHistoryButton" Content="Открыть ранее созданные" Click="OpenHistory_Click"
+                <Button x:Name="OpenHistoryButton" Style="{StaticResource PythonToolbarButton}" Content="Открыть ранее созданные" Click="OpenHistory_Click"
                         HorizontalAlignment="Left" Padding="10,6" Margin="0,7,0,4"/>
             </StackPanel>
         </ScrollViewer>
