@@ -50,6 +50,23 @@ public sealed class SummaryViewSourceTests
     }
 
     [Fact]
+    public void SummaryDoesNotOwnDuplicateRowsOrRetainSupersededMeasurementSource()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "EstimateView.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var logic = File.ReadAllText(Path.Combine(app, "EstimateView.CostSummary.cs"));
+        Assert.Contains("SummaryRecs => _costSummaryData?.Rows ?? Array.Empty<CostSummaryRow>()", logic);
+        Assert.DoesNotContain("snapshot.Data.Rows.ToList()", logic);
+        var fit = File.ReadAllText(Path.Combine(app, "SummaryColumnFit.cs"));
+        Assert.Contains("WeakReference<object>? _measuredSource", fit);
+        Assert.Contains("_measuredSource.TryGetTarget(out var measured)", fit);
+        Assert.DoesNotContain("private object? _measuredSource", fit);
+    }
+
+    [Fact]
     public void SummaryColumnsHaveStableKeysAndDefaultVisibility()
     {
         var grid = Panel().Descendants(Wpf + "DataGrid").Single();

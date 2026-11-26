@@ -122,7 +122,7 @@ public partial class EstimateView
 
     // ------------------------------------------------------------------ state
     private CostSummaryData? _costSummaryData;
-    private List<CostSummaryRow> _summaryRecs = new();
+    private IReadOnlyList<CostSummaryRow> SummaryRecs => _costSummaryData?.Rows ?? Array.Empty<CostSummaryRow>();
     private CostMissingPriceIndex _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
     private CostSummarySearchIndex? _summarySearchIndex;
     private Dictionary<long, string> _summaryLabels = new();
@@ -162,7 +162,6 @@ public partial class EstimateView
         _summaryLoadVersion++;
         _summaryRevision = "";
         _costSummaryData = null;
-        _summaryRecs = new();
         _summaryMissingIndex = new(Array.Empty<CostSummaryRow>());
         _summarySearchIndex = null;
         _summaryLoading = false;
@@ -213,7 +212,6 @@ public partial class EstimateView
             });
             if (version != _summaryLoadVersion || _detached) return;
             _costSummaryData = snapshot.Data;
-            _summaryRecs = snapshot.Data.Rows.ToList();
             _summaryMissingIndex = snapshot.Missing;
             _summaryLabels = snapshot.Labels;
             _summarySearchIndex = snapshot.Search;
@@ -238,7 +236,7 @@ public partial class EstimateView
     private void SummaryFillSystemFilter()
     {
         if (_costSummaryData is not { } data) return;
-        var systemsWithRows = _summaryRecs.Select(r => r.SystemId).ToHashSet();
+        var systemsWithRows = SummaryRecs.Select(r => r.SystemId).ToHashSet();
         _summarySystemOptions = data.Systems
             .Where(s => s.Label != "Без системы" || systemsWithRows.Contains(s.Id))
             .Select(s => (s.Id, _summaryLabels.GetValueOrDefault(s.Id, s.Label))).ToList();
@@ -285,7 +283,7 @@ public partial class EstimateView
     {
         var data = _costSummaryData;
         if (data is null || SummaryGrid is null) return;
-        var recs = _summaryRecs;
+        var recs = SummaryRecs;
         var chosen = SummaryMissingSelected();
         var missingMask = chosen.Aggregate(CostMissingPrice.None, (mask, key) => mask | SummaryFlag(key));
         // пометки «—» на пропусках: nocost — всегда, остальные — при включённом фильтре
@@ -1162,7 +1160,7 @@ public partial class EstimateView
     // ------------------------------------------------------------------ markup / СМР в смету
     internal async void SummaryMarkupAll_Click(object sender, RoutedEventArgs e)
     {
-        var ids = _summaryRecs.Select(r => r.Id).ToList();
+        var ids = SummaryRecs.Select(r => r.Id).ToList();
         await SummaryMarkupAsync(ids, allRows: true);
     }
 
@@ -1229,7 +1227,7 @@ public partial class EstimateView
         { Owner = Window.GetWindow(this) };
         if (dialog.ShowDialog() != true) return;
         if (!SummarySnapshotReady || revision != _summaryRevision ||
-            !(allRows ? _summaryRecs.Select(r => r.Id) : SummarySelectedIds())
+            !(allRows ? SummaryRecs.Select(r => r.Id) : SummarySelectedIds())
                 .OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id))) return;
         var percent = dialog.Percent;
         await RunSummaryWriteAsync(revision, async expected =>

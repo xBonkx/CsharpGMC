@@ -40,10 +40,23 @@ internal static class SummaryColumnFitChecks
         var money = new DataGridTextColumn { SortMemberPath = "t_cost", Header = new TextBlock { Text = "Закупка ∑" } };
         grid.Columns.Add(money);
         grid.ItemsSource = new[] { new EstimateView.SummaryRow { TotalCostText = "1,00" } };
-        var small = SummaryColumnFit.ReadMinimums(grid, 1)[money];
+        var cache = new SummaryColumnFit(grid, column => 80);
+        var first = cache.GetMinimums(1, 1);
+        var small = first[money];
+        Require(ReferenceEquals(first, cache.GetMinimums(1, 1)), "Unchanged source must reuse measurements.");
         grid.ItemsSource = new[] { new EstimateView.SummaryRow { Kind = "total", TotalCostText = "-19 144 180 999,98" } };
-        var large = SummaryColumnFit.ReadMinimums(grid, 1)[money];
-        Require(large > small, "Large signed totals did not increase the readable minimum.");
+        var second = cache.GetMinimums(1, 1);
+        var large = second[money];
+        Require(!ReferenceEquals(first, second) && large > small,
+            "Replacement source must recalculate widths for large signed totals.");
+        grid.ItemsSource = null;
+        var empty = cache.GetMinimums(1, 1);
+        Require(!ReferenceEquals(second, empty) && empty[money] <= large &&
+            ReferenceEquals(empty, cache.GetMinimums(1, 1)), "Clearing the source must measure headers only.");
+        Require(!ReferenceEquals(empty, cache.GetMinimums(1.25, 1.25)), "DPI change must invalidate measurements.");
+        var beforeFont = cache.GetMinimums(1.25, 1.25);
+        grid.FontSize = 16;
+        Require(!ReferenceEquals(beforeFont, cache.GetMinimums(1.25, 1.25)), "Font change must invalidate measurements.");
         Console.WriteLine("Summary fit arithmetic and formatted-value checks passed (no SQL).");
     }
 

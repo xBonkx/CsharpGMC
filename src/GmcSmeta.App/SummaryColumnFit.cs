@@ -14,7 +14,9 @@ internal sealed class SummaryColumnFit
     private readonly DataGrid _grid;
     private readonly Func<DataGridColumn, double> _preferred;
     private bool _queued;
-    private object? _measuredSource;
+    // Cache identity only: a hidden grid may replace its source without another fit.
+    // Never keep a superseded collection (and all its rows) alive here.
+    private WeakReference<object>? _measuredSource;
     private double _measuredFontSize, _measuredDpi;
     private Dictionary<DataGridColumn, double>? _minimums;
 
@@ -136,27 +138,39 @@ internal sealed class SummaryColumnFit
         return result.ToDictionary(p => p.Key, p => p.Value / dpi);
     }
 
+    private bool IsMeasuredSource(object? source) =>
+        source is null ? _measuredSource is null :
+        _measuredSource is not null && _measuredSource.TryGetTarget(out var measured) &&
+        ReferenceEquals(measured, source);
+
+    internal IReadOnlyDictionary<DataGridColumn, double> GetMinimums(double dpi, double pixelsPerDip)
+    {
+        var source = _grid.ItemsSource;
+        if (_minimums is null || !IsMeasuredSource(source) ||
+            _measuredFontSize != _grid.FontSize || _measuredDpi != dpi)
+        {
+            _minimums = ReadMinimums(_grid, pixelsPerDip);
+            _measuredSource = source is null ? null : new WeakReference<object>(source);
+            _measuredFontSize = _grid.FontSize;
+            _measuredDpi = dpi;
+        }
+        return _minimums;
+    }
+
     private void Apply()
     {
         var viewport = Viewer()?.ViewportWidth ?? 0;
         if (!double.IsFinite(viewport) || viewport <= 0) return;
         var dpi = VisualTreeHelper.GetDpi(_grid).DpiScaleX;
-        if (_minimums is null || !ReferenceEquals(_measuredSource, _grid.ItemsSource) ||
-            _measuredFontSize != _grid.FontSize || _measuredDpi != dpi)
-        {
-            _minimums = ReadMinimums(_grid, VisualTreeHelper.GetDpi(_grid).PixelsPerDip);
-            _measuredSource = _grid.ItemsSource;
-            _measuredFontSize = _grid.FontSize;
-            _measuredDpi = dpi;
-        }
+        var minimums = GetMinimums(dpi, VisualTreeHelper.GetDpi(_grid).PixelsPerDip);
         var visible = _grid.Columns.Where(c => c.Visibility == Visibility.Visible).ToArray();
         var inputs = visible.Select(c => new EstimateColumnLayout.Column(c.SortMemberPath,
-            _preferred(c), _minimums[c], c.SortMemberPath == "name"
+            _preferred(c), minimums[c], c.SortMemberPath == "name"
                 ? EstimateColumnLayout.Role.Name : EstimateColumnLayout.Role.Fixed)).ToArray();
         var fitted = Calculate(inputs, viewport, dpi);
         foreach (var column in visible)
         {
-            var minimum = Math.Ceiling(_minimums[column] * dpi) / dpi;
+            var minimum = Math.Ceiling(minimums[column] * dpi) / dpi;
             if (Math.Abs(column.MinWidth - minimum) > .001) column.MinWidth = minimum;
             var width = fitted[column.SortMemberPath];
             if (!column.Width.IsAbsolute || Math.Abs(column.Width.Value - width) > .001)
