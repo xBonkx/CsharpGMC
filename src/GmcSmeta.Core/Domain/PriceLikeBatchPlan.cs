@@ -15,6 +15,35 @@ public static class PriceLikeBatchPlan
         bool Outside, decimal Price, decimal? PurchasePrice, string? Formulas);
     public sealed record Plan(decimal? Price, IReadOnlyList<long> TargetIds);
 
+    public sealed record MenuPreview(decimal ClientPrice, int ClientCount,
+        decimal? PurchasePrice, int PurchaseCount);
+
+    // Use the full displayed revision, not the filtered grid. The SQL writer
+    // still independently validates revision, targets and formulas in its transaction.
+    public static MenuPreview Preview(IReadOnlyList<EstimateRow> positions, long sourceId)
+    {
+        var source = positions.FirstOrDefault(p => p.Id == sourceId && !p.IsSystem);
+        if (source is null || source.IsSub || source.ParentPositionId is not null ||
+            string.IsNullOrWhiteSpace(source.Name))
+            return new(0m, 0, null, 0);
+
+        var client = source.Price > 0m && source.Price <= NumberText.MaxNumber;
+        var purchase = source.PurchasePrice is decimal value && value > 0m &&
+            value <= NumberText.MaxNumber;
+        var key = Catalog.Key(source.Name, source.Unit);
+        int clientCount = 0, purchaseCount = 0;
+        foreach (var row in positions)
+        {
+            if (row.Id == source.Id || row.IsSystem || row.IsSub ||
+                row.ParentPositionId is not null || row.OutOfKp ||
+                Catalog.Key(row.Name, row.Unit) != key)
+                continue;
+            if (client && row.Price != source.Price) clientCount++;
+            if (purchase && row.PurchasePrice != source.PurchasePrice) purchaseCount++;
+        }
+        return new(source.Price, clientCount, source.PurchasePrice, purchaseCount);
+    }
+
     public static Plan Build(IReadOnlyList<Position> rows, long sourceId, string field)
     {
         ArgumentNullException.ThrowIfNull(rows);

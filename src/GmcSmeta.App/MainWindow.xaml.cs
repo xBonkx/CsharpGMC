@@ -1107,13 +1107,8 @@ public partial class MainWindow : Window
         var create = ContextMenuIcons.Create("Новый объект…", "FolderPlus");
         create.Click += (_, _) => EditObjectProperties(null);
         menu.Items.Add(create);
-        // В Python «Корзина» лежит в главном меню ☰; пока оно не перенесено — здесь.
-        var trash = ContextMenuIcons.Create("Корзина (удалённые объекты и документы)…", "Trash");
-        trash.Click += (_, _) => OpenTrash();
-        menu.Items.Add(trash);
-        var history = ContextMenuIcons.Create("Журнал изменений…", "History");
-        history.Click += (_, _) => OpenHistory(null);
-        menu.Items.Add(history);
+        // Global history and trash already live in the main menu (Python).
+        // Keep only target-specific commands here.
 
         if (target is { Tag: ObjectRow selected })
         {
@@ -1180,10 +1175,12 @@ public partial class MainWindow : Window
                 move.Click += (_, _) => MoveCurrentContract(doc);
                 menu.Items.Add(move);
             }
-            var exportEstimate = ContextMenuIcons.Create("Сохранить смету в Excel…", "Download");
+            menu.Items.Add(new Separator());
+            var exportKp = ContextMenuIcons.Create("Сохранить в Excel / PDF…", "Download");
+            var exportEstimate = new MenuItem { Header = "Сохранить смету в Excel…" };
             exportEstimate.Click += (_, _) => ExportEstimate(doc);
-            menu.Items.Add(exportEstimate);
-            var exportKp = ContextMenuIcons.Create("Экспорт КП / сметы…", "Download");
+            exportKp.Items.Add(exportEstimate);
+            exportKp.Items.Add(new Separator());
             void AddKpExport(string label, bool internalPrices = false, bool positional = false,
                 bool pdf = false, bool vatLine = false)
             {
@@ -1205,6 +1202,10 @@ public partial class MainWindow : Window
             var compare = ContextMenuIcons.Create("Сравнить с другим документом…", "List");
             compare.Click += (_, _) => OpenCompare(doc);
             menu.Items.Add(compare);
+            var documentHistory = ContextMenuIcons.Create("История изменений…", "History");
+            documentHistory.Click += (_, _) => OpenHistory(doc.Id);
+            menu.Items.Add(documentHistory);
+            menu.Items.Add(new Separator());
             var procurement = ContextMenuIcons.Create("Закупки (контроль оборудования)…", "List");
             procurement.Click += (_, _) => OpenProcurement(doc);
             menu.Items.Add(procurement);
@@ -1214,14 +1215,12 @@ public partial class MainWindow : Window
             var acts = ContextMenuIcons.Create("КС-2 (акты)…", "File");
             acts.Click += (_, _) => OpenActs(doc);
             menu.Items.Add(acts);
+            menu.Items.Add(new Separator());
             AddDocumentFileMenu(menu, doc);
             var link = ContextMenuIcons.Create("Создать ссылку .gmcs…", "FilePlus");
             link.Click += (_, _) => CreateGmcsLink(doc);
             menu.Items.Add(link);
-            var documentHistory = ContextMenuIcons.Create("История изменений…", "History");
-            documentHistory.Click += (_, _) => OpenHistory(doc.Id);
-            menu.Items.Add(documentHistory);
-            // В Python «Свойства» лежат в меню редактора; пока редактора нет — здесь.
+            // C# also exposes properties directly from the navigation tree.
             var props = ContextMenuIcons.Create("Свойства документа…", "Edit");
             props.Click += (_, _) => EditContractProperties(doc);
             menu.Items.Add(props);

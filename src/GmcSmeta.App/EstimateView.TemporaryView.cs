@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -118,15 +119,15 @@ public partial class EstimateView
         catch (System.Runtime.InteropServices.ExternalException) { /* буфер занят */ }
         if (excelClip)
         {
-            Add("Вставить из Excel", PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Upload");
+            Add("Вставить из Excel", PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Download");
             if (realSelected && nSel > 0 && !selected!.IsSystem)
                 Add(nSel > 1 ? $"Заменить выделенные ({nSel}) строками из Excel"
                         : "Заменить эту строку строками из Excel",
-                    () => ReplaceRows_Click(this, new RoutedEventArgs()), canWrite, "Ctrl+Shift+V", needsAnchor: false, glyph: "Upload");
+                    () => ReplaceRows_Click(this, new RoutedEventArgs()), canWrite, "Ctrl+Shift+V", needsAnchor: false, glyph: "Copy");
         }
         else if (ownClip && ClipboardRows.Count > 0)
             Add($"Вставить скопированные ({ClipboardRows.Count})",
-                PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Upload");
+                PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Download");
         if (realSelected && selected is { IsSystem: false })
         {
             Add(nSel > 1 ? $"Дублировать выделенные ({nSel})" : "Копия строки",
@@ -139,25 +140,39 @@ public partial class EstimateView
                     canIndent && !_rows.Any(r => !r.IsSystem && r.Source.ParentPositionId == selected.Id) &&
                     _rows.Any(r => !r.IsSystem && r.Source.SystemId == selected.Source.SystemId &&
                         r.Source.ParentPositionId is null && r.SortKey < selected.SortKey),
-                    "Ctrl+]", glyph: "ArrowForward");
+                    "Ctrl+]", glyph: "Indent");
             else
                 Add("Сделать обычной строкой", () => _ = IndentSelectedAsync(false),
-                    canIndent, "Ctrl+[", glyph: "ArrowBack");
+                    canIndent, "Ctrl+[", glyph: "Outdent");
             Add("Превратить в раздел", () => ToSections_Click(this, new RoutedEventArgs()), canWrite, needsAnchor: false, glyph: "Layers");
             Add("Перенести в другую систему…", () => MoveSection_Click(this, new RoutedEventArgs()),
-                canWrite && selected is { IsSystem: false }, "Ctrl+M", needsAnchor: false, glyph: "ArrowForward");
-            Add("Цена как у этой…", () => PriceLike_Click(this, new RoutedEventArgs()),
-                canWrite && selected is { IsSystem: false, IsSub: false }, glyph: "Copy");
+                canWrite && selected is { IsSystem: false }, "Ctrl+M", needsAnchor: false, glyph: "Layers");
+            if (canWrite && sameAnchor && !selected.IsSub &&
+                selected.Source.ParentPositionId is null && _estimate is { } snapshot)
+            {
+                var preview = PriceLikeBatchPlan.Preview(snapshot.PositionsInOrder, selected.Id);
+                var culture = CultureInfo.GetCultureInfo("ru-RU");
+                if (preview.ClientCount > 0)
+                    Add($"Цену {preview.ClientPrice.ToString("N2", culture)} ₽ — всем таким же строкам ({preview.ClientCount})",
+                        () => _ = SavePriceLikeAsync(selected.Id, "price"),
+                        preview.ClientCount <= PriceLikeBatchPlan.MaxChanges, glyph: "Check");
+                // C# extension: only a positive purchase price, never silently
+                // clear other rows with an empty/zero source.
+                if (preview.PurchaseCount > 0 && preview.PurchasePrice is decimal purchase)
+                    Add($"Закупочную цену {purchase.ToString("N2", culture)} ₽ — всем таким же строкам ({preview.PurchaseCount})",
+                        () => _ = SavePriceLikeAsync(selected.Id, "purchase_price"),
+                        preview.PurchaseCount <= PriceLikeBatchPlan.MaxChanges);
+            }
         }
         if (realSelected)
         {
             Add("Копировать систему…", () => CopySection_Click(this, new RoutedEventArgs()),
-                canWrite && CopySourceSystem(selected) is not null, glyph: "Duplicate");
+                canWrite && CopySourceSystem(selected) is not null, glyph: "Copy");
             if (selected is { IsSystem: true, IsVirtual: false })
                 Add("Переименовать систему", () => RenameSection_Click(this, new RoutedEventArgs()), canWrite, "F2", glyph: "Edit");
         }
         if (selected is { IsAreaSummary: true, IsVirtual: false })
-            Add("Развернуть эту строку м² обратно", () => ExpandArea(selected.Id), canWrite);
+            Add("Развернуть эту строку м² обратно", () => ExpandArea(selected.Id), canWrite, glyph: "Undo");
         menu.Items.Add(new Separator());
         if (realSelected)
             Add("Удалить",

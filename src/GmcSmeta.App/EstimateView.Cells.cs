@@ -351,36 +351,6 @@ public partial class EstimateView
             $"Система скопирована: «{newName}» ✓");
     }
 
-    /// <summary>«Цена как у этой» (set_price_like): клиентская цена выбранной строки —
-    /// другим одинаковым верхним строкам; закупка — для закупочной цены.</summary>
-    private void PriceLike_Click(object sender, RoutedEventArgs e)
-    {
-        if (_estimate?.Locked != false || Volatile.Read(ref _pendingWrites) != 0) return;
-        if (_serverConflict)
-        {
-            SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
-            return;
-        }
-        if (EstimateGrid.SelectedItem is not EditableEstimateRow row ||
-            row.IsSystem || row.IsVirtual || row.Source.ParentPositionId is not null)
-        {
-            SetStatus("Выберите верхнюю строку — источник цены.", true);
-            return;
-        }
-
-        var menu = new ContextMenu();
-        MenuItem Add(string header, string field)
-        {
-            var item = new MenuItem { Header = header };
-            item.Click += async (_, _) => await SavePriceLikeAsync(row.Id, field);
-            return item;
-        }
-        menu.Items.Add(Add("Перенести цену клиенту", "price"));
-        menu.Items.Add(Add("Перенести закупочную цену", "purchase_price"));
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
-        menu.IsOpen = true;
-    }
-
     private async Task SavePriceLikeAsync(long sourceId, string field)
     {
         // Состояние могло измениться, пока было открыто меню выбора цены.
