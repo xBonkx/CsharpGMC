@@ -359,7 +359,8 @@ public partial class EstimateView
         button.Background = on ? new SolidColorBrush(Color.FromRgb(0xE8, 0xF0, 0xFE)) : Brushes.Transparent;
         button.BorderBrush = on ? new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB))
             : Brushes.Transparent;
-        button.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+        button.FontWeight = FontWeights.Normal;
+        button.Padding = on ? new Thickness(10, 5, 10, 5) : new Thickness(9, 6, 9, 6);
         button.Foreground = on ? new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF))
             : new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
     }
@@ -414,13 +415,17 @@ public partial class EstimateView
         if (EstimateGrid is null) return;
         var zoom = double.IsFinite(_uiSettings.TableZoom)
             ? Math.Clamp(_uiSettings.TableZoom, 0.8, 1.8) : 1.0;
-        EstimateGrid.FontSize = 13.333333333333334 * zoom;
+        var baseSize = (double)FindResource("UiBodySize");
+        var headerRatio = (double)FindResource("UiEstimateHeaderZoomRatio");
+        EstimateGrid.FontSize = baseSize * zoom;
+        if (EstimateColumnsButton is not null)
+            EstimateColumnsButton.ToolTip = $"Какие столбцы показывать\nМасштаб таблицы: {Math.Round(zoom * 100)} % · Ctrl+колесо, Ctrl+0 — сброс";
         var baseHeader = TryFindResource(typeof(DataGridColumnHeader)) as Style;
         var header = new Style(typeof(DataGridColumnHeader))
         {
             BasedOn = baseHeader
         };
-        header.Setters.Add(new Setter(Control.FontSizeProperty, 12.0 * zoom));
+        header.Setters.Add(new Setter(Control.FontSizeProperty, baseSize * headerRatio * zoom));
         EstimateGrid.ColumnHeaderStyle = header;
 
         // Python common.set_alignment: headers follow the delegate alignment.

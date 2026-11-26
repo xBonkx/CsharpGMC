@@ -10,7 +10,7 @@
         <Style x:Key="DirectorExportButton" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Padding" Value="9,6"/>
         </Style>
         <Style x:Key="DirectorHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ReportGridHeader}">
             <Setter Property="Height" Value="48"/>
@@ -132,7 +132,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Главная" Foreground="#64748B" FontSize="{StaticResource UiBodySize}" Margin="0,0,0,2"/>
+                <TextBlock Text="Главная" Foreground="#64748B" FontSize="{StaticResource UiBodySize}" Margin="0,0,0,2" VerticalAlignment="Center"/>
                 <TextBlock x:Name="HeadingText" Text="Договоры — объекты в работе" FontWeight="Bold" FontSize="{StaticResource UiH1Size}" TextWrapping="Wrap"/>
             </StackPanel>
             <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" Click="Export_Click"

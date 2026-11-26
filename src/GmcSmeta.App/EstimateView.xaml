@@ -38,7 +38,7 @@
         <Style x:Key="DocumentFlatTool" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Padding" Value="9,6"/>
         </Style>
         <Style x:Key="DocumentTitleEdit" TargetType="Button" BasedOn="{StaticResource DocumentFlatTool}">
             <Setter Property="MinHeight" Value="26"/>
@@ -533,7 +533,7 @@
                 <!-- Python common.view_button: «Группировка» and «Сортировка» — two buttons,
                      each with its own menu; only the on-screen look changes, not the KP order. -->
                 <Button x:Name="GroupButton" Style="{StaticResource DocumentFlatTool}" Content="Группировка" ContentTemplate="{StaticResource IconLabelLayers}"
-                        Click="GroupMenu_Click" Margin="0,0,2,4"
+                        Click="GroupMenu_Click" Margin="0,0,6,4"
                         ToolTip="Как показать строки: по системам, одинаковые вместе, по типу, списком. Порядок строк в КП не меняется"/>
                 <Button x:Name="SortButton" Style="{StaticResource DocumentFlatTool}" Content="Сортировка" ContentTemplate="{StaticResource IconLabelSort}"
                         Click="SortMenu_Click" Margin="0,0,2,4"
@@ -549,7 +549,7 @@
                 <CheckBox x:Name="PurchaseToggle" Style="{StaticResource PythonToolbarToggle}" Content="Закуп" ContentTemplate="{StaticResource IconLabelBuilding}" VerticalAlignment="Center" Margin="0,0,2,4"
                 Checked="PurchaseToggle_Changed" Unchecked="PurchaseToggle_Changed"
                 ToolTip="Показать закупочную цену рядом с ценой заказчика. Видна только нам"/>
-                <Button Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>
+                <Button x:Name="EstimateColumnsButton" Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>
                 <Grid Width="150" Height="34" Margin="0,0,0,4">
                 <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonSearch}" TextChanged="EstimateSearch_TextChanged"
                          ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете" Padding="30,6,27,6"/>
