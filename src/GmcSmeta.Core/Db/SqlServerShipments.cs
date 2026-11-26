@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Threading;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
 
@@ -67,29 +68,36 @@ public static class SqlServerShipments
     }
 
     /// <summary>Все договоры/ДС объекта, в том числе без доступных позиций.</summary>
-    public static List<ShipmentDocument> DocumentsOf(SqlConnection conn, long objectId)
+    public static List<ShipmentDocument> DocumentsOf(SqlConnection conn, long objectId,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<ShipmentDocument>();
         using var cmd = new SqlCommand(
             "SELECT id,kind,number,[date],name FROM dbo.contracts " +
             "WHERE object_id=@obj AND kind IN (N'main',N'dop') ORDER BY id", conn);
         cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             string Text(int i) => reader.IsDBNull(i) ? "" :
                 Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             list.Add(new ShipmentDocument(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
                 Documents.ContractTitleText(Text(1), Text(2), Text(3), Text(4))));
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
     public static string TitleOf(string number) => $"Ведомость № {number}";
 
     /// <summary>Ведомости объекта (старые последними, как o.shipments).</summary>
-    public static List<ShipmentInfo> ShipmentsOf(SqlConnection conn, long objectId, long? shipmentId = null)
+    public static List<ShipmentInfo> ShipmentsOf(SqlConnection conn, long objectId, long? shipmentId = null,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<ShipmentInfo>();
         using var cmd = new SqlCommand(
             "SELECT id,number,[date],recipient,issued_by,fixed,note," +
@@ -98,8 +106,11 @@ public static class SqlServerShipments
             (shipmentId.HasValue ? " AND sh.id=@shipment" : "") + " ORDER BY id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
         if (shipmentId.HasValue) cmd.Parameters.Add("@shipment", SqlDbType.BigInt).Value = shipmentId.Value;
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             list.Add(new ShipmentInfo(
                 Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                 r.GetString(1),
@@ -109,12 +120,16 @@ public static class SqlServerShipments
                 !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture),
                 (int)Convert.ToInt64(r.GetValue(7), CultureInfo.InvariantCulture),
                 r.IsDBNull(6) ? "" : r.GetString(6)));
+        }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
     /// <summary>Строки ведомости с данными позиций (для окна выдачи).</summary>
-    public static List<ShipmentLineRow> LinesOf(SqlConnection conn, long shipmentId, IReadOnlyList<long>? positionIds = null)
+    public static List<ShipmentLineRow> LinesOf(SqlConnection conn, long shipmentId, IReadOnlyList<long>? positionIds = null,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<ShipmentLineRow>();
         using var cmd = new SqlCommand(
             "SELECT sl.id, sl.position_id, sl.shipment_id, p.name, p.unit, sl.qty, " +
@@ -125,9 +140,11 @@ public static class SqlServerShipments
             "WHERE sl.shipment_id=@id" + PositionFilter(positionIds) + " ORDER BY sl.id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
         AddPositionParameters(cmd, positionIds);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var positionId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
             var qtyByKp = r.IsDBNull(6) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(6), CultureInfo.InvariantCulture));
             var price = r.IsDBNull(7) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture));
@@ -140,6 +157,7 @@ public static class SqlServerShipments
                 Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
                 price, qtyByKp, r.IsDBNull(8) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(8), CultureInfo.InvariantCulture))));
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
@@ -157,8 +175,10 @@ public static class SqlServerShipments
 
     /// <summary>Строки объекта, которые можно выдавать (shipments.object_positions):
     /// договоры/ДС, верхние строки и комплектующие первого уровня, не работы; вне КП тоже берутся.</summary>
-    public static List<IssuableRow> IssuableRows(SqlConnection conn, long objectId, IReadOnlyList<long>? positionIds = null)
+    public static List<IssuableRow> IssuableRows(SqlConnection conn, long objectId, IReadOnlyList<long>? positionIds = null,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<IssuableRow>();
         using var cmd = new SqlCommand(
             "SELECT sy.contract_id, p.id, p.system_id, sy.name, p.name, p.unit, p.qty, p.price, " +
@@ -176,9 +196,11 @@ public static class SqlServerShipments
             "CASE WHEN p.parent_id IS NULL THEN 0 ELSE 1 END,p.[order],p.id", conn);
         cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
         AddPositionParameters(cmd, positionIds);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var outOfKp = !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture);
             var name = r.IsDBNull(4) ? "" : r.GetString(4);
             if (EstimateStatistics.IsWorkName(name)) continue;
@@ -195,6 +217,7 @@ public static class SqlServerShipments
                 r.IsDBNull(10) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(10), CultureInfo.InvariantCulture)),
                 outOfKp, !r.IsDBNull(11)));
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
