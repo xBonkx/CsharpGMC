@@ -1,6 +1,3 @@
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using GmcSmeta.Core;
@@ -8,20 +5,6 @@ using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
-
-/// <summary>Строка предпросмотра сравнения — цвет фона по типу (compare_view LOOK).</summary>
-public sealed class ComparePreviewRow
-{
-    public string Sys { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Unit { get; init; } = "";
-    public string Qty { get; init; } = "";
-    public string Price { get; init; } = "";
-    public string SumA { get; init; } = "";
-    public string SumB { get; init; } = "";
-    public string Diff { get; init; } = "";
-    public string RowBackground { get; init; } = "White";
-}
 
 /// <summary>
 /// «Сравнить документы» (compare_view.py): что изменилось между двумя КП — добавлено,
@@ -33,6 +16,7 @@ public partial class CompareDialog : Window
     private readonly int _currentId;
     private readonly List<(int Id, string Title)> _docs = new();
     private CompareResult? _result;
+    private CompareDisplaySnapshot? _display;
     private CancellationTokenSource? _loadCancellation;
     private bool _initializing = true;
     private bool _closed;
@@ -95,6 +79,7 @@ public partial class CompareDialog : Window
         _loadCancellation?.Cancel();
         _loadCancellation = null;
         _result = null;
+        _display = null;
         ExportButton.IsEnabled = false;
         CompareGrid.ItemsSource = null;
         TileMatValue.Text = TileSmrValue.Text = TileTotalValue.Text = TileCountValue.Text = "—";
@@ -110,10 +95,14 @@ public partial class CompareDialog : Window
         var token = cancellation.Token;
         try
         {
-            var result = await Task.Run(() =>
-                SqlServerCompare.Compare(_connectionString, a.Id, b.Id, token), token);
+            var snapshot = await Task.Run(() =>
+            {
+                var result = SqlServerCompare.Compare(_connectionString, a.Id, b.Id, token);
+                return (Result: result, Display: CompareDisplayProjection.Build(result, token));
+            }, token);
             if (_closed || token.IsCancellationRequested || !ReferenceEquals(_loadCancellation, cancellation)) return;
-            _result = result;
+            _result = snapshot.Result;
+            _display = snapshot.Display;
             ShowResult();
             ExportButton.IsEnabled = true;
         }
@@ -121,6 +110,7 @@ public partial class CompareDialog : Window
         {
             if (_closed || token.IsCancellationRequested || !ReferenceEquals(_loadCancellation, cancellation)) return;
             _result = null;
+            _display = null;
             ExportButton.IsEnabled = false;
             InfoText.Text = "Не удалось сравнить: " + ex.Message;
         }
@@ -130,70 +120,16 @@ public partial class CompareDialog : Window
         }
     }
 
-    private static string Arrow(decimal? a, decimal? b, Func<decimal, string> fmt)
-    {
-        if (a is null) return fmt(b!.Value);
-        if (b is null) return fmt(a.Value);
-        return fmt(a.Value) == fmt(b.Value) ? fmt(b.Value) : $"{fmt(a.Value)} → {fmt(b.Value)}";
-    }
-
-    private static string Signed(decimal v) => Math.Abs(v) < 0.005m ? ""
-        : (v > 0 ? "+" : "−") + Money.Format(Math.Abs(v));
-
-    private static string QtyText(decimal v) => v == decimal.Truncate(v)
-        ? v.ToString("0", CultureInfo.CurrentCulture)
-        : v.ToString("0.###", CultureInfo.CurrentCulture);
-
     private void ShowResult()
     {
-        var res = _result!;
-        TileMatValue.Text = Money.Format(res.MatB) + Delta(res.MatB - res.MatA);
-        TileSmrValue.Text = Money.Format(res.SmrB) + Delta(res.SmrB - res.SmrA);
-        TileTotalValue.Text = Money.Format(res.TotalB) + Delta(res.TotalB - res.TotalA);
-        TileCountValue.Text = $"+{res.Added}  −{res.Removed}  ~{res.ChangedCount}";
-
-        var rows = new ObservableCollection<ComparePreviewRow>();
-        var showSame = ShowSameCheck.IsChecked == true;
-        var shown = 0;
-        string? currentSystem = null;
-        foreach (var r in res.Rows)
-        {
-            if (r.Kind == "same" && !showSame) continue;
-            var (fg, bg, word) = r.Kind switch
-            {
-                "added" => ("#047857", "#ECFDF3", "добавлено"),
-                "removed" => ("#B91C1C", "#FEF2F2", "убрано"),
-                "changed" => ("#B45309", "#FFFBEB", "изменено"),
-                _ => ("", "White", ""),
-            };
-            var name = r.Name;
-            if (r.Changed.Contains("sys")) name += $"   (было в {r.SysWas})";
-            rows.Add(new ComparePreviewRow
-            {
-                Sys = r.Sys,
-                Name = name,
-                Unit = r.Unit,
-                Qty = Arrow(r.QtyA, r.QtyB, QtyText),
-                Price = Arrow(r.PriceA, r.PriceB, Money.Format),
-                SumA = r.QtyA is null ? "" : Money.Format(r.SumA),
-                SumB = r.QtyB is null ? "" : Money.Format(r.SumB),
-                Diff = Signed(r.Diff),
-                RowBackground = bg,
-            });
-            shown++;
-        }
-        if (shown == 0)
-            rows.Add(new ComparePreviewRow
-            {
-                Name = "Отличий нет — документы совпадают по строкам, количествам и ценам.",
-            });
-        CompareGrid.ItemsSource = rows;
-        var d = res.TotalB - res.TotalA;
-        InfoText.Text = $"Итого было {Money.Format(res.TotalA)} ₽, стало {Money.Format(res.TotalB)} ₽" +
-            (Math.Abs(d) >= 0.005m ? $"  ({Signed(d)} ₽)" : "  (без изменений)");
+        if (_display is not { } display) return;
+        TileMatValue.Text = display.Materials;
+        TileSmrValue.Text = display.Smr;
+        TileTotalValue.Text = display.Total;
+        TileCountValue.Text = display.Count;
+        CompareGrid.ItemsSource = ShowSameCheck.IsChecked == true ? display.AllRows : display.ChangedRows;
+        InfoText.Text = display.Info;
     }
-
-    private static string Delta(decimal d) => Math.Abs(d) < 0.005m ? "" : "   " + Signed(d);
 
     /// <summary>Экспорт таблицы сравнения — xlsx (compare_view.export).</summary>
     private void Export_Click(object sender, RoutedEventArgs e)

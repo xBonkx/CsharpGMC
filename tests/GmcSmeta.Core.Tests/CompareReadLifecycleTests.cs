@@ -30,5 +30,9 @@ public sealed class CompareReadLifecycleTests
         Assert.Contains("ExportButton.IsEnabled = false;", source);
         Assert.Contains("ExportButton.IsEnabled = true;", source);
         Assert.Contains("if (!_initializing && _result is not null) ShowResult();", source);
+        Assert.Contains("CompareDisplayProjection.Build(result, token)", source);
+        Assert.Contains("_display = null;", source);
+        Assert.Contains("display.AllRows : display.ChangedRows", source);
+        Assert.DoesNotContain("new ObservableCollection<ComparePreviewRow>", source);
     }
 }

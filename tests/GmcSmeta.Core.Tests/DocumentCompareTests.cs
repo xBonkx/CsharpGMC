@@ -125,4 +125,40 @@ public sealed class DocumentCompareTests
         Assert.Equal(-10m, removed.Diff);
         Assert.Equal(40m, kept.SumB);
     }
+    [Fact]
+    public void DisplayProjectionSharesRowsAndPreservesFilterAndFormatting()
+    {
+        var a = Doc("КП 1", Sys(1, "В1"), Pos(10, 1, "Решётка", "шт", 10m, 100m),
+            Pos(11, 1, "Без изменений", "шт", 1m, 10m), Pos(12, 1, "Убрана", "шт", 1m, 5m));
+        var b = Doc("КП 2", Sys(1, "В1"), Sys(2, "В2"),
+            Pos(20, 2, "Решётка", "шт", 12m, 110m),
+            Pos(21, 1, "Без изменений", "шт", 1m, 10m), Pos(22, 1, "Добавлена", "шт", 2m, 6m));
+        var result = DocumentCompare.CompareDocuments(a, b);
+        var display = CompareDisplayProjection.Build(result);
+        Assert.Equal(4, display.AllRows.Count);
+        Assert.Equal(3, display.ChangedRows.Count);
+        Assert.DoesNotContain(display.ChangedRows, row => row.Name == "Без изменений");
+        var changed = Assert.Single(display.ChangedRows.Where(row => row.Name.Contains("Решётка")));
+        Assert.Same(changed, Assert.Single(display.AllRows.Where(row => row.Name.Contains("Решётка"))));
+        Assert.Equal("Решётка   (было в В1)", changed.Name);
+        Assert.Equal("10 → 12", changed.Qty);
+        Assert.Equal("#FFFBEB", changed.RowBackground);
+        Assert.Equal("", Assert.Single(display.ChangedRows.Where(row => row.Name == "Добавлена")).SumA);
+        Assert.Equal("", Assert.Single(display.ChangedRows.Where(row => row.Name == "Убрана")).SumB);
+        Assert.Equal("+1  −1  ~1", display.Count);
+    }
+
+    [Fact]
+    public void DisplayProjectionShowsPlaceholderOnlyInEmptyViewsAndHonorsCancellation()
+    {
+        var doc = Doc("КП", Sys(1, "В"), Pos(10, 1, "Решётка", "шт", 1m, 1m));
+        var result = DocumentCompare.CompareDocuments(doc, doc);
+        var display = CompareDisplayProjection.Build(result);
+        Assert.Equal("Решётка", Assert.Single(display.AllRows).Name);
+        Assert.StartsWith("Отличий нет", Assert.Single(display.ChangedRows).Name);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => CompareDisplayProjection.Build(result, cancellation.Token));
+    }
+
 }
