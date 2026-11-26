@@ -37,6 +37,12 @@ public sealed class ShipmentFilterVisualSourceTests
         Assert.Contains("if (filter == 2 && !row.InShipment) return false;", code);
         Assert.Contains("if (filter != 2 && DocumentFilter.SelectedItem", code);
         Assert.Contains("if (filter == 1 && !row.InShipment", code);
+        Assert.Contains("return ShipmentSearchMatches(row);", code);
+        Assert.Contains("_shipmentRowIndex ??= _rows.Select", code);
+        Assert.Equal(2, code.Split("_shipmentRowIndex = null;").Length - 1);
+        Assert.Contains("if (state.SelectedIds.Count > 0 || restoreCurrent)", code);
+        Assert.Contains("SystemGroup => _systemGroup ??=", code);
+        Assert.Contains("!existingDocuments.SequenceEqual(documentOptions)", code);
         Assert.Contains("SyncShipmentFilter(hasShipment: false, editable: false);", code);
         Assert.Contains("SyncShipmentFilter(hasShipment: true, editable: editable);", code);
         var filters = File.ReadAllText(Path.Combine(app, "ShipmentsPane.Filters.cs"));
@@ -44,5 +50,6 @@ public sealed class ShipmentFilterVisualSourceTests
         Assert.Contains("RowFilter.IsEnabled = hasShipment && editable;", filters);
         Assert.Contains("RowFilterList.IsChecked = filter == 2;", filters);
         Assert.Contains("RefreshRowFilter();", filters);
+        Assert.Contains("_shipmentSearch.Matches(RowSearch?.Text, row.Name, row.SystemLabel)", filters);
     }
 }

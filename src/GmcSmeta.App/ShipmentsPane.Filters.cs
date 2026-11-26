@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -8,6 +9,13 @@ public partial class ShipmentsPane
 {
     // Preserve the user's draft filter when a fixed shipment forces its own rows.
     private int _requestedRowFilter;
+    private readonly ShipmentSearchQuery _shipmentSearch = new();
+
+    // Read the current text even for actions/incremental readback invoked
+    // outside a normal view.Refresh. Only tokenize when the text changes.
+    private bool ShipmentSearchMatches(ShipmentPreviewRow row) =>
+        _shipmentSearch.Matches(RowSearch?.Text, row.Name, row.SystemLabel);
+
     private int EffectiveShipmentFilter =>
         Current?.Fixed == true && !IsEditingFixed ? 2 : _requestedRowFilter;
 

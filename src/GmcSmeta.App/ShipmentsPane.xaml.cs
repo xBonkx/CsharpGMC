@@ -34,7 +34,9 @@ public sealed class ShipmentPreviewRow
     public string Price { get; init; } = "";
     public string IssuedTotal { get; init; } = "";
     public string SystemLabel { get; init; } = "";
-    public ShipmentSystemGroup SystemGroup => new(ContractId, SystemId, SystemLabel) { IsSubsystem = IsSubsystem };
+    private ShipmentSystemGroup? _systemGroup;
+    public ShipmentSystemGroup SystemGroup => _systemGroup ??=
+        new(ContractId, SystemId, SystemLabel) { IsSubsystem = IsSubsystem };
     public string ByEstimate { get; init; } = "";
     public string StockText { get; init; } = "";
     public string LeftText { get; init; } = "";
@@ -74,6 +76,7 @@ public partial class ShipmentsPane : UserControl
     private bool IsEditingFixed => Current is { Fixed: true } current && current.Id == _editingFixedId;
     private bool IsEditable => Current is { Fixed: false } || IsEditingFixed;
     private ObservableCollection<ShipmentPreviewRow> _rows = new();
+    private Dictionary<long, int>? _shipmentRowIndex;
     private readonly HashSet<(long Contract, long System)> _collapsedGroups = new();
     private bool _restoringGroup;
     private int _viewportGeneration;
@@ -105,13 +108,24 @@ public partial class ShipmentsPane : UserControl
     private void RestoreGridState(GridState state)
     {
         if (LinesGrid.ItemsSource is not ListCollectionView view) return;
-        var selected = view.OfType<ShipmentPreviewRow>()
-            .Where(row => state.SelectedIds.Contains(row.PositionId)).ToList();
+        var selected = new List<ShipmentPreviewRow>();
+        ShipmentPreviewRow? current = null;
+        var restoreCurrent = state.CurrentId.HasValue && state.Column is not null &&
+            LinesGrid.Columns.Contains(state.Column);
+        // No targets means no enumeration; otherwise locate selection and
+        // current row in one pass over the visible view, not the backing list.
+        if (state.SelectedIds.Count > 0 || restoreCurrent)
+        {
+            foreach (var row in view.OfType<ShipmentPreviewRow>())
+            {
+                if (state.SelectedIds.Contains(row.PositionId)) selected.Add(row);
+                if (restoreCurrent && current is null && row.PositionId == state.CurrentId)
+                    current = row;
+            }
+        }
         LinesGrid.SelectedItems.Clear();
         foreach (var row in selected) LinesGrid.SelectedItems.Add(row);
-        if (state.CurrentId.HasValue && state.Column is not null &&
-            LinesGrid.Columns.Contains(state.Column) &&
-            view.OfType<ShipmentPreviewRow>().FirstOrDefault(row => row.PositionId == state.CurrentId.Value) is { } current)
+        if (current is not null && state.Column is not null)
             LinesGrid.CurrentCell = new DataGridCellInfo(current, state.Column);
         var generation = ++_viewportGeneration;
         var shipmentId = _shipmentId;
@@ -215,6 +229,7 @@ public partial class ShipmentsPane : UserControl
         ++_viewportGeneration;
         LinesGrid.ItemsSource = null;
         _rows.Clear();
+        _shipmentRowIndex = null;
         FixedCheck.IsChecked = false;
         FixedCheck.IsEnabled = RecipientBox.IsEnabled = IssuedByBox.IsEnabled = false;
         AddRowsButton.IsEnabled = StockRowsButton.IsEnabled = RemoveRowsButton.IsEnabled = DeleteShipmentButton.IsEnabled = false;
@@ -278,10 +293,15 @@ public partial class ShipmentsPane : UserControl
         var documentId = (DocumentFilter.SelectedItem as SqlServerShipments.ShipmentDocument)?.Id ?? 0;
         var documentOptions = new List<SqlServerShipments.ShipmentDocument> { new(0, "Все документы объекта") };
         documentOptions.AddRange(documents);
-        DocumentFilter.ItemsSource = documentOptions;
-        DocumentFilter.SelectedItem = documentOptions.FirstOrDefault(d => d.Id == documentId) ?? documentOptions[0];
+        if (DocumentFilter.ItemsSource is not IEnumerable<SqlServerShipments.ShipmentDocument> existingDocuments ||
+            !existingDocuments.SequenceEqual(documentOptions) || DocumentFilter.SelectedItem is null)
+        {
+            DocumentFilter.ItemsSource = documentOptions;
+            DocumentFilter.SelectedItem = documentOptions.FirstOrDefault(d => d.Id == documentId) ?? documentOptions[0];
+        }
         DocumentFilter.Visibility = editable && documents.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         _rows = new ObservableCollection<ShipmentPreviewRow>(snapshot.Rows);
+        _shipmentRowIndex = null;
         var view = new ListCollectionView(_rows);
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ShipmentPreviewRow.SystemGroup)));
         view.Filter = RowVisible;
@@ -367,7 +387,9 @@ public partial class ShipmentsPane : UserControl
         if (!IsLoaded || attachment != _attachmentGeneration || changes is null || Current?.Id != current.Id ||
             (changes.Shipment with { Lines = current.Lines }) != current) return false;
 
-        var indexById = _rows.Select((row, index) => (row.PositionId, Index: index))
+        // Full readback/clear invalidates the index. Delta readback only
+        // replaces existing positions without changing their indices.
+        var indexById = _shipmentRowIndex ??= _rows.Select((row, index) => (row.PositionId, Index: index))
             .ToDictionary(pair => pair.PositionId, pair => pair.Index);
         var byId = changes.Lines.ToDictionary(line => line.PositionId);
         var replacements = new List<(int Index, ShipmentPreviewRow Row)>();
@@ -591,8 +613,7 @@ public partial class ShipmentsPane : UserControl
         if (filter != 2 && DocumentFilter.SelectedItem is SqlServerShipments.ShipmentDocument { Id: > 0 } document &&
             row.ContractId != document.Id) return false;
         if (filter == 1 && !row.InShipment && (row.Stock <= 0.000001m || row.Remaining <= 0.000001m)) return false;
-        var words = RowSearch.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return words.All(w => (row.Name + " " + row.SystemLabel).Contains(w, StringComparison.OrdinalIgnoreCase));
+        return ShipmentSearchMatches(row);
     }
 
     private void RowFilter_Changed(object sender, SelectionChangedEventArgs e) => RefreshRowFilter();

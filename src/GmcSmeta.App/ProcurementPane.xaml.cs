@@ -321,10 +321,14 @@ public partial class ProcurementPane : UserControl
                 new("(не указан)", ""),
             };
             choices.AddRange(suppliers.Select(name => new ProcurementSupplierFilterChoice(name, name)));
-            ProcurementSupplierFilter.ItemsSource = choices;
-            ProcurementSupplierFilter.SelectedItem = choices.FirstOrDefault(choice =>
-                string.Equals(choice.Key, previouslySelectedSupplier, StringComparison.Ordinal))
-                ?? choices[0];
+            if (ProcurementSupplierFilter.ItemsSource is not IEnumerable<ProcurementSupplierFilterChoice> existing ||
+                !existing.SequenceEqual(choices) || ProcurementSupplierFilter.SelectedItem is null)
+            {
+                ProcurementSupplierFilter.ItemsSource = choices;
+                ProcurementSupplierFilter.SelectedItem = choices.FirstOrDefault(choice =>
+                    string.Equals(choice.Key, previouslySelectedSupplier, StringComparison.Ordinal))
+                    ?? choices[0];
+            }
         }
         finally
         {
@@ -337,14 +341,17 @@ public partial class ProcurementPane : UserControl
     {
         if (ProcurementSystemItems is null) return;
         var query = ProcurementSystemSearch?.Text.Trim() ?? "";
-        ProcurementSystemItems.ItemsSource = _systemChoices
-            .Where(choice => query.Length == 0 ||
-                choice.Label.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Select(choice => new ProcurementSystemFilterChoice
-            {
-                Id = choice.Id, Label = choice.Label,
-                IsSelected = _selectedSystemIds.Contains(choice.Id),
-            }).ToList();
+        var visible = _systemChoices.Where(choice => query.Length == 0 ||
+                choice.Label.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (ProcurementSystemItems.ItemsSource is IEnumerable<ProcurementSystemFilterChoice> existing &&
+            existing.Select(choice => (choice.Id, choice.Label, choice.IsSelected)).SequenceEqual(
+                visible.Select(choice => (choice.Id, choice.Label, _selectedSystemIds.Contains(choice.Id)))))
+            return;
+        ProcurementSystemItems.ItemsSource = visible.Select(choice => new ProcurementSystemFilterChoice
+        {
+            Id = choice.Id, Label = choice.Label,
+            IsSelected = _selectedSystemIds.Contains(choice.Id),
+        }).ToList();
     }
 
     private void ProcurementSystemSearch_TextChanged(object sender, TextChangedEventArgs e)

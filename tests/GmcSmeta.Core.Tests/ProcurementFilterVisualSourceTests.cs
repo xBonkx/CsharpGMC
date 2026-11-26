@@ -40,4 +40,17 @@ public sealed class ProcurementFilterVisualSourceTests
         var code = File.ReadAllText(Path.Combine(app, "ProcurementPane.xaml.cs"));
         Assert.Contains("ProcurementSystemToggle.Tag = selected.Count > 0 ? \"filtered\" : null;", code);
     }
+
+    [Fact]
+    public void EquivalentScopeChoicesDoNotRebindFilterControls()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ProcurementPane.xaml.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "ProcurementPane.xaml.cs"));
+        Assert.Contains("!existing.SequenceEqual(choices)", code);
+        Assert.Contains("existing.Select(choice => (choice.Id, choice.Label, choice.IsSelected)).SequenceEqual(", code);
+        Assert.Contains("visible.Select(choice => (choice.Id, choice.Label, _selectedSystemIds.Contains(choice.Id)))", code);
+    }
 }
