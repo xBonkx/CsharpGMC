@@ -39,28 +39,28 @@ public static class SqlServerDirector
     private static IReadOnlyList<DirectorRow> ReadRows(SqlConnection conn, string mode)
     {
         var objects = new List<(long Id, string Name)>();
-        using (var read = new SqlCommand(
-            "SELECT id,name FROM dbo.objects WHERE archived=0 ORDER BY name", conn))
-            using (var r = read.ExecuteReader())
-                while (r.Read())
-                    objects.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1)));
-
         var contracts = new Dictionary<long, List<(long Id, int Order, string Kind, int? StageOf)>>();
         using (var read = new SqlCommand(
+            "SELECT id,name FROM dbo.objects WHERE archived=0 ORDER BY name;" +
             "SELECT c.id,c.object_id,c.[order],c.kind,c.stage_of FROM dbo.contracts c " +
-            "JOIN dbo.objects o ON o.id=c.object_id WHERE o.archived=0 ORDER BY c.[order],c.id", conn))
-            using (var r = read.ExecuteReader())
-                while (r.Read())
-                {
-                    var objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
-                    if (!contracts.TryGetValue(objectId, out var list))
-                        contracts[objectId] = list = new List<(long, int, string, int?)>();
-                    list.Add((
-                        Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                        Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
-                        r.IsDBNull(3) ? "kp" : r.GetString(3),
-                        r.IsDBNull(4) ? null : Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture)));
-                }
+            "JOIN dbo.objects o ON o.id=c.object_id WHERE o.archived=0 ORDER BY c.[order],c.id;", conn))
+        using (var r = read.ExecuteReader())
+        {
+            while (r.Read())
+                objects.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1)));
+            if (!r.NextResult()) throw new InvalidOperationException("Нет списка договоров сводки в ответе SQL.");
+            while (r.Read())
+            {
+                var objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                if (!contracts.TryGetValue(objectId, out var list))
+                    contracts[objectId] = list = new List<(long, int, string, int?)>();
+                list.Add((
+                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
+                    r.IsDBNull(3) ? "kp" : r.GetString(3),
+                    r.IsDBNull(4) ? null : Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture)));
+            }
+        }
 
         var kpOnly = mode == "kp";
         var scopes = objects.Select(o =>
@@ -146,7 +146,7 @@ public static class SqlServerDirector
                 names.Add(name);
                 read.Parameters.Add(name, SqlDbType.BigInt).Value = batch[i];
             }
-            read.CommandText = ContractMetricsSql(string.Join(",", names));
+            read.CommandText = ContractMetricsSql(string.Join(",", names), countLate);
             using var r = read.ExecuteReader();
             decimal Number(int index) => r.IsDBNull(index) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(index), CultureInfo.InvariantCulture));
@@ -165,17 +165,20 @@ public static class SqlServerDirector
                 var qty = Number(2);
                 var price = Number(3);
                 var issued = Number(4);
-                var received = Number(5);
-                var dueDate = r.IsDBNull(6) ? (DateTime?)null :
-                    Convert.ToDateTime(r.GetValue(6), CultureInfo.InvariantCulture);
-                var stage = r.IsDBNull(7) ? "" : r.GetString(7);
                 if (!EstimateStatistics.IsWorkName(name))
                 {
                     m.MaterialTotal += Money.Round2(qty * price);
                     m.IssuedValue += Math.Min(issued, qty) * price;
                 }
-                if (countLate && DueState(qty, received, issued, stage, dueDate, today) == "late")
-                    m.Late++;
+                if (countLate)
+                {
+                    var received = Number(5);
+                    var dueDate = r.IsDBNull(6) ? (DateTime?)null :
+                        Convert.ToDateTime(r.GetValue(6), CultureInfo.InvariantCulture);
+                    var stage = r.IsDBNull(7) ? "" : r.GetString(7);
+                    if (DueState(qty, received, issued, stage, dueDate, today) == "late")
+                        m.Late++;
+                }
             }
         }
         return result;
@@ -184,7 +187,9 @@ public static class SqlServerDirector
     // The caller constructs the IN list exclusively from bound parameter names.
     // Scope movement aggregation to selected top-level positions and preserve
     // separate SUM(out) - SUM(back), SUM(in) - SUM(back_supplier).
-    private static string ContractMetricsSql(string ids) =>
+    // KP never counts late deliveries; skip inbound movement kinds and the
+    // procurement join only there. Issued value and both SMR sums stay intact.
+    private static string ContractMetricsSql(string ids, bool countLate) =>
         "SELECT sy.contract_id, COALESCE(SUM(p.qty*ISNULL(p.work_cost,0)),0) " +
         "FROM dbo.positions p JOIN dbo.systems sy ON sy.id=p.system_id " +
         $"WHERE sy.contract_id IN ({ids}) AND p.parent_id IS NULL AND p.out_of_kp=0 GROUP BY sy.contract_id; " +
@@ -194,16 +199,18 @@ public static class SqlServerDirector
         $"WHERE sy.contract_id IN ({ids}) AND p.parent_id IS NULL AND ISNULL(p.out_of_kp,0)=0), " +
         "movement_totals AS (SELECT m.position_id, " +
         "SUM(CASE WHEN m.kind=N'out' THEN m.qty END) AS qty_out, " +
-        "SUM(CASE WHEN m.kind=N'back' THEN m.qty END) AS qty_back, " +
-        "SUM(CASE WHEN m.kind=N'in' THEN m.qty END) AS qty_in, " +
-        "SUM(CASE WHEN m.kind=N'back_supplier' THEN m.qty END) AS qty_back_supplier " +
+        "SUM(CASE WHEN m.kind=N'back' THEN m.qty END) AS qty_back " +
+        (countLate ? ", SUM(CASE WHEN m.kind=N'in' THEN m.qty END) AS qty_in, " +
+            "SUM(CASE WHEN m.kind=N'back_supplier' THEN m.qty END) AS qty_back_supplier " : "") +
         "FROM dbo.movements m JOIN selected_positions p ON p.id=m.position_id " +
-        "WHERE m.kind IN (N'out',N'back',N'in',N'back_supplier') GROUP BY m.position_id) " +
+        (countLate ? "WHERE m.kind IN (N'out',N'back',N'in',N'back_supplier') " :
+            "WHERE m.kind IN (N'out',N'back') ") +
+        "GROUP BY m.position_id) " +
         "SELECT p.contract_id,p.name,p.qty,p.price, " +
-        "ISNULL(m.qty_out,0)-ISNULL(m.qty_back,0), " +
-        "ISNULL(m.qty_in,0)-ISNULL(m.qty_back_supplier,0),pr.due_date,ISNULL(pr.stage,N'') " +
+        "ISNULL(m.qty_out,0)-ISNULL(m.qty_back,0) " +
+        (countLate ? ", ISNULL(m.qty_in,0)-ISNULL(m.qty_back_supplier,0),pr.due_date,ISNULL(pr.stage,N'') " : "") +
         "FROM selected_positions p LEFT JOIN movement_totals m ON m.position_id=p.id " +
-        "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id;";
+        (countLate ? "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id;" : ";");
 
     /// <summary>late/soon/ok/done/none — procurement.due_state (статусы из stage закупки).</summary>
     private static string? DueState(decimal qty, decimal received, decimal issued, string stage,
