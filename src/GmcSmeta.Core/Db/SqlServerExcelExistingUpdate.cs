@@ -398,7 +398,7 @@ public static partial class SqlServerExcelExistingUpdate
                     var path = r.GetString(2).Length == 0 ? r.GetString(1) :
                         r.GetString(2) + " / " + r.GetString(1);
                     var key = ExcelExistingUpdatePlan.Normalize(path);
-                    if (!sectionMap.TryAdd(key, r.GetInt64(0))) sectionMap[key] = -1;
+                    if (!sectionMap.TryAdd(key, SqlInteger.ReadInt64(r, 0))) sectionMap[key] = -1;
                 }
             }
             var table = new DataTable();

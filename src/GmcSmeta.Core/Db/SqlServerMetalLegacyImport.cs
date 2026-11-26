@@ -387,8 +387,8 @@ FROM dbo.gmc_metal_legacy_import WHERE id=1
         {
             if (!reader.Read()) return null;
             hash = reader.GetString(0).Trim();
-            count = reader.GetInt32(1);
-            offset = reader.GetInt16(2);
+            count = SqlInteger.ReadInt32(reader, 1);
+            offset = SqlInteger.ReadInt32(reader, 2);
         }
         var reconstructed = new List<MetalLegacyEntry>();
         using (var cmd = new SqlCommand("""

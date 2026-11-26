@@ -33,7 +33,7 @@ public sealed class PtoSqlSource
         var result=new List<ObjectChoice>();
         using var r=cmd.ExecuteReader();
         string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
-        while(r.Read())result.Add(new(r.GetInt64(0),S(1),S(2),S(3)));
+        while(r.Read())result.Add(new(SqlInteger.ReadInt64(r, 0),S(1),S(2),S(3)));
         return result;
     }
     public IReadOnlyList<ContractChoice> Contracts(long? objectId=null)
@@ -48,7 +48,7 @@ public sealed class PtoSqlSource
         var result=new List<ContractChoice>();
         using var r=cmd.ExecuteReader();
         string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
-        while(r.Read())result.Add(new(r.GetInt64(0),r.GetInt64(1),S(2),S(3),S(4),S(5),S(6)));
+        while(r.Read())result.Add(new(SqlInteger.ReadInt64(r, 0),SqlInteger.ReadInt64(r, 1),S(2),S(3),S(4),S(5),S(6)));
         return result;
     }
     public PtoPackage Snapshot(ObjectChoice obj,ContractChoice? contract=null,
@@ -92,7 +92,7 @@ public sealed class PtoSqlSource
         var result=new List<KsChoice>();
         using var r=cmd.ExecuteReader();
         while(r.Read())
-            result.Add(new KsChoice(r.GetInt64(0),r.IsDBNull(1)?"":r.GetString(1),
+            result.Add(new KsChoice(SqlInteger.ReadInt64(r, 0),r.IsDBNull(1)?"":r.GetString(1),
                 r.IsDBNull(2)?"":r.GetString(2)));
         return result;
     }
@@ -121,7 +121,7 @@ public sealed class PtoSqlSource
             result.Add(new PtoWork
             {
                 System=S(0),Name=S(1),Unit=S(2),Qty=S(3),
-                SourceActId=actId,SourcePositionId=r.GetInt64(4)
+                SourceActId=actId,SourcePositionId=SqlInteger.ReadInt64(r, 4)
             });
         return result;
     }

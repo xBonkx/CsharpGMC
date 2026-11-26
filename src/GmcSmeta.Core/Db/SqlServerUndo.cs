@@ -243,8 +243,8 @@ public static class SqlServerUndo
             "(SELECT id FROM dbo.positions WHERE system_id IN " +
             "(SELECT id FROM dbo.systems WHERE contract_id=@id)) " +
             "AND shipment_id IN (SELECT id FROM dbo.shipments WHERE fixed=1) ORDER BY id", contractId));
-        var restored = target.Rows("positions").Select(r => (long)r["id"]!).ToHashSet();
-        if (keepMoves.Concat(keepLines).Any(r => !restored.Contains((long)r["position_id"]!)))
+        var restored = target.Rows("positions").Select(r => SqlInteger.RequireInt64(r["id"])).ToHashSet();
+        if (keepMoves.Concat(keepLines).Any(r => !restored.Contains(SqlInteger.RequireInt64(r["position_id"]))))
             throw new InvalidOperationException("Отмена затёрла бы позицию в закреплённой ведомости.");
 
         // SQL Server каскадов не обещает: зависимые записи удаляем явно, детей первыми.
@@ -272,8 +272,8 @@ public static class SqlServerUndo
             ["updated_at"] = DateTime.Now,
             ["updated_by"] = ChangeLog.CurrentUser,
         });
-        InsertRows(conn, tx, "movements", keepMoves.Where(r => restored.Contains((long)r["position_id"]!)).ToList());
-        InsertRows(conn, tx, "shipment_lines", keepLines.Where(r => restored.Contains((long)r["position_id"]!)).ToList());
+        InsertRows(conn, tx, "movements", keepMoves.Where(r => restored.Contains(SqlInteger.RequireInt64(r["position_id"]))).ToList());
+        InsertRows(conn, tx, "shipment_lines", keepLines.Where(r => restored.Contains(SqlInteger.RequireInt64(r["position_id"]))).ToList());
         InsertRows(conn, tx, "movements", target.Rows("movements").ToList());
         InsertRows(conn, tx, "acts", target.Rows("acts").ToList());
         InsertRows(conn, tx, "smr_costs", target.Rows("smr_costs").ToList());
@@ -287,7 +287,7 @@ public static class SqlServerUndo
             while (dr.Read())
                 draftShipments.Add(Convert.ToInt64(dr.GetValue(0), System.Globalization.CultureInfo.InvariantCulture));
         InsertRows(conn, tx, "shipment_lines", target.Rows("shipment_lines")
-            .Where(r => draftShipments.Contains((long)r["shipment_id"]!)).ToList());
+            .Where(r => draftShipments.Contains(SqlInteger.RequireInt64(r["shipment_id"]))).ToList());
     }
 
     private static void UpdateContract(SqlConnection conn, SqlTransaction tx, UndoSnapshot target)
@@ -368,7 +368,7 @@ public static class SqlServerUndo
             using (var off = new SqlCommand($"SET IDENTITY_INSERT dbo.[{table}] OFF", conn, tx))
                 off.ExecuteNonQuery();
             foreach (var row in batch)
-                inserted.Add((long)row["id"]!);
+                inserted.Add(SqlInteger.RequireInt64(row["id"]));
         }
     }
 

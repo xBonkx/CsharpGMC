@@ -162,7 +162,7 @@ ORDER BY l.created_utc DESC,l.id DESC
         using (var r = cmd.ExecuteReader())
             while (r.Read())
                 lots.Add(new MetalLotView(r.GetInt64(0), r.GetInt64(1), r.GetString(2),
-                    r.GetString(3), r.GetString(4), r.GetInt64(5), r.GetInt32(6),
+                    r.GetString(3), r.GetString(4), r.GetInt64(5), SqlInteger.ReadInt32(r, 6),
                     r.GetInt32(7) != 0, r.GetInt64(8), checked((int)r.GetInt64(9)), r.GetDateTime(10)));
         tx.Commit();
         return new MetalSnapshot(revision, initialized, stock, places, objects, lots);
@@ -195,7 +195,7 @@ ORDER BY e.id DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
         var result = new List<MetalMovement>();
         while (r.Read())
             result.Add(new MetalMovement(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3),
-                r.GetString(4), r.GetInt64(5), r.GetInt32(6), r.GetInt64(7), r.GetString(8),
+                r.GetString(4), r.GetInt64(5), SqlInteger.ReadInt32(r, 6), r.GetInt64(7), r.GetString(8),
                 r.GetString(9), r.IsDBNull(10) ? null : r.GetInt64(10), r.GetString(11),
                 r.GetString(12), r.GetString(13), r.IsDBNull(14) ? null : r.GetInt64(14),
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));

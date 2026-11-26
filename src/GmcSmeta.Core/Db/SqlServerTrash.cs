@@ -30,11 +30,11 @@ public static partial class SqlServerTrash
         var dump = DumpContracts(conn, tx, contractIds);
         // Python: строки по позициям своей копии, затем дополняем строками по ведомостям объекта.
         var shipmentLines = (List<Dictionary<string, object?>>)dump["shipment_lines"]!;
-        var have = shipmentLines.Select(r => (long)r["id"]!).ToHashSet();
+        var have = shipmentLines.Select(r => SqlInteger.RequireInt64(r["id"])).ToHashSet();
         var shipmentIds = IdList(conn, tx,
             "SELECT id FROM dbo.shipments WHERE object_id=@id ORDER BY id", objectId);
         var extra = DumpRows(conn, tx, "shipment_lines", shipmentIds, "shipment_id");
-        shipmentLines.AddRange(extra.Where(r => !have.Contains((long)r["id"]!)));
+        shipmentLines.AddRange(extra.Where(r => !have.Contains(SqlInteger.RequireInt64(r["id"]))));
         dump["objects"] = DumpRows(conn, tx, "objects", new List<long> { objectId }, "id");
         dump["access_lists"] = DumpRows(conn, tx, "access_lists", new List<long> { objectId }, "object_id");
         dump["shipments"] = DumpRows(conn, tx, "shipments", new List<long> { objectId }, "object_id");
@@ -101,7 +101,7 @@ public static partial class SqlServerTrash
         // mssql-ветка trash._dump_contracts: держатели ссылок за пределами копии. Удаление
         // обнуляет base_contract_id и price_history.contract_id — restore возвращает их по парам.
         dump["contract_links"] = DumpRows(conn, tx, "contracts", contractIds, "base_contract_id")
-            .Where(r => !contractIds.Contains((long)r["id"]!))
+            .Where(r => !contractIds.Contains(SqlInteger.RequireInt64(r["id"])))
             .Select(r => new Dictionary<string, object?>
             {
                 ["id"] = r["id"],

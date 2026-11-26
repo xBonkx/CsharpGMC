@@ -27,7 +27,7 @@ WHERE e.material_id=@id ORDER BY e.id
             long? lot = r.IsDBNull(14) ? null : r.GetInt64(14);
             result.Add(new MetalMovement(
                 r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4),
-                r.GetInt64(5), r.GetInt32(6), r.GetInt64(7), r.GetString(8), r.GetString(9),
+                r.GetInt64(5), SqlInteger.ReadInt32(r, 6), r.GetInt64(7), r.GetString(8), r.GetString(9),
                 obj, r.GetString(11), r.GetString(12), r.GetString(13), lot,
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));
         }
@@ -206,7 +206,7 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = lotId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new ArgumentException("Партия не найдена.");
-            materialId = r.GetInt64(0); orderedArea = r.GetInt64(1); orderedPieces = r.GetInt32(2);
+            materialId = r.GetInt64(0); orderedArea = r.GetInt64(1); orderedPieces = SqlInteger.ReadInt32(r, 2);
             supplier = r.GetString(3); invoice = r.GetString(4); materialCategory = r.GetString(5);
         }
         if (materialCategory != "Бухты") throw new ArgumentException("Партии доступны только для бухт.");
@@ -226,7 +226,7 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
                 if (kind == "Получение партии")
                 {
                     receivedArea += r.GetInt64(1);
-                    receivedPieces += r.GetInt32(2);
+                    receivedPieces += SqlInteger.ReadInt32(r, 2);
                 }
             }
         }
