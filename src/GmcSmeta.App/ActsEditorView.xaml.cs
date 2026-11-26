@@ -123,6 +123,8 @@ public partial class ActsEditorView : UserControl
     private bool _loadFailed;
     private long _actLoadGeneration;
     private string _actsRevision = "";
+    private string _publishedActRevision = "";
+    private long _publishedActId;
     private bool _tilesVisible = true;
     private List<SqlServerActs.ActInfo> _acts = new();
     private SqlServerActs.ActSheetData? _sheet;
@@ -169,6 +171,7 @@ public partial class ActsEditorView : UserControl
         Unloaded += (_,_) =>
         {
             _exportAttachmentGeneration++;
+            _publishedActRevision = "";
             DetachQuantityEditor();
         };
     }
@@ -241,6 +244,82 @@ public partial class ActsEditorView : UserControl
             !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) || ActWritePending)) return;
         _revision = string.Empty;
         Reload();
+    }
+
+    internal static bool CanReuseActOnReturn(string published, string displayed, string listRevision,
+        string observed, long publishedId, long selectedId, bool cleanReadOnly) =>
+        cleanReadOnly && publishedId == selectedId && !string.IsNullOrWhiteSpace(published) &&
+        string.Equals(published, displayed, StringComparison.Ordinal) &&
+        string.Equals(published, listRevision, StringComparison.Ordinal) &&
+        string.Equals(published, observed, StringComparison.Ordinal);
+
+    // Drafts retain the existing full readback: charges and quantity bindings
+    // can contain unsaved input. Only signed acts and a confirmed empty list
+    // have no such mutable fields.
+    private bool CleanReadOnlyAct => !_loadFailed && !ActWritePending && !_exportInProgress &&
+        (ActGrid.ItemsSource is not System.ComponentModel.IEditableCollectionView { IsEditingItem: true }) &&
+        (_actId == 0 ? _acts.Count == 0 && _sheet is null :
+            Current is { Signed: true } && _signed && _sheet is not null &&
+            _details is not null && _totals is not null && SignedCheck.IsChecked == true);
+
+    internal async void RefreshOnTabReturn()
+    {
+        if (_contractId == 0 || _building || _loadingAct || ActWritePending) return;
+        var revision = _revision;
+        var actId = _actId;
+        if (!IsLoaded || !CanReuseActOnReturn(_publishedActRevision, revision, _actsRevision,
+            revision, _publishedActId, actId, CleanReadOnlyAct))
+        {
+            RefreshFromServer();
+            return;
+        }
+
+        var generation = ++_actLoadGeneration;
+        var attachment = _exportAttachmentGeneration;
+        var connectionString = _connectionString;
+        var contractId = _contractId;
+        _revision = "";
+        _loadingAct = true;
+        _building = true;
+        // The signed checkbox, new-act command and selection must not run
+        // during revalidation; existing write guards also reject empty revision.
+        var enabled = IsEnabled;
+        IsEnabled = false;
+        var hit = false;
+        try
+        {
+            var observed = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(connectionString);
+                return SqlServerDatabase.Revision(conn);
+            });
+            if (generation != _actLoadGeneration || contractId != _contractId ||
+                connectionString != _connectionString) return;
+            hit = IsLoaded && attachment == _exportAttachmentGeneration &&
+                CanReuseActOnReturn(_publishedActRevision, revision, _actsRevision,
+                    observed, _publishedActId, _actId, CleanReadOnlyAct) && _actId == actId;
+            if (hit)
+            {
+                _revision = revision;
+                StartupTrace.Mark("act_tab_revision_hit");
+            }
+        }
+        catch (Exception)
+        {
+            // A failed probe must not authorize writes. Fall back to the
+            // established full loader and its error presentation.
+        }
+        finally
+        {
+            IsEnabled = enabled;
+            if (generation == _actLoadGeneration)
+            {
+                _loadingAct = false;
+                _building = false;
+            }
+        }
+        if (generation != _actLoadGeneration || !IsLoaded) return;
+        if (!hit) await ReloadAsync(actId, reuseList: false);
     }
 
     /// <summary>Показывать поле выбора акта (в отдельном окне без списка слева).</summary>
@@ -341,6 +420,7 @@ public partial class ActsEditorView : UserControl
         var cachedRevision = _actsRevision;
         _loadingAct = true;
         _loadFailed = false;
+        _publishedActRevision = "";
         _revision = "";
         // Clear the old sheet before publishing the target ID. Selection remains
         // available in the surrounding contract list while this editor is hidden.
@@ -367,6 +447,8 @@ public partial class ActsEditorView : UserControl
             _actsRevision = loaded.Revision;
             _revision = loaded.Revision;
             ApplyActSnapshot(loaded);
+            _publishedActId = loaded.ActId;
+            _publishedActRevision = loaded.Revision;
         }
         catch (Exception ex)
         {

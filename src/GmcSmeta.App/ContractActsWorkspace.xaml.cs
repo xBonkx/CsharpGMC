@@ -115,7 +115,11 @@ public partial class ContractActsWorkspace : UserControl
     {
         if (_bound && _contractId == contractId && _connectionString == connectionString)
         {
-            EmbeddedEditor.RefreshFromServer();
+            EmbeddedEditor.RefreshOnTabReturn();
+            // The progress view may still be selected when returning from
+            // another contract tab. Revalidate it independently of the editor.
+            if (SummaryPage.Visibility == Visibility.Visible && IsLoaded)
+                _ = RefreshSummaryAsync();
             return;
         }
         InvalidateSummary();

@@ -169,6 +169,7 @@ internal static class Program
         CheckEstimateVisibleRowPresentation();
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();
+        CheckSignedActTabReuse();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -394,6 +395,26 @@ internal static class Program
         if (changes != 0)
             throw new Exception("An unchanged visible row must not raise redundant notifications.");
         Console.WriteLine("Estimate visible-row presentation and grouping transitions OK.");
+    }
+
+    private static void CheckSignedActTabReuse()
+    {
+        static void Expect(bool expected, string published, string displayed,
+            string list, string observed, long publishedId, long selectedId, bool clean)
+        {
+            if (ActsEditorView.CanReuseActOnReturn(published, displayed, list, observed,
+                publishedId, selectedId, clean) != expected)
+                throw new Exception("Act tab reuse guard accepted stale or mutable data.");
+        }
+        Expect(true, "r1", "r1", "r1", "r1", 42, 42, true);
+        Expect(true, "r1", "r1", "r1", "r1", 0, 0, true);
+        Expect(false, "r1", "r1", "r1", "r1", 42, 42, false); // draft or active editor
+        Expect(false, "r1", "r2", "r1", "r2", 42, 42, true); // write receipt
+        Expect(false, "r1", "r1", "r2", "r1", 42, 42, true);
+        Expect(false, "r1", "r1", "r1", "r2", 42, 42, true);
+        Expect(false, "r1", "r1", "r1", "r1", 42, 43, true);
+        Expect(false, "", "", "", "", 0, 0, true);
+        Console.WriteLine("Signed act tab revision and published snapshot guards OK.");
     }
 
     private static void CheckShipmentTabReuse()
