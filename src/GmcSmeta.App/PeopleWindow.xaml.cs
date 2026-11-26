@@ -15,7 +15,9 @@ namespace GmcSmeta.App;
 /// <summary>Python PeopleDialog dual-mode parity. The menu owner only calls the public constructor.</summary>
 public partial class PeopleWindow : Window
 {
-    private readonly SqlServerPeopleAccess _db;
+    private SqlServerPeopleAccess _db = null!;
+    private CancellationTokenSource? _initialCancellation;
+    private bool _closed;
     private readonly long? _objectId;
     private AccessSite? _site;
     private List<AccessCompany> _companies = new();
@@ -37,7 +39,6 @@ public partial class PeopleWindow : Window
         _loading = true;
         InitializeComponent();
         _objectId = objectId;
-        _db = new SqlServerPeopleAccess(connectionString);
         Title = IsAccess ? "Список на допуск" : "Люди и автомобили";
         TitleText.Text = Title;
         SubtitleText.Text = IsAccess ?
@@ -45,33 +46,91 @@ public partial class PeopleWindow : Window
             "Общая база для всех объектов. Неактивные остаются в ранее выданных списках.";
         if (IsAccess)
         {
-            _site = _db.Site(objectId!.Value);
-            SubtitleText.Text = _site.Name + " · " + SubtitleText.Text;
             HistoryPanel.Visibility = Visibility.Visible;
             AccessOptions.Visibility = Visibility.Visible;
             OrdersButton.Visibility = Visibility.Visible;
             ExportButton.Visibility = Visibility.Visible;
             PeopleAll.Visibility = PeopleNone.Visibility = Visibility.Visible;
             CarsAll.Visibility = CarsNone.Visibility = Visibility.Visible;
-            IntroBox.Text = PeopleRules.DefaultIntro(_site);
-            _companies = _db.Companies().ToList();
-            CompanyBox.ItemsSource = _companies;
-            CompanyBox.SelectedItem = _companies.FirstOrDefault(x =>
-                x.Name.Contains("ГМЦ", StringComparison.OrdinalIgnoreCase)) ?? _companies.FirstOrDefault();
         }
         else
         {
             PeopleSelectedColumn.Visibility = Visibility.Collapsed;
             CarsSelectedColumn.Visibility = Visibility.Collapsed;
         }
-        _loading = false;
-        RefreshHistory();
-        Reload();
-        Loaded += (_, _) => WindowState = WindowState.Maximized;
+        // No editing/export before the initial authoritative directory is available.
+        var content = (UIElement)Content;
+        content.IsEnabled = false;
+        HintText.Text = "Загрузка справочника…";
+        Loaded += async (_, _) =>
+        {
+            WindowState = WindowState.Maximized;
+            await InitializeAsync(connectionString, content);
+        };
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _initialCancellation?.Cancel();
+        };
+    }
+
+    private async Task InitializeAsync(string connectionString, UIElement content)
+    {
+        if (_closed || !_loading || _initialCancellation is not null) return;
+        using var cancellation = new CancellationTokenSource();
+        _initialCancellation = cancellation;
+        var token = cancellation.Token;
+        var showInactive = ShowInactive.IsChecked == true;
+        try
+        {
+            var snapshot = await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                var db = new SqlServerPeopleAccess(connectionString);
+                token.ThrowIfCancellationRequested();
+                var site = _objectId is long objectId ? db.Site(objectId) : null;
+                token.ThrowIfCancellationRequested();
+                var companies = site is null ? new List<AccessCompany>() : db.Companies().ToList();
+                token.ThrowIfCancellationRequested();
+                var history = _objectId is long id ? db.History(id, "list") : Array.Empty<AccessHistory>();
+                token.ThrowIfCancellationRequested();
+                var directory = db.Load(showInactive);
+                token.ThrowIfCancellationRequested();
+                return (Db: db, Site: site, Companies: companies, History: history, Directory: directory);
+            }, token);
+            if (_closed || token.IsCancellationRequested) return;
+            HintText.Text = "Выберите строку для редактирования; все изменения сохраняются в SQL Server.";
+            _db = snapshot.Db;
+            _site = snapshot.Site;
+            if (_site is not null)
+            {
+                SubtitleText.Text = _site.Name + " · " + SubtitleText.Text;
+                IntroBox.Text = PeopleRules.DefaultIntro(_site);
+                _companies = snapshot.Companies;
+                CompanyBox.ItemsSource = _companies;
+                CompanyBox.SelectedItem = _companies.FirstOrDefault(x =>
+                    x.Name.Contains("ГМЦ", StringComparison.OrdinalIgnoreCase)) ?? _companies.FirstOrDefault();
+                ApplyHistory(snapshot.History);
+            }
+            ApplyDirectory(snapshot.Directory.People, snapshot.Directory.Cars, snapshot.Directory.Revision, null, null);
+            content.IsEnabled = true;
+        }
+        catch (Exception ex)
+        {
+            if (_closed || token.IsCancellationRequested) return;
+            _revision = "";
+            MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            Close();
+        }
+        finally
+        {
+            _initialCancellation = null;
+        }
     }
 
     private void Run(Action action)
     {
+        if (_closed || _loading) return;
         try { action(); }
         catch (DBConcurrencyException)
         {
@@ -100,9 +159,15 @@ public partial class PeopleWindow : Window
         var selectedC = (CarsGrid.SelectedItem as PeopleCar)?.Id;
         _revision = "";
         var data = _db.Load(ShowInactive.IsChecked == true);
-        _revision = data.Revision;
-        _people = data.People.ToList();
-        _cars = data.Cars.ToList();
+        ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
+    }
+
+    private void ApplyDirectory(IReadOnlyList<PeoplePerson> people, IReadOnlyList<PeopleCar> cars,
+        string revision, long? selectedP, long? selectedC)
+    {
+        _revision = revision;
+        _people = people.ToList();
+        _cars = cars.ToList();
         if (IsAccess)
         {
             // Python first-ever access list selects all active employees/vehicles.
@@ -465,16 +530,24 @@ public partial class PeopleWindow : Window
     private void RefreshHistory()
     {
         if (!IsAccess) return;
-        _history = _db.History(_objectId!.Value, "list")
-            .Select(h => new HistoryOption(h, $"{h.CreatedAt:dd.MM.yyyy HH:mm} · {h.User}")).ToList();
+        ApplyHistory(_db.History(_objectId!.Value, "list"));
+    }
+
+    private void ApplyHistory(IReadOnlyList<AccessHistory> history)
+    {
+        _history = history.Select(h => new HistoryOption(h, $"{h.CreatedAt:dd.MM.yyyy HH:mm} · {h.User}")).ToList();
+        var wasLoading = _loading;
         _loading = true;
-        HistoryBox.ItemsSource = _history;
-        if (_history.Count > 0)
+        try
         {
-            HistoryBox.SelectedIndex = 0;
-            RestoreHistory(_history[0].History);
+            HistoryBox.ItemsSource = _history;
+            if (_history.Count > 0)
+            {
+                HistoryBox.SelectedIndex = 0;
+                RestoreHistory(_history[0].History);
+            }
         }
-        _loading = false;
+        finally { _loading = wasLoading; }
     }
     private void RestoreHistory(AccessHistory history)
     {
