@@ -673,11 +673,24 @@
         <local:SummaryTableFrame x:Name="EstimateTablePanel" Grid.Row="4" Background="White" BorderBrush="#E4E8EF" BorderThickness="1"
                 CornerRadius="12" Margin="24,8,24,0">
             <DockPanel>
-                <Button DockPanel.Dock="Bottom" Content="Добавить строку" ContentTemplate="{StaticResource IconLabelPlus}"
+                <Button x:Name="BottomAddRowButton" DockPanel.Dock="Bottom" Content="Добавить строку"
                         Click="AddRow_Click" IsEnabled="{Binding IsEnabled, ElementName=AddRowButton}"
                         Foreground="#2563EB" BorderThickness="0" Background="Transparent"
-                        HorizontalAlignment="Left" FontWeight="SemiBold" Padding="8,4"
-                        Margin="0,3,0,2" ToolTip="Добавить позицию после выбранной"/>
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" FontWeight="SemiBold"
+                        MinHeight="32" Padding="14,0" ToolTip="Добавить позицию после выбранной">
+                    <Button.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="20" Height="20" Margin="0,0,6,0" IsHitTestVisible="False">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </Button.ContentTemplate>
+                </Button>
                 <!-- Python ui/stage_mode.py: stage cards and segmented filters sit immediately
                      above the same estimate table; document rows and source amounts stay unchanged. -->
                 <Border x:Name="InlineStagesBar" DockPanel.Dock="Top" Visibility="Collapsed"
@@ -958,7 +971,8 @@
             <DockPanel LastChildFill="True">
                 <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top"
                         Style="{StaticResource DocumentFlatTool}" MinHeight="30"
-                        Content="Скрыть итоги" Click="ToggleTotals_Click"/>
+                        Content="Скрыть итоги" ContentTemplate="{StaticResource IconLabelArrowDown}"
+                        Foreground="#64748B" Click="ToggleTotals_Click"/>
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
                                Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,10,0"/>

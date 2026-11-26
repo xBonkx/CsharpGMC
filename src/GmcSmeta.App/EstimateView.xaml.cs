@@ -1073,7 +1073,9 @@ public partial class EstimateView : UserControl
     {
         TotalsCards.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
         TotalsSummary.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
-        ToggleTotalsButton.Content = hidden ? "↑ Показать итоги" : "↓ Скрыть итоги";
+        ToggleTotalsButton.Content = hidden ? "Показать итоги" : "Скрыть итоги";
+        ToggleTotalsButton.ContentTemplate = (DataTemplate)FindResource(hidden ? "IconLabelArrowUp" : "IconLabelArrowDown");
+        ToggleTotalsButton.Foreground = (Brush)new BrushConverter().ConvertFromString(hidden ? "#0F172A" : "#64748B")!;
         var description = hidden ? "Показать итоги" : "Скрыть итоги";
         ToggleTotalsButton.ToolTip = description;
         System.Windows.Automation.AutomationProperties.SetName(ToggleTotalsButton, description);
