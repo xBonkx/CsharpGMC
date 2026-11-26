@@ -40,33 +40,9 @@ public static class ActQuantityFormulas
         Stored.Replace(formula,m=>long.TryParse(m.Groups[1].Value,NumberStyles.None,CultureInfo.InvariantCulture,out var id)
             && numbers.TryGetValue(id,out var number) ? "К"+number : m.Value);
 
-    private static readonly Regex EditingReference=new(@"[КK](\d+(?:[.,]\d+)*)|@(\d+)",RegexOptions.IgnoreCase|RegexOptions.Compiled);
-
     /// <summary>Python 0.67.9: unique valid references in typing order, including incomplete formulas.</summary>
-    public static IReadOnlyList<long> EditingReferences(string? text,IReadOnlyDictionary<long,string> numbers)
-    {
-        var result=new List<long>();
-        if(text is null||!text.TrimStart().StartsWith('=')) return result;
-        var byNumber=numbers.GroupBy(p=>NormalizeNumber(p.Value),StringComparer.Ordinal)
-            .ToDictionary(g=>g.Key,g=>g.Select(p=>p.Key).ToList(),StringComparer.Ordinal);
-        var seen=new HashSet<long>();
-        foreach(Match match in EditingReference.Matches(text))
-        {
-            long id;
-            if(match.Groups[2].Success)
-            {
-                if(!long.TryParse(match.Groups[2].Value,NumberStyles.None,CultureInfo.InvariantCulture,out id)
-                    ||!numbers.ContainsKey(id)) continue;
-            }
-            else
-            {
-                if(!byNumber.TryGetValue(NormalizeNumber(match.Groups[1].Value),out var ids)||ids.Count!=1) continue;
-                id=ids[0];
-            }
-            if(seen.Add(id)) result.Add(id);
-        }
-        return result;
-    }
+    public static IReadOnlyList<long> EditingReferences(string? text,IReadOnlyDictionary<long,string> numbers) =>
+        new ActQuantityReferenceIndex(numbers).EditingReferences(text);
 
     /// <summary>
     /// Перепривязать стабильные id позиций (@123) после восстановления из корзины со

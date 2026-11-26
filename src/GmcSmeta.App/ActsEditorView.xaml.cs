@@ -550,6 +550,8 @@ public partial class ActsEditorView : UserControl
     private void ShowActUnavailable(string? error)
     {
         _sheet = null;
+        _indexedRefNumbers = null;
+        _quantityReferenceIndex = null;
         _sharedExtraIds.Clear();
         _details = null;
         _totals = null;
@@ -680,10 +682,6 @@ public partial class ActsEditorView : UserControl
             OverLeft = left < -0.000000001m,
         };
     }
-
-    /// <summary>Стабильные ID, в том числе составные номера вида 15.1.</summary>
-    private Dictionary<long,string> RefNumbers() =>
-        _sheet?.RefDisplay.ToDictionary(p=>p.Key,p=>p.Value) ?? new();
 
     private void FilterRows()
     {
@@ -836,9 +834,8 @@ public partial class ActsEditorView : UserControl
         DetachQuantityEditor();
         _qtyEditor = editor;
         var raw = ((KsRowVm)e.Row.Item).NowRaw;
-        var map = RefNumbers();
         editor.Text = !raw.StartsWith('=') &&
-            ActQuantityFormulas.EditingReferences("="+raw,map).Count>0 ? "="+raw : raw;
+            QuantityReferenceIndex().EditingReferences("="+raw).Count>0 ? "="+raw : raw;
         editor.TextChanged += QuantityEditor_TextChanged;
         editor.Unloaded += QuantityEditor_Unloaded;
         UpdateQuantityReferences();
@@ -859,7 +856,7 @@ public partial class ActsEditorView : UserControl
     private void UpdateQuantityReferences()
     {
         if (_rows is null) return;
-        var refs=ActQuantityFormulas.EditingReferences(_qtyEditor?.Text,RefNumbers())
+        var refs=QuantityReferenceIndex().EditingReferences(_qtyEditor?.Text)
             .Select((id,index)=>(id,brush:ReferenceColors[index%ReferenceColors.Length]))
             .ToDictionary(x=>x.id,x=>x.brush);
         foreach(var row in _rows)

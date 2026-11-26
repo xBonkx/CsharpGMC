@@ -187,6 +187,25 @@ public sealed class ActQuantityFormulaTests
     }
 
     [Fact]
+    public void ReferenceIndex_ReusesLargeSnapshotAndPreservesAmbiguityAndTypingOrder()
+    {
+        var numbers = Enumerable.Range(1, 25000).ToDictionary(i => (long)i, i => i.ToString());
+        numbers[10] = "15.1";
+        numbers[11] = "15,1";
+        numbers[12] = "15.2";
+        var index = new ActQuantityReferenceIndex(numbers);
+        Assert.Equal(new long[] { 25000, 12, 10, 11 },
+            index.EditingReferences("=К25000+K15,2+К15.1+@10+@11+@10+"));
+        Assert.Equal(new long[] { 12, 25000 },
+            index.EditingReferences("=К15.2+@25000+К99999+"));
+        Assert.Empty(index.EditingReferences("К15.2"));
+        Assert.Equal("К15.2+К25000", ActQuantityFormulas.Display("@12+@25000", numbers));
+        var replacement = new ActQuantityReferenceIndex(new Dictionary<long, string> { [42] = "15.1" });
+        Assert.Equal(new long[] { 42 }, replacement.EditingReferences("=К15,1"));
+        Assert.Empty(index.EditingReferences("=К15,1"));
+    }
+
+    [Fact]
     public void EditingReferences_PartialDuplicateAmbiguousAndStable()
     {
         var numbers=new Dictionary<long,string>{[1]="12",[2]="15.1",[3]="99",[4]="99"};

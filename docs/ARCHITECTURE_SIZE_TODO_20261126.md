@@ -57,3 +57,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - При обнаружении пересечения с существующим TODO связать ID и не дублировать работу; не менять исторические 400 ID без содержательной сверки.
 
 Регистрация 26.11.2026: 8 NOT STARTED; правила внесены в AGENTS.md. Код, БД и сборка не изменялись; реализация и приёмка впереди.
+
+- 26.11.2026, PERF-019 / ARCH-SIZE-02: ActsEditorView.xaml.cs 2466→2463, новый ActsEditorView.QuantityReferences.cs 28, ActQuantityFormulas.cs 252→228, новый ActQuantityReferenceIndex.cs 54 строк. Выделен самостоятельный тестируемый индекс ссылок; WPF-адаптер вынесен без расширения большого файла. Полная декомпозиция редактора остаётся NOT STARTED; сборка/тесты не запускались.
