@@ -45,15 +45,53 @@ public partial class ActsEditorView
         throw new InvalidOperationException("КС-2 изменилась во время чтения. Повторите загрузку.");
     }
 
-    private async Task ReloadAsync(long? requestedActId, bool reuseList)
+    // Only ordinary reads can be cancelled by navigation. The default protects
+    // existing post-write callers, including recovery after an uncertain result.
+    private bool _actLoadRequired;
+    private long _activeReadActId;
+    private long? _resumeActId;
+
+    private void UpdateActReadVisibility()
     {
-        if (_contractId == 0 || ActWritePending) return;
+        if (!IsLoaded || !IsVisible) CancelHiddenActRead();
+        else ResumeActReadIfNeeded();
+    }
+
+    private void CancelHiddenActRead()
+    {
+        if (_actLoadRequired || ActWritePending || _actLoadCancellation is not { } cancellation ||
+            cancellation.IsCancellationRequested) return;
+        _resumeActId = _activeReadActId;
+        cancellation.Cancel();
+    }
+
+    private void ResumeActReadIfNeeded()
+    {
+        if (!IsLoaded || !IsVisible || _loadingAct || _building || ActWritePending ||
+            _resumeActId is not long id) return;
+        _ = ReloadAsync(id, reuseList: false, requiredReadback: false);
+    }
+
+    private async Task ReloadAsync(long? requestedActId, bool reuseList, bool requiredReadback = true)
+    {
+        if (_contractId == 0 || ActWritePending || _actLoadRequired) return;
+        if (!requiredReadback && IsLoaded && !IsVisible)
+        {
+            CancelHiddenActRead();
+            _resumeActId = requestedActId ?? _actId;
+            _revision = "";
+            _publishedActRevision = "";
+            return;
+        }
+        _resumeActId = null;
+        _actLoadRequired = requiredReadback;
+        _activeReadActId = requestedActId ?? _actId;
         var generation = ++_actLoadGeneration;
         using var cancellation = new CancellationTokenSource();
         var previous = _actLoadCancellation;
         _actLoadCancellation = cancellation;
         previous?.Cancel();
-        var token = cancellation.Token;
+        var token = requiredReadback ? CancellationToken.None : cancellation.Token;
         var connectionString = _connectionString;
         var contractId = _contractId;
         var requested = requestedActId ?? _actId;
@@ -93,7 +131,7 @@ public partial class ActsEditorView
         }
         catch (Exception) when (token.IsCancellationRequested)
         {
-            // A newer selection owns the UI. No write was cancelled.
+            // A newer selection or navigation owns the UI. No write was cancelled.
         }
         catch (Exception ex)
         {
@@ -107,13 +145,21 @@ public partial class ActsEditorView
         }
         finally
         {
-            if (ReferenceEquals(_actLoadCancellation, cancellation)) _actLoadCancellation = null;
+            if (ReferenceEquals(_actLoadCancellation, cancellation))
+            {
+                _actLoadCancellation = null;
+                _actLoadRequired = false;
+            }
             if (generation == _actLoadGeneration)
             {
                 _loadingAct = false;
                 _building = false;
-                UpdateSelectionQty();
-                ActsChanged?.Invoke(this, EventArgs.Empty);
+                if (!token.IsCancellationRequested)
+                {
+                    UpdateSelectionQty();
+                    ActsChanged?.Invoke(this, EventArgs.Empty);
+                }
+                ResumeActReadIfNeeded();
             }
         }
     }

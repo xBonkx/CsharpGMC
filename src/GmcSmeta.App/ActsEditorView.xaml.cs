@@ -84,13 +84,16 @@ public partial class ActsEditorView : UserControl
             _exportAttachmentGeneration++;
             _publishedActRevision = "";
             DetachQuantityEditor();
+            CancelHiddenActRead();
         };
+        Loaded += (_, _) => UpdateActReadVisibility();
+        IsVisibleChanged += (_, _) => UpdateActReadVisibility();
     }
 
     /// <summary>Bind the same editor to a document, whether hosted inline or in a legacy window.</summary>
     public void Bind(string connectionString, int contractId, string title, long? selectedActId = null)
     {
-        if (ActWritePending) return;
+        if (ActWritePending || _actLoadRequired) return;
         if (_contractId != contractId || _connectionString != connectionString)
         {
             _actsRevision = "";
@@ -104,12 +107,12 @@ public partial class ActsEditorView : UserControl
         _contractId = contractId;
         _title = title;
         _revision = "";
-        Reload(selectedActId);
+        _ = ReloadAsync(selectedActId, reuseList: false, requiredReadback: false);
     }
 
     public void SelectAct(long actId)
     {
-        if (_contractId == 0 || _building) return;
+        if (_contractId == 0 || _building || _actLoadRequired) return;
         if (actId == _actId && _sheet is not null) return;
         if (ActWritePending ||
             (_sheet is not null && (!ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
@@ -122,7 +125,7 @@ public partial class ActsEditorView : UserControl
             return;
         }
         _revision = "";
-        _ = ReloadAsync(actId, reuseList: true);
+        _ = ReloadAsync(actId, reuseList: true, requiredReadback: false);
     }
 
     private void SyncActSelector()
@@ -154,7 +157,7 @@ public partial class ActsEditorView : UserControl
         if (_sheet is not null && (!ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) || ActWritePending)) return;
         _revision = string.Empty;
-        Reload();
+        _ = ReloadAsync(null, reuseList: false, requiredReadback: false);
     }
 
     internal static bool CanReuseActOnReturn(string published, string displayed, string listRevision,
@@ -176,6 +179,16 @@ public partial class ActsEditorView : UserControl
     internal async void RefreshOnTabReturn()
     {
         if (_contractId == 0 || _building || _loadingAct || ActWritePending) return;
+        if (_resumeActId.HasValue)
+        {
+            ResumeActReadIfNeeded();
+            return;
+        }
+        if (IsLoaded && !IsVisible)
+        {
+            _ = ReloadAsync(null, reuseList: false, requiredReadback: false);
+            return;
+        }
         var revision = _revision;
         var actId = _actId;
         if (!IsLoaded || !CanReuseActOnReturn(_publishedActRevision, revision, _actsRevision,
@@ -186,6 +199,10 @@ public partial class ActsEditorView : UserControl
         }
 
         var generation = ++_actLoadGeneration;
+        using var cancellation = new CancellationTokenSource();
+        _actLoadCancellation = cancellation;
+        _activeReadActId = actId;
+        var token = cancellation.Token;
         var attachment = _exportAttachmentGeneration;
         var connectionString = _connectionString;
         var contractId = _contractId;
@@ -201,12 +218,12 @@ public partial class ActsEditorView : UserControl
         {
             var observed = await Task.Run(() =>
             {
-                using var conn = SqlServerDatabase.Open(connectionString);
-                return SqlServerDatabase.Revision(conn);
-            });
-            if (generation != _actLoadGeneration || contractId != _contractId ||
+                using var conn = SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult();
+                return SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult();
+            }, token);
+            if (token.IsCancellationRequested || generation != _actLoadGeneration || contractId != _contractId ||
                 connectionString != _connectionString) return;
-            hit = IsLoaded && attachment == _exportAttachmentGeneration &&
+            hit = IsLoaded && IsVisible && attachment == _exportAttachmentGeneration &&
                 CanReuseActOnReturn(_publishedActRevision, revision, _actsRevision,
                     observed, _publishedActId, _actId, CleanReadOnlyAct) && _actId == actId;
             if (hit)
@@ -223,14 +240,21 @@ public partial class ActsEditorView : UserControl
         finally
         {
             IsEnabled = enabled;
+            if (ReferenceEquals(_actLoadCancellation, cancellation)) _actLoadCancellation = null;
             if (generation == _actLoadGeneration)
             {
                 _loadingAct = false;
                 _building = false;
             }
         }
-        if (generation != _actLoadGeneration || !IsLoaded) return;
-        if (!hit) await ReloadAsync(actId, reuseList: false);
+        if (generation != _actLoadGeneration) return;
+        if (token.IsCancellationRequested)
+        {
+            ResumeActReadIfNeeded();
+            return;
+        }
+        if (!IsLoaded || !IsVisible) return;
+        if (!hit) await ReloadAsync(actId, reuseList: false, requiredReadback: false);
     }
 
     /// <summary>Показывать поле выбора акта (в отдельном окне без списка слева).</summary>
