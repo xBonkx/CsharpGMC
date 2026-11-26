@@ -69,7 +69,7 @@ public sealed record InstalledUpdateTarget(string Exe, Version Version)
     private static bool TryVersion(string text, out Version version)
     {
         version = new Version(0, 0, 0, 0);
-        if (!Version.TryParse(text, out var parsed)) return false;
+        if (!System.Version.TryParse(text, out var parsed)) return false;
         version = new Version(parsed.Major, parsed.Minor,
             Math.Max(0, parsed.Build), Math.Max(0, parsed.Revision));
         return true;

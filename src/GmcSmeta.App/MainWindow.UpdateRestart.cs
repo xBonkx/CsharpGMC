@@ -11,8 +11,14 @@ public partial class MainWindow
         _ready && !_startupClosed && !_startupInProgress && IsEnabled &&
         ObjectRenameBox.Visibility != Visibility.Visible &&
         _estimateCacheValidation is null &&
-        _estimateCache.Values.All(view => view.CanTransferDocument) &&
-        (PageHost.Content is not EstimateView current || current.CanTransferDocument);
+        _estimateCache.Values.All(view => view.CanRestartAfterUpdate) &&
+        (PageHost.Content is not EstimateView current || current.CanRestartAfterUpdate);
 
     internal int? RestartDocumentId => PageHost.Content is EstimateView ? _openDocumentId : null;
+}
+
+public partial class EstimateView
+{
+    // An unresolved revision conflict must never cause an unattended close.
+    internal bool CanRestartAfterUpdate => CanTransferDocument && !_serverConflict;
 }

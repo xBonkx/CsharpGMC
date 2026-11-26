@@ -68,6 +68,10 @@ internal sealed class UpdateRestartCoordinator
             // In particular, do not call Application.Shutdown or Process.Kill.
             _window.Close();
         }
+        catch (InvalidOperationException ex)
+        {
+            Trace.TraceWarning("Update close postponed: " + ex.Message);
+        }
         finally
         {
             _closing = false;
