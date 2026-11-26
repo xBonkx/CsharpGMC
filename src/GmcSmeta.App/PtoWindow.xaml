@@ -5,7 +5,7 @@
     Title="ПТО / Исполнительная документация" Width="1200" Height="760"
     MinWidth="750" MinHeight="530" WindowStartupLocation="CenterOwner"
     Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
-  <DockPanel Margin="14">
+  <DockPanel x:Name="PtoContent" Margin="14">
     <StackPanel DockPanel.Dock="Top">
       <TextBlock x:Name="ArchiveLabel" Margin="0,0,0,10" Foreground="#64748B" TextWrapping="Wrap"/>
       <WrapPanel Margin="0,0,0,6">

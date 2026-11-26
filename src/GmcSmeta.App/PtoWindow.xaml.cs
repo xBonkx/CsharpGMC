@@ -15,10 +15,12 @@ public partial class PtoWindow : Window
     private readonly long? _scopeObjectId;
     private readonly long? _scopeContractId;
     private readonly PtoSqlSource _source;
-    private PtoArchive _archive;
-    private List<PtoPackage> _all=new();
-    private sealed record Row(Guid Id,string ObjectLabel,string Section,string Number,
-        string Date,string Status,int Attachments,string Findings);
+    private PtoArchive _archive=null!;
+    private IReadOnlyList<PtoPackageListProjection.Row> _rows=Array.Empty<PtoPackageListProjection.Row>();
+    private bool _initializing=true;
+    private bool _initialReadStarted;
+    private bool _loading;
+    private bool _closed;
 
     public PtoWindow(string connection,long? objectId=null,long? contractId=null)
     {
@@ -26,55 +28,140 @@ public partial class PtoWindow : Window
         if(contractId.HasValue && !objectId.HasValue)throw new ArgumentException("Для договора требуется объект.");
         _connection=connection;_scopeObjectId=objectId;_scopeContractId=contractId;
         _source=new PtoSqlSource(connection);
-        if(contractId is long cid)
-        {
-            var doc=_source.Contracts(objectId).FirstOrDefault(c=>c.Id==cid) ??
-                throw new InvalidOperationException("Договор не найден в выбранном объекте.");
-            Title="АОСР · "+doc;
-        }
-        _archive=new PtoArchive(connection,PtoUserSettings.Root);
-        Refresh();
+        SetLoading(true);
+        ArchiveLabel.Text="Загрузка исполнительной документации…";
+        Loaded+=async (_,_)=>await InitializeAsync();
+        // Archive initialization includes the existing Pilot-only schema check/creation.
+        Closing+=(_,e)=>{if(_initializing)e.Cancel=true;};
+        Closed+=(_,_)=>_closed=true;
     }
+
+    private void SetLoading(bool value)
+    {
+        _loading=value;
+        PtoContent.IsEnabled=!value;
+    }
+
+    private async Task InitializeAsync()
+    {
+        if(_closed || !_initializing || !_loading || _archive is not null)return;
+        // Loaded normally fires once; detach the initialization state before dispatching.
+        if(_initialReadStarted)return;
+        _initialReadStarted=true;
+        try
+        {
+            var snapshot=await Task.Run(()=>
+            {
+                string? title=null;
+                if(_scopeContractId is long cid)
+                {
+                    var doc=_source.Contracts(_scopeObjectId).FirstOrDefault(c=>c.Id==cid) ??
+                        throw new InvalidOperationException("Договор не найден в выбранном объекте.");
+                    title="АОСР · "+doc;
+                }
+                var archive=new PtoArchive(_connection,PtoUserSettings.Root);
+                return (Archive:archive,Title:title,Rows:ReadRows(archive));
+            });
+            if(_closed)return;
+            _archive=snapshot.Archive;
+            if(snapshot.Title is not null)Title=snapshot.Title;
+            ApplyRows(snapshot.Rows,null);
+        }
+        catch(Exception ex)
+        {
+            _initializing=false;
+            if(!_closed){ShowError(ex);Close();}
+        }
+        finally
+        {
+            _initializing=false;
+            if(!_closed)SetLoading(false);
+        }
+    }
+
+    private void ShowError(Exception e)=>
+        MessageBox.Show(this,e.Message,"ПТО / Исполнительная документация",
+            MessageBoxButton.OK,MessageBoxImage.Warning);
+
     private void Try(Action action)
     {
+        if(_closed || _loading || _initializing)return;
         try{action();}
-        catch(Exception e)
-        {
-            MessageBox.Show(this,e.Message,"ПТО / Исполнительная документация",
-                MessageBoxButton.OK,MessageBoxImage.Warning);
-        }
+        catch(Exception e){ShowError(e);}
     }
-    private void Refresh()
+
+    private IReadOnlyList<PtoPackageListProjection.Row> ReadRows(PtoArchive archive)=>
+        PtoPackageListProjection.Build(archive.Sql.Packages(_scopeObjectId),_scopeObjectId,_scopeContractId);
+
+    private Guid? SelectedId()=>(Packages.SelectedItem as PtoPackageListProjection.Row)?.Id;
+
+    private void ApplyRows(IReadOnlyList<PtoPackageListProjection.Row> rows,Guid? selected)
     {
+        _rows=rows;
         ArchiveLabel.Text="Файловый архив: "+_archive.Root+
             " · карточки, сертификаты, версии: Microsoft SQL Server (только GmcSmetaPilot_*)";
+        ApplyFilter(selected);
+    }
+
+    private void ApplyFilter(Guid? selected)
+    {
         var q=Search.Text.Trim();
         var status=(StatusFilter.SelectedItem as ComboBoxItem)?.Content?.ToString();
-        _all=_archive.Sql.Packages(_scopeObjectId).Where(Belongs).ToList();
-        Packages.ItemsSource=_all.Where(p=>
-            (string.IsNullOrWhiteSpace(q)||
-                JsonSerializer.Serialize(p,PtoRules.Json).Contains(q,StringComparison.OrdinalIgnoreCase))&&
-            (status is null or "Все статусы" ||p.Status==status))
-            .Select(p=>
-            {
-                var findings=PtoRules.Check(p);
-                return new Row(p.Id,PtoRules.Text(p,"object")+" / "+p.ContractLabel,
-                    PtoRules.Text(p,"section"),PtoRules.Text(p,"number"),
-                    PtoRules.Text(p,"date"),p.Status,p.Attachments.Count,
-                    $"{findings.Errors.Count} ошибок · {findings.Warnings.Count} предупрежд.");
-            }).ToArray();
+        var visible=PtoPackageListProjection.Filter(_rows,q,status);
+        Packages.ItemsSource=visible;
+        Packages.SelectedItem=visible.FirstOrDefault(r=>r.Id==selected);
     }
+
+    private void InvalidateRows()
+    {
+        _rows=Array.Empty<PtoPackageListProjection.Row>();
+        Packages.ItemsSource=_rows;
+        ArchiveLabel.Text="Список не загружен. Нажмите «Обновить».";
+    }
+
+    // Existing mutation/child-dialog readback stays synchronous and authoritative.
+    private void Refresh()
+    {
+        var selected=SelectedId();
+        InvalidateRows();
+        ApplyRows(ReadRows(_archive),selected);
+    }
+
+    private async Task RefreshAsync()
+    {
+        if(_closed || _loading || _initializing)return;
+        var selected=SelectedId();
+        var archive=_archive;
+        InvalidateRows();
+        SetLoading(true);
+        ArchiveLabel.Text="Обновление списка комплектов…";
+        try
+        {
+            var rows=await Task.Run(()=>ReadRows(archive));
+            if(_closed)return;
+            ApplyRows(rows,selected);
+        }
+        catch(Exception ex)
+        {
+            if(!_closed){InvalidateRows();ShowError(ex);}
+        }
+        finally
+        {
+            if(!_closed)SetLoading(false);
+        }
+    }
+
     private void Filter_Changed(object sender,RoutedEventArgs e)
     {
-        if(_archive is not null && Packages is not null && Search is not null)
-            Try(Refresh);
+        if(!_closed && !_loading && !_initializing && Packages is not null && Search is not null)
+            ApplyFilter(SelectedId());
     }
     private bool Belongs(PtoPackage p)=>
         (!_scopeObjectId.HasValue || p.ObjectId==_scopeObjectId) &&
         (!_scopeContractId.HasValue || p.ContractId==_scopeContractId);
     private PtoPackage? Selected()
     {
-        if(Packages.SelectedItem is not Row row)return null;
+        if(Packages.SelectedItem is not PtoPackageListProjection.Row row)return null;
         var current=_archive.Sql.Get(row.Id,_scopeObjectId);
         if(!Belongs(current)) {Refresh();return null;}
         return current;
@@ -160,7 +247,7 @@ public partial class PtoWindow : Window
         _archive.Sql.Delete(p);
         Refresh();
     });
-    private void Refresh_Click(object sender,RoutedEventArgs e)=>Try(Refresh);
+    private async void Refresh_Click(object sender,RoutedEventArgs e)=>await RefreshAsync();
 
     private void Certificates_Click(object sender,RoutedEventArgs e)=>Try(()=>
     {
