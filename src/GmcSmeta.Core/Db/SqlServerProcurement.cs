@@ -221,7 +221,23 @@ public static partial class SqlServerProcurement
     /// one guarded connection. The revision fence spans both result sets.
     /// No snapshot is returned if another writer changed the revision.
     /// </summary>
-    public static BuySnapshot ReadBuySnapshot(string connectionString, int contractId)
+    public static BuySnapshot ReadBuySnapshot(string connectionString, int contractId) =>
+        ReadBuySnapshotIfChanged(connectionString, contractId, "", null)
+        ?? throw new InvalidOperationException("Не получен снимок закупок.");
+
+    public static bool CanReuseBuySnapshot(string publishedRevision, string observedRevision,
+        DateTime? publishedDay, DateTime today) =>
+        !string.IsNullOrWhiteSpace(publishedRevision) &&
+        string.Equals(publishedRevision, observedRevision, StringComparison.Ordinal) &&
+        publishedDay == today;
+
+    /// <summary>
+    /// Null means the caller's published snapshot still matches the server
+    /// and today's date. A miss reads the full snapshot on the same connection.
+    /// Callers must never pass a write receipt or unconfirmed UI state.
+    /// </summary>
+    public static BuySnapshot? ReadBuySnapshotIfChanged(string connectionString, int contractId,
+        string publishedRevision, DateTime? publishedDay)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
         var revision = SqlServerDatabase.Revision(conn);
@@ -229,6 +245,9 @@ public static partial class SqlServerProcurement
             throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
 
         var day = DateTime.Today;
+        if (CanReuseBuySnapshot(publishedRevision, revision, publishedDay, day))
+            return null;
+
         IReadOnlyList<BuyRow> rows;
         IReadOnlyList<SystemChoice> systems;
         using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery, conn))

@@ -185,6 +185,17 @@ internal static class PilotExtendedCases
             "Cannot prepare empty system for snapshot check");
         var snapshot = SqlServerProcurement.ReadBuySnapshot(cs, contract);
         var separateSystems = SqlServerProcurement.SystemChoices(cs, contract);
+        PilotRunner.Check(SqlServerProcurement.ReadBuySnapshotIfChanged(cs, contract,
+            snapshot.Revision, snapshot.Day) is null,
+            "Unchanged same-day procurement snapshot must skip full read");
+        var previousDay = SqlServerProcurement.ReadBuySnapshotIfChanged(cs, contract,
+            snapshot.Revision, snapshot.Day.AddDays(-1));
+        PilotRunner.Check(previousDay is not null && previousDay.Rows.Count == snapshot.Rows.Count,
+            "Day rollover must reload delivery warnings");
+        var staleRevision = SqlServerProcurement.ReadBuySnapshotIfChanged(cs, contract,
+            revisionBeforeReceipts, snapshot.Day);
+        PilotRunner.Check(staleRevision is not null && staleRevision.Revision == snapshot.Revision,
+            "A stale revision must read current procurement data");
         PilotRunner.Check(snapshot.Revision == p.Revision() &&
             snapshot.Systems.SequenceEqual(separateSystems) &&
             snapshot.Systems.Any(x => x.Id == emptySection.SystemId.Value) &&

@@ -54,6 +54,22 @@ public sealed class ProcurementReadAndSupplierTests
         Assert.Equal(43L, row.ParentPositionId);
     }
 
+    [Theory]
+    [InlineData("r1", "r1", 0, true)]
+    [InlineData("r1", "r2", 0, false)]
+    [InlineData("r1", "r1", -1, false)]
+    [InlineData("r1", "r1", 1, false)]
+    [InlineData("", "", 0, false)]
+    [InlineData(" ", " ", 0, false)]
+    public void BuySnapshotReuse_RequiresSameRevisionAndCalendarDay(
+        string published, string observed, int dayOffset, bool expected)
+    {
+        var today = new DateTime(2026, 11, 26);
+        Assert.Equal(expected, SqlServerProcurement.CanReuseBuySnapshot(
+            published, observed, today.AddDays(dayOffset), today));
+        Assert.False(SqlServerProcurement.CanReuseBuySnapshot(published, observed, null, today));
+    }
+
     [Fact]
     public void BuyRowsQuery_TargetsBothMovementAggregationAndPositionProjection()
     {

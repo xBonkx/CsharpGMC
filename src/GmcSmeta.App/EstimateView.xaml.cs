@@ -409,7 +409,7 @@ public partial class EstimateView : UserControl
                     if (_contractProcurementPane is null)
                         ContractProcurementHost.Content = _contractProcurementPane =
                             new ProcurementPane(_sqlConnectionString, _contractId, _estimate.Title);
-                    else if (was != page) _contractProcurementPane.RefreshFromSqlServer();
+                    else if (was != page) _contractProcurementPane.RefreshOnTabReturn();
                     break;
                 case "shipments":
                     if (_contractShipmentsPane is null)

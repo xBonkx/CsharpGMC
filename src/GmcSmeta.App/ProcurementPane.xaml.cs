@@ -102,6 +102,9 @@ public partial class ProcurementPane : UserControl
     private readonly string _connectionString;
     private readonly int _contractId;
     private string _revision = "";
+    // Mutable WPF bindings can change a row even before an edit is committed.
+    // Only a full authoritative publication clears this conservative guard.
+    private bool _buySnapshotMayReuse;
     private List<ProcurementPreviewRow> _allRows = new();
     private string _activeCategory = "all";
     private readonly HashSet<long> _selectedSystemIds = new();
@@ -155,6 +158,7 @@ public partial class ProcurementPane : UserControl
             ++_historyLoadToken;
             ++_buyViewportGeneration;
             _revision = _historyRevision = "";
+            _buySnapshotMayReuse = false;
             _needsReloadAfterAttach = true;
         };
     }
@@ -218,19 +222,42 @@ public partial class ProcurementPane : UserControl
         return false;
     }
 
-    private async Task ReloadAsync(bool preserveStatus = false)
+    private async Task ReloadAsync(bool preserveStatus = false, bool allowUnchanged = false)
     {
         if (!IsLoaded) return;
         // All network I/O is outside the WPF dispatcher. A later refresh
         // supersedes an earlier response if they finish out of order.
         var generation = ++_reloadGeneration;
+        var cachedRevision = allowUnchanged && _buySnapshotMayReuse && !_batchBusy &&
+            !_needsReloadAfterAttach && _snapshotDay == DateTime.Today &&
+            BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: false }
+            ? _revision : "";
+        var cachedDay = _snapshotDay;
         _revision = "";
         _historyRevision = "";
+        _buySnapshotMayReuse = false;
+        UpdateHistoryButtons();
         var snapshot = await Task.Run(() =>
-            SqlServerProcurement.ReadBuySnapshot(_connectionString, _contractId));
+            SqlServerProcurement.ReadBuySnapshotIfChanged(_connectionString, _contractId,
+                cachedRevision, cachedDay));
         if (generation != _reloadGeneration || !IsLoaded) return;
         if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
             throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
+        if (snapshot is null)
+        {
+            // A midnight rollover during the await invalidates due-date flags.
+            // No write is allowed while _revision is empty.
+            if (_batchBusy || _needsReloadAfterAttach || cachedDay != DateTime.Today)
+            {
+                await ReloadAsync(preserveStatus);
+                return;
+            }
+            _revision = cachedRevision;
+            _buySnapshotMayReuse = true;
+            if (MovementHistoryExpander?.IsExpanded == true) _ = LoadSelectedMovementHistoryAsync();
+            if (!preserveStatus) FooterText.Text = "";
+            return;
+        }
         var rows = snapshot.Rows;
         var systems = snapshot.Systems;
         var items = new ObservableCollection<ProcurementPreviewRow>();
@@ -258,6 +285,7 @@ public partial class ProcurementPane : UserControl
             ApplyProcurementFilters();
             _snapshotDay = loadedDay;
             _revision = snapshot.Revision;
+            _buySnapshotMayReuse = true;
             _needsReloadAfterAttach = false;
         }
         finally { _applyingBuySnapshot = false; }
@@ -318,9 +346,9 @@ public partial class ProcurementPane : UserControl
         };
     }
 
-    private async Task TryReloadAsync(bool preserveStatus = false)
+    private async Task TryReloadAsync(bool preserveStatus = false, bool allowUnchanged = false)
     {
-        try { await ReloadAsync(preserveStatus); }
+        try { await ReloadAsync(preserveStatus, allowUnchanged); }
         catch (Exception ex) { SetStatus("Ошибка загрузки закупок: " + ex.Message); }
     }
 
@@ -750,6 +778,12 @@ public partial class ProcurementPane : UserControl
             _ = TryReloadAsync();
     }
 
+    internal void RefreshOnTabReturn()
+    {
+        if (IsLoaded && !_batchBusy && BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: true })
+            _ = TryReloadAsync(allowUnchanged: true);
+    }
+
     private async void ProcurementRefresh_Click(object sender, RoutedEventArgs e)
     {
         if (_batchBusy || BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true }) return;
@@ -783,6 +817,7 @@ public partial class ProcurementPane : UserControl
         if (!CanStartOperation || e.Row.Item is not ProcurementPreviewRow row) { e.Cancel = true; return; }
         var field = Field(e.Column);
         if (field is null || row.Work && field != "supplier") { e.Cancel = true; return; }
+        _buySnapshotMayReuse = false;
         var original = field switch
         {
             "supplier" => row.Supplier,
