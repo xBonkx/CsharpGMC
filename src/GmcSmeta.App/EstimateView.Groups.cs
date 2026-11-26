@@ -134,11 +134,12 @@ public partial class EstimateView
                 !row.IsVirtual && !row.IsSystem && row.Id == selections.Id);
 
         // Other tabs remain based on the unmodified source document.
-        MaterialsGrid.ItemsSource = EstimateFilter.Apply(_estimate.Rows, EstimateSearch.Text)
-            .Select(row => index.BySortKey[row.SortKey])
-            .Where(row => row.IsSystem ||
-                (!row.IsSub && !EstimateStatistics.IsWorkName(row.Name)))
-            .ToList();
+        if (MaterialsGrid is { } materialsGrid)
+            materialsGrid.ItemsSource = EstimateFilter.Apply(_estimate.Rows, EstimateSearch.Text)
+                .Select(row => index.BySortKey[row.SortKey])
+                .Where(row => row.IsSystem ||
+                    (!row.IsSub && !EstimateStatistics.IsWorkName(row.Name)))
+                .ToList();
 
         RefreshTemporaryViewControls();
         return true;

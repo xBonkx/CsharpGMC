@@ -106,8 +106,9 @@ public partial class EstimateView
     // ------------------------------------------------------------------ load
     private async Task LoadMaterialsAsync(bool force = false)
     {
-        if (_estimate is null || MaterialsGrid is null) return;
+        if (_estimate is null || MaterialsPanel is null) return;
         if (_materialsLoading) return;
+        if (MaterialsView is null && _visibleEstimateMode != "materials") return;
         if (!force && _materialsData is not null && !string.IsNullOrWhiteSpace(_materialsRevision) &&
             _materialsRevision == _serverRevision)
         {
@@ -119,6 +120,7 @@ public partial class EstimateView
         var version = ++_materialsLoadVersion;
         try
         {
+            EnsureMaterialsView();
             var snapshot = await Task.Run(() =>
             {
                 using var conn = SqlServerDatabase.Open(_sqlConnectionString);

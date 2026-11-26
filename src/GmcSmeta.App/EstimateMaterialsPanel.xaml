@@ -1,0 +1,348 @@
+<Grid x:Class="GmcSmeta.App.EstimateMaterialsPanel"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="clr-namespace:GmcSmeta.App">
+    <Grid.Resources>
+        <Style x:Key="DocumentNameDisplay" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
+                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Grid.Resources>
+    <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <WrapPanel Grid.Row="0" Margin="0,0,0,10">
+        <Button x:Name="MaterialsMarkupButton" Style="{StaticResource PythonToolbarMain}" 
+                Margin="0,0,2,0" ToolTip="Выделите строки (можно целую систему) и посчитайте цену клиенту из закупа — например, закуп × 1,44 (или наоборот)">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphList}" Stroke="#2563EB"/></Canvas></Viewbox>
+                <TextBlock Text="Наценка выделенным…" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <Button x:Name="MaterialsCatalogButton" Style="{StaticResource PythonToolbarMain}" 
+                Margin="0,0,2,0" ToolTip="Где закупочная цена пустая — подставить последнюю цену из справочника">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBook}" Stroke="#2563EB"/></Canvas></Viewbox>
+                <TextBlock Text="Закуп из справочника" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <Button x:Name="MaterialsRequestButton" Style="{StaticResource PythonToolbarPrimary}"  Margin="0,0,10,0"
+                ToolTip="Excel-заявка поставщику: выберите его в окне — в заявку пойдут все его позиции по договору, одинаковые сложены, количество общее">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="White"/></Canvas></Viewbox>
+                <TextBlock Text="Заявка поставщику" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <Button x:Name="MaterialsColorButton" Style="{StaticResource PythonToolbarButton}" 
+                Margin="0,0,2,0" ToolTip="Покрасить выделенные строки, как заливку в Excel">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Цвет" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <Button x:Name="MaterialsGroupingButton" Style="{StaticResource PythonToolbarButton}" 
+                Margin="0,0,2,0" ToolTip="Как показать строки: группировка и сортировка. Только на экране — порядок строк в КП, Excel и печати не меняется">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Группировка" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <Button x:Name="MaterialsSortingButton" Style="{StaticResource PythonToolbarButton}" 
+                Margin="0,0,6,0" ToolTip="Порядок строк на экране">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSort}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Сортировка" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <ToggleButton x:Name="MaterialsNoCostToggle" Style="{StaticResource MatFilterToggleWarm}"
+                        
+                      Visibility="Collapsed"
+                      Margin="0,0,2,0" ToolTip="Показать только строки, где закупочная цена не указана — удобно вписывать: вписанная строка уходит из списка">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#B5761E"/></Canvas></Viewbox>
+                <TextBlock x:Name="MaterialsNoCostText" Text="Без закупочных цен" VerticalAlignment="Center"/>
+            </StackPanel>
+        </ToggleButton>
+        <ToggleButton x:Name="MaterialsNoPriceToggle" Style="{StaticResource MatFilterToggle}"
+                        
+                      Visibility="Collapsed"
+                      Margin="0,0,2,0" ToolTip="Показать только строки без цены клиенту — удобно проставлять: строка с ценой уходит из списка">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock x:Name="MaterialsNoPriceText" Text="Без цены" VerticalAlignment="Center"/>
+            </StackPanel>
+        </ToggleButton>
+        <Button x:Name="MaterialsResetViewButton" Style="{StaticResource PythonToolbarButton}" Content="Как в КП" ContentTemplate="{StaticResource IconLabelX}"
+                 Visibility="Collapsed" Margin="0,0,2,0"
+                ToolTip="Вернуть обычный вид — по системам, как в КП"/>
+        <Border Width="10"/>
+        <ComboBox x:Name="MaterialsSystemFilter" Width="160" VerticalContentAlignment="Center"
+                  
+                  ToolTip="Показать строки одной системы"/>
+        <TextBox x:Name="MaterialsSearch" Style="{StaticResource PythonSearch}" Width="200" Margin="6,0,6,0"
+                  ToolTip="Поиск по названию или системе"/>
+        <Button x:Name="MaterialsExportButton" Style="{StaticResource PythonToolbarButton}"  MinWidth="36"
+                ToolTip="Сохранить закуп-розница: Excel с закупочными и розничными ценами и маржой (только для нас)">
+            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphDownload}" Stroke="#2563EB"/></Canvas></Viewbox>
+        </Button>
+    </WrapPanel>
+    <Border x:Name="MaterialsHintBar" Grid.Row="1" Background="#E8F0FE" CornerRadius="8"
+            Margin="0,0,0,10" Padding="12,7,6,7">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="⚠" Foreground="#2563EB" FontSize="14"
+                       VerticalAlignment="Top" Margin="0,0,10,0"/>
+            <TextBlock Grid.Column="1" Foreground="#1E40AF" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Впишите закуп в «Закуп за ед.» (двойной щелчок). Много строк сразу — выделите и «Наценка выделенным…»."/>
+            <Button x:Name="MaterialsHintCloseButton" Grid.Column="2" Content="Понятно"  Margin="10,0,0,0"
+                    Style="{StaticResource PythonToolbarButton}" MinHeight="28" Padding="10,3"/>
+        </Grid>
+    </Border>
+    <DataGrid local:TableColumnMenu.Key="estimate-materials" x:Name="MaterialsGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="False"
+              CellStyle="{StaticResource CompactCostCell}"
+              RowStyle="{StaticResource MaterialsCostRow}"
+              MinRowHeight="24" ColumnHeaderStyle="{StaticResource CompactCostHeader}"
+              CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False" RowHeaderWidth="0"
+              HeadersVisibility="Column" GridLinesVisibility="All"
+              HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF" BorderBrush="#E4E8EF" BorderThickness="1" Background="White"
+              SelectionMode="Extended" SelectionUnit="FullRow"
+              EnableRowVirtualization="True" EnableColumnVirtualization="True"
+              VirtualizingPanel.VirtualizationMode="Recycling"
+              VirtualizingPanel.ScrollUnit="Pixel"
+               
+              
+              
+              
+              ScrollViewer.CanContentScroll="True"
+              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+              ScrollViewer.VerticalScrollBarVisibility="Auto">
+        <DataGrid.Resources>
+            <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
+            <!-- Python GridDelegate.paint: выделенная строка — ровная светло-голубая
+                 заливка с тёмным текстом, а у текущей ячейки — синяя рамка-курсор,
+                 нарисованная ПОВЕРХ (текст не двигается). -->
+            <Style x:Key="MaterialsCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}"><Setter Property="Background" Value="Transparent"/></Style>
+            <Style x:Key="MaterialsCellBlue" TargetType="DataGridCell" BasedOn="{StaticResource MaterialsCell}">
+                <Setter Property="Background" Value="#EEF4FF"/>
+            </Style>
+            <Style x:Key="MaterialsCellOrange" TargetType="DataGridCell" BasedOn="{StaticResource MaterialsCell}">
+                <Setter Property="Background" Value="#FFF5E6"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasFact}" Value="True">
+                        <Setter Property="FontWeight" Value="Bold"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </DataGrid.Resources>
+        <DataGrid.Columns>
+            <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="56"
+                                IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
+                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+            <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="220"
+                                    CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource DocumentNameDisplay}"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{Binding NameTooltip}"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding Name, Mode=OneWay}" VerticalContentAlignment="Center"
+                                 ToolTip="Наименование меняется и в смете"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48"
+                                IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
+                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+            <DataGridTextColumn Header="Кол-во" Binding="{Binding QtyText}" Width="64"
+                                IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
+                                ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+            <DataGridTemplateColumn Header="Цена клиенту" Width="112"
+                                    CellStyle="{StaticResource MaterialsCellBlue}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding PriceText}" Style="{StaticResource CompactCostMoney}"
+                                   ToolTip="{Binding PriceTooltip}"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding PriceRaw, Mode=OneWay}" TextAlignment="Right"
+                                 VerticalContentAlignment="Center"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Сумма клиенту" Binding="{Binding AmountText}" Width="124"
+                                IsReadOnly="True" CellStyle="{StaticResource MaterialsCellBlue}"
+                                ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+            <DataGridTemplateColumn Header="Закуп за ед." Width="108"
+                                    CellStyle="{StaticResource MaterialsCellOrange}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding CostText}" ToolTip="{Binding CostTooltip}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CostMissing}" Value="True">
+                                            <Setter Property="Foreground" Value="#DC2626"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding CostWork}" Value="True">
+                                            <Setter Property="Foreground" Value="#64748B"/>
+                                        </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+</Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding CostRaw, Mode=OneWay}" TextAlignment="Right"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="Плановая закупочная цена. Факт по счёту — в колонке «Факт по счёту»"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Закуп сумма" Binding="{Binding CostSumText}" Width="118"
+                                IsReadOnly="True" CellStyle="{StaticResource MaterialsCellOrange}"
+                                ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+            <DataGridTemplateColumn Header="Наценка, %" Width="96"
+                                    CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding MarkupText}" ToolTip="{Binding MarkupTooltip}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostCenter}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding MarkupWarn}" Value="True">
+                                            <Setter Property="Foreground" Value="#B45309"/>
+                                        </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+</Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding MarkupRaw, Mode=OneWay}" TextAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="Цена клиенту = закуп × (1 + наценка, %)"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Маржа" Binding="{Binding MarginText}" Width="108" IsReadOnly="True"
+                                CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
+                <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MarginNegative}" Value="True">
+                                <Setter Property="Foreground" Value="#DC2626"/>
+                            </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+</Style.Triggers>
+                    </Style>
+                </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+            <DataGridTemplateColumn Header="Факт по счёту" Width="112"
+                                    CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding FactText}" Style="{StaticResource CompactCostMoney}"
+                                   ToolTip="Фактическая цена по счёту поставщика — двойной щелчок, чтобы вписать. Когда указана, считается вместо плановой закупочной."/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding FactRaw, Mode=OneWay}" TextAlignment="Right"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="Фактическая цена по счёту поставщика. Пусто — считать по плановой закупочной"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Header="Поставщик" Width="130"
+                                    CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Supplier}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   ToolTip="Поставщик — двойной щелчок, чтобы вписать или выбрать из списка. Тот же, что на вкладке «Закупки»."/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding Supplier, Mode=OneWay}" VerticalContentAlignment="Center"
+                                 ToolTip="Поставщик или «Цех» — тот же, что на вкладке «Закупки»"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTemplateColumn Header="Пометки" Width="180"
+                                    CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding NoteText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   Foreground="#334155"
+                                   ToolTip="{Binding NoteTooltip}"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+                <DataGridTemplateColumn.CellEditingTemplate>
+                    <DataTemplate>
+                        <TextBox Text="{Binding NoteText, Mode=OneWay}" VerticalContentAlignment="Center"
+                                 ToolTip="Наши пометки — заказчик их не видит"/>
+                    </DataTemplate>
+                </DataGridTemplateColumn.CellEditingTemplate>
+            </DataGridTemplateColumn>
+        </DataGrid.Columns>
+    </DataGrid>
+    <UniformGrid Grid.Row="3" Columns="4" Margin="0,10,0,0">
+        <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0">
+            <StackPanel>
+                <TextBlock x:Name="MatTileRevCaption" Text="Цена клиенту (материалы)" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="MatTileRevValue" Style="{StaticResource PythonTileValue}"/>
+            </StackPanel>
+        </Border>
+        <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0">
+            <StackPanel>
+                <TextBlock Text="Себестоимость (закуп)" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="MatTileCostValue" Style="{StaticResource PythonTileValue}"/>
+            </StackPanel>
+        </Border>
+        <Button x:Name="MatTileTrans"  Cursor="Hand" Margin="0,0,10,0"
+                ToolTip="Щёлкните и впишите, сколько транспорт стоит нам. Сумма клиенту — из сметы («Транспорт» в итогах сметы)">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border Style="{StaticResource PythonTile}">
+                        <StackPanel>
+                            <TextBlock x:Name="MatTileTransCaption" Text="Транспорт · в смете нет" Style="{StaticResource PythonTileLabel}"/>
+                            <TextBlock x:Name="MatTileTransValue" Style="{StaticResource PythonTileValue}"/>
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+        <Border Style="{StaticResource PythonTileAccent}">
+            <StackPanel>
+                <TextBlock x:Name="MatTileMarginCaption" Text="Маржа на материалах" Foreground="#DBEAFE"
+                           FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                <TextBlock x:Name="MatTileMarginValue" Foreground="White" Style="{StaticResource PythonTileValue}"/>
+            </StackPanel>
+        </Border>
+    </UniformGrid>
+</Grid>

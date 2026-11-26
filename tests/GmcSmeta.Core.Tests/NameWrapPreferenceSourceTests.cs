@@ -28,7 +28,8 @@ public sealed class NameWrapPreferenceSourceTests
     }
 
     [Theory]
-    [InlineData("EstimateView.xaml", 2)]
+    [InlineData("EstimateView.xaml", 1)]
+    [InlineData("EstimateMaterialsPanel.xaml", 1)]
     [InlineData("ProcurementPane.xaml", 1)]
     public void NameDisplayHasSharedWrapAndEllipsis(string path, int expectedNames)
     {
