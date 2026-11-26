@@ -41,8 +41,8 @@ public partial class EstimateView : UserControl
         ContractActsControl?.HasCacheActivity == true ||
         HasGridEdit(SummaryGrid) || HasGridEdit(TotalsGrid) || HasGridEdit(MaterialsGrid);
 
-    private static bool HasGridEdit(DataGrid grid) =>
-        grid.ItemsSource is not null &&
+    private static bool HasGridEdit(DataGrid? grid) =>
+        grid?.ItemsSource is not null &&
         System.Windows.Data.CollectionViewSource.GetDefaultView(grid.ItemsSource)
             is System.ComponentModel.IEditableCollectionView { IsEditingItem: true };
 

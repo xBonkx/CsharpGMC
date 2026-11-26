@@ -55,6 +55,21 @@ public partial class EstimateView
     private bool _totalsBusy;
     private int _totalsLoadVersion;
 
+    // ------------------------------------------------------------------ lazy UI
+    private EstimateTotalsPanel? TotalsView => TotalsPanel?.Child as EstimateTotalsPanel;
+    private DataGrid? TotalsGrid => TotalsView?.TotalsGrid;
+
+    private EstimateTotalsPanel EnsureTotalsView()
+    {
+        if (TotalsView is { } existing) return existing;
+        var view = new EstimateTotalsPanel();
+        view.TotalsGrid.BeginningEdit += TotalsGrid_BeginningEdit;
+        view.TotalsGrid.PreparingCellForEdit += TotalsGrid_PreparingCellForEdit;
+        view.TotalsGrid.CellEditEnding += TotalsGrid_CellEditEnding;
+        TotalsPanel.Child = view;
+        return view;
+    }
+
     // ------------------------------------------------------------------ load
     private void InvalidateCostTotals()
     {
@@ -63,13 +78,15 @@ public partial class EstimateView
         _totalsSourceSummary = null;
         _totalsRevision = "";
         _totalsLoading = false;
-        if (TotalsGrid is not null) TotalsGrid.ItemsSource = null;
+        if (TotalsGrid is { } grid) grid.ItemsSource = null;
     }
 
     private async Task LoadCostTotalsAsync(bool force = false)
     {
-        if (_estimate is null || TotalsGrid is null) return;
+        if (_estimate is null || TotalsPanel is null) return;
         if (_totalsLoading) return;
+        // Refreshes and cache checks must not instantiate an unopened tab.
+        if (TotalsView is null && _visibleEstimateMode != "totals") return;
         if (!force && _costTotalsData is not null && TotalsSnapshotReady) return;
         var cachedSummary = !force && SummarySnapshotReady && !HasUnsettledCacheWrites
             ? _costSummaryData : null;
@@ -79,6 +96,7 @@ public partial class EstimateView
         var version = ++_totalsLoadVersion;
         try
         {
+            EnsureTotalsView();
             var snapshot = await Task.Run(() => CostFinancialSnapshot.ReadTotals(
                 _sqlConnectionString, _contractId, cachedSummary, cachedRevision));
             if (version != _totalsLoadVersion || _detached) return;
@@ -124,7 +142,8 @@ public partial class EstimateView
     private void TotalsShow()
     {
         var d = _costTotalsData;
-        if (d is null || TotalsGrid is null) return;
+        var view = TotalsView;
+        if (d is null || view is null) return;
         var rows = new List<TotalsRow>();
         decimal costSum = 0m, sellSum = 0m;
 
@@ -175,18 +194,18 @@ public partial class EstimateView
                 Kind = "grand", Key = "grand", Name = "ИТОГО с НДС", SellText = Money.Format(d.Total),
             });
         }
-        TotalsGrid.ItemsSource = new ObservableCollection<TotalsRow>(rows);
+        view.TotalsGrid.ItemsSource = new ObservableCollection<TotalsRow>(rows);
 
         // плитки (cost_totals_view._show)
-        TotalsTileCostValue.Text = Money.Format(costSum);
-        TotalsTileSellCaption.Text = d.VatTop ? "Розница — всего с НДС" : "Розница — всего";
-        TotalsTileSellValue.Text = Money.Format(d.VatTop ? d.Total : sellSum);
+        view.TotalsTileCostValue.Text = Money.Format(costSum);
+        view.TotalsTileSellCaption.Text = d.VatTop ? "Розница — всего с НДС" : "Розница — всего";
+        view.TotalsTileSellValue.Text = Money.Format(d.VatTop ? d.Total : sellSum);
         var marg = sellSum - costSum;
         var pct = TotalsPct(costSum, sellSum);
-        TotalsTileMarginValue.Text = pct.Length > 0
+        view.TotalsTileMarginValue.Text = pct.Length > 0
             ? $"{Money.Format(marg)}  ·  {pct}"
             : sellSum != 0m ? Money.Format(marg) : "—";
-        TotalsTileMarginValue.Foreground = marg < 0m
+        view.TotalsTileMarginValue.Foreground = marg < 0m
             ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626"))
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0F172A"));
     }

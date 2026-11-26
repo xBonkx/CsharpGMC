@@ -67,6 +67,8 @@ internal static class Program
             PumpUntil(() => grid.Items.Count > 0, "estimate rows");
             if (page.FindName("ContractActsPanel") is not Border { Child: null })
                 throw new Exception("Initial estimate must not create the hidden KS workspace.");
+            if (page.FindName("TotalsPanel") is not Border { Child: null })
+                throw new Exception("Initial estimate must not create the hidden totals panel.");
             foreach (var width in new[] { 1366d, 1920d })
             {
                 var element = (FrameworkElement)window.Content;
@@ -176,6 +178,7 @@ internal static class Program
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();
         LazyContractActsChecks.Run();
+        LazyEstimateTotalsChecks.Run();
         CheckKsReferenceHighlights();
         KsRowNotificationChecks.Run();
         CheckSummaryTableFrame();

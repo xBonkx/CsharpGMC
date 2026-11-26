@@ -89,3 +89,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-041 / ARCH-SIZE-03: EstimateView.xaml.cs 1163→1155, EstimateRowViewIndex.cs 45→112, Program.cs (App.Checks) 638→639, новый EstimateRowIndexReadbackChecks.cs 70 строк. Логика согласования моделей/индексов вынесена из крупного view в существующий индекс; build/test не запускались.
 
 - 26.11.2026, PERF-018 / ARCH-SIZE-03: EstimateView.xaml 2308→2307, EstimateView.xaml.cs 1155→1165, Program.cs (App.Checks) 669→672, новый LazyContractActsChecks.cs 38 строк. КС уже самостоятельный UserControl, отложено его создание; рост code-behind ограничен фабрикой и guards. Сборка/тесты не запускались.
+
+- 26.11.2026, PERF-018 / ARCH-SIZE-03: EstimateView.xaml 2307→2199, EstimateView.xaml.cs 1165→1165, EstimateView.CostTotals.cs 306→325, новый EstimateTotalsPanel.xaml 108 / .xaml.cs 9, Program.cs (App.Checks) 672→675, новый LazyEstimateTotalsChecks.cs 36 строк. Разметка отдельного функционального раздела вынесена из монолита; финансовая логика и SQL остаются прежними. Сборка/тесты не запускались.
