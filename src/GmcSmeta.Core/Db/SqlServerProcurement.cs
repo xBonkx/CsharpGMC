@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Threading;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
 
@@ -193,23 +194,30 @@ public static partial class SqlServerProcurement
         return ReadSystemChoices(reader);
     }
 
-    private static IReadOnlyList<BuyRow> ReadBuyRows(IDataReader reader, DateTime today)
+    private static IReadOnlyList<BuyRow> ReadBuyRows(IDataReader reader, DateTime today, CancellationToken token = default)
     {
         var rows = new List<BuyRow>();
-        while (reader.Read()) rows.Add(MapBuyRow(reader, today));
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            rows.Add(MapBuyRow(reader, today));
+        }
         return rows;
     }
 
-    private static IReadOnlyList<SystemChoice> ReadSystemChoices(IDataReader reader)
+    private static IReadOnlyList<SystemChoice> ReadSystemChoices(IDataReader reader, CancellationToken token = default)
     {
         var systems = new List<SystemChoice>();
         while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
             systems.Add(new SystemChoice(
                 Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
                 reader.IsDBNull(1) ? null :
                     Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
                 reader.IsDBNull(2) ? "" : reader.GetString(2),
                 reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3), CultureInfo.InvariantCulture)));
+        }
         return systems;
     }
 
@@ -237,10 +245,17 @@ public static partial class SqlServerProcurement
     /// Callers must never pass a write receipt or unconfirmed UI state.
     /// </summary>
     public static BuySnapshot? ReadBuySnapshotIfChanged(string connectionString, int contractId,
-        string publishedRevision, DateTime? publishedDay)
+        string publishedRevision, DateTime? publishedDay, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
-        var revision = SqlServerDatabase.Revision(conn);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
+        var revision = Revision();
+        token.ThrowIfCancellationRequested();
         if (string.IsNullOrEmpty(revision))
             throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
 
@@ -253,14 +268,18 @@ public static partial class SqlServerProcurement
         using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery, conn))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var reader = cmd.ExecuteReader();
-            rows = ReadBuyRows(reader, day);
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
+            rows = ReadBuyRows(reader, day, token);
+            token.ThrowIfCancellationRequested();
             if (!reader.NextResult())
                 throw new InvalidOperationException("Не получен список систем закупок.");
-            systems = ReadSystemChoices(reader);
+            systems = ReadSystemChoices(reader, token);
         }
-        if (SqlServerDatabase.Revision(conn) != revision)
+        token.ThrowIfCancellationRequested();
+        if (Revision() != revision)
             throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
+        token.ThrowIfCancellationRequested();
         return new BuySnapshot(rows, systems, revision, day);
     }
 
@@ -591,6 +610,13 @@ public static partial class SqlServerProcurement
         string connectionString, int contractId, long positionId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
+        return MovementsForPosition(conn, contractId, positionId);
+    }
+
+    public static IReadOnlyList<MovementHistoryRow> MovementsForPosition(
+        SqlConnection conn, int contractId, long positionId, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT m.id,m.position_id,m.kind,m.qty,m.[date],ISNULL(m.doc,N'')," +
             "ISNULL(m.note,N''),ISNULL(m.[user],N''),m.shipment_id " +
@@ -601,9 +627,15 @@ public static partial class SqlServerProcurement
             "ORDER BY m.[date] DESC,m.id DESC", conn);
         cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         cmd.Parameters.Add("@position", SqlDbType.BigInt).Value = positionId;
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         var movements = new List<MovementHistoryRow>();
-        while (reader.Read()) movements.Add(MapMovement(reader));
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            movements.Add(MapMovement(reader));
+        }
+        token.ThrowIfCancellationRequested();
         return movements;
     }
 

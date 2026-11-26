@@ -147,15 +147,17 @@ public partial class ProcurementPane : UserControl
         InitializeComponent();
         BuyGrid.PreviewKeyDown += BuyGrid_OrderShortcut;
 
-        Loaded += (_, _) =>
+        Loaded += (_, _) => ResumeVisibleBuyReads();
+        IsVisibleChanged += (_, _) =>
         {
-            if (_needsReloadAfterAttach && !_batchBusy) _ = TryReloadAsync();
+            if (IsVisible) ResumeVisibleBuyReads();
+            else SuspendBuyReads();
         };
         Unloaded += (_, _) =>
         {
             ++_attachmentGeneration;
             ++_reloadGeneration;
-            ++_historyLoadToken;
+            SuspendBuyReads();
             ++_buyViewportGeneration;
             _revision = _historyRevision = "";
             _buySnapshotMayReuse = false;
@@ -185,7 +187,7 @@ public partial class ProcurementPane : UserControl
                 throw new InvalidOperationException("Раздел закрыт или открыт заново. Запись не начата.");
             // Never attach a returned/new revision to an old grid, even on failure.
             _owner._revision = "";
-            _owner._historyRevision = "";
+            _owner.CancelMovementHistory();
             return Revision;
         }
         public void Dispose()
@@ -195,7 +197,7 @@ public partial class ProcurementPane : UserControl
             if (!_owner.IsLoaded) return;
             _owner.UpdateHistoryButtons();
             if (_owner._needsReloadAfterAttach && _attachment != _owner._attachmentGeneration)
-                _ = _owner.TryReloadAsync();
+                _ = _owner.TryReloadAsync(requiredReadback: false);
         }
     }
 
@@ -220,77 +222,6 @@ public partial class ProcurementPane : UserControl
         SetStatus("Закупки изменены другим сотрудником. Данные перечитываются; повторите действие.");
         await TryReloadAsync(preserveStatus: true);
         return false;
-    }
-
-    private async Task ReloadAsync(bool preserveStatus = false, bool allowUnchanged = false)
-    {
-        if (!IsLoaded) return;
-        // All network I/O is outside the WPF dispatcher. A later refresh
-        // supersedes an earlier response if they finish out of order.
-        var generation = ++_reloadGeneration;
-        var cachedRevision = allowUnchanged && _buySnapshotMayReuse && !_batchBusy &&
-            !_needsReloadAfterAttach && _snapshotDay == DateTime.Today &&
-            BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: false }
-            ? _revision : "";
-        var cachedDay = _snapshotDay;
-        _revision = "";
-        _historyRevision = "";
-        _buySnapshotMayReuse = false;
-        UpdateHistoryButtons();
-        var snapshot = await Task.Run(() =>
-            SqlServerProcurement.ReadBuySnapshotIfChanged(_connectionString, _contractId,
-                cachedRevision, cachedDay));
-        if (generation != _reloadGeneration || !IsLoaded) return;
-        if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
-            throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
-        if (snapshot is null)
-        {
-            // A midnight rollover during the await invalidates due-date flags.
-            // No write is allowed while _revision is empty.
-            if (_batchBusy || _needsReloadAfterAttach || cachedDay != DateTime.Today)
-            {
-                await ReloadAsync(preserveStatus);
-                return;
-            }
-            _revision = cachedRevision;
-            _buySnapshotMayReuse = true;
-            if (MovementHistoryExpander?.IsExpanded == true) _ = LoadSelectedMovementHistoryAsync();
-            if (!preserveStatus) FooterText.Text = "";
-            return;
-        }
-        var rows = snapshot.Rows;
-        var systems = snapshot.Systems;
-        var items = new ObservableCollection<ProcurementPreviewRow>();
-        var loadedDay = snapshot.Day;
-        var originalIndex = 0;
-        var number = 1;
-        var systemNumbers = new Dictionary<long, string>();
-        foreach (var row in rows)
-        {
-            // Python procurement omits purely work rows from buying and warehouse views.
-            if (row.Work) continue;
-            if (!systemNumbers.ContainsKey(row.SystemId))
-                systemNumbers[row.SystemId] = row.SystemName == "Без системы" ? "" : (number++).ToString(CultureInfo.CurrentCulture);
-            var rowNumber = row.ParentPositionId is null && !row.OutOfKp ? (number++).ToString(CultureInfo.CurrentCulture) : "";
-            items.Add(BuildBuyPreview(row, rowNumber, systemNumbers[row.SystemId], originalIndex++));
-        }
-        _applyingBuySnapshot = true;
-        try
-        {
-            _allRows = items.ToList();
-            _buyRowIndex = null;
-            _allSystems = systems.ToList();
-            RebuildScopeFilters();
-            UpdateCategoryCounts();
-            ApplyProcurementFilters();
-            _snapshotDay = loadedDay;
-            _revision = snapshot.Revision;
-            _buySnapshotMayReuse = true;
-            _needsReloadAfterAttach = false;
-        }
-        finally { _applyingBuySnapshot = false; }
-        if (MovementHistoryExpander?.IsExpanded == true) _ = LoadSelectedMovementHistoryAsync();
-        if (!preserveStatus) FooterText.Text = "";
     }
 
     private static ProcurementPreviewRow BuildBuyPreview(SqlServerProcurement.BuyRow row,
@@ -344,12 +275,6 @@ public partial class ProcurementPane : UserControl
             LastIssueDate = row.LastIssueDate,
             OriginalIndex = originalIndex,
         };
-    }
-
-    private async Task TryReloadAsync(bool preserveStatus = false, bool allowUnchanged = false)
-    {
-        try { await ReloadAsync(preserveStatus, allowUnchanged); }
-        catch (Exception ex) { SetStatus("Ошибка загрузки закупок: " + ex.Message); }
     }
 
     private void RebuildScopeFilters()
@@ -556,8 +481,7 @@ public partial class ProcurementPane : UserControl
         if (ProcurementStatusButton is not null) ProcurementStatusButton.IsEnabled = count > 0;
         // Loading is lazy: merely selecting cells does not query the network
         // while the Python-style history panel is collapsed.
-        _historyLoadToken++;
-        _historyRevision = "";
+        CancelMovementHistory();
         if (MovementEditButton is not null) MovementEditButton.IsEnabled = false;
         if (MovementDeleteButton is not null) MovementDeleteButton.IsEnabled = false;
         if (MovementHistoryGrid is not null) MovementHistoryGrid.ItemsSource = null;
@@ -592,53 +516,9 @@ public partial class ProcurementPane : UserControl
 
     private void MovementHistory_Collapsed(object sender, RoutedEventArgs e)
     {
-        ++_historyLoadToken;
-        _historyRevision = "";
+        CancelMovementHistory();
+        _historyNeedsResume = false;
         UpdateHistoryButtons();
-    }
-
-    private async Task LoadSelectedMovementHistoryAsync()
-    {
-        if (!IsLoaded || MovementHistoryExpander?.IsExpanded != true ||
-            MovementHistoryGrid is null || MovementDetailsText is null) return;
-        var token = ++_historyLoadToken;
-        _historyRevision = "";
-        var revision = _revision;
-        var row = SelectedHistoryRow();
-        MovementHistoryGrid.ItemsSource = null;
-        MovementDeleteButton.IsEnabled = false;
-        MovementEditButton.IsEnabled = false;
-        if (row is null || string.IsNullOrEmpty(revision)) return;
-        MovementDetailsText.Text = "Загрузка истории из SQL Server…";
-        try
-        {
-            var rows = await Task.Run(() =>
-            {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                if (SqlServerDatabase.Revision(conn) != revision) return null;
-                var history = SqlServerProcurement.MovementsForPosition(
-                    _connectionString, _contractId, row.PositionId);
-                return SqlServerDatabase.Revision(conn) == revision ? history : null;
-            });
-            if (token != _historyLoadToken || !IsLoaded || MovementHistoryExpander?.IsExpanded != true || _revision != revision ||
-                SelectedHistoryRow()?.PositionId != row.PositionId) return;
-            if (rows is null)
-            {
-                MovementDetailsText.Text = "История изменилась. Обновите закупки.";
-                return;
-            }
-            _historyRevision = revision;
-            MovementHistoryGrid.ItemsSource = rows;
-            MovementDetailsText.Text =
-                $"По КП: {row.Qty} {row.Unit} · пришло {row.Received} · выдано {row.Issued}" +
-                $" · записей: {rows.Count}" +
-                (row.Flags.Length > 0 ? " · ⚠ " + row.Flags : "");
-        }
-        catch (Exception ex)
-        {
-            if (token != _historyLoadToken || !IsLoaded) return;
-            MovementDetailsText.Text = "Не удалось прочитать историю: " + ex.Message;
-        }
     }
 
     private void MovementHistory_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
@@ -775,13 +655,14 @@ public partial class ProcurementPane : UserControl
     public void RefreshFromSqlServer()
     {
         if (IsLoaded && !_batchBusy && BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: true })
-            _ = TryReloadAsync();
+            _ = TryReloadAsync(requiredReadback: false);
     }
 
     internal void RefreshOnTabReturn()
     {
-        if (IsLoaded && !_batchBusy && BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: true })
-            _ = TryReloadAsync(allowUnchanged: true);
+        if (IsLoaded && !_batchBusy && _ordinaryReloadCancellation is null &&
+            BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: true })
+            _ = TryReloadAsync(allowUnchanged: true, requiredReadback: false);
     }
 
     private async void ProcurementRefresh_Click(object sender, RoutedEventArgs e)
@@ -789,8 +670,8 @@ public partial class ProcurementPane : UserControl
         if (_batchBusy || BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true }) return;
         try
         {
-            await ReloadAsync();
-            SetStatus("Закупки обновлены из SQL Server.");
+            if (await ReloadAsync(requiredReadback: false))
+                SetStatus("Закупки обновлены из SQL Server.");
         }
         catch (Exception ex) { SetStatus("Ошибка обновления закупок: " + ex.Message); }
     }
