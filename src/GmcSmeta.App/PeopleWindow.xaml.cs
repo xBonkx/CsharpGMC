@@ -17,6 +17,7 @@ public partial class PeopleWindow : Window
 {
     private SqlServerPeopleAccess _db = null!;
     private CancellationTokenSource? _initialCancellation;
+    private CancellationTokenSource? _reloadCancellation;
     private bool _closed;
     private readonly long? _objectId;
     private AccessSite? _site;
@@ -71,6 +72,7 @@ public partial class PeopleWindow : Window
         {
             _closed = true;
             _initialCancellation?.Cancel();
+            _reloadCancellation?.Cancel();
         };
     }
 
@@ -131,6 +133,11 @@ public partial class PeopleWindow : Window
     private void Run(Action action)
     {
         if (_closed || _loading) return;
+        if (string.IsNullOrWhiteSpace(_revision))
+        {
+            HintText.Text = "Нет актуальной ревизии справочника. Измените фильтр или откройте окно заново.";
+            return;
+        }
         try { action(); }
         catch (DBConcurrencyException)
         {
@@ -160,6 +167,47 @@ public partial class PeopleWindow : Window
         _revision = "";
         var data = _db.Load(ShowInactive.IsChecked == true);
         ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
+    }
+
+    // Read-only refreshes may be cancelled; mutation readback keeps its existing synchronous path.
+    private async Task ReloadReadOnlyAsync(AccessHistory? history = null)
+    {
+        if (_closed || _loading || _reloadCancellation is not null) return;
+        RememberChecks();
+        var selectedP = (PeopleGrid.SelectedItem as PeoplePerson)?.Id;
+        var selectedC = (CarsGrid.SelectedItem as PeopleCar)?.Id;
+        var showInactive = ShowInactive.IsChecked == true;
+        var content = (UIElement)Content;
+        using var cancellation = new CancellationTokenSource();
+        _reloadCancellation = cancellation;
+        var token = cancellation.Token;
+        _revision = "";
+        _loading = true;
+        content.IsEnabled = false;
+        HintText.Text = "Обновление справочника…";
+        try
+        {
+            var data = await Task.Run(() => _db.Load(showInactive, token), token);
+            if (_closed || token.IsCancellationRequested) return;
+            HintText.Text = _registrationUncertain
+                ? "Файл создан, но запись в журнал не подтверждена. Повторный экспорт не выполняйте."
+                : "Выберите строку для редактирования; все изменения сохраняются в SQL Server.";
+            if (history is not null) RestoreHistory(history);
+            ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
+        }
+        catch (Exception ex)
+        {
+            if (_closed || token.IsCancellationRequested) return;
+            _revision = "";
+            HintText.Text = "Не удалось обновить справочник. Сохранение заблокировано; измените фильтр или откройте окно заново.";
+            MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _reloadCancellation = null;
+            _loading = false;
+            if (!_closed) content.IsEnabled = true;
+        }
     }
 
     private void ApplyDirectory(IReadOnlyList<PeoplePerson> people, IReadOnlyList<PeopleCar> cars,
@@ -220,9 +268,9 @@ public partial class PeopleWindow : Window
     {
         if (!_loading && PeopleGrid is not null) ApplyFilter();
     }
-    private void Filter_Changed(object sender, RoutedEventArgs e)
+    private async void Filter_Changed(object sender, RoutedEventArgs e)
     {
-        if (!_loading && PeopleGrid is not null) Run(Reload);
+        if (!_loading && PeopleGrid is not null) await ReloadReadOnlyAsync();
     }
     private void Selection_Changed(object sender, SelectionChangedEventArgs e) => UpdateCounts();
     private void People_DoubleClick(object sender, MouseButtonEventArgs e)
@@ -581,10 +629,10 @@ public partial class PeopleWindow : Window
             HintText.Text = "Запись истории содержит повреждённый JSON. Старый файл сохранён; текущие галочки не изменены.";
         }
     }
-    private void History_Changed(object sender, SelectionChangedEventArgs e)
+    private async void History_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || HistoryBox.SelectedItem is not HistoryOption option) return;
-        Run(() => { RestoreHistory(option.History); Reload(rememberChecks: false); });
+        await ReloadReadOnlyAsync(option.History);
     }
     private void OpenHistory_Click(object sender, RoutedEventArgs e) => Run(() =>
     {

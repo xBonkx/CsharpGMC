@@ -49,4 +49,31 @@ public sealed class PeopleInitialReadLifecycleTests
             "Server=invalid;Database=GmcSmeta;Integrated Security=true", cancellation.Token));
     }
 
+    [Fact]
+    public void ReadOnlyRefreshPreservesSelectionAndGuardsWritesUntilReadback()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "PeopleWindow.xaml.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var source = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "PeopleWindow.xaml.cs"));
+        var reload = source[source.IndexOf("private async Task ReloadReadOnlyAsync", StringComparison.Ordinal)..
+            source.IndexOf("private void ApplyDirectory", StringComparison.Ordinal)];
+        Assert.Contains("RememberChecks();", reload);
+        Assert.Contains("_revision = \"\";", reload);
+        Assert.Contains("content.IsEnabled = false;", reload);
+        Assert.Contains("await Task.Run(() => _db.Load(showInactive, token), token)", reload);
+        Assert.Contains("if (_closed || token.IsCancellationRequested) return;", reload);
+        Assert.Contains("if (history is not null) RestoreHistory(history);", reload);
+        Assert.True(reload.IndexOf("RestoreHistory(history)", StringComparison.Ordinal) <
+            reload.IndexOf("ApplyDirectory(data.People", StringComparison.Ordinal));
+        Assert.Contains("ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);", reload);
+        Assert.Contains("if (!_closed) content.IsEnabled = true;", reload);
+        Assert.Contains("_reloadCancellation?.Cancel();", source);
+        Assert.Contains("await ReloadReadOnlyAsync();", source);
+        Assert.Contains("await ReloadReadOnlyAsync(option.History);", source);
+        Assert.Contains("if (string.IsNullOrWhiteSpace(_revision))", source);
+        Assert.Contains("private void Reload(bool rememberChecks)", source);
+    }
+
 }
