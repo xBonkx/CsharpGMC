@@ -13,23 +13,32 @@ namespace GmcSmeta.Core.Db;
 public sealed class SqlServerPeopleAccess
 {
     private readonly string _connectionString;
-    public SqlServerPeopleAccess(string connectionString)
+    public SqlServerPeopleAccess(string connectionString, CancellationToken token = default)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        token.ThrowIfCancellationRequested();
         _connectionString = connectionString;
-        using var conn = Open();
+        using var conn = Open(token);
         foreach (var table in new[] { "people", "cars", "access_lists" })
         {
             using var check = new SqlCommand("SELECT OBJECT_ID(@name, N'U')", conn);
             check.Parameters.Add("@name", SqlDbType.NVarChar, 128).Value = "dbo." + table;
-            if (check.ExecuteScalar() is DBNull or null)
+            token.ThrowIfCancellationRequested();
+            var value = token.CanBeCanceled
+                ? check.ExecuteScalarAsync(token).GetAwaiter().GetResult()
+                : check.ExecuteScalar();
+            token.ThrowIfCancellationRequested();
+            if (value is DBNull or null)
                 throw new InvalidOperationException("В тестовой базе отсутствует таблица SQL Server: " + table);
         }
     }
 
-    private SqlConnection Open()
+    private SqlConnection Open(CancellationToken token = default)
     {
-        var conn = SqlServerDatabase.Open(_connectionString);
+        token.ThrowIfCancellationRequested();
+        var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(_connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(_connectionString);
         if (!conn.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
         {
             conn.Dispose();
@@ -85,32 +94,50 @@ public sealed class SqlServerPeopleAccess
             throw new InvalidOperationException("Объект не найден в этой базе.");
     }
 
-    public (IReadOnlyList<PeoplePerson> People, IReadOnlyList<PeopleCar> Cars, string Revision) Load(bool showInactive)
+    public (IReadOnlyList<PeoplePerson> People, IReadOnlyList<PeopleCar> Cars, string Revision) Load(
+        bool showInactive, CancellationToken token = default)
     {
         // A second pass when a different client writes during the read gives a consistent snapshot.
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            using var conn = Open();
-            var before = SqlServerDatabase.Revision(conn);
+            using var conn = Open(token);
+            string Revision() => token.CanBeCanceled
+                ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+                : SqlServerDatabase.Revision(conn);
+            var before = Revision();
             var people = new List<PeoplePerson>();
             var cars = new List<PeopleCar>();
             using (var cmd = Command(conn, null,
                 "SELECT id,fio,post,birth,note,fio_gen,post_gen,active,sort_order FROM dbo.people " +
                 (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
-            using (var reader = cmd.ExecuteReader())
+            using (var registration = SqlReadCancellation.Register(cmd, token))
+            using (var reader = SqlReadCancellation.ExecuteReader(cmd, token))
                 while (reader.Read())
+                {
+                    token.ThrowIfCancellationRequested();
                     people.Add(ReadPerson(reader));
+                }
             using (var cmd = Command(conn, null,
                 "SELECT id,model,plate,note,active,sort_order FROM dbo.cars " +
                 (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
-            using (var reader = cmd.ExecuteReader())
+            using (var registration = SqlReadCancellation.Register(cmd, token))
+            using (var reader = SqlReadCancellation.ExecuteReader(cmd, token))
                 while (reader.Read())
+                {
+                    token.ThrowIfCancellationRequested();
                     cars.Add(ReadCar(reader));
-            var after = SqlServerDatabase.Revision(conn);
+                }
+            token.ThrowIfCancellationRequested();
+            var after = Revision();
+            token.ThrowIfCancellationRequested();
             if (before == after)
-                return (PeopleRules.SortPeople(people),
-                    cars.OrderBy(x => x.SortOrder == 0 ? int.MaxValue : x.SortOrder)
-                        .ThenBy(x => x.Model).ThenBy(x => x.Plate).ToArray(), after);
+            {
+                var sortedPeople = PeopleRules.SortPeople(people);
+                var sortedCars = cars.OrderBy(x => x.SortOrder == 0 ? int.MaxValue : x.SortOrder)
+                    .ThenBy(x => x.Model).ThenBy(x => x.Plate).ToArray();
+                token.ThrowIfCancellationRequested();
+                return (sortedPeople, sortedCars, after);
+            }
         }
         throw new DBConcurrencyException("Справочник меняется в другом окне. Повторите загрузку.");
     }
@@ -426,9 +453,9 @@ public sealed class SqlServerPeopleAccess
         copy.WriteToServer(data);
     }
 
-    public AccessSite Site(long objectId)
+    public AccessSite Site(long objectId, CancellationToken token = default)
     {
-        using var conn = Open();
+        using var conn = Open(token);
         using var cmd = Command(conn, null, """
             SELECT o.id,o.name,o.address,o.site_full,o.work_title,o.folder,
             COALESCE(NULLIF(o.cust_org,N''),o.customer),
@@ -440,39 +467,52 @@ public sealed class SqlServerPeopleAccess
                 ORDER BY CASE c.kind WHEN N'main' THEN 0 WHEN N'dop' THEN 1 ELSE 2 END,c.id),N'')
             FROM dbo.objects o WHERE o.id=@id
             """, ("@id", objectId));
-        using var r = cmd.ExecuteReader();
-        if (!r.Read()) throw new InvalidOperationException("Объект не найден.");
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        var found = r.Read();
+        token.ThrowIfCancellationRequested();
+        if (!found) throw new InvalidOperationException("Объект не найден.");
         return new AccessSite(Convert.ToInt64(r.GetValue(0)), r.GetString(1), r.GetString(2), r.GetString(3),
             r.GetString(4), r.GetString(5), r.GetString(6), r.GetString(7), r.GetString(8));
     }
 
-    public IReadOnlyList<AccessCompany> Companies()
+    public IReadOnlyList<AccessCompany> Companies(CancellationToken token = default)
     {
-        using var conn = Open();
+        using var conn = Open(token);
         using var cmd = Command(conn, null,
             "SELECT id,name,address,inn_kpp,signer_post,signer_name FROM dbo.companies ORDER BY [order],id");
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var list = new List<AccessCompany>();
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             list.Add(new AccessCompany(Convert.ToInt64(r.GetValue(0)), r.GetString(1), r.GetString(2),
                 r.GetString(3), r.GetString(4), r.GetString(5)));
+        }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
-    public IReadOnlyList<AccessHistory> History(long objectId, string kind)
+    public IReadOnlyList<AccessHistory> History(long objectId, string kind, CancellationToken token = default)
     {
         if (kind is not ("list" or "order")) throw new ArgumentException("Недопустимый тип истории.");
-        using var conn = Open();
+        using var conn = Open(token);
         using var cmd = Command(conn, null, """
             SELECT a.id,a.object_id,a.kind,a.created_at,a.file,a.[user],a.data
             FROM dbo.access_lists a INNER JOIN dbo.objects o ON o.id=a.object_id
             WHERE a.object_id=@oid AND a.kind=@kind ORDER BY a.id DESC
             """, ("@oid", objectId), ("@kind", kind));
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var list = new List<AccessHistory>();
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             list.Add(new AccessHistory(Convert.ToInt64(r.GetValue(0)), Convert.ToInt64(r.GetValue(1)), r.GetString(2), r.GetDateTime(3),
                 r.GetString(4), r.GetString(5), r.GetString(6)));
+        }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 

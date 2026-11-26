@@ -1,3 +1,5 @@
+using GmcSmeta.Core.Db;
+
 namespace GmcSmeta.Core.Tests;
 
 public sealed class PeopleInitialReadLifecycleTests
@@ -17,8 +19,11 @@ public sealed class PeopleInitialReadLifecycleTests
         Assert.Contains("await InitializeAsync(connectionString, content)", ctor);
         Assert.Contains("_initialCancellation?.Cancel();", ctor);
         Assert.Contains("var snapshot = await Task.Run", source);
-        Assert.Contains("var db = new SqlServerPeopleAccess(connectionString);", source);
-        Assert.Contains("var directory = db.Load(showInactive);", source);
+        Assert.Contains("var db = new SqlServerPeopleAccess(connectionString, token);", source);
+        Assert.Contains("db.Site(objectId, token)", source);
+        Assert.Contains("db.Companies(token)", source);
+        Assert.Contains("db.History(id, \"list\", token)", source);
+        Assert.Contains("var directory = db.Load(showInactive, token);", source);
         Assert.Contains("if (_closed || token.IsCancellationRequested) return;", source);
         Assert.Contains("ApplyHistory(snapshot.History);", source);
         Assert.Contains("ApplyDirectory(snapshot.Directory.People, snapshot.Directory.Cars, snapshot.Directory.Revision, null, null);", source);
@@ -26,4 +31,22 @@ public sealed class PeopleInitialReadLifecycleTests
         Assert.Contains("if (_closed || _loading) return;", source);
         Assert.Contains("finally { _loading = wasLoading; }", source);
     }
+    [Fact]
+    public void CancelledServiceConstructionDoesNotConnect()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => new SqlServerPeopleAccess(
+            "Server=invalid;Database=GmcSmetaPilot_People;Integrated Security=true", cancellation.Token));
+    }
+
+    [Fact]
+    public void CancellationDoesNotBypassPilotGuard()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<InvalidOperationException>(() => new SqlServerPeopleAccess(
+            "Server=invalid;Database=GmcSmeta;Integrated Security=true", cancellation.Token));
+    }
+
 }

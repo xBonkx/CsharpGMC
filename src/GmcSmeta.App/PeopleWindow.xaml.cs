@@ -86,15 +86,15 @@ public partial class PeopleWindow : Window
             var snapshot = await Task.Run(() =>
             {
                 token.ThrowIfCancellationRequested();
-                var db = new SqlServerPeopleAccess(connectionString);
+                var db = new SqlServerPeopleAccess(connectionString, token);
                 token.ThrowIfCancellationRequested();
-                var site = _objectId is long objectId ? db.Site(objectId) : null;
+                var site = _objectId is long objectId ? db.Site(objectId, token) : null;
                 token.ThrowIfCancellationRequested();
-                var companies = site is null ? new List<AccessCompany>() : db.Companies().ToList();
+                var companies = site is null ? new List<AccessCompany>() : db.Companies(token).ToList();
                 token.ThrowIfCancellationRequested();
-                var history = _objectId is long id ? db.History(id, "list") : Array.Empty<AccessHistory>();
+                var history = _objectId is long id ? db.History(id, "list", token) : Array.Empty<AccessHistory>();
                 token.ThrowIfCancellationRequested();
-                var directory = db.Load(showInactive);
+                var directory = db.Load(showInactive, token);
                 token.ThrowIfCancellationRequested();
                 return (Db: db, Site: site, Companies: companies, History: history, Directory: directory);
             }, token);
