@@ -219,6 +219,7 @@ internal static class Program
         ColumnMenuChecks.Run();
         LegacySummaryChecks.Run();
         SummaryRowSequenceChecks.Run();
+        SummaryExcelChecks.Run();
     }
 
     /// <summary>

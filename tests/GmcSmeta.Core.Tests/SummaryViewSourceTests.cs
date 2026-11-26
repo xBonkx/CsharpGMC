@@ -20,6 +20,49 @@ public sealed class SummaryViewSourceTests
     }
 
     [Fact]
+    public void MissingOptionsRefreshOnlyCaptionWhenFilterIsOff()
+    {
+        var source = SummarySource("EstimateView.CostSummary.cs");
+        Assert.Contains("if (_summaryMissingOn) SummaryRebuild();", source);
+        Assert.Contains("else SummaryUpdateMissingCounts(_summaryMissingChecked.Aggregate(", source);
+        Assert.Contains("if (_summaryMissingOn == enabled) return;", source);
+        Assert.Contains("if (_summaryMode == key) return;", source);
+        Assert.Contains("if (_summarySort == key) return;", source);
+        Assert.Contains("ReferenceEquals(_summaryMissingItems, menuItems)", source);
+    }
+
+    [Fact]
+    public void SummaryMarkupRechecksLockedAndRevisionAndUsesSetEquality()
+    {
+        var source = SummarySource("EstimateView.CostSummary.cs");
+        Assert.Contains("new MenuItem { Header = \"Наценка на СМР…\", IsEnabled = _estimate?.Locked == false }", source);
+        Assert.Contains("new HashSet<long>(ids).SetEquals(SummarySelectedIds())", source);
+        Assert.Contains("!SummarySnapshotReady || _estimate?.Locked != false || revision != _summaryRevision", source);
+        Assert.Contains("IsCancel = true", source);
+    }
+
+    [Fact]
+    public void SummaryReportCapturesRowsBeforeSaveAndRejectsStaleSnapshot()
+    {
+        var source = SummarySource("EstimateView.SummaryExcel.cs");
+        Assert.Contains("if (!SummarySnapshotReady ||", source);
+        Assert.True(source.IndexOf("var snapshot = rows.ToArray();", StringComparison.Ordinal) <
+            source.IndexOf("XlsxExport.Save(", StringComparison.Ordinal));
+        Assert.Contains("SummaryDisplayedExcel.Fill(sheet, snapshot)", source);
+        Assert.DoesNotContain("NumberText.Parse", source);
+        Assert.DoesNotContain("FormulaA1 =", source);
+    }
+
+    private static string SummarySource(string file)
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", file)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        return File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", file));
+    }
+
+    [Fact]
     public void SummaryHostIsEmptyAndCompiledPanelPreservesTemplateAndEditHandlers()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);

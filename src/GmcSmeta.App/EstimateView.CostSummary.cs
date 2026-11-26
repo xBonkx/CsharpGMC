@@ -316,20 +316,7 @@ public partial class EstimateView
         // пометки «—» на пропусках: nocost — всегда, остальные — при включённом фильтре
         var markKinds = _summaryMissingOn ? chosen : new HashSet<string>();
 
-        // счётчики пропусков в меню (cost_summary_view._count_missing)
-        foreach (var item in _summaryMissingItems)
-        {
-            var key = (string)item.Tag!;
-            var count = _summaryMissingIndex.CountAny(SummaryFlag(key));
-            item.Header = $"{SummaryMissingKinds.First(k => k.Key == key).Text}: {count}";
-        }
-        int missingCount = _summaryMissingIndex.CountAny(missingMask);
-        if (SummaryMissingText is not null)
-            SummaryMissingText.Text = chosen.Count == 1 && chosen.Contains("nocost")
-                ? $"Без закупочных цен: {missingCount}"
-                : $"Без цен: {missingCount}";
-        // Python keeps the split filter available even at zero: the user must
-        // still be able to select a different kind of missing price.
+        SummaryUpdateMissingCounts(missingMask);
 
         // фильтр (show_data): системы, «без цен», поиск
         var systemIds = SummarySystemSelection.Expand(_summarySelectedSystems, data.SystemParents);
@@ -821,6 +808,26 @@ public partial class EstimateView
         SummaryNote.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    // Refresh only the filter caption and the currently open menu. No grid rebuild.
+    private void SummaryUpdateMissingCounts(CostMissingPrice missingMask)
+    {
+        var chosen = SummaryMissingSelected();
+        // счётчики пропусков в меню (cost_summary_view._count_missing)
+        foreach (var item in _summaryMissingItems)
+        {
+            var key = (string)item.Tag!;
+            var count = _summaryMissingIndex.CountAny(SummaryFlag(key));
+            item.Header = $"{SummaryMissingKinds.First(k => k.Key == key).Text}: {count}";
+        }
+        int missingCount = _summaryMissingIndex.CountAny(missingMask);
+        if (SummaryMissingText is not null)
+            SummaryMissingText.Text = chosen.Count == 1 && chosen.Contains("nocost")
+                ? $"Без закупочных цен: {missingCount}"
+                : $"Без цен: {missingCount}";
+        // Python keeps the split filter available even at zero: the user must
+        // still be able to select a different kind of missing price.
+    }
+
     private void SummarySyncViewButtons()
     {
         if (SummaryResetViewButton is not null)
@@ -839,7 +846,9 @@ public partial class EstimateView
 
     internal void SummaryMissing_Changed(object sender, RoutedEventArgs e)
     {
-        _summaryMissingOn = SummaryMissingToggle?.IsChecked == true;
+        var enabled = SummaryMissingToggle?.IsChecked == true;
+        if (_summaryMissingOn == enabled) return;
+        _summaryMissingOn = enabled;
         SummaryRebuild();
     }
 
@@ -847,7 +856,13 @@ public partial class EstimateView
     {
         if (SummaryMissingChrome is null) return;
         var menu = new ContextMenu { PlacementTarget = SummaryMissingChrome, Placement = PlacementMode.Bottom };
-        _summaryMissingItems = new List<MenuItem>();
+        var menuItems = new List<MenuItem>();
+        _summaryMissingItems = menuItems;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_summaryMissingItems, menuItems))
+                _summaryMissingItems = new List<MenuItem>();
+        };
         foreach (var (key, text) in SummaryMissingKinds)
         {
             var item = new MenuItem
@@ -857,12 +872,15 @@ public partial class EstimateView
             };
             item.Click += (_, _) =>
             {
-                if (item.IsChecked) _summaryMissingChecked.Add(key);
-                else _summaryMissingChecked.Remove(key);
-                SummaryRebuild();
+                var changed = item.IsChecked
+                    ? _summaryMissingChecked.Add(key) : _summaryMissingChecked.Remove(key);
+                if (!changed) return;
+                if (_summaryMissingOn) SummaryRebuild();
+                else SummaryUpdateMissingCounts(_summaryMissingChecked.Aggregate(
+                    CostMissingPrice.None, (mask, kind) => mask | SummaryFlag(kind)));
             };
             menu.Items.Add(item);
-            _summaryMissingItems.Add(item);
+            menuItems.Add(item);
         }
         menu.IsOpen = true;
     }
@@ -881,7 +899,12 @@ public partial class EstimateView
         foreach (var (key, title) in modes)
         {
             var item = new MenuItem { Header = title, IsCheckable = true, IsChecked = _summaryMode == key };
-            item.Click += (_, _) => { _summaryMode = key; SummaryRebuild(); };
+            item.Click += (_, _) =>
+            {
+                if (_summaryMode == key) return;
+                _summaryMode = key;
+                SummaryRebuild();
+            };
             menu.Items.Add(item);
         }
         menu.IsOpen = true;
@@ -904,7 +927,12 @@ public partial class EstimateView
         foreach (var (key, title) in sorts)
         {
             var item = new MenuItem { Header = title, IsCheckable = true, IsChecked = _summarySort == key };
-            item.Click += (_, _) => { _summarySort = key; SummaryRebuild(); };
+            item.Click += (_, _) =>
+            {
+                if (_summarySort == key) return;
+                _summarySort = key;
+                SummaryRebuild();
+            };
             menu.Items.Add(item);
         }
         menu.IsOpen = true;
@@ -912,6 +940,7 @@ public partial class EstimateView
 
     internal void SummaryResetView_Click(object sender, RoutedEventArgs e)
     {
+        if (_summaryMode == "kp" && _summarySort == "kp") return;
         _summaryMode = "kp";
         _summarySort = "kp";
         SummaryRebuild();
@@ -1209,11 +1238,13 @@ public partial class EstimateView
         var revision = _summaryRevision;
         var menu = new ContextMenu { PlacementTarget = SummaryGrid,
             Placement = e.CursorLeft < 0 && e.CursorTop < 0 ? PlacementMode.Bottom : PlacementMode.MousePoint };
-        var item = ContextMenuIcons.Create("Наценка на СМР…", "Edit", _estimate?.Locked == false);
+        // The Python action has no icon.
+        var item = new MenuItem { Header = "Наценка на СМР…", IsEnabled = _estimate?.Locked == false };
         item.Click += (_, _) =>
         {
-            if (SummarySnapshotReady && _contractId == contractId && _summaryRevision == revision &&
-                SummarySelectedIds().OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id)))
+            if (SummarySnapshotReady && _estimate?.Locked == false &&
+                _contractId == contractId && _summaryRevision == revision &&
+                new HashSet<long>(ids).SetEquals(SummarySelectedIds()))
                 _ = SummaryMarkupAsync(ids, allRows: false);
             else SetStatus("Выбор или данные изменились. Откройте меню снова.", true);
         };
@@ -1253,9 +1284,12 @@ public partial class EstimateView
         var dialog = new SummaryMarkupDialog($"{scope} ({ids.Count}). Цена клиенту за ед. будет пересчитана от закупа СМР.")
         { Owner = Window.GetWindow(this) };
         if (dialog.ShowDialog() != true) return;
-        if (!SummarySnapshotReady || revision != _summaryRevision ||
-            !(allRows ? SummaryRecs.Select(r => r.Id) : SummarySelectedIds())
-                .OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id))) return;
+        if (!SummarySnapshotReady || _estimate?.Locked != false || revision != _summaryRevision ||
+            !new HashSet<long>(ids).SetEquals(allRows ? SummaryRecs.Select(r => r.Id) : SummarySelectedIds()))
+        {
+            SetStatus("Выбор или данные изменились. Откройте диалог снова.", true);
+            return;
+        }
         var percent = dialog.Percent;
         await RunSummaryWriteAsync(revision, async expected =>
         {
@@ -1283,49 +1317,7 @@ public partial class EstimateView
         });
     }
 
-    // ------------------------------------------------------------------ export
-    internal void SummaryExcel_Click(object sender, RoutedEventArgs e)
-    {
-        if (SummaryGrid?.ItemsSource is not ObservableCollection<SummaryRow> rows) return;
-        XlsxExport.Save(Window.GetWindow(this),
-            "Сводная — " + (_estimate?.Title ?? _contractId.ToString()), sheet =>
-        {
-            XlsxExport.Header(sheet, 1, new[]
-            {
-                "Наименование", "Ед.", "Кол-во",
-                "Материалы: закуп за ед.", "Материалы: розн. за ед.",
-                "Материалы: закуп", "Материалы: розница",
-                "Работы: закуп за ед.", "Работы: розн. за ед.",
-                "Работы: закуп", "Работы: розница",
-                "Итого: закуп", "Итого: розница",
-                "Маржа материалов, ₽", "Маржа работ, ₽", "СМР: наценка, %",
-            });
-            var index = 2;
-            foreach (var r in rows)
-            {
-                sheet.Cell(index, 1).Value = r.Name;
-                sheet.Cell(index, 2).Value = r.Unit;
-                sheet.Cell(index, 3).Value = r.QtyText;
-                sheet.Cell(index, 4).Value = r.CostUnitText;
-                sheet.Cell(index, 5).Value = r.PriceUnitText;
-                sheet.Cell(index, 6).Value = r.MCostText;
-                sheet.Cell(index, 7).Value = r.MSellText;
-                sheet.Cell(index, 8).Value = r.WorkCostText;
-                sheet.Cell(index, 9).Value = r.WorkSellText;
-                sheet.Cell(index, 10).Value = r.WCostText;
-                sheet.Cell(index, 11).Value = r.WSellText;
-                sheet.Cell(index, 12).Value = r.TotalCostText;
-                sheet.Cell(index, 13).Value = r.TotalSellText;
-                sheet.Cell(index, 14).Value = r.MatMarginText;
-                sheet.Cell(index, 15).Value = r.WorkMarginText;
-                sheet.Cell(index, 16).Value = r.MarkupText;
-                if (r.Kind is "system" or "total")
-                    sheet.Row(index).Style.Font.Bold = true;
-                index++;
-            }
-            sheet.SheetView.FreezeRows(1);
-        });
-    }
+
 }
 
 /// <summary>Диалог наценки на СМР (cost_summary_view._prompt_markup → QInputDialog.getDouble).</summary>
@@ -1360,8 +1352,7 @@ public sealed class SummaryMarkupDialog : Window
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0),
         };
-        var cancel = new Button { Content = "Отмена", Padding = new Thickness(12, 6, 12, 6) };
-        cancel.Click += (_, _) => DialogResult = false;
+        var cancel = new Button { Content = "Отмена", IsCancel = true, Padding = new Thickness(12, 6, 12, 6) };
         var ok = new Button
         {
             Content = "OK", Padding = new Thickness(16, 6, 16, 6),
