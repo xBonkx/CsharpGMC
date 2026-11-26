@@ -1,0 +1,53 @@
+using System.Xml.Linq;
+
+namespace GmcSmeta.Core.Tests;
+
+public sealed class ShipmentTableVisualTests
+{
+    [Fact]
+    public void TablePreservesActionsAndMatchesPythonQuantityPresentation()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ShipmentsPane.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var document = XDocument.Load(Path.Combine(app, "ShipmentsPane.xaml"));
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement Named(string name) => Assert.Single(document.Descendants()
+            .Where(e => (string?)e.Attribute(x + "Name") == name));
+
+        var grid = Named("LinesGrid");
+        Assert.Equal("0", (string?)grid.Attribute("AlternationCount"));
+        var columns = grid.Descendants(p + "DataGridTextColumn")
+            .ToDictionary(e => (string)e.Attribute("Header")!);
+        foreach (var name in new[] { "По смете", "Выдано раньше", "Есть на складе", "Останется выдать" })
+            Assert.Equal("{StaticResource CompactCostMoney}", (string?)columns[name].Attribute("ElementStyle"));
+        var now = columns["Выдать сейчас ✎"];
+        Assert.Equal("{StaticResource ShipmentNowCell}", (string?)now.Attribute("CellStyle"));
+        Assert.Equal("{StaticResource ShipmentNowText}", (string?)now.Attribute("ElementStyle"));
+        Assert.Equal("{StaticResource CompactCostMoneyEditor}", (string?)now.Attribute("EditingElementStyle"));
+        Assert.Equal("{StaticResource ShipmentNowHeader}", (string?)now.Attribute("HeaderStyle"));
+        Assert.Equal("LinesGrid_CellEditEnding", (string?)grid.Attribute("CellEditEnding"));
+        Assert.Equal("MarkRow_Click", (string?)grid.Descendants(p + "CheckBox").Single().Attribute("Click"));
+
+        XElement Style(string key) => Assert.Single(document.Descendants(p + "Style")
+            .Where(e => (string?)e.Attribute(x + "Key") == key));
+        var nowCell = Style("ShipmentNowCell").ToString();
+        Assert.Contains("#EEF4FF", nowCell);
+        Assert.Contains("#ECFDF3", nowCell);
+        Assert.Contains("StockOverrun", nowCell);
+        Assert.Contains("GridSelectionTextBrush", nowCell);
+        Assert.Contains("{Binding QtyHint}", nowCell);
+        Assert.NotNull(Named("StockWarningText"));
+        Assert.NotNull(Named("ShipmentHelpText"));
+
+        var code = File.ReadAllText(Path.Combine(app, "ShipmentsPane.xaml.cs"));
+        Assert.Contains("ShipmentCardText.PositionCount(lineCount)", code);
+        Assert.Contains("ShipmentCardText.PositionCount(over)", code);
+        Assert.Contains("ShipmentCardText.PositionCount(planned - done)", code);
+        Assert.Contains("StockWarningText.Visibility = over == 0 ?", code);
+        Assert.Contains("TotalTile.ToolTip =", code);
+    }
+}

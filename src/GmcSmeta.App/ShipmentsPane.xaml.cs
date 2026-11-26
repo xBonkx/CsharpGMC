@@ -43,6 +43,9 @@ public sealed class ShipmentPreviewRow
     public bool StockOverrun { get; init; }
     public bool Planned { get; init; }
     public bool FullyIssued { get; init; }
+    public string QtyHint => !CanChange ? "" : StockOverrun
+        ? $"Выдаём больше, чем есть на складе (на складе {(string.IsNullOrEmpty(StockText) ? "0" : StockText)})"
+        : InShipment ? "Поправить — двойной щелчок" : "Двойной щелчок — вписать, сколько выдаём";
 }
 
 /// <summary>
@@ -220,6 +223,9 @@ public partial class ShipmentsPane : UserControl
         EditFixedButton.Visibility = FinishFixedButton.Visibility = Visibility.Collapsed;
         ExportExcelButton.IsEnabled = ExportPdfButton.IsEnabled = false;
         LinesTile.Text = OverTile.Text = TotalTile.Text = "—";
+        StockWarningText.Text = "";
+        StockWarningText.Visibility = ShipmentHelpText.Visibility = Visibility.Collapsed;
+        TotalTile.ToolTip = null;
         UpdateShipmentSteps(null);
         SetStatus(message);
     }
@@ -335,10 +341,15 @@ public partial class ShipmentsPane : UserControl
             planned++;
             if (row.FullyIssued) done++;
         }
-        LinesTile.Text = $"{lineCount} поз.";
-        OverTile.Text = over == 0 ? "нет" : $"{over} поз.";
+        LinesTile.Text = ShipmentCardText.PositionCount(lineCount);
+        OverTile.Text = over == 0 ? "нет" : ShipmentCardText.PositionCount(over);
+        StockWarningText.Text = over == 0 ? "" :
+            $"⚠ {ShipmentCardText.PositionCount(over)}: выдаём больше, чем есть на складе";
+        StockWarningText.Visibility = over == 0 ? Visibility.Collapsed : Visibility.Visible;
+        ShipmentHelpText.Visibility = IsEditable ? Visibility.Visible : Visibility.Collapsed;
         TotalTile.Text = planned == 0 ? "нет позиций" :
-            $"выдано {100m * done / planned:0}% · осталось {planned - done} поз.";
+            $"выдано {100m * done / planned:0}% · осталось {ShipmentCardText.PositionCount(planned - done)}";
+        TotalTile.ToolTip = $"Выдано полностью {done} из {planned} позиций всех документов объекта";
         return over;
     }
 

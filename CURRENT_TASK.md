@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 26.11.2026 — таблица и итоги выдачи (SHIP-VIS-05)
+
+26.11.2026 ChatGPT / main — SHIP-VIS-05 PARTIAL: таблица выдачи сверена с Python ship_view.py (HEADERS, NowDelegate, _set_row, _summary). Количества выровнены вправо, ширины 74/48/80/110/112/130/130, header tooltips; светло-синяя ячейка только у неотмеченных, зелёная у выбранных, предупреждение об избыточном количестве, подсказка edit, жирный текущий объём, убрана zebra. Итоги используют русские формы числа позиций через ShipmentCardText, отдельное предупреждение и tooltip закрытых позиций. SQL, проверка количества и запись/выбор строк не менялись; source regression добавлена. Windows build/xUnit/SQL Pilot/GUI не запускались: WIN-07/SHIP-VIS-05 остаются PARTIAL до приёмки DPI, больших ведомостей, edit/selection/scroll.
+
 ## 26.11.2026 — сегменты фильтров выдачи
 
 26.11.2026 ChatGPT / main (база b3a65a1) — SHIP-VIS-04, WIN-07 PARTIAL. Python ship_view.py:263–270, common.py segmented: track min330, radius11, padding3, gap2, weights3:4:4, exclusive, checked white/border_strong, original captions/tooltips. ShipmentsPane reuses existing Segment style, local radio siblings (no global GroupName), Click only, requested filter preserved across fixed readback, forced fixed filter2 displayed disabled, clear disabled, EditFixed resets requested0. Existing RowVisible conditions, document/search filters, RefreshRowFilter with grid-state restore retained; no SQL changes. Separate ShipmentsPane.Filters.cs, previous source regression updated and new test added. Existing draft default all retained (Python empty draft may default stock), Python hides locked toolbar while C# keeps disabled controls; not changed. Static review only; Windows build/xUnit/GUI not run. Acceptance: independent panes, keyboard, fixed/unfixed/edit, switch drafts, active cell edit/busy, document+search+segments, selection/scroll, 2500+ rows, narrow/DPI. Table/totals remain.

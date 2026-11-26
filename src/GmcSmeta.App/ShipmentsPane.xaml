@@ -35,6 +35,48 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="2,0"/>
         </Style>
+
+        <!-- ship_view.py: matching table headers and quantity cell feedback. -->
+        <Style x:Key="ShipmentMarkHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+            <Setter Property="ToolTip" Value="Галочка — позиция в ведомости"/>
+        </Style>
+        <Style x:Key="ShipmentStockHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+            <Setter Property="ToolTip" Value="Пришло на склад и ещё не выдано"/>
+        </Style>
+        <Style x:Key="ShipmentNowHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ShipmentQuantityHeader}">
+            <Setter Property="ToolTip" Value="Сколько выдаём по этой ведомости. Поправить — двойной щелчок"/>
+        </Style>
+        <Style x:Key="ShipmentLeftHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+            <Setter Property="ToolTip" Value="Сколько по смете ещё не выдано (после этой ведомости)"/>
+        </Style>
+        <Style x:Key="ShipmentNowCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+            <Setter Property="ToolTip" Value="{Binding QtyHint}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding InShipment}" Value="False">
+                    <Setter Property="Background" Value="#EEF4FF"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding InShipment}" Value="True">
+                    <Setter Property="Background" Value="#ECFDF3"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding StockOverrun}" Value="True">
+                    <Setter Property="Foreground" Value="#B45309"/>
+                </DataTrigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/>
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
+                </Trigger>
+                <Trigger Property="IsEditing" Value="True">
+                    <Setter Property="Background" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ShipmentNowText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding InShipment}" Value="True">
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid Margin="24,6,24,14">
         <Grid.ColumnDefinitions>
@@ -268,7 +310,7 @@
                   Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="LinesGrid" Grid.Row="4" Margin="0,2,0,0"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
-                  SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2" CanUserSortColumns="False" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                  SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="0" CanUserSortColumns="False" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                   BeginningEdit="LinesGrid_BeginningEdit" CellEditEnding="LinesGrid_CellEditEnding" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
             <DataGrid.Resources>
                 <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
@@ -313,7 +355,7 @@
                 </GroupStyle>
             </DataGrid.GroupStyle>
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Выдать" Width="62" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Выдать" Width="74" IsReadOnly="True" HeaderStyle="{StaticResource ShipmentMarkHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <CheckBox IsChecked="{Binding InShipment, Mode=OneWay}" IsEnabled="{Binding CanChange}"
                                   HorizontalAlignment="Center" VerticalAlignment="Center" Click="MarkRow_Click"
@@ -321,28 +363,35 @@
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource ShipmentNameText}" HeaderStyle="{StaticResource CompactCostTextHeader}"/>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="46" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
-                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="105" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
-                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="105" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="110" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="112" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentStockHeader}"/>
                 <DataGridTextColumn x:Name="QtyColumn" Header="Выдать сейчас ✎"
-                                    Binding="{Binding Qty, Mode=TwoWay}" Width="138"
-                                    ElementStyle="{StaticResource CompactCostCenter}" EditingElementStyle="{StaticResource CompactCostCenterEditor}"
-                                    CellStyle="{StaticResource ShipmentQuantityCell}" HeaderStyle="{StaticResource ShipmentQuantityHeader}"/>
-                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="116" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}"/>
+                                    Binding="{Binding Qty, Mode=TwoWay}" Width="130"
+                                    ElementStyle="{StaticResource ShipmentNowText}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"
+                                    CellStyle="{StaticResource ShipmentNowCell}" HeaderStyle="{StaticResource ShipmentNowHeader}"/>
+                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="130" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>
             </DataGrid.RowStyle>
         </DataGrid>
-        <TextBlock x:Name="FooterText" Grid.Row="5" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <StackPanel Grid.Row="5" Margin="0,8,0,0">
+            <TextBlock x:Name="StockWarningText" Foreground="#B45309" FontWeight="SemiBold"
+                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,3"/>
+            <TextBlock x:Name="ShipmentHelpText" Foreground="#64748B" TextWrapping="Wrap"
+                       Text="Галочка ставит столько, сколько есть на складе. Другое количество — двойной щелчок в столбце «Выдать сейчас»."
+                       Visibility="Collapsed"/>
+            <TextBlock x:Name="FooterText" Foreground="#64748B" Margin="0,2,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
         <UniformGrid Grid.Row="6" Columns="3" Margin="0,10,0,0">
             <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
                 <TextBlock Text="В этой ведомости" Style="{StaticResource PythonTileLabel}"/>
                 <TextBlock x:Name="LinesTile" Style="{StaticResource PythonTileValue}"/>
             </StackPanel></Border>
             <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
-                <TextBlock Text="Больше, чем на складе" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
+                <TextBlock Text="Выдаём больше, чем есть на складе" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
                 <TextBlock x:Name="OverTile" Style="{StaticResource PythonTileValue}"/>
             </StackPanel></Border>
             <Border Style="{StaticResource PythonTileAccent}"><StackPanel>
