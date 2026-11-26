@@ -32,6 +32,13 @@ internal static class Program
                 EstimateFooterLayoutChecks.Run();
                 return 0;
             }
+            if (args.Length == 2 && args[0] == "--visual-audit")
+            {
+                var auditApp = CreateApplication();
+                VisualAuditChecks.Export(args[1]);
+                auditApp.Shutdown();
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--offline-check")
             {
                 var offline = CreateApplication();
@@ -194,6 +201,7 @@ internal static class Program
         EstimateRowReadbackChecks.Run();
         EstimateGridRowUpdateChecks.Run();
         EstimateScrollingChecks.Run();
+        VisualAuditChecks.RunLayoutChecks();
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();
