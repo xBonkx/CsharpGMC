@@ -867,9 +867,9 @@ public partial class MainWindow : Window
         if (doc.Kind is "main" or "dop")
         {
             var signed = ContextMenuIcons.Create("Подписанный PDF", "Check");
-            signed.Click += (_, _) =>
+            signed.Click += async (_, _) =>
             {
-                if (ValidTarget()) AttachmentWindow.OpenSigned(this, connection!, doc.Id, doc.Title);
+                if (ValidTarget()) await AttachmentWindow.OpenSignedAsync(this, connection!, doc.Id, doc.Title, ValidTarget);
             };
             menu.Items.Add(signed);
             var select = ContextMenuIcons.Create("Добавить / выбрать подписанный PDF…", "File");
@@ -931,11 +931,12 @@ public partial class MainWindow : Window
     private DocRow? CardFileTarget(object sender) =>
         sender is Button { Tag: int id } ? _docs.FirstOrDefault(doc => doc.Id == id && doc.Kind is "main" or "dop") : null;
 
-    private void CardSignedPdf_Click(object sender, RoutedEventArgs e)
+    private async void CardSignedPdf_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (CardFileTarget(sender) is { } doc && _sqlConnectionString is { } connection)
-            AttachmentWindow.OpenSigned(this, connection, doc.Id, doc.Title);
+            await AttachmentWindow.OpenSignedAsync(this, connection, doc.Id, doc.Title, () =>
+                connection == _sqlConnectionString && _docs.Any(current => current.Id == doc.Id && current.Kind == doc.Kind));
     }
 
     private void CardSignedPdfMenu_Click(object sender, RoutedEventArgs e)

@@ -44,6 +44,9 @@ public sealed class AttachmentWindow : Window
     private bool _closed;
     private bool _allowCloseDuringRead;
     private CancellationTokenSource? _readCancellation;
+    private CancellationTokenSource? _openCancellation;
+    // Accessed only from the owning WPF dispatcher; one direct-open request per window.
+    private static readonly HashSet<Window> DirectOpenOwners = new();
     private string _revision = "";
     private string _objectFolder = "";
     private readonly List<(Button Button, Func<bool> Available)> _commands = new();
@@ -76,7 +79,7 @@ public sealed class AttachmentWindow : Window
         _grid.ItemsSource = _rows;
         _grid.ContextMenu = new ContextMenu();
         _grid.ContextMenuOpening += AttachmentMenu_Opening;
-        _grid.MouseDoubleClick += (_, _) => OpenSelected();
+        _grid.MouseDoubleClick += async (_, _) => await OpenSelectedAsync();
 
         var root = new DockPanel { Margin = new Thickness(16) };
         Content = root;
@@ -89,7 +92,7 @@ public sealed class AttachmentWindow : Window
         var add = new Button { Content = "Добавить…", Width = 110, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
         add.Click += (_, _) => AddFiles();
         var open = new Button { Content = "Открыть", Width = 100, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
-        open.Click += (_, _) => OpenSelected();
+        open.Click += async (_, _) => await OpenSelectedAsync();
         var del = new Button { Content = "Удалить", Width = 100, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
         del.Click += (_, _) => DeleteSelected();
         var close = new Button { Content = "Закрыть", Width = 100, Height = 30, IsCancel = true };
@@ -157,6 +160,7 @@ public sealed class AttachmentWindow : Window
         {
             _closed = true;
             _readCancellation?.Cancel();
+            _openCancellation?.Cancel();
         };
     }
 
@@ -219,24 +223,48 @@ public sealed class AttachmentWindow : Window
         AddedAt = item.AddedAt, Note = item.Note, Role = item.Role, IsPrimary = item.IsPrimary
     };
 
-    internal static void OpenSigned(Window owner, string connectionString, long contractId, string title)
+    internal static async Task OpenSignedAsync(Window owner, string connectionString, long contractId,
+        string title, Func<bool> validTarget)
     {
+        if (!owner.IsLoaded || !validTarget() || !DirectOpenOwners.Add(owner)) return;
+        using var cancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+        EventHandler closed = (_, _) => cancellation.Cancel();
+        owner.Closed += closed;
+        bool CanPublish() => !token.IsCancellationRequested && owner.IsLoaded && validTarget();
         try
         {
-            var rows = SqlServerAttachments.Read(connectionString, contractId).Entries.Select(ToRow).ToArray();
-            var id = SignedPdfSelection.DirectId(rows.Select(row =>
-                new SignedPdfSelection.Entry(row.Id, row.Role, row.IsPrimary)));
-            if (id is null)
+            var row = await Task.Run(() =>
+            {
+                var entries = SqlServerAttachments.Read(connectionString, contractId, token).Entries;
+                var id = SignedPdfSelection.DirectId(entries.Select(entry =>
+                    new SignedPdfSelection.Entry(entry.Id, entry.Role, entry.IsPrimary)));
+                if (id is null) return null;
+                var selected = ToRow(entries.Single(entry => entry.Id == id));
+                ValidateOpenFile(selected, signedOnly: true);
+                token.ThrowIfCancellationRequested();
+                return selected;
+            }, token);
+            if (!CanPublish()) return;
+            if (row is null)
             {
                 new AttachmentWindow(connectionString, contractId, title, signedOnly: true) { Owner = owner }.ShowDialog();
                 return;
             }
-            OpenFile(rows.Single(row => row.Id == id), signedOnly: true);
+            LaunchFile(row);
         }
-        catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Подписанный PDF", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex)
+        {
+            if (CanPublish()) MessageBox.Show(owner, ex.Message, "Подписанный PDF", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            owner.Closed -= closed;
+            DirectOpenOwners.Remove(owner);
+        }
     }
 
-    private static void OpenFile(AttachmentRow row, bool signedOnly)
+    private static void ValidateOpenFile(AttachmentRow row, bool signedOnly)
     {
         if (!Path.IsPathFullyQualified(row.Path))
             throw new InvalidOperationException("Относительный путь требует настройки общей папки: " + row.Path);
@@ -245,7 +273,12 @@ public sealed class AttachmentWindow : Window
         if (signedOnly && (row.Role != "signed_contract" ||
             !Path.GetExtension(row.Path).Equals(".pdf", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Файл не отмечен как подписанный PDF.");
-        Process.Start(new ProcessStartInfo(row.Path) { UseShellExecute = true });
+    }
+
+    // ShellExecute stays on the STA dispatcher, only after the current target is checked.
+    private static void LaunchFile(AttachmentRow row)
+    {
+        using var process = Process.Start(new ProcessStartInfo(row.Path) { UseShellExecute = true });
     }
 
     private void AttachmentMenu_Opening(object sender, ContextMenuEventArgs e)
@@ -257,9 +290,9 @@ public sealed class AttachmentWindow : Window
                 ? System.Windows.Controls.Primitives.PlacementMode.Bottom
                 : System.Windows.Controls.Primitives.PlacementMode.MousePoint };
         var open = ContextMenuIcons.Create("Открыть файл", "File", _grid.SelectedItems.Count == 1);
-        open.Click += (_, _) =>
+        open.Click += async (_, _) =>
         {
-            if (_rows.Contains(row) && ReferenceEquals(_grid.SelectedItem, row)) OpenSelected();
+            if (_rows.Contains(row) && ReferenceEquals(_grid.SelectedItem, row)) await OpenSelectedAsync();
         };
         menu.Items.Add(open);
         var revision = _revision;
@@ -367,16 +400,32 @@ public sealed class AttachmentWindow : Window
         finally { await ReloadAsync(); }
     }
 
-    private void OpenSelected()
+    private async Task OpenSelectedAsync()
     {
-        if (_loading || _grid.SelectedItems.Count != 1 || _grid.SelectedItem is not AttachmentRow row) return;
+        if (_loading || _closed || _grid.SelectedItems.Count != 1 || _grid.SelectedItem is not AttachmentRow row) return;
+        using var cancellation = new CancellationTokenSource();
+        _openCancellation = cancellation;
+        var token = cancellation.Token;
+        _loading = true;
+        _allowCloseDuringRead = true;
+        UpdateCommands();
+        bool CanPublish() => !_closed && !token.IsCancellationRequested &&
+            _grid.SelectedItems.Count == 1 && ReferenceEquals(_grid.SelectedItem, row) && _rows.Contains(row);
         try
         {
-            OpenFile(row, _signedOnly);
+            await Task.Run(() => ValidateOpenFile(row, _signedOnly), token);
+            if (CanPublish()) LaunchFile(row);
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (CanPublish()) MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _openCancellation = null;
+            _allowCloseDuringRead = false;
+            _loading = false;
+            if (!_closed) UpdateCommands();
         }
     }
 
