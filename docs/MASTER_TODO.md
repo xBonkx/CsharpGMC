@@ -24,11 +24,11 @@ WIN-26 сняты с активного контроля. Итог провер�
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 118 | 121 | 2 | 0 | 0 | 1 | 0 | 0 | 0 |
+| [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 117 | 122 | 2 | 0 | 0 | 1 | 0 | 0 | 0 |
 | [PERFORMANCE_TODO_20261124.md](PERFORMANCE_TODO_20261124.md) | 58 | 19 | 37 | 2 | 0 | 0 | 0 | 0 | 0 |
 | [CONTEXT_MENU_TODO_20261124.md](CONTEXT_MENU_TODO_20261124.md) | 49 | 8 | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [FUNCTIONAL_BUG_TODO_20261124.md](FUNCTIONAL_BUG_TODO_20261124.md) | 54 | 0 | 1 | 53 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **Всего** | 403 | 145 | 200 | 57 | 0 | 0 | 1 | 0 | 0 | 0 |
+| **Всего** | 403 | 144 | 201 | 57 | 0 | 0 | 1 | 0 | 0 | 0 |
 
 Открыто до приёмки: **403**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
 
@@ -130,7 +130,7 @@ WIN-26 сняты с активного контроля. Итог провер�
 | [GRID-29](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L281) | P2 | Рамка текущей ячейки без сдвига текста. | PARTIAL | [журнал, связанная реализация](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L64) | Сверить весь критерий, парный Windows/DPI тест |
 | [GRID-30](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L283) | P2 | Толщина и цвет сетки. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [GRID-31](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L285) | P2 | Белая пустая область. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
-| [GRID-32](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L287) | P1 | Скруглённый контейнер таблицы. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
+| [GRID-32](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L287) | P1 | Скруглённый контейнер таблицы. | PARTIAL | 26.11.2026: `EstimateView.xaml`, `SummaryTableFrame.cs`, `EstimateTableFrameSourceTests.cs`; [журнал](../CURRENT_TASK.md#26112026--скругление-таблицы-сметы). | Windows build/test, углы при прокрутке/resize, этапах, смене вкладок, DPI. |
 | [GRID-33](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L289) | P2 | Отступ кнопки Добавить строку. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [GRID-34](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L291) | P1 | Нижняя панель не отнимает лишнюю рабочую высоту. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [GRID-35](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L293) | P1 | Устранить лишние интервалы между таблицей, итогами и низом окна. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |

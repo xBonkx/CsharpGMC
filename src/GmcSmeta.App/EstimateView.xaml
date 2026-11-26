@@ -670,7 +670,7 @@
         </StackPanel>
 
         <!-- Таблица сметы -->
-        <Border x:Name="EstimateTablePanel" Grid.Row="4" Background="White" BorderBrush="#E4E8EF" BorderThickness="1"
+        <local:SummaryTableFrame x:Name="EstimateTablePanel" Grid.Row="4" Background="White" BorderBrush="#E4E8EF" BorderThickness="1"
                 CornerRadius="12" Margin="24,8,24,0">
             <DockPanel>
                 <Button DockPanel.Dock="Bottom" Content="Добавить строку" ContentTemplate="{StaticResource IconLabelPlus}"
@@ -916,7 +916,7 @@
                 </DataGrid.Columns>
                 </DataGrid>
             </DockPanel>
-        </Border>
+        </local:SummaryTableFrame>
 
 
         <!-- Python cost_view mat_page: панель инструментов, подсказка, таблица 13 колонок,
