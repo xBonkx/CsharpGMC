@@ -209,15 +209,19 @@ public static class SqlServerWorkspaceNavigation
         using var r = cmd.ExecuteReader();
         var rows = new List<CompanyEntry>();
         while (r.Read())
-        {
-            string S(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
-            rows.Add(new CompanyEntry(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), S(1), S(2), S(3), S(4), S(5),
-                r.IsDBNull(6) ? 0 : Convert.ToDecimal(r.GetValue(6), CultureInfo.InvariantCulture),
-                S(7), S(8), S(9), r.IsDBNull(10) ? 0 : r.GetInt32(10),
-                Convert.ToInt64(r.GetValue(11), CultureInfo.InvariantCulture))
-                { Logo = r.IsDBNull(12) ? null : (byte[])r.GetValue(12) });
-        }
+            rows.Add(ReadCompany(r));
         return rows;
+    }
+
+    // The existing SQL Server databases may expose [order] as INT or BIGINT.
+    internal static CompanyEntry ReadCompany(IDataRecord r)
+    {
+        string S(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
+        return new CompanyEntry(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), S(1), S(2), S(3), S(4), S(5),
+            r.IsDBNull(6) ? 0 : Convert.ToDecimal(r.GetValue(6), CultureInfo.InvariantCulture),
+            S(7), S(8), S(9), r.IsDBNull(10) ? 0 : Convert.ToInt32(r.GetValue(10), CultureInfo.InvariantCulture),
+            Convert.ToInt64(r.GetValue(11), CultureInfo.InvariantCulture))
+            { Logo = r.IsDBNull(12) ? null : (byte[])r.GetValue(12) };
     }
 
     public static IReadOnlyList<TagEntry> Tags(string connectionString)

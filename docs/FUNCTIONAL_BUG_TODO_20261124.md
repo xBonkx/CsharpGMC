@@ -326,3 +326,8 @@ SaveTotalsFieldAsync возвращает bool, потребители прек�
 - 26.11.2026, пользовательский скриншот v1.0.3: Unable to cast object of type 'System.Int64' to type 'System.Int32'. В SqlServerPeopleAccess.Load обе проекции sort_order используют GetInt32, который не принимает SQL BIGINT; идентификаторы уже читаются как Int64.
 - Исправление: выделены два маппера IDataRecord, sort_order читается через Convert.ToInt32(GetValue), с проверкой диапазона, без изменения модели, сортировки, SQL-схемы и данных. Других GetInt32 в данном классе нет.
 - Регрессия: пять параметризованных сценариев обоих мапперов с INT/BIGINT, нулевым и ручным порядком, большим ID. Windows build, xUnit, SQL Pilot и GUI ещё не запускались. CODE READY, не DONE.
+
+## BUG-F53 — P1 — CODE READY: Int64 → Int32 при открытии «Наши организации»
+- 26.11.2026, пользовательский скриншот v1.0.3: диалог «Организации» падает при загрузке. CompanyWindow.LoadAsync вызывает SqlServerWorkspaceNavigation.Companies; проекция c.[order] читалась через GetInt32(10), несовместимый с BIGINT. ID и COUNT_BIG уже корректно читаются как Int64.
+- Исправление: выделен ReadCompany(IDataRecord), для [order] используется Convert.ToInt32(GetValue) с контролем диапазона и прежним поведением NULL=0; остальные реквизиты, НДС, логотип, защита удаления и схема неизменны. Добавлено шесть сценариев INT/BIGINT/NULL с большим ID и числом использований.
+- Статическая проверка; Windows build, xUnit, SQL Pilot и GUI не запускались. CODE READY, не DONE. Связано с BUG-F52; нужен отдельный общий аудит строгих числовых геттеров SQL Server.

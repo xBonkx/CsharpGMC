@@ -1,3 +1,4 @@
+using System.Data;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -6,6 +7,40 @@ namespace GmcSmeta.Core.Tests;
 /// <summary>Pure SQL Server-only checks. No connection to any database is made.</summary>
 public sealed class SqlServerWorkspaceTests
 {
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 12)]
+    [InlineData(true, 0)]
+    [InlineData(true, 12)]
+    [InlineData(true, int.MaxValue)]
+    [InlineData(true, null)]
+    public void CompanyReaderAcceptsIntAndBigIntOrder(bool bigInt, int? order)
+    {
+        using var table = new DataTable();
+        table.Columns.Add("id", typeof(long));
+        foreach (var column in new[] { "name", "address", "inn_kpp", "phone", "email" })
+            table.Columns.Add(column, typeof(string));
+        table.Columns.Add("vat_rate", typeof(double));
+        foreach (var column in new[] { "legal_full", "signer_post", "signer_name" })
+            table.Columns.Add(column, typeof(string));
+        table.Columns.Add("order", bigInt ? typeof(long) : typeof(int));
+        table.Columns.Add("uses", typeof(long));
+        table.Columns.Add("logo", typeof(byte[]));
+        const long id = (long)int.MaxValue + 1;
+        object orderValue = order is int n ? (bigInt ? (object)(long)n : n) : DBNull.Value;
+        var logo = new byte[] { 1, 2, 3 };
+        table.Rows.Add(id, "ООО Тест", "", "", "", "", 22d, "", "", "", orderValue, id, logo);
+        using var reader = table.CreateDataReader();
+        Assert.True(reader.Read());
+        var company = SqlServerWorkspaceNavigation.ReadCompany(reader);
+        Assert.Equal(id, company.Id);
+        Assert.Equal(id, company.Uses);
+        Assert.Equal(order ?? 0, company.Order);
+        Assert.Equal(22m, company.VatRate);
+        Assert.Equal("ООО Тест", company.Name);
+        Assert.Equal(logo, company.Logo);
+    }
+
     [Theory]
     [InlineData("Server=localhost;Database=master;Integrated Security=true")]
     [InlineData("Server=localhost;Database=GmcSmeta;Integrated Security=true")]
