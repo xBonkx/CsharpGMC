@@ -214,7 +214,9 @@ public partial class EstimateView : UserControl
             : focusId is int id ? _rows.FirstOrDefault(r => r.Id == id && !r.IsSystem) : null;
         if (selected is not null)
         {
-            EstimateGrid.SelectedItem = selected;
+            if (!ReferenceEquals(EstimateGrid.SelectedItem, selected) &&
+                (focusSystem is not null || selectedId != focusId || !EstimateGrid.SelectedItems.Contains(selected)))
+                EstimateGrid.SelectedItem = selected;
             if (focusSystem is not null || selectedId != focusId)
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -704,9 +706,12 @@ public partial class EstimateView : UserControl
         if (EstimateGrid.ItemsSource is not IEnumerable<EditableEstimateRow> existing ||
             !existing.SequenceEqual(visible, ReferenceEqualityComparer.Instance))
         {
-            EstimateGrid.ItemsSource = visible;
-            if (selected is not null && visible.Contains(selected))
-                EstimateGrid.SelectedItem = selected;
+            if (_inlineStagesOn || !EstimateGridRowUpdates.TryReplace(EstimateGrid, visible))
+            {
+                EstimateGrid.ItemsSource = EstimateGridRowUpdates.CreateSource(visible);
+                if (selected is not null && visible.Contains(selected))
+                    EstimateGrid.SelectedItem = selected;
+            }
         }
 
         RefreshTemporaryViewControls();

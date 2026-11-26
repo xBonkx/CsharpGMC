@@ -83,3 +83,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-036/035 / ARCH-SIZE-07: SqlServerDirector.cs 221→228, PilotCases.cs 493→494, новый PilotDirectorMovementCases.cs 87 строк. Раздельная SQL projection по необходимости просрочек; общий код сохранён, build/test не запускались.
 - 26.11.2026, PERF-041 / ARCH-SIZE-03/07: Estimate.cs 521→506, новый EstimateReader.Totals.cs 25, Totals.cs 340→374, EstimateDisplayTests.cs 71→76, новый EstimateTotalsProjectionTests.cs 66 строк. Вынесен тематический расчёт, generic reuse исходных строк; logical reader не полностью декомпозирован, build/test не запускались.
 - 26.11.2026, PERF-041 / ARCH-SIZE-03: EditableEstimateRow.cs 271→313, Program.cs (App.Checks) 636→637, новый EstimateRowReadbackChecks.cs 79 строк. Изменения локальны в модели, новый сценарий выделен из runner; build/test не запускались.
+
+- 26.11.2026, PERF-041 / ARCH-SIZE-03: EstimateView.xaml.cs 1158→1163, новый EstimateGridRowUpdates.cs 70, Program.cs (App.Checks) 637→638, новый EstimateGridRowUpdateChecks.cs 60 строк. Изолирован компонент публикации строк, интеграция в крупный класс минимальна; build/test не запускались.
