@@ -177,7 +177,14 @@ public partial class EstimateView
 
     private async Task LoadCostSummaryAsync(bool force = false)
     {
-        if (_estimate is null || SummaryGrid is null) return;
+        if (_estimate is null || _detached) return;
+        // Only a visible tab may create its visual tree. Cache checks and
+        // invalidation use SummaryView/SummaryGrid without constructing it.
+        if (SummaryView is null)
+        {
+            if (_visibleEstimateMode != "summary" || SummaryPanel is null) return;
+            EnsureSummaryView(SummaryPanel, this);
+        }
         if (_summaryLoading) return;
         if (!force && _costSummaryData is not null && !string.IsNullOrWhiteSpace(_summaryRevision) &&
             _summaryRevision == _serverRevision)
@@ -254,7 +261,7 @@ public partial class EstimateView
             : string.Join("\n", names);
     }
 
-    private void SummarySystemFilter_Click(object sender, RoutedEventArgs e)
+    internal void SummarySystemFilter_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || _costSummaryData is not { } data || _detached) return;
         var options = _summarySystemOptions;
@@ -797,21 +804,21 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ toolbar events
-    private void SummarySearch_TextChanged(object sender, TextChangedEventArgs e) => SummaryRebuild();
+    internal void SummarySearch_TextChanged(object sender, TextChangedEventArgs e) => SummaryRebuild();
 
-    private void ClearSummarySearch_Click(object sender, RoutedEventArgs e)
+    internal void ClearSummarySearch_Click(object sender, RoutedEventArgs e)
     {
         SummarySearch.Clear();
         SummarySearch.Focus();
     }
 
-    private void SummaryMissing_Changed(object sender, RoutedEventArgs e)
+    internal void SummaryMissing_Changed(object sender, RoutedEventArgs e)
     {
         _summaryMissingOn = SummaryMissingToggle?.IsChecked == true;
         SummaryRebuild();
     }
 
-    private void SummaryMissingMenu_Click(object sender, RoutedEventArgs e)
+    internal void SummaryMissingMenu_Click(object sender, RoutedEventArgs e)
     {
         if (SummaryMissingChrome is null) return;
         var menu = new ContextMenu { PlacementTarget = SummaryMissingChrome, Placement = PlacementMode.Bottom };
@@ -835,7 +842,7 @@ public partial class EstimateView
         menu.IsOpen = true;
     }
 
-    private void SummaryGroup_Click(object sender, RoutedEventArgs e)
+    internal void SummaryGroup_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
@@ -855,7 +862,7 @@ public partial class EstimateView
         menu.IsOpen = true;
     }
 
-    private void SummarySort_Click(object sender, RoutedEventArgs e)
+    internal void SummarySort_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
@@ -878,7 +885,7 @@ public partial class EstimateView
         menu.IsOpen = true;
     }
 
-    private void SummaryResetView_Click(object sender, RoutedEventArgs e)
+    internal void SummaryResetView_Click(object sender, RoutedEventArgs e)
     {
         _summaryMode = "kp";
         _summarySort = "kp";
@@ -890,7 +897,7 @@ public partial class EstimateView
         supplierKey is not null ? _collapsedSummarySuppliers.Contains(supplierKey) :
         systemId != 0 && _collapsedSummarySystems.Contains(systemId);
 
-    private void SummaryToggleSystem_Click(object sender, RoutedEventArgs e)
+    internal void SummaryToggleSystem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: SummaryRow row } || !row.CanCollapseSystem) return;
         if (row.SupplierGroupKey is { } supplierKey)
@@ -906,7 +913,7 @@ public partial class EstimateView
     /// <summary>Имя колонки «Сводной» — из SortMemberPath (шапка — визуальный объект).</summary>
     private static string SummaryColumnKey(DataGridColumn column) => column.SortMemberPath ?? "";
 
-    private void SummaryGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+    internal void SummaryGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
     {
         if (!SummarySnapshotReady || e.Row.Item is not SummaryRow row)
         {
@@ -991,7 +998,7 @@ public partial class EstimateView
         }
     }
 
-    private void SummaryGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
+    internal void SummaryGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
         var editor = MaterialsEditorTextBox(e.EditingElement);
         if (editor is null) return;
@@ -1005,7 +1012,7 @@ public partial class EstimateView
         }, DispatcherPriority.Background);
     }
 
-    private void SummaryGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
+    internal void SummaryGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
     {
         if (e.EditAction != DataGridEditAction.Commit) return;
         if (!SummarySnapshotReady) { e.Cancel = true; return; }
@@ -1153,13 +1160,13 @@ public partial class EstimateView
         });
 
     // ------------------------------------------------------------------ markup / СМР в смету
-    private async void SummaryMarkupAll_Click(object sender, RoutedEventArgs e)
+    internal async void SummaryMarkupAll_Click(object sender, RoutedEventArgs e)
     {
         var ids = _summaryRecs.Select(r => r.Id).ToList();
         await SummaryMarkupAsync(ids, allRows: true);
     }
 
-    private void SummaryGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    internal void SummaryGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (!SummarySnapshotReady ||
             ContextMenuTarget.SelectRow<SummaryRow>(SummaryGrid, e) is not { Kind: "pos" })
@@ -1233,7 +1240,7 @@ public partial class EstimateView
         });
     }
 
-    private async void SummaryTransferSmr_Click(object sender, RoutedEventArgs e)
+    internal async void SummaryTransferSmr_Click(object sender, RoutedEventArgs e)
     {
         if (!SummarySnapshotReady || _estimate?.Locked != false) return;
         var revision = _summaryRevision;
@@ -1252,7 +1259,7 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ export
-    private void SummaryExcel_Click(object sender, RoutedEventArgs e)
+    internal void SummaryExcel_Click(object sender, RoutedEventArgs e)
     {
         if (SummaryGrid?.ItemsSource is not ObservableCollection<SummaryRow> rows) return;
         XlsxExport.Save(Window.GetWindow(this),

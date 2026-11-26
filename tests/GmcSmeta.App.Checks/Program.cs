@@ -71,6 +71,8 @@ internal static class Program
                 throw new Exception("Initial estimate must not create the hidden totals panel.");
             if (page.FindName("MaterialsPanel") is not Border { Child: null })
                 throw new Exception("Initial estimate must not create the hidden materials panel.");
+            if (page.FindName("SummaryPanel") is not Border { Child: null })
+                throw new Exception("Initial estimate must not create the hidden summary panel.");
             foreach (var width in new[] { 1366d, 1920d })
             {
                 var element = (FrameworkElement)window.Content;
@@ -182,6 +184,7 @@ internal static class Program
         LazyContractActsChecks.Run();
         LazyEstimateTotalsChecks.Run();
         LazyEstimateMaterialsChecks.Run();
+        LazyEstimateSummaryChecks.Run();
         CheckKsReferenceHighlights();
         KsRowNotificationChecks.Run();
         CheckSummaryTableFrame();

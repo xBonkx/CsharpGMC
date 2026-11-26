@@ -16,8 +16,37 @@ public sealed class SummaryViewSourceTests
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "EstimateView.xaml")))
             root = root.Parent;
         Assert.NotNull(root);
-        return XDocument.Load(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "EstimateView.xaml"))
-            .Descendants(Wpf + "Border").Single(e => (string?)e.Attribute(Xaml + "Name") == "SummaryPanel");
+        return XDocument.Load(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "EstimateSummaryPanel.xaml")).Root!;
+    }
+
+    [Fact]
+    public void SummaryHostIsEmptyAndCompiledPanelPreservesTemplateAndEditHandlers()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "EstimateView.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var editor = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        var host = editor.Descendants(Wpf + "Border").Single(e => (string?)e.Attribute(Xaml + "Name") == "SummaryPanel");
+        Assert.Empty(host.Elements());
+        Assert.Equal("Collapsed", (string?)host.Attribute("Visibility"));
+        var panel = Panel();
+        Assert.Equal("GmcSmeta.App.EstimateSummaryPanel", (string?)panel.Attribute(Xaml + "Class"));
+        Assert.Single(panel.Descendants(Wpf + "Button").Where(e =>
+            (string?)e.Attribute("Click") == "SummaryToggleSystem_Click"));
+        var grid = panel.Descendants(Wpf + "DataGrid").Single();
+        Assert.Equal("SummaryGrid_BeginningEdit", (string?)grid.Attribute("BeginningEdit"));
+        Assert.Equal("SummaryGrid_PreparingCellForEdit", (string?)grid.Attribute("PreparingCellForEdit"));
+        Assert.Equal("SummaryGrid_CellEditEnding", (string?)grid.Attribute("CellEditEnding"));
+        Assert.Equal("SummaryGrid_ContextMenuOpening", (string?)grid.Attribute("ContextMenuOpening"));
+        var forwarding = File.ReadAllText(Path.Combine(app, "EstimateSummaryPanel.xaml.cs"));
+        Assert.Contains("Owner?.SummaryToggleSystem_Click(sender, e)", forwarding);
+        Assert.Contains("Owner?.SummaryGrid_CellEditEnding(sender, e)", forwarding);
+        var factory = File.ReadAllText(Path.Combine(app, "EstimateView.SummaryPanel.cs"));
+        Assert.Contains("if (host.Child is EstimateSummaryPanel existing) return existing;", factory);
+        var logic = File.ReadAllText(Path.Combine(app, "EstimateView.CostSummary.cs"));
+        Assert.Contains("if (_visibleEstimateMode != \"summary\" || SummaryPanel is null) return;", logic);
     }
 
     [Fact]
