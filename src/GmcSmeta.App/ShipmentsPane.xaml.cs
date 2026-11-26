@@ -225,9 +225,12 @@ public partial class ShipmentsPane : UserControl
 
     private sealed record ShipmentItem(long Id, SqlServerShipments.ShipmentInfo Info)
     {
-        public string Title => $"№ {Info.Number} от {Info.Date:dd.MM.yyyy}";
-        public string Details => (Info.Fixed ? "Выдана" : "Черновик") + $" · строк {Info.Lines}" +
-            (string.IsNullOrWhiteSpace(Info.Recipient) ? "" : "\n" + Info.Recipient);
+        public string Title => $"№ {Info.Number}  ·  {Info.Date:dd.MM.yyyy}";
+        public bool HasRecipient => !string.IsNullOrWhiteSpace(Info.Recipient);
+        public string RecipientCaption => HasRecipient ? Info.Recipient : "кому — не указано";
+        public string StateCaption => Info.Fixed ? "✓ Выдано" : "Готовится";
+        public string LineCountCaption => ShipmentCardText.PositionCount(Info.Lines);
+        public string Details => RecipientCaption + "\n" + StateCaption + " · " + LineCountCaption;
         public override string ToString() => Title + " · " + Details;
     }
 
