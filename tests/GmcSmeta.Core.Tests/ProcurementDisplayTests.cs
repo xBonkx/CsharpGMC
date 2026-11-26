@@ -27,6 +27,43 @@ public class ProcurementDisplayTests
         Assert.Equal("done", ProcurementDisplay.ExpectedState(now.AddDays(-1), "issued", now));
     }
 
+    [Fact]
+    public void StatusBadgesUseCanonicalStatusColorsWithPythonBorder()
+    {
+        foreach (var status in GmcSmeta.Core.Db.SqlServerProcurement.StatusTable)
+        {
+            var look = ProcurementBadgePalette.Status(status.Code);
+            Assert.Equal(status.Code == "none" ? "#FEE2E2" : status.Bg, look.Background);
+            Assert.Equal(status.Fg, look.Foreground);
+            Assert.Equal("#46" + status.Fg[1..], look.Border);
+        }
+        Assert.Equal(ProcurementBadgePalette.Status("none"), ProcurementBadgePalette.Status("unknown"));
+    }
+
+    [Theory]
+    [InlineData("late", "#FEE2E2", "#B91C1C")]
+    [InlineData("soon", "#FEF3C7", "#B45309")]
+    [InlineData("ok", "#EEF2F7", "#334155")]
+    [InlineData("done", "#F4F4F5", "#94A3B8")]
+    public void DueBadgesMatchPythonPalette(string state, string bg, string fg)
+    {
+        var look = ProcurementBadgePalette.Due(state);
+        Assert.Equal(new ProcurementBadgeLook(bg, fg, "#46" + fg[1..]), look);
+        Assert.Equal("#00000000", ProcurementBadgePalette.Due("").Background);
+    }
+
+    [Fact]
+    public void DueTooltipExplainsCurrentDeliveryState()
+    {
+        var now = new DateTime(2026, 11, 24);
+        Assert.Equal("Просрочено на 2 дн.: ждали к 22.11.2026", ProcurementDisplay.ExpectedTooltip(now.AddDays(-2), "ordered", now));
+        Assert.Equal("Сегодня", ProcurementDisplay.ExpectedTooltip(now, "ordered", now));
+        Assert.Equal("Через 3 дн.", ProcurementDisplay.ExpectedTooltip(now.AddDays(3), "ordered", now));
+        Assert.Equal("Ждём к 28.11.2026", ProcurementDisplay.ExpectedTooltip(now.AddDays(4), "ordered", now));
+        Assert.Equal("Ждали к 22.11.2026 — уже пришло", ProcurementDisplay.ExpectedTooltip(now.AddDays(-2), "stock", now));
+        Assert.Contains("Двойной щелчок", ProcurementDisplay.ExpectedTooltip(null, "ordered", now));
+    }
+
     [Theory]
     [InlineData(10, 2, "part_issued", "8")]
     [InlineData(10, 11, "issued", "")]

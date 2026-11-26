@@ -71,6 +71,9 @@ public sealed class ProcurementPreviewRow
     public DateTime? DueOn { get; init; }
     public string ExpectedCaption => ProcurementDisplay.ExpectedCaption(DueOn, DateTime.Today);
     public string ExpectedState => ProcurementDisplay.ExpectedState(DueOn, StatusCode, DateTime.Today);
+    public ProcurementBadgeLook StatusBadge => ProcurementBadgePalette.Status(StatusCode);
+    public ProcurementBadgeLook DueBadge => ProcurementBadgePalette.Due(ExpectedState);
+    public string DueTooltip => ProcurementDisplay.ExpectedTooltip(DueOn, StatusCode, DateTime.Today);
     public string RowNumber { get; set; } = "";
     public bool IsSub { get; init; }
     public string StageChoice => string.IsNullOrEmpty(Stage) || Stage == "plan" ? "none" : Stage;

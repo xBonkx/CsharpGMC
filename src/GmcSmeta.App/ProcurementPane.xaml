@@ -6,6 +6,24 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <UserControl.Resources>
+        <!-- Python common.GridDelegate pill: 5px radius, foreground alpha 70 border,
+             demi-bold 86% of the normal 10pt font, left inset 6px. -->
+        <Style x:Key="ProcurementBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="7,1"/>
+            <Setter Property="Margin" Value="2,0,2,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="18"/>
+        </Style>
+        <Style x:Key="ProcurementBadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.466666666666667"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
         <Style x:Key="ProcurementCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
             <Setter Property="Padding" Value="4,4"/>
         </Style>
@@ -323,71 +341,11 @@
                 <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Border CornerRadius="5" Padding="6,1" Margin="0" HorizontalAlignment="Left"
-                                    BorderThickness="1" MinHeight="18" ToolTip="{Binding StatusLabel}">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Background" Value="#F1F4F9"/><Setter Property="BorderBrush" Value="#D0D7E2"/>
-                                        <Setter Property="TextElement.Foreground" Value="#475569"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Не заказано">
-                                                <Setter Property="Background" Value="#FEE2E2"/>
-                                                <Setter Property="BorderBrush" Value="#FECACA"/>
-                                                <Setter Property="TextElement.Foreground" Value="#B91C1C"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Не заказываем">
-                                                <Setter Property="Background" Value="#F4F4F5"/>
-                                                <Setter Property="TextElement.Foreground" Value="#71717A"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="0 по КП">
-                                                <Setter Property="Background" Value="#F4F4F5"/>
-                                                <Setter Property="TextElement.Foreground" Value="#A1A1AA"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="По факту">
-                                                <Setter Property="Background" Value="#F1F5F9"/>
-                                                <Setter Property="TextElement.Foreground" Value="#475569"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Заказано">
-                                                <Setter Property="Background" Value="#EFF6FF"/>
-                                                <Setter Property="TextElement.Foreground" Value="#1D4ED8"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Заявка в цех">
-                                                <Setter Property="Background" Value="#EEF2FF"/>
-                                                <Setter Property="TextElement.Foreground" Value="#4338CA"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="В изготовлении">
-                                                <Setter Property="Background" Value="#FAE8FF"/>
-                                                <Setter Property="TextElement.Foreground" Value="#A21CAF"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Счёт">
-                                                <Setter Property="Background" Value="#FEF9C3"/>
-                                                <Setter Property="TextElement.Foreground" Value="#854D0E"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Оплачено">
-                                                <Setter Property="Background" Value="#F3E8FF"/>
-                                                <Setter Property="TextElement.Foreground" Value="#7E22CE"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Пришло частично">
-                                                <Setter Property="Background" Value="#FFEDD5"/>
-                                                <Setter Property="TextElement.Foreground" Value="#C2410C"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="На складе">
-                                                <Setter Property="Background" Value="#E0F2FE"/>
-                                                <Setter Property="TextElement.Foreground" Value="#0369A1"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Выдано частично">
-                                                <Setter Property="Background" Value="#ECFCCB"/>
-                                                <Setter Property="TextElement.Foreground" Value="#4D7C0F"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding StatusLabel}" Value="Выдано">
-                                                <Setter Property="Background" Value="#DCFCE7"/>
-                                                <Setter Property="TextElement.Foreground" Value="#15803D"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock Text="{Binding StatusLabel}" FontSize="{StaticResource UiCaptionSize}"
-                                           FontWeight="Normal" TextTrimming="CharacterEllipsis"/>
+                            <Border Style="{StaticResource ProcurementBadge}"
+                                    Background="{Binding StatusBadge.Background}" BorderBrush="{Binding StatusBadge.Border}"
+                                    ToolTip="{Binding StatusLabel}">
+                                <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ProcurementBadgeText}"
+                                           Foreground="{Binding StatusBadge.Foreground}"/>
                             </Border>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
@@ -405,17 +363,21 @@
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Ожидаем" Width="86" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate>
-                        <Border CornerRadius="5" Padding="4,1" Margin="0" HorizontalAlignment="Center" ToolTip="{Binding DueDate}">
-                            <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ExpectedState}" Value="late"><Setter Property="Background" Value="#FEE2E2"/><Setter Property="TextElement.Foreground" Value="#B91C1C"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding ExpectedState}" Value="soon"><Setter Property="Background" Value="#FEF3C7"/><Setter Property="TextElement.Foreground" Value="#B45309"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding ExpectedState}" Value="ok"><Setter Property="Background" Value="#EEF2F7"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding ExpectedState}" Value="done"><Setter Property="Background" Value="#F4F4F5"/><Setter Property="TextElement.Foreground" Value="#94A3B8"/></DataTrigger>
-                                </Style.Triggers>
-                            </Style></Border.Style>
-                            <TextBlock Text="{Binding ExpectedCaption}" VerticalAlignment="Center" FontSize="{StaticResource UiCaptionSize}"/>
+                        <Grid ToolTip="{Binding DueTooltip}" Background="Transparent">
+                        <Border Background="{Binding DueBadge.Background}" BorderBrush="{Binding DueBadge.Border}">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource ProcurementBadge}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ExpectedCaption}" Value="">
+                                            <Setter Property="Visibility" Value="Hidden"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding ExpectedCaption}" Style="{StaticResource ProcurementBadgeText}"
+                                       Foreground="{Binding DueBadge.Foreground}"/>
                         </Border>
+                        </Grid>
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding DueDate, Mode=OneWay}" Style="{StaticResource CompactCostCenterEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>

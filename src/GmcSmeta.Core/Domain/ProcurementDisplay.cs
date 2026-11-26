@@ -24,6 +24,21 @@ public static class ProcurementDisplay
         return days < 0 ? "late" : days <= 3 ? "soon" : "ok";
     }
 
+    public static string ExpectedTooltip(DateTime? due, string status, DateTime today)
+    {
+        if (due is not DateTime date)
+            return "Двойной щелчок — когда ждём поставку (дд.мм или +7)";
+        var days = (date.Date - today.Date).Days;
+        var formatted = date.ToString("dd.MM.yyyy", Russian);
+        return ExpectedState(date, status, today) switch
+        {
+            "late" => $"Просрочено на {-days} дн.: ждали к {formatted}",
+            "soon" => days == 0 ? "Сегодня" : $"Через {days} дн.",
+            "done" => $"Ждали к {formatted} — уже пришло",
+            _ => $"Ждём к {formatted}"
+        };
+    }
+
     public static string Remaining(decimal planned, decimal issued, string status, CultureInfo culture)
     {
         var left = Math.Max(0m, planned - issued);
