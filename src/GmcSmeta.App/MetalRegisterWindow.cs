@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ClosedXML.Excel;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using Microsoft.Win32;
 
@@ -145,10 +146,9 @@ internal sealed class MetalRegisterWindow : Window
         if (_book is null || !_dirty) return;
         try
         {
-            var output = new MemoryStream();
-            _book.SaveAs(output);
+            var bytes = LiveWorkbookSnapshot.Capture(_book);
             var mainRevision = await Task.Run(_warehouse.Revision);
-            var next = await Task.Run(() => _warehouse.SaveRegister(output.ToArray(),_version,mainRevision));
+            var next = await Task.Run(() => _warehouse.SaveRegister(bytes,_version,mainRevision));
             _version = next;
             _dirty = false;
             Title = "Учёт металла";
@@ -172,7 +172,10 @@ internal sealed class MetalRegisterWindow : Window
         if (picker.ShowDialog(this) != true) return;
         try
         {
-            _book.SaveAs(picker.FileName);
+            // Never bind the live editable workbook to the exported filename.
+            // It must survive deletion/locking of that file and later saves.
+            var bytes = LiveWorkbookSnapshot.Capture(_book);
+            ExportFilePublication.WriteBytes(picker.FileName, bytes);
             _status.Text = "Файл сохранён: " + picker.FileName;
         }
         catch (Exception ex) { Error(ex); }

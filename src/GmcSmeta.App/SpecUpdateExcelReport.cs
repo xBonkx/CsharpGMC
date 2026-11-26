@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using ClosedXML.Excel;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.App;
@@ -24,8 +25,9 @@ public static class SpecUpdateExcelReport
         for (var col = 0; col < headers.Length; col++)
             sheet.Cell(1, col + 1).Value = headers[col];
 
+        var ordered = history.OrderBy(r => r.Id).ToArray();
         var currentRow = 2;
-        foreach (var revision in history.OrderBy(r => r.Id))
+        foreach (var revision in ordered)
         {
             using JsonDocument? json = Parse(revision.Data);
             var changes = json?.RootElement.ValueKind == JsonValueKind.Array
@@ -60,9 +62,9 @@ public static class SpecUpdateExcelReport
         var summary = workbook.Worksheets.Add("Ревизии");
         var titles = new[] { "Изм.", "Дата", "Пользователь", "Файл", "Итого до, ₽", "Итого после, ₽", "Разница, ₽" };
         for (var i = 0; i < titles.Length; i++) summary.Cell(1, i + 1).Value = titles[i];
-        for (var i = 0; i < history.Count; i++)
+        for (var i = 0; i < ordered.Length; i++)
         {
-            var item = history.OrderBy(x => x.Id).ElementAt(i);
+            var item = ordered[i];
             var row = i + 2;
             summary.Cell(row, 1).Value = item.Title;
             summary.Cell(row, 2).Value = item.CreatedAt;
@@ -81,7 +83,7 @@ public static class SpecUpdateExcelReport
         summary.Columns(5, 7).Width = 22;
         summary.Columns(5, 7).Style.NumberFormat.Format = "#,##0.00";
         summary.SheetView.FreezeRows(1);
-        workbook.SaveAs(path);
+        ExportFilePublication.Write(path, stream => workbook.SaveAs(stream));
     }
 
     private static JsonDocument? Parse(string? data)

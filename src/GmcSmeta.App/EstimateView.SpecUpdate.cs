@@ -296,8 +296,12 @@ internal sealed class SpecUpdateHistoryWindow : Window
         };
         var export = new Button { Content = "Экспорт XLSX…", MinWidth = 135,
             Margin = new Thickness(0,0,12,0), IsEnabled = revisions.Count > 0 };
-        export.Click += (_, _) =>
+        bool exporting = false, closed = false;
+        Closed += (_, _) => closed = true;
+        export.Click += async (_, _) =>
         {
+            if (exporting || closed) return;
+            var snapshot = revisions.ToArray();
             var dialog = new SaveFileDialog
             {
                 Title = "Экспорт изменений спецификаций",
@@ -305,17 +309,28 @@ internal sealed class SpecUpdateHistoryWindow : Window
                 FileName = "Изменения_спецификации.xlsx",
                 DefaultExt = ".xlsx"
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (dialog.ShowDialog(this) != true || closed) return;
+            var destination = dialog.FileName;
+            exporting = true;
+            export.IsEnabled = false;
             try
             {
-                SpecUpdateExcelReport.Export(dialog.FileName, revisions);
-                MessageBox.Show(this, "Отчёт Excel сформирован.", Title,
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                // A captured report may finish even if the history window closes.
+                await Task.Run(() => SpecUpdateExcelReport.Export(destination, snapshot));
+                if (!closed)
+                    MessageBox.Show(this, "Отчёт Excel сформирован.", Title,
+                        MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Ошибка экспорта: " + ex.Message, Title,
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!closed)
+                    MessageBox.Show(this, "Ошибка экспорта: " + ex.Message, Title,
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                exporting = false;
+                if (!closed) export.IsEnabled = revisions.Count > 0;
             }
         };
         var close = new Button { Content = "Закрыть", MinWidth = 100 };

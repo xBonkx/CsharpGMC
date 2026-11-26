@@ -54,7 +54,7 @@ public static class KsPdfForms
             var pdf=generate();
             if(pdf.Length<10 || pdf[0]!='%' || pdf[1]!='P' || pdf[2]!='D' || pdf[3]!='F')
                 throw new InvalidDataException("PDF не сформирован.");
-            File.WriteAllBytes(dlg.FileName,pdf);
+            ExportFilePublication.WriteBytes(dlg.FileName,pdf);
         }
         catch(Exception error)
         {

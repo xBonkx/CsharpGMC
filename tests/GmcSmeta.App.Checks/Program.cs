@@ -220,6 +220,7 @@ internal static class Program
         LegacySummaryChecks.Run();
         SummaryRowSequenceChecks.Run();
         SummaryExcelChecks.Run();
+        LiveWorkbookSnapshotChecks.Run();
     }
 
     /// <summary>
