@@ -495,7 +495,7 @@ public partial class ProcurementPane : UserControl
         if (MovementHistoryExpander is not null)
             MovementHistoryExpander.Header = row is null
                 ? "Движение и замена — выберите одну позицию"
-                : $"Движение и замена: {row.BuyName[..Math.Min(65, row.BuyName.Length)]}";
+                : $"Движение и замена: {row.BuyName}";
         if (MovementDetailsText is not null)
             MovementDetailsText.Text = row is null
                 ? "Выберите одну строку закупки для просмотра истории."

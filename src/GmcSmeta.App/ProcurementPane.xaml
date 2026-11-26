@@ -8,6 +8,71 @@
     <UserControl.Resources>
         <!-- Python common.GridDelegate pill: 5px radius, foreground alpha 70 border,
              demi-bold 86% of the normal 10pt font, left inset 6px. -->
+        <Style x:Key="ProcurementHistoryExpander" TargetType="Expander">
+            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <ToggleButton Content="{TemplateBinding Header}" ToolTip="{TemplateBinding Header}"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Foreground="{TemplateBinding Foreground}" FontWeight="SemiBold"
+                                          Cursor="Hand" Padding="2,4" Background="Transparent"
+                                          HorizontalContentAlignment="Left">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Viewbox Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                                    <Canvas Width="24" Height="24">
+                                                        <Path x:Name="HistoryChevron" Style="{StaticResource SvgGlyphPath}"
+                                                              Data="{StaticResource GlyphChevronRight}"
+                                                              Stroke="{TemplateBinding Foreground}"/>
+                                                    </Canvas>
+                                                </Viewbox>
+                                                <TextBlock Grid.Column="1" Text="{TemplateBinding Content}"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="HistoryChevron" Property="Data" Value="{StaticResource GlyphChevronDown}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Foreground" Value="#1E40AF"/>
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter Property="Foreground" Value="#1E40AF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="HistoryContent" Grid.Row="1" ContentSource="Content"
+                                              Visibility="Collapsed"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="HistoryContent" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ProcurementHistoryAction" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
         <Style x:Key="ProcurementBadge" TargetType="Border">
             <Setter Property="CornerRadius" Value="5"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -408,26 +473,33 @@
         <!-- Python procurement: movement history for the selected real position. -->
         <Expander x:Name="MovementHistoryExpander" Grid.Row="3"
                   Header="Движение и замена — выберите позицию"
-                  Margin="0,7,0,0" IsExpanded="False"
-                  Expanded="MovementHistory_Expanded" Collapsed="MovementHistory_Collapsed"
-                  Background="Transparent" BorderBrush="Transparent" BorderThickness="0">
-            <Grid Margin="0,7,0,4">
+                  Margin="0,4,0,0" IsExpanded="False"
+                  Style="{StaticResource ProcurementHistoryExpander}"
+                  Expanded="MovementHistory_Expanded" Collapsed="MovementHistory_Collapsed">
+            <Grid Margin="0,6,0,4">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
                 <DockPanel Margin="0,0,0,6" LastChildFill="True">
                     <Button x:Name="MovementEditButton" DockPanel.Dock="Right"
                             Content="Изменить движение" Margin="6,0,0,0"
+                            ContentTemplate="{StaticResource IconOnlyEdit}"
+                            AutomationProperties.Name="Изменить движение"
                             Click="MovementEdit_Click" IsEnabled="False"
-                            Style="{StaticResource PythonToolbarButton}"
+                            Style="{StaticResource ProcurementHistoryAction}"
                             ToolTip="Редактировать только самостоятельные движения; выдачи по ведомости защищены"/>
                     <Button x:Name="MovementDeleteButton" DockPanel.Dock="Right"
-                            Content="Удалить выбранное движение"
+                            AutomationProperties.Name="Удалить выбранное движение"
                             Click="MovementDelete_Click" IsEnabled="False"
-                            Style="{StaticResource PythonToolbarButton}"
-                            ToolTip="Выдачи по ведомости можно отменить только на вкладке «Выдача»"/>
-                    <TextBlock x:Name="MovementDetailsText"
-                               Text="Выберите одну строку закупки для просмотра истории."
-                               Foreground="#475569" TextWrapping="Wrap"
+                            Style="{StaticResource ProcurementHistoryAction}"
+                            ToolTip="Удалить выбранное движение. Выдачи по ведомости можно отменить только на вкладке «Выдача»">
+                        <Viewbox Width="18" Height="18" IsHitTestVisible="False">
+                            <Canvas Width="24" Height="24">
+                                <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphTrash}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+                    <TextBlock Text="Поставки и выдачи" Style="{StaticResource PythonTileLabel}"
                                VerticalAlignment="Center"/>
                 </DockPanel>
                 <DataGrid local:TableColumnMenu.Key="procurement-history" CellStyle="{StaticResource CompactCostCell}" x:Name="MovementHistoryGrid" Height="155"
@@ -447,7 +519,7 @@
                         <DataGridTextColumn Header="Операция" Width="165"
                                             Binding="{Binding KindLabel}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                         <DataGridTextColumn Header="Кол-во" Width="80"
-                                            Binding="{Binding Qty, StringFormat={}{0:0.###}}" HeaderStyle="{StaticResource CompactCostHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                                            Binding="{Binding Qty, StringFormat={}{0:0.###}}" HeaderStyle="{StaticResource CompactCostMoneyHeader}" ElementStyle="{StaticResource CompactCostMoney}"/>
                         <DataGridTextColumn Header="Документ" Width="150"
                                             Binding="{Binding Document}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                         <DataGridTextColumn Header="Примечание" Width="*"
@@ -460,14 +532,32 @@
                            Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
                            Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                    <TextBlock Text="Замена (на что заменили)" Foreground="#64748B" FontWeight="SemiBold"/>
-                    <TextBox x:Name="ReplacementDetail" Margin="0,4,0,8" IsEnabled="False"/>
-                    <TextBlock Text="Ответственный" Foreground="#64748B" FontWeight="SemiBold"/>
-                    <TextBox x:Name="ResponsibleDetail" Margin="0,4,0,8" IsEnabled="False"/>
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <TextBlock Text="Замена (на что заменили)" Style="{StaticResource PythonTileLabel}" Margin="0,0,0,6"/>
+                    <Grid Margin="0,0,0,6">
+                        <TextBox x:Name="ReplacementDetail" IsEnabled="False"/>
+                        <TextBlock Text="например: ф280 → ф315" Foreground="#94A3B8" Margin="10,0"
+                                   VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=ReplacementDetail}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                    <TextBlock Text="Ответственный" Style="{StaticResource PythonTileLabel}" Margin="0,0,0,6"/>
+                    <TextBox x:Name="ResponsibleDetail" Margin="0,0,0,6" IsEnabled="False"/>
                     <CheckBox x:Name="DirectDetail" Content="Сразу на объект (минуя склад)" IsEnabled="False" Margin="0,0,0,6"/>
                     <Button x:Name="SaveDetailButton" Content="Сохранить изменения" IsEnabled="False"
                             HorizontalAlignment="Left" Style="{StaticResource PythonToolbarButton}" Click="ProcurementSaveDetails_Click"/>
+                    <TextBlock x:Name="MovementDetailsText"
+                               Text="Выберите одну строку закупки для просмотра истории."
+                               Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0"/>
                 </StackPanel>
             </Grid>
         </Expander>
