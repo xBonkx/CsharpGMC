@@ -14,6 +14,10 @@ namespace GmcSmeta.App;
 /// </summary>
 internal sealed class ExcelImportPreviewWindow : Window
 {
+    private sealed record DocumentKind(string Key, string Label);
+    private static readonly DocumentKind[] DocumentKinds =
+        { new("kp", "КП"), new("main", "Договор"), new("dop", "Допсоглашение") };
+
     private sealed record Target(long? Id, string Title)
     {
         public override string ToString() => Title;
@@ -33,8 +37,8 @@ internal sealed class ExcelImportPreviewWindow : Window
         public string Materials => Block.MaterialSum.ToString("N2");
         public string Smr => (Block.HasWork ? Block.WorkSum : Block.Smr ?? 0m).ToString("N2");
         public string Total => (Block.DeclaredTotal ?? Block.CalculatedTotal).ToString("N2");
-        public string Check => Block.VolumesOnly ? "объёмы" :
-            Block.DeclaredMaterial is null && Block.DeclaredTotal is null ? "нет итогов" :
+        public string Check => Block.VolumesOnly ? "объёмы, без цен" :
+            Block.DeclaredMaterial is null && Block.DeclaredTotal is null ? "— нет итогов" :
             Block.Ok ? "✓ сходится" : "✗ расхождение";
         public string Kind { get; set; } = "kp";
         public string Number { get; set; } = "";
@@ -45,9 +49,9 @@ internal sealed class ExcelImportPreviewWindow : Window
     private readonly ExcelImportResult _result;
     private readonly IReadOnlyDictionary<long, IReadOnlySet<string>> _alreadyLoaded;
     private readonly List<DocRow> _docs;
-    private readonly ComboBox _objects = new() { MinWidth = 370, Margin = new Thickness(0, 0, 16, 0) };
-    private readonly ComboBox _baseDocs = new() { MinWidth = 220 };
-    private readonly TextBox _newName = new() { MinWidth = 240 };
+    private readonly ComboBox _objects = new() { MinWidth = 240, MinHeight = 32 };
+    private readonly ComboBox _baseDocs = new() { MinWidth = 220, MinHeight = 32 };
+    private readonly TextBox _newName = new() { MinWidth = 240, MinHeight = 32 };
     private readonly TextBox _report = new()
     {
         IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
@@ -58,10 +62,11 @@ internal sealed class ExcelImportPreviewWindow : Window
     {
         AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false,
         HeadersVisibility = DataGridHeadersVisibility.Column, SelectionMode = DataGridSelectionMode.Single,
-        Margin = new Thickness(0, 8, 0, 8), MinHeight = 250
+        MinHeight = 150, MinRowHeight = 27, AlternationCount = 0,
+        SelectionUnit = DataGridSelectionUnit.FullRow
     };
     private readonly ObservableCollection<PreviewRow> _rows = new();
-    private readonly Button _confirm = new() { Content = "Импортировать", Width = 145, Height = 32, Margin = new Thickness(8, 0, 0, 0) };
+    private readonly Button _confirm = new() { Content = "Импортировать", MinWidth = 145, MinHeight = 32, Margin = new Thickness(8, 0, 0, 0) };
 
     public long? ObjectId => (_objects.SelectedItem as Target)?.Id;
     public string NewObjectName => _newName.Text.Trim();
@@ -88,25 +93,37 @@ internal sealed class ExcelImportPreviewWindow : Window
         var layout = new Grid { Margin = new Thickness(16) };
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star) });
-        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star), MinHeight = 150 });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star), MinHeight = 90 });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var target = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var target = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        target.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        target.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        target.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        target.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         target.Children.Add(Label("Объект:"));
         _objects.Items.Add(new Target(null, "➕ Новый объект…"));
         foreach (var obj in objects.Where(x => !x.Archived))
             _objects.Items.Add(new Target(obj.Id, obj.Name));
         _objects.SelectedItem = _objects.Items.OfType<Target>().FirstOrDefault(x => x.Id == defaultObjectId) ??
                                 _objects.Items[0];
+        Grid.SetColumn(_objects, 1);
         target.Children.Add(_objects);
-        target.Children.Add(Label("Новый объект:"));
+        var nameLabel = Label("Название нового объекта:");
+        Grid.SetRow(nameLabel, 1);
+        nameLabel.Margin = new Thickness(0, 6, 8, 0);
+        target.Children.Add(nameLabel);
+        Grid.SetRow(_newName, 1);
+        Grid.SetColumn(_newName, 1);
+        _newName.Margin = new Thickness(0, 6, 0, 0);
         target.Children.Add(_newName);
         _newName.Text = Path.GetFileNameWithoutExtension(result.FileName).Replace("КП ", "").Trim();
         Grid.SetRow(target, 0); layout.Children.Add(target);
 
         var meta = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-        meta.Children.Add(Label("Найденные КП (отметьте нужные):"));
+        meta.Children.Add(Label("Найденные в файле КП (отметьте, что загружать):"));
         meta.Children.Add(new TextBlock { Text = "Основание ДС:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
         meta.Children.Add(_baseDocs);
         Grid.SetRow(meta, 1); layout.Children.Add(meta);
@@ -118,11 +135,12 @@ internal sealed class ExcelImportPreviewWindow : Window
         AddColumn("Материалы", nameof(PreviewRow.Materials), 108, true);
         AddColumn("СМР", nameof(PreviewRow.Smr), 102, true);
         AddColumn("Итого", nameof(PreviewRow.Total), 112, true);
-        AddColumn("Проверка", nameof(PreviewRow.Check), 122, true);
+        AddColumn("Проверка", nameof(PreviewRow.Check), 158, true);
         _table.Columns.Add(new DataGridComboBoxColumn
         {
-            Header = "Тип", Width = 90, ItemsSource = new[] { "kp", "main", "dop" },
-            SelectedItemBinding = new Binding(nameof(PreviewRow.Kind)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }
+            Header = "Тип", Width = 150, ItemsSource = DocumentKinds,
+            DisplayMemberPath = nameof(DocumentKind.Label), SelectedValuePath = nameof(DocumentKind.Key),
+            SelectedValueBinding = new Binding(nameof(PreviewRow.Kind)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }
         });
         AddColumn("№", nameof(PreviewRow.Number), 85, false);
         AddColumn("Дата", nameof(PreviewRow.Date), 100, false);
@@ -134,25 +152,31 @@ internal sealed class ExcelImportPreviewWindow : Window
                 "№" or "Дата" or "Проверка" => TextAlignment.Center,
                 _ => TextAlignment.Left
             });
+        var statusColumn = _table.Columns.OfType<DataGridTextColumn>().Single(c => Equals(c.Header, "Проверка"));
+        statusColumn.ElementStyle = ExcelPreviewUi.StatusStyle(statusColumn.ElementStyle, "Block.Ok",
+            (true, "#2E7D32"), (false, "#C62828"));
+        _table.Columns.OfType<DataGridTextColumn>().Single(c => Equals(c.Header, "Название")).MinWidth = 160;
         TableColumnMenu.SetProtect(_table, "✓|Лист|Позиций|Итого|Проверка|Тип|Название");
         TableColumnMenu.SetKey(_table, "excel-import-preview");
         _table.ItemsSource = _rows;
         _table.SelectionChanged += (_, _) => ShowReport();
         Grid.SetRow(_table, 2); layout.Children.Add(_table);
 
+        var splitter = ExcelPreviewUi.ReportSplitter();
+        Grid.SetRow(splitter, 3); layout.Children.Add(splitter);
         _report.VerticalAlignment = VerticalAlignment.Stretch;
-        Grid.SetRow(_report, 3); layout.Children.Add(_report);
+        Grid.SetRow(_report, 4); layout.Children.Add(_report);
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 12, 0, 0) };
         var cancel = new Button { Content = "Отмена", Width = 105, Height = 32 };
         cancel.Click += (_, _) => { DialogResult = false; Close(); };
         WorkspaceWindowUi.StyleButton(cancel);
-        WorkspaceWindowUi.StyleButton(_confirm, primary: true, icon: "IconLabelUpload");
+        WorkspaceWindowUi.StyleButton(_confirm, primary: true);
         actions.Children.Add(cancel);
         _confirm.Click += (_, _) => Confirm();
         actions.Children.Add(_confirm);
-        Grid.SetRow(actions, 4); layout.Children.Add(actions);
+        Grid.SetRow(actions, 5); layout.Children.Add(actions);
 
         Content = layout;
         var many = result.Blocks.Count > 1;

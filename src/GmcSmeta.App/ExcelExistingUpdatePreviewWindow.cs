@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -54,7 +55,8 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     {
         AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false,
         CanUserDeleteRows = false, SelectionMode = DataGridSelectionMode.Single,
-        EnableRowVirtualization = true, EnableColumnVirtualization = true
+        EnableRowVirtualization = true, EnableColumnVirtualization = true,
+        MinRowHeight = 27, AlternationCount = 0, HeadersVisibility = DataGridHeadersVisibility.Column
     };
 
     public ExcelExistingUpdatePlan? Plan { get; private set; }
@@ -86,11 +88,13 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         WorkspaceWindowUi.StyleButton(_compare, icon: "IconLabelSearch");
         WorkspaceWindowUi.StyleButton(_resolve, icon: "IconLabelEdit");
         WorkspaceWindowUi.StyleButton(_confirm, primary: true, icon: "IconLabelCheck");
-        var layout = new DockPanel { Margin = new Thickness(14) };
+        var layout = new DockPanel { Margin = new Thickness(22, 18, 22, 16) };
         Content = layout;
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
         DockPanel.SetDock(header, Dock.Top);
         layout.Children.Add(header);
+        header.Children.Add(WorkspaceWindowUi.Heading("Обновить из спецификации"));
+        header.Children.Add(WorkspaceWindowUi.Hint("Файл: " + Path.GetFileName(filePath)));
         header.Children.Add(new TextBlock
         {
             Text = "Excel → существующее КП. Ручные цены, формулы, примечания, КС и ДС не перезаписываются.",
@@ -144,8 +148,9 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         _grid.ItemsSource = _rows;
         _grid.Columns.Add(new DataGridTextColumn
         {
-            Header = "Статус", Binding = new Binding(nameof(ExcelExistingDifference.Kind)),
-            IsReadOnly = true, Width = 110
+            Header = "Статус", Binding = new Binding(nameof(ExcelExistingDifference.Kind))
+            { Converter = new ExcelPreviewUi.ChangeLabelConverter() },
+            IsReadOnly = true, Width = 160
         });
         var template = new DataTemplate();
         var check = new FrameworkElementFactory(typeof(CheckBox));
@@ -198,6 +203,12 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
                 "Объём до → после" or "Цена сохранена / в Excel" => TextAlignment.Right,
                 _ => TextAlignment.Left
             });
+        var statusColumn = _grid.Columns.OfType<DataGridTextColumn>().Single(c => Equals(c.Header, "Статус"));
+        statusColumn.ElementStyle = ExcelPreviewUi.StatusStyle(statusColumn.ElementStyle, nameof(ExcelExistingDifference.Kind),
+            (ExcelExistingChangeKind.Added, "#047857"), (ExcelExistingChangeKind.Changed, "#B45309"),
+            (ExcelExistingChangeKind.DeletedInSource, "#B91C1C"), (ExcelExistingChangeKind.Conflict, "#B91C1C"),
+            (ExcelExistingChangeKind.Ambiguous, "#B45309"));
+        _grid.Columns.OfType<DataGridTextColumn>().Single(c => Equals(c.Header, "Причина / последствия")).MinWidth = 230;
         TableColumnMenu.SetProtect(_grid, "Статус|Применить|Excel / SQL ID|Наименование|Объём до → после|Причина / последствия");
         TableColumnMenu.SetKey(_grid, "excel-update-preview");
         layout.Children.Add(_grid);
@@ -324,6 +335,17 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         cancel.Click += (_, _) => dialog.DialogResult = false;
 
         var choices = new ListBox { ItemsSource = candidates.Select(row => new MappingChoice(row)).ToArray() };
+        ScrollViewer.SetHorizontalScrollBarVisibility(choices, ScrollBarVisibility.Disabled);
+        var itemStyle = new Style(typeof(ListBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 6, 8, 6)));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        choices.ItemContainerStyle = itemStyle;
+        var itemTemplate = new DataTemplate();
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetBinding(TextBlock.TextProperty, new Binding());
+        text.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        itemTemplate.VisualTree = text;
+        choices.ItemTemplate = itemTemplate;
         choices.SelectedIndex = -1;
         panel.Children.Add(choices);
         accept.Click += (_, _) =>
