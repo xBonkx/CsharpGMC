@@ -70,7 +70,7 @@ public partial class ActsEditorView : UserControl
     public event EventHandler<bool>? CompactChanged;
     public event EventHandler<string>? StatusRequested;
 
-    public long SelectedActId => _actId;
+    public long SelectedActId => _resumeActId ?? (_loadingAct ? _activeReadActId : _actId);
     public IReadOnlyList<SqlServerActs.ActInfo> ActsSnapshot => _acts;
     public bool HasActs => _acts.Count > 0;
 
@@ -113,10 +113,12 @@ public partial class ActsEditorView : UserControl
     public void SelectAct(long actId)
     {
         if (_contractId == 0 || _building || _actLoadRequired) return;
-        if (actId == _actId && _sheet is not null) return;
+        if (actId == SelectedActId && (_loadingAct || _resumeActId.HasValue ||
+            (_sheet is not null && !string.IsNullOrEmpty(_revision)))) return;
         if (ActWritePending ||
-            (_sheet is not null && (!ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
-                                    !ActGrid.CommitEdit(DataGridEditingUnit.Row, true))) ||
+            (!_loadingAct && !_resumeActId.HasValue && _sheet is not null &&
+             (!ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+              !ActGrid.CommitEdit(DataGridEditingUnit.Row, true))) ||
             ActWritePending)
         {
             SetStatus("Завершите ввод и сохранение текущей КС-2 перед переключением.", true);
@@ -335,8 +337,6 @@ public partial class ActsEditorView : UserControl
             _details = loaded.Details;
             _totals = loaded.Totals;
             var rules = loaded.Rules ?? throw new InvalidOperationException("Нет настроек КС-2.");
-            EditorRoot.Visibility = Visibility.Visible;
-            EmptyPanel.Visibility = Visibility.Collapsed;
             _form = _sheet.Form;
             _numManual = _sheet.NumManual;
             _dsPerAct = rules.Has(_form, "ds_per_act");
@@ -383,10 +383,13 @@ public partial class ActsEditorView : UserControl
             FillTiles();
             FilterRows();
             UpdateSelectionQty();
+            // The complete header, rows and totals are prepared before reveal.
+            EmptyPanel.Visibility = Visibility.Collapsed;
+            EditorRoot.Visibility = Visibility.Visible;
             SetStatus($"Открыта КС-2 № {current.Number}");
     }
 
-    private void ShowActUnavailable(string? error)
+    private void ClearActSheetState()
     {
         _sheet = null;
         _indexedRefNumbers = null;
@@ -398,6 +401,11 @@ public partial class ActsEditorView : UserControl
         _rows = null;
         _referenceHighlights = null;
         _moveAfter = 0;
+    }
+
+    private void ShowActUnavailable(string? error)
+    {
+        ClearActSheetState();
         ActGrid.ItemsSource = null;
         EditorRoot.Visibility = Visibility.Collapsed;
         EmptyPanel.Visibility = Visibility.Visible;
@@ -665,7 +673,8 @@ public partial class ActsEditorView : UserControl
 
     private void ActGrid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
     {
-        if (_building || e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
+        if (_building || _loadingAct || _loadFailed || string.IsNullOrEmpty(_revision) ||
+            e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
             || _signed || _contractLocked || row.IsSection)
         {
             e.Cancel = true;
@@ -1512,7 +1521,8 @@ public partial class ActsEditorView : UserControl
     {
         var current = Current;
         var totals = _totals;
-        if (_building || ActWritePending || current is null || current.Signed || _contractLocked || totals is null || _details is null) return;
+        if (_building || _loadingAct || _loadFailed || string.IsNullOrEmpty(_revision) ||
+            ActWritePending || current is null || current.Signed || _contractLocked || totals is null || _details is null) return;
         if(kind!=ActChargeKind.Pnr&&!string.IsNullOrEmpty(_details.SectionAmountsJson))return;
         var input = kind switch
         {

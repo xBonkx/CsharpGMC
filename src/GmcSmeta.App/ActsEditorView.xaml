@@ -70,7 +70,7 @@
     </UserControl.Resources>
 
     <Grid>
-        <Grid x:Name="EditorRoot">
+        <Grid x:Name="EditorRoot" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -315,6 +315,18 @@
                 </Border>
             </UniformGrid>
         </Grid>
+
+        <!-- Cold opening has a real first frame; on act switches this becomes
+             a small banner over the disabled, previously published sheet. -->
+        <Border x:Name="ActLoadingPanel" Background="#F4F6FA" BorderBrush="#E4E8EF"
+                BorderThickness="1" CornerRadius="8" Padding="18,12" Margin="8"
+                HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+            <StackPanel MinWidth="220">
+                <TextBlock Text="Загрузка КС-2…" FontWeight="SemiBold" Foreground="#0F172A"
+                           HorizontalAlignment="Center"/>
+                <ProgressBar Height="4" Margin="0,10,0,0" IsIndeterminate="True"/>
+            </StackPanel>
+        </Border>
 
         <!-- «Актов по этому документу ещё нет» -->
         <Border x:Name="EmptyPanel" Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1"

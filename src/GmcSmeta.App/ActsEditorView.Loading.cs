@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Windows;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -72,20 +73,47 @@ public partial class ActsEditorView
         _ = ReloadAsync(id, reuseList: false, requiredReadback: false);
     }
 
+    private void BeginActLoadingPresentation()
+    {
+        // Never expose commands for retained old rows while the revision is
+        // unconfirmed. Keep the surrounding list available for another selection.
+        var retain = _sheet is not null && EditorRoot.Visibility == Visibility.Visible;
+        var wasBuilding = _building;
+        _building = true;
+        try
+        {
+            EditorRoot.IsEnabled = false;
+            EmptyPanel.Visibility = Visibility.Collapsed;
+            if (!retain) EditorRoot.Visibility = Visibility.Collapsed;
+            ActLoadingPanel.VerticalAlignment = retain ? VerticalAlignment.Top : VerticalAlignment.Center;
+            ActLoadingPanel.Visibility = Visibility.Visible;
+        }
+        finally { _building = wasBuilding; }
+        SetStatus("Загрузка КС-2 из SQL Server…");
+    }
+
+    private void EndActLoadingPresentation()
+    {
+        ActLoadingPanel.Visibility = Visibility.Collapsed;
+        EditorRoot.IsEnabled = true;
+    }
+
     private async Task ReloadAsync(long? requestedActId, bool reuseList, bool requiredReadback = true)
     {
         if (_contractId == 0 || ActWritePending || _actLoadRequired) return;
+        var requested = requestedActId ?? SelectedActId;
         if (!requiredReadback && IsLoaded && !IsVisible)
         {
             CancelHiddenActRead();
-            _resumeActId = requestedActId ?? _actId;
+            _resumeActId = requested;
             _revision = "";
             _publishedActRevision = "";
+            BeginActLoadingPresentation();
             return;
         }
         _resumeActId = null;
         _actLoadRequired = requiredReadback;
-        _activeReadActId = requestedActId ?? _actId;
+        _activeReadActId = requested;
         var generation = ++_actLoadGeneration;
         using var cancellation = new CancellationTokenSource();
         var previous = _actLoadCancellation;
@@ -94,25 +122,15 @@ public partial class ActsEditorView
         var token = requiredReadback ? CancellationToken.None : cancellation.Token;
         var connectionString = _connectionString;
         var contractId = _contractId;
-        var requested = requestedActId ?? _actId;
         var cachedActs = reuseList ? _acts.ToList() : null;
         var cachedRevision = _actsRevision;
         _loadingAct = true;
         _loadFailed = false;
         _publishedActRevision = "";
         _revision = "";
-        // Clear the old sheet before publishing the target ID. Selection remains
-        // available in the surrounding contract list while this editor is hidden.
-        _building = true;
-        try
-        {
-            ShowActUnavailable(null);
-            EmptyTitle.Text = "Загрузка КС-2…";
-            EmptyDescription.Text = "Чтение данных из SQL Server.";
-            if (_acts.Any(a => a.Id == requested)) _actId = requested;
-            SyncActSelector();
-        }
-        finally { _building = false; }
+        // Keep the published act ID and rows together until the next coherent
+        // snapshot arrives. The loading banner is separate from the empty state.
+        BeginActLoadingPresentation();
 
         try
         {
@@ -121,6 +139,7 @@ public partial class ActsEditorView
             if (token.IsCancellationRequested || generation != _actLoadGeneration || contractId != _contractId ||
                 connectionString != _connectionString) return;
             _building = true;
+            ClearActSheetState();
             _acts = loaded.Acts;
             _actId = loaded.ActId;
             _actsRevision = loaded.Revision;
@@ -128,6 +147,7 @@ public partial class ActsEditorView
             ApplyActSnapshot(loaded);
             _publishedActId = loaded.ActId;
             _publishedActRevision = loaded.Revision;
+            EndActLoadingPresentation();
         }
         catch (Exception) when (token.IsCancellationRequested)
         {
@@ -140,7 +160,9 @@ public partial class ActsEditorView
             _revision = "";
             _actsRevision = "";
             _loadFailed = true;
+            _actId = requested; // Retry the requested act, not the retained old one.
             ShowActUnavailable(ex.Message);
+            EndActLoadingPresentation();
             SetStatus("Ошибка чтения акта: " + ex.Message, true);
         }
         finally
