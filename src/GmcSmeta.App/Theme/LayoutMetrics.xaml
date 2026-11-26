@@ -18,5 +18,9 @@
     <Thickness x:Key="LayoutTilePadding">16,11,16,11</Thickness>
     <Thickness x:Key="LayoutToolbarPadding">10,4,10,4</Thickness>
     <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>
+    <!-- Qt final field inset and drop-down arrow width; explicit compact controls can override. -->
+    <Thickness x:Key="LayoutFieldPadding">10,6</Thickness>
+    <sys:Double x:Key="LayoutFieldMinHeight">32</sys:Double>
+    <sys:Double x:Key="LayoutComboArrowWidth">22</sys:Double>
     <sys:Double x:Key="LayoutDocumentRowMinHeight">27</sys:Double>
 </ResourceDictionary>
