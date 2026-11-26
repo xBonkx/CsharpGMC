@@ -22,8 +22,9 @@ public sealed class ShipmentTableVisualTests
         Assert.Equal("0", (string?)grid.Attribute("AlternationCount"));
         var columns = grid.Descendants(p + "DataGridTextColumn")
             .ToDictionary(e => (string)e.Attribute("Header")!);
-        foreach (var name in new[] { "По смете", "Выдано раньше", "Есть на складе", "Останется выдать" })
+        foreach (var name in new[] { "По смете", "Выдано раньше", "Есть на складе" })
             Assert.Equal("{StaticResource CompactCostMoney}", (string?)columns[name].Attribute("ElementStyle"));
+        Assert.Equal("{StaticResource ShipmentLeftText}", (string?)columns["Останется выдать"].Attribute("ElementStyle"));
         var now = columns["Выдать сейчас ✎"];
         Assert.Equal("{StaticResource ShipmentNowCell}", (string?)now.Attribute("CellStyle"));
         Assert.Equal("{StaticResource ShipmentNowText}", (string?)now.Attribute("ElementStyle"));
@@ -40,6 +41,22 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("StockOverrun", nowCell);
         Assert.Contains("GridSelectionTextBrush", nowCell);
         Assert.Contains("{Binding QtyHint}", nowCell);
+        Assert.Contains("{Binding QtyHint}", Style("ShipmentNowText").ToString());
+        var leftStyle = Style("ShipmentLeftText").ToString();
+        Assert.Contains("всё", leftStyle);
+        Assert.Contains("#94A3B8", leftStyle);
+        Assert.Contains("GridSelectionTextBrush", leftStyle);
+
+        var group = Assert.Single(grid.Descendants(p + "Expander"));
+        Assert.Equal("SystemGroup_Loaded", (string?)group.Attribute("Loaded"));
+        Assert.Equal("SystemGroup_DataContextChanged", (string?)group.Attribute("DataContextChanged"));
+        Assert.Equal("SystemGroup_ExpansionChanged", (string?)group.Attribute("Expanded"));
+        Assert.Equal("SystemGroup_ExpansionChanged", (string?)group.Attribute("Collapsed"));
+        var groupHeader = Assert.Single(group.Descendants(p + "DockPanel"));
+        Assert.Equal("#F1F4F9", (string?)groupHeader.Attribute("Background"));
+        Assert.Equal("27", (string?)groupHeader.Attribute("MinHeight"));
+        Assert.Equal("Bold", (string?)groupHeader.Descendants(p + "TextBlock").Single().Attribute("FontWeight"));
+        Assert.Equal("SelectSystem_Click", (string?)groupHeader.Descendants(p + "Button").Single().Attribute("Click"));
         Assert.NotNull(Named("StockWarningText"));
         Assert.NotNull(Named("ShipmentHelpText"));
 

@@ -71,9 +71,21 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="ShipmentNowText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+            <Setter Property="ToolTip" Value="{Binding QtyHint}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding InShipment}" Value="True">
                     <Setter Property="FontWeight" Value="Bold"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Python _set_row: completed quantities are muted, except on selection. -->
+        <Style x:Key="ShipmentLeftText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding LeftText}" Value="всё">
+                    <Setter Property="Foreground" Value="#94A3B8"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -386,12 +398,12 @@
                                           Loaded="SystemGroup_Loaded" DataContextChanged="SystemGroup_DataContextChanged"
                                           Expanded="SystemGroup_ExpansionChanged" Collapsed="SystemGroup_ExpansionChanged">
                                     <Expander.Header>
-                                        <DockPanel LastChildFill="True">
+                                        <DockPanel LastChildFill="True" MinHeight="27" Background="#F1F4F9">
                                             <Button DockPanel.Dock="Right" Content="Выбрать систему" Click="SelectSystem_Click"
                                                     Style="{StaticResource PythonToolbarButton}" Padding="6,2" MinHeight="24"
                                                     ToolTip="Выбрать все видимые позиции этой системы для массового действия"/>
-                                            <TextBlock Text="{Binding Name.Label}" FontWeight="SemiBold" TextWrapping="Wrap"
-                                                       VerticalAlignment="Center" Margin="4,2"/>
+                                            <TextBlock Text="{Binding Name.Label}" FontWeight="Bold" Foreground="#0F172A" TextWrapping="Wrap"
+                                                       ToolTip="{Binding Name.Label}" VerticalAlignment="Center" Margin="4,2"/>
                                         </DockPanel>
                                     </Expander.Header>
                                     <ItemsPresenter/>
@@ -418,7 +430,7 @@
                                     Binding="{Binding Qty, Mode=TwoWay}" Width="130"
                                     ElementStyle="{StaticResource ShipmentNowText}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"
                                     CellStyle="{StaticResource ShipmentNowCell}" HeaderStyle="{StaticResource ShipmentNowHeader}"/>
-                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="130" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
+                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="130" IsReadOnly="True" ElementStyle="{StaticResource ShipmentLeftText}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>
