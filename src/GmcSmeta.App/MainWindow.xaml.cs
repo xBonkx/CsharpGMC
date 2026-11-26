@@ -35,12 +35,6 @@ public partial class MainWindow : Window
     private int _pendingOpen;
     private string? _pendingGmcs;
 
-    // LRU-кэш открытых смет (S-03): не более 3 документов.
-    private readonly Dictionary<int, EstimateView> _estimateCache = new();
-    private readonly LinkedList<int> _estimateCacheOrder = new();
-    private const int EstimateCacheCapacity = 3;
-    private System.Windows.Threading.DispatcherTimer? _estimateCacheTrimTimer;
-    private int _estimateCacheTrimAttempts;
     private bool _ready;
     private double _sidebarWidth = 300;
     private int? _openDocumentId;
@@ -84,21 +78,7 @@ public partial class MainWindow : Window
             _navigationSearchTimer.Stop();
             if (_ready && !_startupClosed) ApplyNavigationFilter();
         };
-        _estimateCacheTrimTimer = new System.Windows.Threading.DispatcherTimer(
-            System.Windows.Threading.DispatcherPriority.ContextIdle)
-        {
-            Interval = TimeSpan.FromSeconds(2),
-        };
-        _estimateCacheTrimTimer.Tick += (_, _) =>
-        {
-            _estimateCacheTrimTimer.Stop();
-            if (_startupClosed) return;
-            TrimEstimateCache();
-            // Bounded deferred attempts after pending writes/readback settle.
-            // Permanent drafts can pin an entry until the next navigation.
-            if (_estimateCache.Count > EstimateCacheCapacity && --_estimateCacheTrimAttempts > 0)
-                _estimateCacheTrimTimer.Start();
-        };
+        InitializeEstimateCacheTrim();
         StartupTrace.Mark("main_initialize_component_end");
         ApplyFontScale(_uiSettings.FontScale);
         RestoreWindowGeometry();
@@ -1582,46 +1562,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
-
-    private void CacheEstimate(int contractId, EstimateView view)
-    {
-        _estimateCache[contractId] = view;
-        _estimateCacheOrder.Remove(contractId);
-        _estimateCacheOrder.AddFirst(contractId);
-        TrimEstimateCache(protectedId: contractId);
-    }
-
-    private void ScheduleEstimateCacheTrim()
-    {
-        if (_startupClosed || _estimateCacheTrimTimer is null ||
-            _estimateCache.Count <= EstimateCacheCapacity) return;
-        _estimateCacheTrimAttempts = 15;
-        _estimateCacheTrimTimer.Stop();
-        _estimateCacheTrimTimer.Start();
-    }
-
-    private void TrimEstimateCache(int? protectedId = null)
-    {
-        while (_estimateCacheOrder.Count > EstimateCacheCapacity)
-        {
-            // Never remove the displayed view or a live write queue, even
-            // temporarily. HasUnsettledCacheWrites includes pending readback.
-            var candidate = _estimateCacheOrder.Last;
-            while (candidate is not null)
-            {
-                var view = _estimateCache[candidate.Value];
-                if (candidate.Value != protectedId &&
-                    !ReferenceEquals(PageHost.Content, view) &&
-                    !view.HasUnsettledCacheWrites && view.CanReleaseCachedView)
-                    break;
-                candidate = candidate.Previous;
-            }
-            if (candidate is null) break;
-            _estimateCache.Remove(candidate.Value);
-            _estimateCacheOrder.Remove(candidate);
-            StartupTrace.Mark("estimate_cache_evicted");
         }
     }
 

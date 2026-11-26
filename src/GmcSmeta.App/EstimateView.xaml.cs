@@ -48,6 +48,11 @@ public partial class EstimateView : UserControl
 
     internal bool CanTransferDocument => !CacheReadOrWriteInProgress && !HasUnsettledCacheWrites &&
         !HasActiveEstimateEdit() && !HasNestedCacheActivity;
+    // Row counts are an inexpensive proxy for retained editor size, not bytes.
+    // Include the independently materialized materials/summary projections.
+    internal long CacheRowWeight => (long)_rows.Count + _materialsBuilt.Count + SummaryRecs.Count +
+        (ReferenceEquals(_totalsSourceSummary, _costSummaryData) ? 0 : _totalsSourceSummary?.Rows.Count ?? 0);
+
     internal bool CanReleaseCachedView => !IsLoaded && !CacheReadOrWriteInProgress &&
         !HasUnsettledCacheWrites && !_reloadTimer.IsEnabled && !HasActiveEstimateEdit() &&
         !HasNestedCacheActivity;
@@ -890,6 +895,8 @@ public partial class EstimateView : UserControl
                 _saveError = null;
                 SelectPositionFromSearch();
                 _publishedEstimateRevision = loaded.Revision;
+                // The cache entry was initially added before its rows arrived.
+                if (Window.GetWindow(this) is MainWindow main) main.ScheduleEstimateCacheTrim();
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
