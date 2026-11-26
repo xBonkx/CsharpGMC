@@ -251,6 +251,8 @@ public sealed class CatalogWindow : Window
     private int _page;
     private int _request;
     private int _historyRequest;
+    private CancellationTokenSource? _pageCancellation;
+    private CancellationTokenSource? _historyCancellation;
     private bool _closed;
     private bool _writing;
     private string _revision = "";
@@ -262,6 +264,8 @@ public sealed class CatalogWindow : Window
     {
         ++_request;
         ++_historyRequest;
+        _pageCancellation?.Cancel();
+        _historyCancellation?.Cancel();
         _revision = "";
         _history.ItemsSource = null;
         _prev.IsEnabled = _next.IsEnabled = false;
@@ -351,6 +355,8 @@ public sealed class CatalogWindow : Window
             _delay.Stop();
             ++_request;
             ++_historyRequest;
+            _pageCancellation?.Cancel();
+            _historyCancellation?.Cancel();
             _revision = "";
         };
     }
@@ -364,6 +370,9 @@ public sealed class CatalogWindow : Window
         _delay.Stop();
         InvalidatePage();
         var generation = _request;
+        using var cancellation = new CancellationTokenSource();
+        _pageCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             _count.Text = "Загрузка…";
@@ -371,8 +380,8 @@ public sealed class CatalogWindow : Window
             var skip = _page * 200;
             // 201st row is a cheap look-ahead; no expensive COUNT over a 50k-item catalog.
             var result = await Task.Run(() => SqlServerWorkspaceNavigation.CatalogSnapshot(
-                _connectionString, search, skip, 201));
-            if (_closed || generation != _request) return;
+                _connectionString, search, skip, 201, token: token), token);
+            if (_closed || token.IsCancellationRequested || generation != _request) return;
             var rows = result.Rows;
             _revision = result.Revision;
             _items.ItemsSource = rows.Take(200).ToArray();
@@ -382,30 +391,43 @@ public sealed class CatalogWindow : Window
         }
         catch (Exception ex)
         {
-            if (_closed || generation != _request) return;
+            if (_closed || token.IsCancellationRequested || generation != _request) return;
             InvalidatePage();
             _items.ItemsSource = null;
             _count.Text = "Не удалось загрузить справочник. Нажмите «Обновить».";
             WorkspaceWindowUi.Error(this, ex, "Справочник");
+        }
+        finally
+        {
+            if (ReferenceEquals(_pageCancellation, cancellation)) _pageCancellation = null;
         }
     }
 
     private async Task LoadHistoryAsync()
     {
         var request = ++_historyRequest;
+        _historyCancellation?.Cancel();
         _history.ItemsSource = null;
-        if (_closed || string.IsNullOrWhiteSpace(_revision) || Selected is not { } entry) return;
+        if (_closed || _writing || string.IsNullOrWhiteSpace(_revision) || Selected is not { } entry) return;
         var id = entry.Id;
+        var revision = _revision;
+        using var cancellation = new CancellationTokenSource();
+        _historyCancellation = cancellation;
+        var token = cancellation.Token;
+        bool IsCurrent() => !_closed && !_writing && !token.IsCancellationRequested &&
+            request == _historyRequest && revision == _revision && Selected?.Id == id;
         try
         {
-            var rows = await Task.Run(() => SqlServerWorkspaceNavigation.PriceHistory(_connectionString, id));
-            if (!_closed && request == _historyRequest && Selected?.Id == id)
-                _history.ItemsSource = rows;
+            var rows = await Task.Run(() => SqlServerWorkspaceNavigation.PriceHistory(_connectionString, id, token), token);
+            if (IsCurrent()) _history.ItemsSource = rows;
         }
         catch (Exception ex)
         {
-            if (!_closed && request == _historyRequest && Selected?.Id == id)
-                WorkspaceWindowUi.Error(this, ex, "История цен");
+            if (IsCurrent()) WorkspaceWindowUi.Error(this, ex, "История цен");
+        }
+        finally
+        {
+            if (ReferenceEquals(_historyCancellation, cancellation)) _historyCancellation = null;
         }
     }
 

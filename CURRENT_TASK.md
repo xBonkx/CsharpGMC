@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — отмена чтения основного справочника (PERF-047)
+
+27.11.2026 ChatGPT / main (база 879e18d) — PERF-047 PARTIAL, Catalog manager: независимые CancellationTokenSource для страницы и истории цен; отмена при вводе поиска, смене страницы/выделения, начале записи и Closed. CatalogSnapshot получает token, PriceHistory использует guarded OpenAsync/SqlReadCancellation с проверкой токена при чтении. Старые ответы и ошибки не публикуются (generation, revision, selected ID, writing/closed); finally старого запроса не очищает новый token. Запись, обязательный readback, SQL SELECT TOP 500, порядок, цены и scope не менялись. Добавлен тест отмены PriceHistory до подключения, дополнен source lifecycle. Windows build/xUnit/SQL Pilot не запускались, скорость не измерена; приёмка: быстрый поиск, paging, выбор A→B→C, закрытие, rename/delete, конфликт ревизии, медленный SQL, история 0/500 строк. БД/релиз без изменений.
+
 ## 27.11.2026 — чтение страниц справочника (PERF-047)
 
 27.11.2026 ChatGPT / main (база 1856757) — PERF-047 PARTIAL, Catalog: CatalogSnapshot выполняет страницу и две проверки ревизии на одном guarded SQL connection вместо двух; обычный Catalog сохраняет API и Uses. Picker передаёт expectedRevision, не вычисляет неиспользуемый COUNT_BIG по позициям (Uses=0 только для picker), отменяет предыдущую страницу при поиске/закрытии, сохраняет generation, selection/qty и 201-ю строку. Manager использует тот же snapshot с реальным Uses; отмена его history/page остаётся отдельной задачей. Правила поиска, цены, ORDER/OFFSET и Pilot guard сохранены. Добавлены два теста отмены до SQL/source lifecycle. Windows build/xUnit/SQL Pilot не запускались, планы и время не измерены; приёмка: 50k каталог, 0/201/200+ строк, быстрый поиск, paging, выбор между страницами, конфликт ревизии, сверка Uses/цен. БД/релиз без изменений.

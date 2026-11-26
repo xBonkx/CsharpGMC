@@ -207,10 +207,14 @@ public static class SqlServerWorkspaceNavigation
     /// Python builder.price_history uses currently linked estimate positions, not
     /// the separate price_history cache. This preserves system/quantity and current prices.
     /// </summary>
-    public static IReadOnlyList<PriceHistoryEntry> PriceHistory(string connectionString, long catalogId)
+    public static IReadOnlyList<PriceHistoryEntry> PriceHistory(string connectionString, long catalogId,
+        CancellationToken token = default)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
-        using var conn = SqlServerDatabase.Open(connectionString);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
         using var cmd = new SqlCommand(
             "SELECT TOP (500) p.id,COALESCE(o.name,N'')," +
             "CONCAT(CASE c.kind WHEN N'main' THEN N'Договор' WHEN N'dop' THEN N'ДС' ELSE N'КП' END," +
@@ -222,15 +226,20 @@ public static class SqlServerWorkspaceNavigation
             "JOIN dbo.contracts c ON c.id=s.contract_id JOIN dbo.objects o ON o.id=c.object_id " +
             "WHERE p.catalog_item_id=@id ORDER BY p.id DESC", conn) { CommandTimeout = 30 };
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = catalogId;
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var rows = new List<PriceHistoryEntry>();
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             rows.Add(new PriceHistoryEntry(
                 Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1), r.GetString(2),
                 r.GetString(3), r.GetString(4),
                 Convert.ToDecimal(r.GetValue(5), CultureInfo.InvariantCulture),
                 Convert.ToDecimal(r.GetValue(6), CultureInfo.InvariantCulture),
                 Convert.ToDecimal(r.GetValue(7), CultureInfo.InvariantCulture)));
+        }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 

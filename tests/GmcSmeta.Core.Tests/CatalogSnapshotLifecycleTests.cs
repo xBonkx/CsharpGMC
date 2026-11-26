@@ -15,6 +15,16 @@ public sealed class CatalogSnapshotLifecycleTests
     }
 
     [Fact]
+    public void CancelledPriceHistoryDoesNotConnect()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => SqlServerWorkspaceNavigation.PriceHistory(
+            "Server=invalid;Database=GmcSmetaPilot_Catalog;Integrated Security=true",
+            1, cancellation.Token));
+    }
+
+    [Fact]
     public void PickerAndManagerShareRevisionCheckedPageReader()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
@@ -31,6 +41,16 @@ public sealed class CatalogSnapshotLifecycleTests
         Assert.Contains("_pageCancellation?.Cancel();", picker);
         Assert.Contains("token.IsCancellationRequested || generation != _request", picker);
         Assert.Contains("CatalogSnapshot(", manager);
+        var catalog = manager[manager.IndexOf("public sealed class CatalogWindow", StringComparison.Ordinal)..];
+        Assert.Contains("_pageCancellation?.Cancel();", catalog);
+        Assert.Contains("_historyCancellation?.Cancel();", catalog);
+        Assert.Contains("search, skip, 201, token: token), token)", catalog);
+        Assert.Contains("PriceHistory(_connectionString, id, token), token)", catalog);
+        Assert.Contains("ReferenceEquals(_pageCancellation, cancellation)", catalog);
+        Assert.Contains("ReferenceEquals(_historyCancellation, cancellation)", catalog);
+        Assert.Contains("request == _historyRequest && revision == _revision && Selected?.Id == id", catalog);
+        Assert.Contains("_writing = true;\n        InvalidatePage();", catalog.Replace("\r\n", "\n"));
+        Assert.Contains("if (!_closed) await ReloadAsync();", catalog);
         Assert.Contains("before != expectedRevision", sql);
         Assert.Contains("ReadCatalogPage(conn, query, skip, take, includeUsageCount, token)", sql);
         Assert.Contains("before != Revision()", sql);
