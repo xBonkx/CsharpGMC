@@ -199,12 +199,26 @@
                     Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Добавить выделенные или все отфильтрованные позиции: со склада или остаток, если склада нет"/>
             <Button x:Name="RemoveRowsButton" Content="Убрать из ведомости" ContentTemplate="{StaticResource IconLabelX}" Click="RemoveRows_Click"
                     Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Убрать выделенные позиции из текущей ведомости"/>
-            <ComboBox x:Name="RowFilter" Width="146" Height="32" Margin="0,0,6,4" SelectionChanged="RowFilter_Changed"
-                      ToolTip="Все позиции объекта, доступные к выдаче или уже включённые в ведомость">
-                <ComboBoxItem Content="Все строки" IsSelected="True"/>
-                <ComboBoxItem Content="Можно выдать"/>
-                <ComboBoxItem Content="В ведомости"/>
-            </ComboBox>
+            <Border x:Name="RowFilter" MinWidth="330" Margin="0,0,6,4" Padding="3"
+                    Background="#F1F4F9" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="11"
+                    IsEnabled="False">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="3*"/>
+                        <ColumnDefinition Width="4*"/>
+                        <ColumnDefinition Width="4*"/>
+                    </Grid.ColumnDefinitions>
+                    <RadioButton x:Name="RowFilterAll" Content="Все строки" IsChecked="True"
+                                 Style="{StaticResource Segment}" Click="ShipmentSegment_Click" Margin="0,0,2,0"
+                                 ToolTip="Все позиции объекта"/>
+                    <RadioButton x:Name="RowFilterStock" Grid.Column="1" Content="Можно выдать"
+                                 Style="{StaticResource Segment}" Click="ShipmentSegment_Click" Margin="0,0,2,0"
+                                 ToolTip="Только то, что есть на складе (и уже отмеченное)"/>
+                    <RadioButton x:Name="RowFilterList" Grid.Column="2" Content="В ведомости"
+                                 Style="{StaticResource Segment}" Click="ShipmentSegment_Click"
+                                 ToolTip="Только то, что в этой ведомости"/>
+                </Grid>
+            </Border>
             <ComboBox x:Name="DocumentFilter" Width="205" Height="32" Margin="0,0,6,4"
                       DisplayMemberPath="Title" SelectionChanged="RowFilter_Changed"
                       ToolTip="Показать позиции одного договора или дополнительного соглашения" Visibility="Collapsed"/>

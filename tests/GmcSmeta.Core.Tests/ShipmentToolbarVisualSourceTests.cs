@@ -41,6 +41,6 @@ public sealed class ShipmentToolbarVisualSourceTests
         var code = File.ReadAllText(Path.Combine(app, "ShipmentsPane.xaml.cs"));
         Assert.Contains("RowSearch.Clear();", code);
         Assert.Contains("RowSearch.Focus();", code);
-        Assert.Contains("Current?.Fixed == true && !IsEditingFixed ? 2 : RowFilter.SelectedIndex", code);
+        Assert.Contains("var filter = EffectiveShipmentFilter;", code);
     }
 }

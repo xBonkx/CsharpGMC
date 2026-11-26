@@ -212,6 +212,7 @@ public partial class ShipmentsPane : UserControl
         FixedCheck.IsEnabled = RecipientBox.IsEnabled = IssuedByBox.IsEnabled = false;
         AddRowsButton.IsEnabled = StockRowsButton.IsEnabled = RemoveRowsButton.IsEnabled = DeleteShipmentButton.IsEnabled = false;
         DocumentFilter.Visibility = Visibility.Collapsed;
+        SyncShipmentFilter(hasShipment: false, editable: false);
         QtyColumn.IsReadOnly = true;
         NumberBox.Text = RecipientBox.Text = IssuedByBox.Text = "";
         DateBox.SelectedDate = null;
@@ -261,7 +262,7 @@ public partial class ShipmentsPane : UserControl
         // Keep the menu available for a posted shipment so it can explain the restriction.
         DeleteShipmentButton.IsEnabled = true;
         FixedCheck.IsEnabled = !IsEditingFixed && (current.Fixed || current.Lines > 0);
-        RowFilter.IsEnabled = editable;
+        SyncShipmentFilter(hasShipment: true, editable: editable);
         StockRowsButton.IsEnabled = RemoveRowsButton.IsEnabled = editable;
         var documents = snapshot.Object.Documents;
         var documentId = (DocumentFilter.SelectedItem as SqlServerShipments.ShipmentDocument)?.Id ?? 0;
@@ -517,7 +518,7 @@ public partial class ShipmentsPane : UserControl
         if (!CanStartWrite || Current is not { Fixed: true } current) return;
         if (!Ask("Изменить выданную ведомость", "Изменения сразу отразятся в складских движениях. Продолжить?")) return;
         _editingFixedId = current.Id;
-        RowFilter.SelectedIndex = 0;
+        _requestedRowFilter = 0;
         await ReloadAsync(reuseObject: true, requiredReadback: false);
     }
 
@@ -569,7 +570,7 @@ public partial class ShipmentsPane : UserControl
     private bool RowVisible(object item)
     {
         if (item is not ShipmentPreviewRow row) return false;
-        var filter = Current?.Fixed == true && !IsEditingFixed ? 2 : RowFilter.SelectedIndex;
+        var filter = EffectiveShipmentFilter;
         if (filter == 2 && !row.InShipment) return false;
         // Python: «В ведомости» всегда показывает строки всех документов объекта.
         if (filter != 2 && DocumentFilter.SelectedItem is SqlServerShipments.ShipmentDocument { Id: > 0 } document &&
