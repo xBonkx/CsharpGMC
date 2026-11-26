@@ -5,24 +5,24 @@
         Title="Письмо" Width="1050" Height="820" MinWidth="790" MinHeight="590"
         WindowStartupLocation="CenterOwner" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Closing="Editor_Closing" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
-    <DockPanel Margin="12">
+    <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
         <TextBlock x:Name="StatusText" DockPanel.Dock="Top" Margin="2,0,0,12"
                    Foreground="#64748B" TextWrapping="Wrap"/>
         <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" Click="Save_Click" Padding="13,8" Margin="4,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр PDF" Click="Preview_Click" Padding="13,8" Margin="4,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="BuildButton" Content="Собрать выдачу…" Click="Build_Click" Padding="13,8" Margin="4,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SendButton" Content="Отметить отправленным…" Click="Sent_Click" Padding="13,8" Margin="4,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="История…" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click" Padding="13,8" Margin="4,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="13,8" Margin="4,0"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" Click="Save_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр PDF" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="BuildButton" Content="Собрать выдачу…" Click="Build_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SendButton" Content="Отметить отправленным…" Click="Sent_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="История…" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
         </WrapPanel>
         <TabControl x:Name="LetterTabs" Background="White" Style="{StaticResource PythonTabbedPane}">
             <TabItem Header="1. Реквизиты">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <Grid Margin="12,12,12,14">
+                    <Grid Margin="{StaticResource LayoutAuxTabPageMargin}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="2*" MaxWidth="220"/>
+                            <ColumnDefinition Width="5*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
@@ -42,8 +42,10 @@
                         <Grid Grid.Row="3" Grid.Column="1">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBox x:Name="ObjectBox" Margin="0,2,8,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ObjectButton" Grid.Column="1" Content="Выбрать объект из основной базы…" Padding="12,6"
-                                    Margin="0,2,0,6" Click="Object_Click"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ObjectButton" Grid.Column="1" Padding="12,6" MaxWidth="220"
+                                    Margin="0,2,0,6" Click="Object_Click">
+                                <TextBlock Text="Выбрать объект из основной базы…" TextWrapping="Wrap" TextAlignment="Center"/>
+                            </Button>
                         </Grid>
                         <TextBlock Grid.Row="4" Margin="0,0,12,0" VerticalAlignment="Center" TextWrapping="Wrap" Text="Тема"/>
                         <TextBox Grid.Row="4" Grid.Column="1" x:Name="SubjectBox" MinHeight="32" Margin="0,2,0,6"/>
@@ -68,14 +70,14 @@
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="2. Текст письма">
-                <DockPanel Margin="12">
-                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <Button Style="{StaticResource PythonToolbarButton}" FontWeight="Bold" Content="Жирный" Click="Bold_Click" Padding="12,6" Margin="0,0,7,6"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" FontStyle="Italic" Content="Курсив" Click="Italic_Click" Padding="12,6" Margin="0,0,7,6"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Список" Click="List_Click" Padding="12,6" Margin="0,0,7,6"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="По левому краю" Click="AlignLeft_Click" Padding="12,6" Margin="0,0,7,6"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="По центру" Click="AlignCenter_Click" Padding="12,6" Margin="0,0,7,6"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="По ширине" Click="AlignJustify_Click" Padding="12,6" Margin="0,0,7,6"/>
+                <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <Button Style="{StaticResource PythonToolbarButton}" FontWeight="Bold" Content="Жирный" Click="Bold_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" FontStyle="Italic" Content="Курсив" Click="Italic_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Список" Click="List_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="По левому краю" Click="AlignLeft_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="По центру" Click="AlignCenter_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="По ширине" Click="AlignJustify_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
                     </WrapPanel>
                     <RichTextBox x:Name="BodyBox" AcceptsTab="True" VerticalScrollBarVisibility="Auto"
                                  Background="White" BorderBrush="#D0D7E2" Padding="10" FontFamily="Times New Roman"
@@ -83,22 +85,22 @@
                 </DockPanel>
             </TabItem>
             <TabItem Header="3. Приложения и сканы">
-                <DockPanel Margin="12">
+                <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
                     <TextBlock DockPanel.Dock="Top" Margin="0,0,0,10" Foreground="#64748B"
                                TextWrapping="Wrap" Text="Приложения выдаются отдельно. Сканы письма и подтверждения отправки хранятся в карточке."/>
                     <StackPanel DockPanel.Dock="Bottom">
-                        <WrapPanel Margin="0,9,0,9">
+                        <WrapPanel Margin="0,6,0,3">
                             <ComboBox x:Name="RoleBox" Width="180" SelectedIndex="0" Margin="0,0,8,6">
                                 <ComboBoxItem Content="Приложение"/>
                                 <ComboBoxItem Content="Скан письма"/>
                                 <ComboBoxItem Content="Подтверждение отправки"/>
                             </ComboBox>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить PDF / фото…" Click="FileAdd_Click" Padding="10,5" Margin="0,0,6,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="FileOpen_Click" Padding="10,5" Margin="0,0,6,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Название…" Click="FileRename_Click" Padding="10,5" Margin="0,0,6,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Включить / исключить" Click="FileToggle_Click" Padding="10,5" Margin="0,0,6,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="↑" AutomationProperties.Name="Выше" ToolTip="Выше" Click="FileUp_Click" Margin="0,0,6,6" Width="32" MinWidth="32" Padding="4" />
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="↓" AutomationProperties.Name="Ниже" ToolTip="Ниже" Click="FileDown_Click" Margin="0,0,6,6" Width="32" MinWidth="32" Padding="4" />
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить PDF / фото…" Click="FileAdd_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="FileOpen_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Название…" Click="FileRename_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Включить / исключить" Click="FileToggle_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="↑" AutomationProperties.Name="Выше" ToolTip="Выше" Click="FileUp_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="↓" AutomationProperties.Name="Ниже" ToolTip="Ниже" Click="FileDown_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
                         </WrapPanel>
                         <CheckBox x:Name="CombineBox" Margin="0,4,0,10" Content="Дополнительно собрать письмо и приложения в один PDF"/>
                         <TextBlock Text="Выпуски (двойной щелчок — открыть папку):" Margin="0,0,0,4"/>

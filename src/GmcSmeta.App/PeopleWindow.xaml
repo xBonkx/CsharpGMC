@@ -141,8 +141,8 @@
                 </DataGrid>
             </DockPanel>
             <GridSplitter Grid.Row="1" Height="8" HorizontalAlignment="Stretch"
-                          VerticalAlignment="Center" Background="#E2E8F0"
-                          ResizeDirection="Rows"/>
+                          VerticalAlignment="Center" Background="#E4E8EF"
+                          ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"/>
             <DockPanel Grid.Row="2" Margin="0,6,0,0">
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                     <TextBlock Text="АВТОМОБИЛИ" FontWeight="SemiBold" Foreground="#475569"

@@ -146,17 +146,20 @@
                     <Grid Grid.Row="4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <DataGrid local:TableColumnMenu.Key="metal-places" x:Name="PlaceGrid" Grid.Column="0" Margin="0,0,8,0">
+                        <TabControl Grid.Column="0" Style="{StaticResource PythonTabbedPane}" Margin="0,0,8,0">
+                            <TabItem Header="Наличие">
+                        <DataGrid local:TableColumnMenu.Key="metal-places" x:Name="PlaceGrid">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Место хранения" Binding="{Binding Place}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                                 <DataGridTextColumn Header="Бухты, шт." Binding="{Binding Pieces}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                                 <DataGridTextColumn Header="Площадь, м²" Binding="{Binding Area,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             </DataGrid.Columns>
                         </DataGrid>
-                        <DataGrid local:TableColumnMenu.Key="metal-material-objects" x:Name="MaterialObjectsGrid" Grid.Column="1" Margin="0,0,8,0">
+                            </TabItem>
+                            <TabItem Header="По объектам, м²">
+                        <DataGrid local:TableColumnMenu.Key="metal-material-objects" x:Name="MaterialObjectsGrid">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Объект" Binding="{Binding ObjectName}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                                 <DataGridTextColumn Header="Потребность" Binding="{Binding Demand,Converter={StaticResource Area}}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
@@ -165,18 +168,22 @@
                                 <DataGridTextColumn Header="Осталось" Binding="{Binding Remaining,Converter={StaticResource Area}}" Width="80" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             </DataGrid.Columns>
                         </DataGrid>
-                        <StackPanel Grid.Column="2">
+                            </TabItem>
+                        </TabControl>
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel MinWidth="150">
                             <TextBlock Text="Быстрые действия" FontWeight="SemiBold" Margin="0,0,0,7"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Приход металла" Tag="Приход" Click="QuickOperation_Click" Margin="0,0,0,6"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Резерв под объект" Tag="Резерв" Click="QuickOperation_Click" Margin="0,0,0,6"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Выдача на объект" Tag="Выдача" Click="QuickOperation_Click" Margin="0,0,0,6"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Перемещение" Tag="Перемещение" Click="QuickOperation_Click"/>
                         </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Grid>
             </TabItem>
             <TabItem Header="По объектам">
-                <DataGrid local:TableColumnMenu.Key="metal-objects" local:TableColumnMenu.Protect="Материал" x:Name="ObjectsGrid" Margin="9">
+                <DataGrid local:TableColumnMenu.Key="metal-objects" local:TableColumnMenu.Protect="Материал" x:Name="ObjectsGrid">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Объект" Binding="{Binding ObjectName}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                         <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="120" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
@@ -190,7 +197,7 @@
             </TabItem>
             <TabItem Header="Операции">
                 <DockPanel Margin="9">
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,7">
+                    <WrapPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,7">
                         <Grid Width="330">
                             <TextBox x:Name="HistorySearch" Style="{StaticResource PythonSearch}" Height="32" Background="White"
                                      BorderBrush="#D0D7E2" Padding="10,5" VerticalContentAlignment="Center"
@@ -209,7 +216,7 @@
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Назад" ContentTemplate="{StaticResource IconLabelArrowBack}" ToolTip="Назад" Click="JournalPrevious_Click" Margin="16,0,7,0" Padding="12,5"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Далее" ContentTemplate="{StaticResource IconLabelArrowForward}" ToolTip="Далее" Click="JournalNext_Click" Padding="12,5"/>
                         <TextBlock x:Name="JournalPage" VerticalAlignment="Center" Margin="15,0,0,0"/>
-                    </StackPanel>
+                    </WrapPanel>
                     <DataGrid local:TableColumnMenu.Key="metal-journal" x:Name="JournalGrid">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Дата" Binding="{Binding CreatedUtc,StringFormat=dd.MM.yyyy HH:mm}" Width="128" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
@@ -231,11 +238,11 @@
             </TabItem>
             <TabItem Header="Закупки и хранение">
                 <DockPanel Margin="9">
-                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <WrapPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить партию…" Click="LotAdd_Click" Padding="12,6" Margin="0,0,8,0"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Отметить оплату" Click="LotPay_Click" Padding="12,6" Margin="0,0,8,0"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Забрать с хранения…" Click="LotReceive_Click" Padding="12,6"/>
-                    </StackPanel>
+                    </WrapPanel>
                     <DataGrid local:TableColumnMenu.Key="metal-lots" x:Name="LotsGrid">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier}" Width="180" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
