@@ -21,7 +21,7 @@
             <StackPanel>
                 <TextBlock Text="Расчёт КС-3" Foreground="#0F172A" FontWeight="Bold"
                            FontSize="{StaticResource UiH1Size}"/>
-                <TextBlock x:Name="ActInfoText" Foreground="#64748B" Margin="0,4,0,0"/>
+                <TextBlock x:Name="ActInfoText" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="ExportButton" Content="Сохранить Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click"
@@ -42,7 +42,7 @@
                 <StackPanel>
                     <TextBlock Text="За период · без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
                     <TextBlock x:Name="PeriodNetText" Text="—" FontWeight="Bold"
-                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0"/>
+                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
@@ -50,7 +50,7 @@
                 <StackPanel>
                     <TextBlock x:Name="YearAmountLabel" Text="С начала года · без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
                     <TextBlock x:Name="YearNetText" Text="—" FontWeight="Bold"
-                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0"/>
+                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
@@ -58,7 +58,7 @@
                 <StackPanel>
                     <TextBlock x:Name="StartAmountLabel" Text="С начала работ · без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
                     <TextBlock x:Name="StartNetText" Text="—" FontWeight="Bold"
-                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0"/>
+                               FontSize="{StaticResource UiH2Size}" Foreground="#164280" Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -70,7 +70,7 @@
                            Foreground="#334155" FontWeight="SemiBold" Margin="4,0,0,10"/>
                 <DataGrid local:TableColumnMenu.Key="ks3-previous" local:TableColumnMenu.Protect="Акт КС-2" CellStyle="{StaticResource CompactCostCell}" x:Name="PreviousGrid" IsReadOnly="True" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" RowHeaderWidth="0"
-                          ColumnHeaderStyle="{StaticResource KsQuantityHeader}" MinRowHeight="24"
+                          ColumnHeaderStyle="{StaticResource KsQuantityHeader}" MinRowHeight="27"
                           GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
                           RowStyle="{StaticResource KsReportRow}" AlternationCount="2" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
@@ -91,7 +91,7 @@
             <Border Grid.Column="0" Style="{StaticResource PythonTile}" Margin="0,0,6,0">
                 <StackPanel>
                     <TextBlock Text="НДС за период" Style="{StaticResource PythonTileLabel}"/>
-                    <TextBlock x:Name="VatText" Text="—" FontWeight="Bold" FontSize="{StaticResource UiH2Size}"/>
+                    <TextBlock x:Name="VatText" Text="—" FontWeight="Bold" FontSize="{StaticResource UiH2Size}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" CornerRadius="12" Padding="16,11" Margin="6,0,0,0">
@@ -104,7 +104,7 @@
                 <StackPanel>
                     <TextBlock Text="Итого за период · с НДС" Style="{StaticResource PythonTileLabel}" Foreground="White"/>
                     <TextBlock x:Name="TotalText" Text="—" FontWeight="Bold"
-                               FontSize="{StaticResource UiH2Size}" Foreground="#FFFFFF"/>
+                               FontSize="{StaticResource UiH2Size}" Foreground="#FFFFFF" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </Grid>

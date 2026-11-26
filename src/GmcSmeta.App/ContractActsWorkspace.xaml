@@ -8,13 +8,21 @@
          «Сводная по выполнению», слева список актов документа, справа редактор акта;
          сводная — по позициям и актам с разделом «Вне подписанной сметы». -->
     <UserControl.Resources>
+        <Style x:Key="KsActListText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{Binding Fore}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <DataTemplate x:Key="KsActListTemplate">
-            <StackPanel Margin="2,6">
-                <TextBlock Text="{Binding Title}" Foreground="{Binding Fore}"
+            <StackPanel Margin="6,8">
+                <TextBlock Text="{Binding Title}" Style="{StaticResource KsActListText}"
                            FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding Title}"/>
-                <TextBlock Text="{Binding Caption}" Foreground="{Binding Fore}"
-                           FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
+                <TextBlock Text="{Binding Caption}" Style="{StaticResource KsActListText}"
+                           FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0" TextWrapping="Wrap"/>
             </StackPanel>
         </DataTemplate>
         <Style x:Key="KsSummaryRow" TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
@@ -50,8 +58,8 @@
         </Grid.RowDefinitions>
 
         <!-- режимы вкладки + кнопки; справа — фильтры сводной -->
-        <DockPanel Grid.Row="0" x:Name="ModeBarPanel" LastChildFill="False" Margin="0,0,0,6">
-            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+        <WrapPanel Grid.Row="0" x:Name="ModeBarPanel" Margin="0,0,0,6">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <RadioButton x:Name="ActsMode" GroupName="KsWorkspaceMode" Content="Акты (КС-2, КС-3)"
                              Style="{StaticResource ObjectSubTab}" IsChecked="True"
                              Checked="ActsMode_Checked"/>
@@ -63,8 +71,8 @@
                 <Button Content="Все КС договора" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}"
                         Margin="7,0,0,0" Click="ContractActs_Click"
                         ToolTip="Общий список актов всех приложений и ДС"/>
-            </StackPanel>
-            <StackPanel x:Name="SummaryBarPanel" DockPanel.Dock="Right" Orientation="Horizontal"
+            </WrapPanel>
+            <WrapPanel x:Name="SummaryBarPanel" Orientation="Horizontal"
                         VerticalAlignment="Center" Visibility="Collapsed">
                 <CheckBox x:Name="SummaryRestOnly" Content="Только остатки" VerticalAlignment="Center"
                           Margin="0,0,10,0" Checked="SummaryRest_Changed" Unchecked="SummaryRest_Changed"
@@ -72,8 +80,8 @@
                 <Button Content="Сохранить сводную в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
                         Click="SummaryExport_Click"
                         ToolTip="Сводная по выполнению: по позициям и актам"/>
-            </StackPanel>
-        </DockPanel>
+            </WrapPanel>
+        </WrapPanel>
 
         <!-- подсказка вкладки (Python HintBar «ks») -->
         <Border Grid.Row="1" x:Name="HintBar" Background="#E8F0FE" CornerRadius="8"
@@ -121,7 +129,7 @@
                           AutoGenerateColumns="False" IsReadOnly="True"
                           CanUserAddRows="False" CanUserDeleteRows="False"
                           RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
-                          MinRowHeight="24" EnableRowVirtualization="True"
+                          MinRowHeight="27" EnableRowVirtualization="True"
                           GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                           VerticalGridLinesBrush="#E4E8EF" RowStyle="{StaticResource KsSummaryRow}" AlternationCount="2"
                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -146,7 +154,7 @@
                               AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
-                              MinRowHeight="24" MinHeight="90" MaxHeight="240"
+                              MinRowHeight="27" MinHeight="90" MaxHeight="240"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                               VerticalGridLinesBrush="#E4E8EF"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"

@@ -50,22 +50,22 @@
         <UniformGrid Grid.Row="2" Columns="5" Margin="0,0,0,9">
             <Border Style="{StaticResource PythonTile}" Margin="0,0,8,0">
                 <StackPanel><TextBlock Text="КС-2 в группе" Style="{StaticResource PythonTileLabel}" Foreground="#64748B" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="CountText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"/></StackPanel>
+                    <TextBlock x:Name="CountText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
                     BorderBrush="#D4E4FA" Margin="0,0,8,0">
                 <StackPanel><TextBlock Text="За период без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="PeriodText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"/></StackPanel>
+                    <TextBlock x:Name="PeriodText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
                     BorderBrush="#D4E4FA" Margin="0,0,8,0">
                 <StackPanel><TextBlock x:Name="YearAmountLabel" Text="С начала года без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="YearText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"/></StackPanel>
+                    <TextBlock x:Name="YearText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
                     BorderBrush="#D4E4FA" Margin="0,0,8,0">
                 <StackPanel><TextBlock x:Name="StartAmountLabel" Text="С начала работ без НДС" Style="{StaticResource PythonTileLabel}" Foreground="#476A98" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="StartText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"/></StackPanel>
+                    <TextBlock x:Name="StartText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
             <Border CornerRadius="12" Padding="16,11">
                 <Border.Background>
@@ -76,7 +76,7 @@
                 </Border.Background>
                 <StackPanel><TextBlock Text="ИТОГО с НДС, ₽" Style="{StaticResource PythonTileLabel}" Foreground="White" TextWrapping="Wrap"/>
                     <TextBlock x:Name="GrossText" Foreground="White"
-                               FontSize="{StaticResource UiH2Size}" FontWeight="Bold"/></StackPanel>
+                               FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
         </UniformGrid>
         <Grid Grid.Row="3">
@@ -89,7 +89,7 @@
                     <DataGrid local:TableColumnMenu.Key="ks-group-acts" local:TableColumnMenu.Protect="КС-2" CellStyle="{StaticResource CompactCostCell}" x:Name="ActGrid" IsReadOnly="True" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
-                              RowHeaderWidth="0" MinRowHeight="24"
+                              RowHeaderWidth="0" MinRowHeight="27"
                               EnableRowVirtualization="True" EnableColumnVirtualization="True"
                               RowStyle="{StaticResource KsReportRow}" AlternationCount="2"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
@@ -114,7 +114,7 @@
                                FontWeight="SemiBold" Margin="2,0,0,8"/>
                     <DataGrid local:TableColumnMenu.Key="ks-group-previous" local:TableColumnMenu.Protect="Номер группы" CellStyle="{StaticResource CompactCostCell}" x:Name="PreviousGrid" IsReadOnly="True" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" RowHeaderWidth="0"
-                              ColumnHeaderStyle="{StaticResource KsQuantityHeader}" MinRowHeight="24"
+                              ColumnHeaderStyle="{StaticResource KsQuantityHeader}" MinRowHeight="27"
                               EnableRowVirtualization="True" EnableColumnVirtualization="True"
                               RowStyle="{StaticResource KsReportRow}" AlternationCount="2"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">

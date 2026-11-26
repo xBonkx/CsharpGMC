@@ -34,7 +34,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,9">
+        <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,9">
             <TextBlock x:Name="ScopeTitle" Foreground="#64748B" VerticalAlignment="Center"
                        Margin="0,0,14,0" TextTrimming="CharacterEllipsis"
                        MaxWidth="420" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
@@ -43,11 +43,42 @@
             <Button Content="Общая КС-3 / Excel…" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
                     x:Name="OpenKs3Button" Click="OpenKs3_Click" IsEnabled="False" Margin="0,0,7,0"/>
             <Button Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Style="{StaticResource PythonToolbarButton}" Click="Refresh_Click"/>
-        </StackPanel>
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,9">
-            <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Width="260" Height="32"
-                     VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
-                     ToolTip="Найти акт или приложение…"/>
+        </WrapPanel>
+        <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,9">
+            <Grid Width="260" Height="32">
+                <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Padding="8,5,32,5"
+                         VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
+                         AutomationProperties.Name="Найти акт или приложение" ToolTip="Найти акт или приложение…"/>
+                <TextBlock Text="Найти акт или приложение…" Foreground="#94A3B8" Margin="8,0,32,0"
+                           VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=ActsSearch}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" ToolTip="Очистить поиск"
+                                AutomationProperties.Name="Очистить поиск" Width="26" Height="26" MinWidth="0" MinHeight="0"
+                                Padding="0" Margin="0,0,3,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Click="ClearActsSearch_Click">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=ActsSearch}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+            </Grid>
             <ComboBox x:Name="ActsStatusFilter" Margin="8,0,0,0" MinWidth="150"
                       SelectionChanged="ActsStatusFilter_Changed" SelectedIndex="0">
                 <ComboBoxItem Content="Все статусы" Tag="all"/>
@@ -55,11 +86,11 @@
                 <ComboBoxItem Content="Подписанные" Tag="signed"/>
             </ComboBox>
             <TextBlock x:Name="OverviewStatus" Foreground="#64748B" VerticalAlignment="Center" Margin="14,0,0,0"
-                       TextTrimming="CharacterEllipsis"/>
-        </StackPanel>
+                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </WrapPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="250" MinWidth="180"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <Border Grid.Column="0" Background="White" BorderBrush="#E4E8EF"
@@ -74,34 +105,34 @@
                     <UniformGrid DockPanel.Dock="Top" Columns="4" Margin="0,0,0,13">
                         <Border Style="{StaticResource KsCard}" Background="#F0F5FE">
                             <StackPanel>
-                                <TextBlock Text="Всего КС-2" Foreground="#476A98"/>
-                                <TextBlock x:Name="TotalActsText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                                <TextBlock Text="Всего КС-2" Foreground="#476A98" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TotalActsText" Text="—" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource KsCard}" Background="#F0FBF5">
                             <StackPanel>
-                                <TextBlock Text="Подписано, ₽" Foreground="#166534"/>
-                                <TextBlock x:Name="SignedAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                                <TextBlock Text="Подписано, ₽" Foreground="#166534" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="SignedAmountText" Text="—" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource KsCard}" Background="#FFF9EE">
                             <StackPanel>
-                                <TextBlock Text="На подготовке, ₽" Foreground="#92400E"/>
-                                <TextBlock x:Name="DraftAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                                <TextBlock Text="На подготовке, ₽" Foreground="#92400E" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="DraftAmountText" Text="—" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource KsCard}" Background="#F4EFFD">
                             <StackPanel>
-                                <TextBlock Text="Всего по актам, ₽" Foreground="#6941C6"/>
-                                <TextBlock x:Name="ActsAmountText" Text="—" Style="{StaticResource PythonTileValue}"/>
+                                <TextBlock Text="Всего по актам, ₽" Foreground="#6941C6" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ActsAmountText" Text="—" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                     </UniformGrid>
-                    <DataGrid local:TableColumnMenu.Key="all-contract-acts" CellStyle="{StaticResource CompactCostCell}" x:Name="ActListGrid" RowStyle="{StaticResource KsReportRow}" AlternationCount="2"
+                    <DataGrid local:TableColumnMenu.Key="all-contract-acts" CellStyle="{StaticResource CompactCostCell}" x:Name="ActListGrid" RowStyle="{StaticResource KsReportRow}" AlternationCount="0"
                               AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
-                              MinRowHeight="24" EnableRowVirtualization="True"
+                              MinRowHeight="27" EnableRowVirtualization="True"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                               SelectionChanged="ActListGrid_SelectionChanged"
                               MouseDoubleClick="ActListGrid_DoubleClick"

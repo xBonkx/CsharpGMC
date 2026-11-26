@@ -90,9 +90,8 @@
 
             <!-- шапка в одну строку: «Акты», «КС-2 № … от …», «Свойства акта…», «Компактно» ·
                  «Подписан (не менять)», «Сохранить КС-2 и КС-3», «Ещё» -->
-            <DockPanel Grid.Row="0" LastChildFill="False">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <ToggleButton x:Name="ListToggle" Content="Акты" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
+            <WrapPanel Grid.Row="0">
+                <ToggleButton x:Name="ListToggle" Content="Акты" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
                                   IsChecked="True" Checked="ListToggle_Changed" Unchecked="ListToggle_Changed"
                                   ToolTip="Показать / скрыть список актов слева"/>
                     <ComboBox x:Name="ActCombo" Width="240" Margin="10,0,0,0" Visibility="Collapsed"
@@ -106,15 +105,14 @@
                     <ToggleButton x:Name="CompactToggle" Content="Компактно" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
                                   Margin="6,0,0,0" Checked="Compact_Changed" Unchecked="Compact_Changed"
                                   ToolTip="Свернуть шапку и освободить место для таблицы"/>
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <CheckBox x:Name="SignedCheck" Content="Подписан (не менять)" Margin="0,0,10,0"
+                
+                <CheckBox x:Name="SignedCheck" Content="Подписан (не менять)" Margin="0,0,10,0"
                               VerticalAlignment="Center" Checked="Signed_Changed" Unchecked="Signed_Changed"
                               ToolTip="Перед подписанием выполняется проверка объёмов, цен, позиций вне КП и выдачи"/>
                     <Button x:Name="SaveButton" Content="Сохранить КС-2 и КС-3" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarPrimary}"
                             Click="ExportAct_Click" ToolTip="Excel (с листом КС-3) или PDF этого акта"/>
-                    <Button x:Name="MoreButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Style="{StaticResource PythonToolbarButton}"
-                            Margin="6,0,0,0" Click="HeaderMore_Click">
+                    <Button x:Name="MoreButton" Content="Ещё" ContentTemplate="{StaticResource IconOnlyMore}" Style="{StaticResource PythonToolbarButton}"
+                            ToolTip="Ещё" AutomationProperties.Name="Ещё" Margin="6,0,0,0" Click="HeaderMore_Click">
                         <Button.ContextMenu>
                             <ContextMenu Opened="ActMoreMenu_Opened">
                                 <MenuItem x:Name="PreSignMenuItem" Header="Проверить КС-2 перед подписанием…" Click="PreSignCheck_Click"
@@ -130,17 +128,16 @@
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
-                </StackPanel>
-            </DockPanel>
+                
+            </WrapPanel>
 
             <!-- период и ДС под шапкой -->
             <TextBlock Grid.Row="1" x:Name="ActSub" Foreground="#64748B" Margin="0,5,0,0"
-                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                       TextWrapping="Wrap" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
 
             <!-- панель над таблицей: закрыть/разделы/убрать, «Ещё», справа фильтры и поиск -->
-            <DockPanel Grid.Row="2" Margin="0,5,0,0" LastChildFill="False">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button x:Name="FillRestButton" Content="Закрыть выделенное" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarMain}"
+            <WrapPanel Grid.Row="2" Margin="0,5,0,0">
+                <Button x:Name="FillRestButton" Content="Закрыть выделенное" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarMain}"
                             Margin="0,0,2,0" Click="FillRest_Click"
                             ToolTip="Вписать в акт весь остаток по смете для выделенных строк (можно выделить систему)"/>
                     <Button Content="Закрыть разделы…" ContentTemplate="{StaticResource IconLabelLayers}" Style="{StaticResource PythonToolbarButton}" Margin="0,0,2,0"
@@ -161,9 +158,8 @@
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <ToggleButton x:Name="OnlyActToggle" Content="В акте" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
+                
+                <ToggleButton x:Name="OnlyActToggle" Content="В акте" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource KsToolToggle}"
                                   Margin="0,0,2,0" Checked="Filter_Changed" Unchecked="Filter_Changed"
                                   ToolTip="Показать только строки этого акта"/>
                     <ToggleButton x:Name="OnlyRestToggle" Content="Остатки" ContentTemplate="{StaticResource IconLabelSearch}" Style="{StaticResource KsToolToggle}"
@@ -173,20 +169,36 @@
                                   IsChecked="True" Margin="0,0,2,0" Checked="Tiles_Changed" Unchecked="Tiles_Changed"
                                   ToolTip="Показать / свернуть плашки итогов внизу"/>
                     <Grid Width="200">
-                        <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" VerticalContentAlignment="Center" Padding="30,5,8,5"
+                        <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" VerticalContentAlignment="Center" Padding="32,5,32,5" AutomationProperties.Name="Найти позицию"
                                  TextChanged="Search_Changed"/>
-                        <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                        <TextBlock x:Name="SearchHint" Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,0,0"
+                        <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                        <TextBlock x:Name="SearchHint" Text="Найти позицию…" Foreground="#94A3B8" Margin="32,0,32,0" TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" ToolTip="Очистить поиск"
+                                AutomationProperties.Name="Очистить поиск" Width="26" Height="26" MinWidth="0" MinHeight="0"
+                                Padding="0" Margin="0,0,3,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Click="ClearPositionSearch_Click">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                     </Grid>
-                </StackPanel>
-            </DockPanel>
+                
+            </WrapPanel>
 
             <!-- грид строк акта: № · Наименование · Ед. · По смете · Сдано ранее · В этом акте ·
                  Остаток · Выдано на объект · Цена · Сумма в акте -->
             <DataGrid local:TableColumnMenu.Key="ks-editor" Grid.Row="3" x:Name="ActGrid" Margin="0,5,0,0" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                       CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
-                      MinRowHeight="24"
+                      MinRowHeight="27"
                       AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All"
                       HorizontalGridLinesBrush="#E4E8EF" RowHeaderWidth="0"
