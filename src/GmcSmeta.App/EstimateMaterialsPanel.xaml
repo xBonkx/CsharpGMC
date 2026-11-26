@@ -88,9 +88,38 @@
         <ComboBox x:Name="MaterialsSystemFilter" Width="160" VerticalContentAlignment="Center"
                   
                   ToolTip="Показать строки одной системы"/>
-        <TextBox x:Name="MaterialsSearch" Style="{StaticResource PythonSearch}" Width="200" Margin="6,0,6,0"
-                  ToolTip="Поиск по названию или системе"/>
-        <Button x:Name="MaterialsExportButton" Style="{StaticResource PythonToolbarButton}"  MinWidth="36"
+        <Grid Width="200" Margin="6,0,6,0">
+                    <TextBox x:Name="MaterialsSearch" Style="{StaticResource PythonSearch}" Padding="32,5,32,5"
+                             AutomationProperties.Name="Найти позицию…"  ToolTip="Найти позицию…"/>
+                    <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center"
+                             Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="32,0,32,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=MaterialsSearch}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" Click="ClearMaterialsSearch_Click"
+                            ToolTip="Очистить поиск" AutomationProperties.Name="Очистить поиск"
+                            Width="26" Height="26" MinWidth="0" MinHeight="0" Padding="0" Margin="0,0,3,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=MaterialsSearch}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger></Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+        <Button x:Name="MaterialsExportButton" Style="{StaticResource PythonToolbarButton}"  MinWidth="36" AutomationProperties.Name="Экспорт материалов"
                 ToolTip="Сохранить закуп-розница: Excel с закупочными и розничными ценами и маржой (только для нас)">
             <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphDownload}" Stroke="#2563EB"/></Canvas></Viewbox>
         </Button>
@@ -114,7 +143,7 @@
     <DataGrid local:TableColumnMenu.Key="estimate-materials" x:Name="MaterialsGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="False"
               CellStyle="{StaticResource CompactCostCell}"
               RowStyle="{StaticResource MaterialsCostRow}"
-              MinRowHeight="24" ColumnHeaderStyle="{StaticResource CompactCostHeader}"
+              MinRowHeight="27" ColumnHeaderStyle="{StaticResource CompactCostHeader}"
               CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False" RowHeaderWidth="0"
               HeadersVisibility="Column" GridLinesVisibility="All"
               HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF" BorderBrush="#E4E8EF" BorderThickness="1" Background="White"
@@ -314,7 +343,7 @@
     <UniformGrid Grid.Row="3" Columns="4" Margin="0,10,0,0">
         <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0">
             <StackPanel>
-                <TextBlock x:Name="MatTileRevCaption" Text="Цена клиенту (материалы)" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="MatTileRevCaption" Text="Цена клиенту (материалы)" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
                 <TextBlock x:Name="MatTileRevValue" Style="{StaticResource PythonTileValue}"/>
             </StackPanel>
         </Border>
@@ -330,7 +359,7 @@
                 <ControlTemplate TargetType="Button">
                     <Border Style="{StaticResource PythonTile}">
                         <StackPanel>
-                            <TextBlock x:Name="MatTileTransCaption" Text="Транспорт · в смете нет" Style="{StaticResource PythonTileLabel}"/>
+                            <TextBlock x:Name="MatTileTransCaption" Text="Транспорт · в смете нет" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
                             <TextBlock x:Name="MatTileTransValue" Style="{StaticResource PythonTileValue}"/>
                         </StackPanel>
                     </Border>
@@ -340,7 +369,7 @@
         <Border Style="{StaticResource PythonTileAccent}">
             <StackPanel>
                 <TextBlock x:Name="MatTileMarginCaption" Text="Маржа на материалах" Foreground="#DBEAFE"
-                           FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                           FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                 <TextBlock x:Name="MatTileMarginValue" Foreground="White" Style="{StaticResource PythonTileValue}"/>
             </StackPanel>
         </Border>

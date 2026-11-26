@@ -482,11 +482,11 @@ WIN-26 сняты с активного контроля. Итог провер�
 
 | Окно / модуль | Статус |
 |---|---|
-| [WIN-01](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L691) — Карточки объектов — MainWindow | UNVERIFIED: парная приёмка по матрице |
-| [WIN-02](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L692) — Материалы — EstimateView.Materials | UNVERIFIED: парная приёмка по матрице |
-| [WIN-03](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L693) — Сводная — EstimateView.CostSummary | UNVERIFIED: парная приёмка по матрице |
-| [WIN-04](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L694) — Себестоимость — CostSummaryPane | UNVERIFIED: парная приёмка по матрице |
-| [WIN-05](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L695) — Монтаж — CostSummaryPane.Smr | UNVERIFIED: парная приёмка по матрице |
+| [WIN-01](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L691) — Карточки объектов — MainWindow | PARTIAL: card/table/search/toolbar readability; парная приёмка по матрице |
+| [WIN-02](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L692) — Материалы — EstimateView.Materials | PARTIAL: card/table/search/toolbar readability; парная приёмка по матрице |
+| [WIN-03](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L693) — Сводная — EstimateView.CostSummary | PARTIAL: card/table/search/toolbar readability; парная приёмка по матрице |
+| [WIN-04](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L694) — Себестоимость — CostSummaryPane | PARTIAL: card/table/search/toolbar readability; парная приёмка по матрице |
+| [WIN-05](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L695) — Монтаж — CostSummaryPane.Smr | PARTIAL: card/table/search/toolbar readability; парная приёмка по матрице |
 | [WIN-06](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L696) — Закупки — ProcurementPane | PARTIAL: PRC-VIS-01/02/03/04/05, парная приёмка остальных частей по матрице |
 | [WIN-07](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L697) — Выдача — ShipmentsPane | PARTIAL: SHIP-VIS-01/02/03/04/05, парная приёмка остальных частей по матрице |
 | [WIN-08](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L698) — КС-2/КС-3 — ActsEditorView | PARTIAL: KS layout, search/row/card readability; парная приёмка по матрице |

@@ -201,21 +201,21 @@
                 <Button.ContextMenu><ContextMenu/></Button.ContextMenu>
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Top">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <WrapPanel Margin="0,0,0,4">
                         <Border Background="#E8F0FE" CornerRadius="9" Padding="9,2"><TextBlock Text="{Binding KindTitle}" Foreground="#1E40AF" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/></Border>
                         <Border Background="#F1F4F9" CornerRadius="9" Padding="9,2" Margin="6,0,0,0">
                             <Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding TagName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Border.Style>
-                            <TextBlock Text="{Binding TagName}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
+                            <TextBlock Text="{Binding TagName}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" MaxWidth="220" ToolTip="{Binding TagName}"/>
                         </Border>
-                    </StackPanel>
+                    </WrapPanel>
                     <TextBlock Text="{Binding Title}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding BaseTitle, StringFormat=к договору: {0}}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding BaseTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
-                    <TextBlock Text="{Binding Meta}" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
+                    <TextBlock Text="{Binding Meta}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
                   </StackPanel>
                   <StackPanel DockPanel.Dock="Bottom">
-                    <TextBlock Text="{Binding Total, StringFormat={}{0:N2} ₽}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,14,0,4"/>
+                    <TextBlock Text="{Binding Total, StringFormat={}{0:N2} ₽}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,10,0,4" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding SplitText}" Foreground="#64748B" TextWrapping="Wrap"/>
                     <StackPanel Margin="0,12,0,0">
                         <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/>
@@ -223,12 +223,12 @@
                         </Style></StackPanel.Style>
                         <local:ContractProgressBar Height="8" SignedFraction="{Binding Progress.SignedFraction}" PendingFraction="{Binding Progress.PendingFraction}"/>
                         <UniformGrid Columns="3" Margin="0,8,0,0">
-                            <StackPanel><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"><Run Text="● " Foreground="#2563EB"/><Run Text="Подписано "/><Run Text="{Binding Progress.SignedPercent, Mode=OneWay}"/></TextBlock>
-                                <TextBlock Text="{Binding Finance.Signed, StringFormat={}{0:N2}}" FontWeight="SemiBold"/></StackPanel>
-                            <StackPanel><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"><Run Text="● " Foreground="#F59E0B"/><Run Text="На сдаче "/><Run Text="{Binding Progress.PendingPercent, Mode=OneWay}"/></TextBlock>
-                                <TextBlock Text="{Binding Finance.Pending, StringFormat={}{0:N2}}" FontWeight="SemiBold"/></StackPanel>
+                            <StackPanel><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#2563EB"/><Run Text="Подписано "/><Run Text="{Binding Progress.SignedPercent, Mode=OneWay}"/></TextBlock>
+                                <TextBlock Text="{Binding Finance.Signed, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
+                            <StackPanel><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#F59E0B"/><Run Text="На сдаче "/><Run Text="{Binding Progress.PendingPercent, Mode=OneWay}"/></TextBlock>
+                                <TextBlock Text="{Binding Finance.Pending, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
                             <StackPanel><TextBlock Text="○ Остаток" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
-                                <TextBlock Text="{Binding Progress.Remaining, StringFormat={}{0:N2}}" FontWeight="SemiBold"/></StackPanel>
+                                <TextBlock Text="{Binding Progress.Remaining, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
                         </UniformGrid>
                     </StackPanel>
                     <WrapPanel Margin="0,8,0,0">

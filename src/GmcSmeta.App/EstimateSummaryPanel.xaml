@@ -13,8 +13,9 @@
         <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
     <!-- заголовок + кнопки справа (cost_summary_view.__init__: title_row) -->
-    <DockPanel Grid.Row="0" Margin="0,0,0,10">
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+    <WrapPanel Grid.Row="0" Margin="0,0,0,10" VerticalAlignment="Center">
+        <TextBlock Text="Сводная стоимость" Foreground="#233C61" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"
+                   VerticalAlignment="Center" Margin="0,0,12,4"/>
             <Button x:Name="SummaryTransferSmrButton" Style="{StaticResource PythonToolbarButton}"
                     Content="СМР в смету по системам…" ContentTemplate="{StaticResource IconLabelList}" Click="SummaryTransferSmr_Click" IsEnabled="False"
                     Margin="0,0,6,0" MinHeight="30"
@@ -22,10 +23,7 @@
             <Button x:Name="SummaryExcelButton" Style="{StaticResource PythonToolbarButton}"
                     Content="Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="SummaryExcel_Click" IsEnabled="False" MinHeight="30"
                     ToolTip="Выгрузить сводную в Excel"/>
-        </StackPanel>
-        <TextBlock Text="Сводная стоимость" Foreground="#233C61" FontSize="19" FontWeight="Bold"
-                   VerticalAlignment="Center"/>
-    </DockPanel>
+    </WrapPanel>
     <!-- панель фильтров, как на «Материалах» (bar: вид, «без цен», наценка, системы, поиск) -->
     <local:SummaryToolbarPanel Grid.Row="1" Margin="0,0,0,10">
         <WrapPanel x:Name="SummaryActions" VerticalAlignment="Center">
@@ -184,7 +182,7 @@
     <local:SummaryTableFrame Grid.Row="2" CornerRadius="9" BorderThickness="1" BorderBrush="#DAE3EF" Background="White">
         <Grid ClipToBounds="True">
         <DataGrid local:TableColumnMenu.Key="estimate-summary" x:Name="SummaryGrid" AutoGenerateColumns="False" IsReadOnly="False"
-              MinRowHeight="26" ColumnHeaderHeight="78" MinHeight="120"
+              MinRowHeight="27" ColumnHeaderHeight="78" MinHeight="120"
               EnableRowVirtualization="True" EnableColumnVirtualization="True"
               VirtualizingPanel.VirtualizationMode="Recycling"
               VirtualizingPanel.ScrollUnit="Pixel"
