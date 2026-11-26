@@ -1,3 +1,5 @@
+using System.Data;
+using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.Core.Tests;
@@ -86,6 +88,46 @@ public sealed class PeopleRulesTests
         Assert.Equal(1, snapshot.People.Count);
         Assert.Equal(2L, snapshot.Cars[0].Id);
         Assert.Equal("Интро", snapshot.Intro);
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 17)]
+    [InlineData(true, 0)]
+    [InlineData(true, 17)]
+    [InlineData(true, int.MaxValue)]
+    public void AccessReadersAcceptIntAndBigIntSortOrder(bool bigInt, int order)
+    {
+        var orderType = bigInt ? typeof(long) : typeof(int);
+        object orderValue = bigInt ? (object)(long)order : order;
+        const long id = (long)int.MaxValue + 1;
+        using var people = new DataTable();
+        people.Columns.Add("id", typeof(long));
+        foreach (var column in new[] { "fio", "post", "birth", "note", "fio_gen", "post_gen" })
+            people.Columns.Add(column, typeof(string));
+        people.Columns.Add("active", typeof(bool));
+        people.Columns.Add("sort_order", orderType);
+        people.Rows.Add(id, "Иванов", "монтажник", "", "", "", "", true, orderValue);
+        using var personReader = people.CreateDataReader();
+        Assert.True(personReader.Read());
+        var person = SqlServerPeopleAccess.ReadPerson(personReader);
+        Assert.Equal(id, person.Id);
+        Assert.Equal(order, person.SortOrder);
+        Assert.True(person.Active);
+
+        using var cars = new DataTable();
+        cars.Columns.Add("id", typeof(long));
+        foreach (var column in new[] { "model", "plate", "note" })
+            cars.Columns.Add(column, typeof(string));
+        cars.Columns.Add("active", typeof(bool));
+        cars.Columns.Add("sort_order", orderType);
+        cars.Rows.Add(id, "Марка", "А123ВС", "", false, orderValue);
+        using var carReader = cars.CreateDataReader();
+        Assert.True(carReader.Read());
+        var car = SqlServerPeopleAccess.ReadCar(carReader);
+        Assert.Equal(id, car.Id);
+        Assert.Equal(order, car.SortOrder);
+        Assert.False(car.Active);
     }
 
     [Fact]

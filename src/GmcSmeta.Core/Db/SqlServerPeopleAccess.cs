@@ -99,16 +99,13 @@ public sealed class SqlServerPeopleAccess
                 (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
             using (var reader = cmd.ExecuteReader())
                 while (reader.Read())
-                    people.Add(new PeoplePerson(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
-                        reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
-                        reader.GetBoolean(7), reader.GetInt32(8)));
+                    people.Add(ReadPerson(reader));
             using (var cmd = Command(conn, null,
                 "SELECT id,model,plate,note,active,sort_order FROM dbo.cars " +
                 (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
             using (var reader = cmd.ExecuteReader())
                 while (reader.Read())
-                    cars.Add(new PeopleCar(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
-                        reader.GetString(3), reader.GetBoolean(4), reader.GetInt32(5)));
+                    cars.Add(ReadCar(reader));
             var after = SqlServerDatabase.Revision(conn);
             if (before == after)
                 return (PeopleRules.SortPeople(people),
@@ -117,6 +114,17 @@ public sealed class SqlServerPeopleAccess
         }
         throw new DBConcurrencyException("Справочник меняется в другом окне. Повторите загрузку.");
     }
+
+    // SQL Server copies may store sort_order as INT or BIGINT.
+    // Convert checks the Int32 range instead of requiring an exact provider type.
+    internal static PeoplePerson ReadPerson(IDataRecord reader) =>
+        new(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
+            reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
+            reader.GetBoolean(7), Convert.ToInt32(reader.GetValue(8)));
+
+    internal static PeopleCar ReadCar(IDataRecord reader) =>
+        new(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
+            reader.GetString(3), reader.GetBoolean(4), Convert.ToInt32(reader.GetValue(5)));
 
     public (long Id, string Revision) SavePerson(PeoplePerson row, string expectedRevision)
     {
