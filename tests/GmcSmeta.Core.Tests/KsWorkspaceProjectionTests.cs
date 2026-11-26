@@ -73,6 +73,56 @@ public sealed class KsWorkspaceProjectionTests
         Assert.True(KsWorkspaceProjection.Build(new[] { Sample[0] })[0].Signed);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void VisibleSummaryGroups_MatchOriginalScanOnLargeSnapshot(bool onlyRest)
+    {
+        var systems = new List<(SqlServerActs.SummarySystem System, bool SectionHeader)>();
+        for (var i = 0; i < 250; i++)
+        {
+            long parent = 1000 + i;
+            systems.Add((new(parent, $"Группа {i}", false), true));
+            systems.Add((new(i * 2 + 1, "П1", true, parent), false));
+            systems.Add((new(i * 2 + 2, "П1", true, parent), false));
+        }
+        var perAct = new Dictionary<long, decimal> { [101] = 2m, [102] = 3m };
+        var positions = Enumerable.Range(1, 25000).Select(i =>
+        {
+            long systemId = (i - 1) % 500 + 1;
+            var left = systemId % 5 == 0 ? 0m :
+                i % 4 == 0 ? -2m : i % 3 == 0 ? 0.000001m : 3m;
+            return new SqlServerActs.SummaryRow(i, systemId, i.ToString(), "Позиция", "шт",
+                5m + left, 10m, 5m, 50m, left, left * 10m, 1m, perAct);
+        }).ToArray();
+        // Empty section and empty child must not become visible.
+        systems.Add((new(2000, "Пустая", false), true));
+        systems.Add((new(999, "Пустая", true, 2000), false));
+        var summary = new SqlServerActs.SummaryData(Sample, systems, positions);
+
+        bool Visible(SqlServerActs.SummaryRow p) => !onlyRest || Math.Abs(p.Left) > 0.000001m;
+        var expected = new List<(long Id, bool Header, long Position)>();
+        foreach (var (system, header) in systems)
+        {
+            if (header)
+            {
+                if (systems.Any(s => !s.SectionHeader && s.System.ParentId == system.SystemId &&
+                    positions.Any(p => p.SystemId == s.System.SystemId && Visible(p))))
+                    expected.Add((system.SystemId, true, 0));
+                continue;
+            }
+            foreach (var p in positions.Where(p => p.SystemId == system.SystemId && Visible(p)))
+                expected.Add((system.SystemId, false, p.PositionId));
+        }
+        var groups = KsWorkspaceProjection.VisibleSummaryGroups(summary, onlyRest).ToArray();
+        var actual = groups.SelectMany(g => g.SectionHeader
+            ? new[] { (g.System.SystemId, true, 0L) }
+            : g.Positions.Select(p => (g.System.SystemId, false, p.PositionId))).ToArray();
+        Assert.Equal(expected.ToArray(), actual);
+        Assert.All(groups.SelectMany(g => g.Positions), p =>
+            Assert.Same(positions[checked((int)p.PositionId - 1)], p));
+    }
+
     [Fact]
     public void Filter_HidesUnmatchedActsButLeavesOriginalDataUnchanged()
     {

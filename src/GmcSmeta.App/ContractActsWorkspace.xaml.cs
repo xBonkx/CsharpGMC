@@ -269,6 +269,8 @@ public partial class ContractActsWorkspace : UserControl
         _extras = Array.Empty<SqlServerActs.ExtraRow>();
         _summaryActs.Clear();
         if (SummaryGrid is not null) SummaryGrid.ItemsSource = null;
+        if (ExtraGrid is not null) ExtraGrid.ItemsSource = null;
+        if (ExtraBox is not null) ExtraBox.Visibility = Visibility.Collapsed;
     }
 
     private async Task RefreshSummaryAsync()
@@ -286,8 +288,7 @@ public partial class ContractActsWorkspace : UserControl
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
                     var before = SqlServerDatabase.Revision(conn);
-                    var sheet = SqlServerActs.SummarySheet(conn, contractId);
-                    var extra = SqlServerActs.ExtraRows(conn, contractId);
+                    var (sheet, extra) = SqlServerActs.SummaryWithExtras(conn, contractId);
                     var totals = Totals.ReadOne(conn, contractId);
                     if (!string.IsNullOrEmpty(before) && before == SqlServerDatabase.Revision(conn))
                         return (sheet, extra, totals);
@@ -303,6 +304,7 @@ public partial class ContractActsWorkspace : UserControl
             BuildSummaryColumns();
             FillSummaryTiles();
             ApplySummaryFilter();
+            BuildExtra();
         }
         catch (Exception ex)
         {
@@ -362,40 +364,22 @@ public partial class ContractActsWorkspace : UserControl
         var rows = new List<KsSummaryVm>();
         var summary = _summary;
         if (summary is null) return rows;
-        // видимость позиций и разделов при «Только остатки» (ks_view._filter_summary_rest):
-        // скрытая позиция прячет и её раздел, если видимых позиций в нём не осталось
-        var visibleBySystem = new Dictionary<long, int>();
-        foreach (var (system, sectionHeader) in summary.Systems)
-        {
-            if (sectionHeader)
-                continue;
-            visibleBySystem[system.SystemId] = summary.Positions
-                .Where(p => p.SystemId == system.SystemId)
-                .Count(p => !onlyRest || Math.Abs(p.Left) > 0.000001m);
-        }
-        foreach (var (system, sectionHeader) in summary.Systems)
+        // One indexed projection for the current filter, preserving section order.
+        foreach (var (system, sectionHeader, positions) in KsWorkspaceProjection.VisibleSummaryGroups(summary, onlyRest))
         {
             if (sectionHeader)
             {
-                var childVisible = summary.Systems.Any(s =>
-                    !s.SectionHeader && s.System.ParentId == system.SystemId &&
-                    visibleBySystem.GetValueOrDefault(s.System.SystemId) > 0);
-                if (childVisible)
-                    rows.Add(new KsSummaryVm { IsTop = true, Name = system.Name });
+                rows.Add(new KsSummaryVm { IsTop = true, Name = system.Name });
                 continue;
             }
-            if (visibleBySystem.GetValueOrDefault(system.SystemId) == 0)
-                continue;
             rows.Add(new KsSummaryVm
             {
                 IsTop = !system.IsSub,
                 IsSub = system.IsSub,
                 Name = (system.IsSub ? "      ↳  " : "") + system.Name,
             });
-            foreach (var p in summary.Positions.Where(p => p.SystemId == system.SystemId))
+            foreach (var p in positions)
             {
-                if (onlyRest && Math.Abs(p.Left) <= 0.000001m)
-                    continue;
                 rows.Add(new KsSummaryVm
                 {
                     PositionId = p.PositionId,
@@ -420,7 +404,6 @@ public partial class ContractActsWorkspace : UserControl
     {
         if (SummaryGrid is null) return;
         SummaryGrid.ItemsSource = BuildSummaryRows(SummaryRestOnly.IsChecked == true);
-        BuildExtra();
     }
 
     private void SummaryRest_Changed(object sender, RoutedEventArgs e) => ApplySummaryFilter();

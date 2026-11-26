@@ -306,6 +306,8 @@ public static partial class SqlServerActs
 
         var issued = ReadIssued(conn, contractId);
         var systemById = systemRows.ToDictionary(s => s.Id, s => s);
+        // Preserve the SQL ordering inside each system, including for KP numbering.
+        var positionsBySystem = positions.ToLookup(p => p.SystemId);
 
         // «№» — как kp_numbers: разделы считаются тоже
         var kp = new Dictionary<long, string>();
@@ -314,10 +316,8 @@ public static partial class SqlServerActs
         {
             if (sy.Name != "Без системы")
                 n += 1;
-            foreach (var p in positions)
+            foreach (var p in positionsBySystem[sy.Id])
             {
-                if (p.SystemId != sy.Id)
-                    continue;
                 kp[p.Id] = numManual ? p.Num : n.ToString(CultureInfo.InvariantCulture);
                 n += 1;
             }
@@ -328,8 +328,8 @@ public static partial class SqlServerActs
         var shown = new HashSet<long>();
         foreach (var sy in systemRows)
         {
-            var mine = positions.Where(p => p.SystemId == sy.Id).ToList();
-            if (mine.Count == 0)
+            var mine = positionsBySystem[sy.Id];
+            if (!mine.Any())
                 continue;
             if (sy.Parent != 0 && !shown.Contains(sy.Parent))
             {
@@ -371,9 +371,21 @@ public static partial class SqlServerActs
     /// «Вне подписанной сметы» (acts.extra_rows): строки актов, у которых позиция
     /// вне КП, группировано по позиции; подписанные отдельно от черновиков.
     /// </summary>
-    public static IReadOnlyList<ExtraRow> ExtraRows(SqlConnection conn, long contractId)
+    public static IReadOnlyList<ExtraRow> ExtraRows(SqlConnection conn, long contractId) =>
+        ReadExtraRows(conn, contractId, ActsOf(conn, contractId));
+
+    /// <summary>One act list for both projections. Caller must fence the entire
+    /// read with the SQL revision, as for the individual read APIs.</summary>
+    public static (SummaryData Summary, IReadOnlyList<ExtraRow> Extras) SummaryWithExtras(
+        SqlConnection conn, long contractId)
     {
-        var acts = ActsOf(conn, contractId);
+        var summary = SummarySheet(conn, contractId);
+        return (summary, ReadExtraRows(conn, contractId, summary.Acts));
+    }
+
+    private static IReadOnlyList<ExtraRow> ReadExtraRows(SqlConnection conn, long contractId,
+        IReadOnlyList<ActInfo> acts)
+    {
         var actById = acts.ToDictionary(a => a.Id);
         var groups = new Dictionary<long, List<(long ActId, decimal Qty, decimal Price, decimal Amount)>>();
         using (var read = new SqlCommand(

@@ -20,6 +20,33 @@ public static class KsWorkspaceProjection
         acts.Any(a => a.Id == requestedId) ? requestedId :
         acts.Count == 0 ? 0 : acts[^1].Id;
 
+    public sealed record SummaryGroup(SqlServerActs.SummarySystem System, bool SectionHeader,
+        IReadOnlyList<SqlServerActs.SummaryRow> Positions);
+
+    /// <summary>Visible systems in the original order; section headers are
+    /// shown only when a direct child has visible positions. Preserve signed
+    /// negative remainders and the existing quantity tolerance.</summary>
+    public static IEnumerable<SummaryGroup> VisibleSummaryGroups(
+        SqlServerActs.SummaryData summary, bool onlyRest)
+    {
+        var bySystem = summary.Positions
+            .Where(p => !onlyRest || Math.Abs(p.Left) > 0.000001m)
+            .ToLookup(p => p.SystemId);
+        var visibleParents = summary.Systems
+            .Where(s => !s.SectionHeader && bySystem.Contains(s.System.SystemId))
+            .Select(s => s.System.ParentId).ToHashSet();
+        foreach (var (system, sectionHeader) in summary.Systems)
+        {
+            if (sectionHeader)
+            {
+                if (visibleParents.Contains(system.SystemId))
+                    yield return new SummaryGroup(system, true, Array.Empty<SqlServerActs.SummaryRow>());
+            }
+            else if (bySystem.Contains(system.SystemId))
+                yield return new SummaryGroup(system, false, bySystem[system.SystemId].ToArray());
+        }
+    }
+
     // Filtering the overview must never keep an invisible act selected.
     public static SqlServerActs.ActInfo? VisibleAct(
         IEnumerable<SqlServerActs.ActInfo> visible, long selectedId) =>
