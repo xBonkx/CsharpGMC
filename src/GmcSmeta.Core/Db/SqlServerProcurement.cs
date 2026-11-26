@@ -171,28 +171,37 @@ public static partial class SqlServerProcurement
     public static IReadOnlyList<BuyRow> BuyRows(string connectionString, int contractId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
-        var rows = new List<BuyRow>();
-        using (var read = new SqlCommand(BuyRowsQuery(), conn))
-        {
-            read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var r = read.ExecuteReader();
-            while (r.Read())
-                rows.Add(MapBuyRow(r, DateTime.Today));
-        }
-        return rows;
+        using var read = new SqlCommand(BuyRowsQuery(), conn);
+        read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+        using var reader = read.ExecuteReader();
+        return ReadBuyRows(reader, DateTime.Today);
     }
 
     /// <summary>All systems of a contract, including empty parents. Read-only for SystemPicker.</summary>
     public sealed record SystemChoice(long Id, long? ParentId, string Name, int Order);
 
+    private const string SystemChoicesQuery =
+        "SELECT id, parent_id, name, [order] FROM dbo.systems " +
+        "WHERE contract_id=@id ORDER BY [order],id";
+
     public static IReadOnlyList<SystemChoice> SystemChoices(string connectionString, int contractId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
-        using var cmd = new SqlCommand(
-            "SELECT id, parent_id, name, [order] FROM dbo.systems " +
-            "WHERE contract_id=@id ORDER BY [order],id", conn);
+        using var cmd = new SqlCommand(SystemChoicesQuery, conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         using var reader = cmd.ExecuteReader();
+        return ReadSystemChoices(reader);
+    }
+
+    private static IReadOnlyList<BuyRow> ReadBuyRows(IDataReader reader, DateTime today)
+    {
+        var rows = new List<BuyRow>();
+        while (reader.Read()) rows.Add(MapBuyRow(reader, today));
+        return rows;
+    }
+
+    private static IReadOnlyList<SystemChoice> ReadSystemChoices(IDataReader reader)
+    {
         var systems = new List<SystemChoice>();
         while (reader.Read())
             systems.Add(new SystemChoice(
@@ -202,6 +211,38 @@ public static partial class SqlServerProcurement
                 reader.IsDBNull(2) ? "" : reader.GetString(2),
                 reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3), CultureInfo.InvariantCulture)));
         return systems;
+    }
+
+    public sealed record BuySnapshot(IReadOnlyList<BuyRow> Rows,
+        IReadOnlyList<SystemChoice> Systems, string Revision, DateTime Day);
+
+    /// <summary>
+    /// Read rows and all systems (including empty parents) in one batch on
+    /// one guarded connection. The revision fence spans both result sets.
+    /// No snapshot is returned if another writer changed the revision.
+    /// </summary>
+    public static BuySnapshot ReadBuySnapshot(string connectionString, int contractId)
+    {
+        using var conn = SqlServerDatabase.Open(connectionString);
+        var revision = SqlServerDatabase.Revision(conn);
+        if (string.IsNullOrEmpty(revision))
+            throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
+
+        var day = DateTime.Today;
+        IReadOnlyList<BuyRow> rows;
+        IReadOnlyList<SystemChoice> systems;
+        using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery, conn))
+        {
+            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+            using var reader = cmd.ExecuteReader();
+            rows = ReadBuyRows(reader, day);
+            if (!reader.NextResult())
+                throw new InvalidOperationException("Не получен список систем закупок.");
+            systems = ReadSystemChoices(reader);
+        }
+        if (SqlServerDatabase.Revision(conn) != revision)
+            throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
+        return new BuySnapshot(rows, systems, revision, day);
     }
 
     /// <summary>

@@ -179,6 +179,22 @@ internal static class PilotExtendedCases
             ("@id", issue.ShipmentId)) == 2,
             "Issue movements were not persisted atomically");
         var projected = SqlServerProcurement.BuyRows(p.PilotConnection, contract);
+        var emptySection = SqlServerDatabase.AddSection(cs, contract, "QA empty procurement section",
+            false, null, p.Revision());
+        PilotRunner.Check(emptySection.Saved && emptySection.SystemId.HasValue,
+            "Cannot prepare empty system for snapshot check");
+        var snapshot = SqlServerProcurement.ReadBuySnapshot(cs, contract);
+        var separateSystems = SqlServerProcurement.SystemChoices(cs, contract);
+        PilotRunner.Check(snapshot.Revision == p.Revision() &&
+            snapshot.Systems.SequenceEqual(separateSystems) &&
+            snapshot.Systems.Any(x => x.Id == emptySection.SystemId.Value) &&
+            snapshot.Rows.All(x => x.SystemId != emptySection.SystemId.Value),
+            "Combined snapshot must preserve the revision and empty systems");
+        PilotRunner.Check(snapshot.Rows.Count == projected.Count &&
+            snapshot.Rows.Zip(projected).All(pair =>
+                pair.First.Flags.SequenceEqual(pair.Second.Flags) &&
+                (pair.First with { Flags = pair.Second.Flags }) == pair.Second),
+            "Combined snapshot changed procurement rows, flags or ordering");
         var first = projected.Single(x => x.PositionId == ids[0]);
         PilotRunner.Check(first.Received == 1.25m && first.Issued == 0.5m &&
             first.CostPrice == 41.25m, "Real procurement projection disagrees with its ledger");
@@ -371,6 +387,18 @@ internal static class PilotExtendedCases
         }
         Measure("public_procurement_buy_rows", () =>
             SqlServerProcurement.BuyRows(p.PilotConnection, contract).Count);
+        Measure("public_procurement_full_snapshot_previous", () =>
+        {
+            using var conn = p.Conn();
+            var rev = SqlServerDatabase.Revision(conn);
+            var rows = SqlServerProcurement.BuyRows(p.PilotConnection, contract);
+            _ = SqlServerProcurement.SystemChoices(p.PilotConnection, contract);
+            PilotRunner.Check(!string.IsNullOrEmpty(rev) && SqlServerDatabase.Revision(conn) == rev,
+                "Previous snapshot benchmark revision changed");
+            return rows.Count;
+        });
+        Measure("public_procurement_full_snapshot_batched", () =>
+            SqlServerProcurement.ReadBuySnapshot(p.PilotConnection, contract).Rows.Count);
         Measure("public_ks_progress_for_contract", () =>
             SqlServerActs.ProgressForContract(p.PilotConnection, contractId).Count);
     }

@@ -227,22 +227,14 @@ public partial class ProcurementPane : UserControl
         _revision = "";
         _historyRevision = "";
         var snapshot = await Task.Run(() =>
-        {
-            using var conn = SqlServerDatabase.Open(_connectionString);
-            var revision = SqlServerDatabase.Revision(conn);
-            var rows = SqlServerProcurement.BuyRows(_connectionString, _contractId);
-            var systems = SqlServerProcurement.SystemChoices(_connectionString, _contractId);
-            if (string.IsNullOrEmpty(revision) || SqlServerDatabase.Revision(conn) != revision)
-                throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
-            return (Rows: rows, Systems: systems, Revision: revision);
-        });
+            SqlServerProcurement.ReadBuySnapshot(_connectionString, _contractId));
         if (generation != _reloadGeneration || !IsLoaded) return;
         if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
             throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
         var rows = snapshot.Rows;
         var systems = snapshot.Systems;
         var items = new ObservableCollection<ProcurementPreviewRow>();
-        var loadedDay = DateTime.Today;
+        var loadedDay = snapshot.Day;
         var originalIndex = 0;
         var number = 1;
         var systemNumbers = new Dictionary<long, string>();
