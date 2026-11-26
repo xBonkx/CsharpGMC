@@ -5,6 +5,10 @@
          Summary keeps Python's inner 12/8/20/16, composed with page 24/6/24/14.
          Standalone cost window overrides LayoutCostPaneMargin locally. -->
     <Thickness x:Key="LayoutPageMargin">24,18,24,14</Thickness>
+    <!-- Python main_window.py side margins/spacing and 40px show-panel reservation. -->
+    <Thickness x:Key="LayoutSidebarPadding">14,16,14,12</Thickness>
+    <Thickness x:Key="LayoutSidebarSectionGap">0,0,0,10</Thickness>
+    <Thickness x:Key="LayoutShowSidebarMargin">24,6,0,4</Thickness>
     <Thickness x:Key="LayoutPageHeaderPadding">24,18,24,0</Thickness>
     <Thickness x:Key="LayoutDocumentTabsPadding">24,12,24,0</Thickness>
     <Thickness x:Key="LayoutDocumentToolbarMargin">24,6,24,0</Thickness>

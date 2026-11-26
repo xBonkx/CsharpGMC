@@ -412,10 +412,10 @@
                 <ColumnDefinition x:Name="SplitterColumn" Width="1"/>
                 <ColumnDefinition Width="*" MinWidth="420"/>
             </Grid.ColumnDefinitions>
-            <Border x:Name="Sidebar" Background="#FBFCFE" BorderThickness="0" Padding="14,16,14,12">
+            <Border x:Name="Sidebar" Background="#FBFCFE" BorderThickness="0" Padding="{StaticResource LayoutSidebarPadding}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <DockPanel Margin="0,0,0,10">
+                        <DockPanel Margin="{StaticResource LayoutSidebarSectionGap}">
                             <Button DockPanel.Dock="Right" Style="{StaticResource SidebarIconButton}" ToolTip="Спрятать панель (Ctrl+B)"
                                     AutomationProperties.Name="Спрятать панель" Click="ToggleSidebar_Click">
                                 <Viewbox Width="18" Height="18" Stretch="Uniform" IsHitTestVisible="False">
@@ -452,7 +452,7 @@
                                 </StackPanel>
                             </Button>
                         </DockPanel>
-                        <Grid Margin="0,0,0,10">
+                        <Grid Margin="{StaticResource LayoutSidebarSectionGap}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="6"/>
@@ -465,7 +465,7 @@
                                     IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}"
                                     ToolTip="Загрузить КП из Excel (Ctrl+I)" Click="ImportExcelFromObject_Click"/>
                         </Grid>
-                        <Grid Margin="0,0,0,10">
+                        <Grid Margin="{StaticResource LayoutSidebarSectionGap}">
                             <TextBox x:Name="ObjectSearch" Style="{StaticResource PythonSearch}"
                                      Padding="30,6,32,6" Height="34" VerticalContentAlignment="Center"
                                      AutomationProperties.Name="Поиск объекта"
@@ -503,7 +503,7 @@
                                 </Button.Style>
                             </Button>
                         </Grid>
-                        <Border Background="#F1F4F9" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="11" Padding="3" Margin="0,0,0,10">
+                        <Border Background="#F1F4F9" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="11" Padding="3" Margin="{StaticResource LayoutSidebarSectionGap}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="11*"/>
@@ -542,7 +542,7 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                 <Button x:Name="ShowSidebarButton" Style="{StaticResource PythonToolbarButton}" Content="Показать объекты" ContentTemplate="{StaticResource IconLabelMenu}" Visibility="Collapsed" HorizontalAlignment="Left"
-                        Width="148" Height="30" MinHeight="30" Margin="24,6,0,4" Click="ToggleSidebar_Click" ToolTip="Показать панель (Ctrl+B)"/>
+                        MinWidth="148" MinHeight="30" Margin="{StaticResource LayoutShowSidebarMargin}" Click="ToggleSidebar_Click" ToolTip="Показать панель (Ctrl+B)"/>
                 <Grid x:Name="EmptyPage" Grid.Row="1" Visibility="Collapsed" Margin="16,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="2*"/>
@@ -605,7 +605,7 @@
                                 <TextBox x:Name="ObjectRenameBox" Style="{StaticResource PythonSearch}" Visibility="Collapsed" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"
                                          Padding="8,2" MinWidth="260" MaxWidth="640" Margin="0,2,0,0"
                                          KeyDown="ObjectRenameBox_KeyDown" LostFocus="ObjectRenameBox_LostFocus"/>
-                                <TextBlock x:Name="ObjectSubtitle" Foreground="#64748B" Margin="0,4,0,0"/>
+                                <TextBlock x:Name="ObjectSubtitle" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                             <Grid x:Name="ObjectTotals" Grid.Row="1" Visibility="Collapsed" Margin="0,0,12,14">
                                 <Border x:Name="ObjectTotalCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0">

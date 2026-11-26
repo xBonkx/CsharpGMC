@@ -379,7 +379,7 @@
         <Border Grid.Row="0" Background="Transparent" BorderThickness="0"
                 Padding="{StaticResource LayoutPageHeaderPadding}">
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Top">
                     <DockPanel LastChildFill="True" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Border DockPanel.Dock="Right" x:Name="LockChip" Margin="6,0,0,0" Background="#FEF3E2"
@@ -390,7 +390,8 @@
                     </Border>
                         <Border DockPanel.Dock="Right" x:Name="CompanyChip" Margin="6,0,0,0" Background="#F1F4F9"
                             CornerRadius="9" Padding="9,2" VerticalAlignment="Center">
-                        <TextBlock x:Name="CompanyText" Foreground="#64748B"
+                        <TextBlock x:Name="CompanyText" Foreground="#64748B" MaxWidth="180" TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    FontSize="{StaticResource UiCaptionSize}"/>
                     </Border>
                         <Border DockPanel.Dock="Right" x:Name="DocumentKindChip" Margin="6,0,0,0" Background="#E8F0FE"
@@ -399,6 +400,7 @@
                                    FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                     </Border>
                         <TextBlock x:Name="SubtitleText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
                     </DockPanel>
                     <DockPanel HorizontalAlignment="Left" LastChildFill="True" Margin="0,2,0,0">
@@ -415,8 +417,7 @@
                                    FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                     </Border>
                 </StackPanel>
-                <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+                <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
                     <Button x:Name="UndoButton" Style="{StaticResource PythonToolbarButton}" Content="Отменить" ContentTemplate="{StaticResource IconLabelUndo}" Click="Undo_Click" ToolTip="Отменить последнее действие (Ctrl+Z)" IsEnabled="False" Margin="0,0,3,0"/>
                     <Button x:Name="RedoButton" Style="{StaticResource PythonToolbarButton}" Content="Вернуть" ContentTemplate="{StaticResource IconLabelRedo}" Click="Redo_Click" ToolTip="Вернуть отменённое (Ctrl+Y)" IsEnabled="False" Margin="0,0,8,0"/>
                     <Button Content="Помощь" Style="{StaticResource PythonToolbarButton}" Click="Help_Click" Margin="0,0,6,0"/>
@@ -424,8 +425,7 @@
                             ToolTip="Всё, что делается с документом целиком" Margin="0,0,8,0"/>
                     <Button x:Name="ExportButton" Style="{StaticResource PythonToolbarPrimary}" Content="Сохранить в Excel / PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportExcelPdf_Click"
                             ToolTip="Выгрузка сметы в Excel и PDF (Ctrl+E)"/>
-                </StackPanel>
-                </StackPanel>
+                </WrapPanel>
             </Grid>
         </Border>
 
@@ -512,12 +512,8 @@
         </Border>
 
         <!-- Python kp_editor: left = add + view controls; right = Закуп, Столбцы, search. -->
-        <Grid x:Name="EstimateToolsBar" Grid.Row="2" Margin="{StaticResource LayoutDocumentToolbarMargin}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <WrapPanel Grid.Column="0" VerticalAlignment="Center">
+        <local:ResponsiveToolbarPanel x:Name="EstimateToolsBar" Grid.Row="2" Margin="{StaticResource LayoutDocumentToolbarMargin}">
+            <WrapPanel VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,0,2,4">
                     <Button x:Name="AddRowButton" Style="{StaticResource DocumentSplitLeft}" Click="AddRow_Click"
                             Content="+ Строка" ContentTemplate="{StaticResource IconLabelRowPlus}" IsEnabled="False"
@@ -549,7 +545,7 @@
                         Margin="0,0,2,4" Visibility="Collapsed"
                         ToolTip="Вернуть исходный вид, порядок, фильтр и группировку"/>
             </WrapPanel>
-            <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                 <CheckBox x:Name="PurchaseToggle" Style="{StaticResource PythonToolbarToggle}" Content="Закуп" ContentTemplate="{StaticResource IconLabelBuilding}" VerticalAlignment="Center" Margin="0,0,2,4"
                 Checked="PurchaseToggle_Changed" Unchecked="PurchaseToggle_Changed"
                 ToolTip="Показать закупочную цену рядом с ценой заказчика. Видна только нам"/>
@@ -558,8 +554,8 @@
                 <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonSearch}" TextChanged="EstimateSearch_TextChanged"
                          ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете" Padding="30,6,27,6"/>
                  <Viewbox Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                <TextBlock Text="Найти в смете…" Foreground="#64748B" Margin="30,0,10,0"
-                           VerticalAlignment="Center" IsHitTestVisible="False">
+                <TextBlock Text="Найти в смете…" Foreground="#64748B" Margin="30,0,27,0"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style><Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed"/>
                         <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=EstimateSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
@@ -583,7 +579,7 @@
                 </Button>
               </Grid>
             </WrapPanel>
-        </Grid>
+        </local:ResponsiveToolbarPanel>
         <Popup x:Name="ExtraActionsExpander" PlacementTarget="{Binding ElementName=MoreActionsButton}"
                Placement="Bottom" HorizontalOffset="-10" VerticalOffset="-6"
                StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
