@@ -77,8 +77,9 @@
                            Margin="0,6,0,8"/>
                 <TextBlock Text="ИСТОРИЯ ПРИКАЗОВ ЭТОГО ОБЪЕКТА" FontWeight="SemiBold"
                            Foreground="#475569" Margin="0,14,0,7"/>
-                <ListBox x:Name="OrderHistory" Height="120" DisplayMemberPath="Label"/>
-                <Button Content="Открыть ранее созданные" Click="OpenHistory_Click"
+                <ListBox x:Name="OrderHistory" Height="120" DisplayMemberPath="Label"
+                         SelectionChanged="History_SelectionChanged"/>
+                <Button x:Name="OpenHistoryButton" Content="Открыть ранее созданные" Click="OpenHistory_Click"
                         HorizontalAlignment="Left" Padding="10,6" Margin="0,7,0,4"/>
             </StackPanel>
         </ScrollViewer>

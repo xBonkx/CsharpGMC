@@ -15,6 +15,7 @@ public partial class OrdersWindow : Window
 {
     private SqlServerPeopleAccess _db = null!;
     private CancellationTokenSource? _initialCancellation;
+    private CancellationTokenSource? _historyOpenCancellation;
     private bool _closed;
     private readonly long _objectId;
     private AccessSite _site = null!;
@@ -56,6 +57,7 @@ public partial class OrdersWindow : Window
         {
             _closed = true;
             _initialCancellation?.Cancel();
+            _historyOpenCancellation?.Cancel();
         };
     }
 
@@ -229,30 +231,50 @@ public partial class OrdersWindow : Window
             FolderInfo.Text = _folder;
         }
     }
-    private void OpenHistory_Click(object sender, RoutedEventArgs e)
+    private void History_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (OrderHistory.SelectedItem is not OrderHistoryItem selected) return;
+        _historyOpenCancellation?.Cancel();
+    }
+
+    private async void OpenHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (_closed || _initializing || _historyOpenCancellation is not null ||
+            OrderHistory.SelectedItem is not OrderHistoryItem selected) return;
+        using var cancellation = new CancellationTokenSource();
+        _historyOpenCancellation = cancellation;
+        var token = cancellation.Token;
+        var wasMakeEnabled = MakeButton.IsEnabled;
+        var originalLabel = OpenHistoryButton.Content;
+        OpenHistoryButton.IsEnabled = false;
+        OpenHistoryButton.Content = "Поиск файлов…";
+        MakeButton.IsEnabled = false;
         try
         {
-            var paths = new List<string>();
-            using var json = JsonDocument.Parse(selected.History.Data);
-            var root = json.RootElement;
-            if (root.TryGetProperty("Files", out var files) || root.TryGetProperty("files", out files))
-                foreach (var file in files.EnumerateArray())
-                    if (!string.IsNullOrWhiteSpace(file.GetString()))
-                        paths.Add(file.GetString()!);
-            if (paths.Count == 0 && Directory.Exists(selected.History.File))
-                paths.Add(selected.History.File);
-            if (paths.Count == 0) throw new FileNotFoundException("В истории нет файлов этого приказа.");
-            var path = paths.FirstOrDefault(File.Exists) ?? paths.FirstOrDefault(Directory.Exists);
-            if (path is null) throw new FileNotFoundException("Файлы из истории не найдены.");
+            var path = await Task.Run(() => OrderHistoryFileResolver.Resolve(selected.History, token), token);
+            if (_closed || token.IsCancellationRequested ||
+                !ReferenceEquals(OrderHistory.SelectedItem, selected)) return;
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
-        catch (Exception ex) { Error(ex.Message); }
+        catch (Exception ex)
+        {
+            if (!_closed && !token.IsCancellationRequested &&
+                ReferenceEquals(OrderHistory.SelectedItem, selected)) Error(ex.Message);
+        }
+        finally
+        {
+            _historyOpenCancellation = null;
+            if (!_closed)
+            {
+                OpenHistoryButton.Content = originalLabel;
+                OpenHistoryButton.IsEnabled = true;
+                MakeButton.IsEnabled = wasMakeEnabled && !_registrationUncertain;
+            }
+        }
     }
     private void Make_Click(object sender, RoutedEventArgs e)
     {
         if (_closed || _initializing || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_historyOpenCancellation is not null) return;
         if (_registrationUncertain) { Error("Проверьте журнал и файлы, затем заново откройте окно."); return; }
         var chosen = _templates.Where(x => x.Checked).ToArray();
         if (chosen.Length == 0) { Error("Отметьте хотя бы один шаблон приказа."); return; }
