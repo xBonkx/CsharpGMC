@@ -471,114 +471,6 @@ public partial class MainWindow : Window
         else ShowEmptyPage();
     }
 
-    // UI-only sequence; superseded object-card results never replace the
-    // currently open page when a user navigates quickly.
-    private int _objectCardLoadRequest;
-    private readonly Dictionary<(int ObjectId, NavigationMode Mode), ObjectDocuments> _objectCardCache = new();
-    private string? _objectCardCacheRevision;
-
-    private async void ShowObject(ObjectRow o)
-    {
-        if (_startupClosed || _serverConn is null || _sqlConnectionString is not { } connectionString) return;
-
-        // Только команды, перенесённые на SQL Server; вид страницы объекта — как в Python.
-        if (ObjectRenameBox.Visibility == Visibility.Visible) EndPageRename();
-        if (_selectedObject?.Id != o.Id) ObjectCardsScroll.ScrollToTop();
-        ObjectTotals.Visibility = ObjectCardsScroll.Visibility = Visibility.Collapsed;
-        ObjectCardsStatus.Text = "Загружаются документы объекта…";
-        ObjectCardsStatus.Visibility = Visibility.Visible;
-        _selectedObject = o;
-        _openDocumentId = null;
-        ShowPage(ObjectPage);
-
-        var truncated = o.Name.Length > 110;
-        var name = truncated ? o.Name[..105].TrimEnd(' ', ',', '.') + "…" : o.Name;
-        ObjectTitle.Text = name + (o.Archived ? "   (архив" + (o.ArchivedOn.Length >= 4 ? " " + o.ArchivedOn[..4] : "") + ")" : "");
-        ObjectTitle.ToolTip = truncated ? o.Name : "Двойной щелчок — переименовать объект";
-        ObjectNewKpButton.Visibility = ObjectPropertiesButton.Visibility =
-            ObjectMoreButton.Visibility = ObjectRenameButton.Visibility = ObjectCrumb.Visibility = Visibility.Visible;
-        ObjectNewKpButton.IsEnabled = SqlWritesEnabled && !o.Archived;
-        ObjectPropertiesButton.IsEnabled = SqlWritesEnabled && !o.Archived;
-        ObjectMoreButton.IsEnabled = SqlWritesEnabled;
-        ObjectRenameButton.IsEnabled = SqlWritesEnabled && !o.Archived;
-        ObjectTitle.TextWrapping = TextWrapping.Wrap;
-        var parts = new[] { o.Customer.Length > 0 ? "заказчик: " + o.Customer : "", o.Address,
-            o.Folder.Length > 0 ? "папка: " + o.Folder : "" }.Where(p => p.Length > 0).ToList();
-        ObjectSubtitle.Text = parts.Count > 0 ? string.Join(" · ", parts) : "Заказчик, адрес и папку документов можно указать в «Свойствах».";
-        ObjectSubtitle.TextWrapping = TextWrapping.Wrap;
-        // Never execute contract scans, totals, finance and card projections
-        // on the WPF UI thread. Keep input order and current navigation mode
-        // stable while the background read runs on its own SQL connection.
-        var request = ++_objectCardLoadRequest;
-        var documentsSnapshot = _docs.ToArray();
-        var mode = CurrentMode;
-        var navigationGeneration = _estimateOpenGeneration;
-        bool IsCurrent() => !_startupClosed &&
-            request == _objectCardLoadRequest && navigationGeneration == _estimateOpenGeneration &&
-            mode == CurrentMode && connectionString == _sqlConnectionString &&
-            ReferenceEquals(PageHost.Content, ObjectPage) && _selectedObject?.Id == o.Id;
-        ObjectDocumentTools.Visibility = mode == NavigationMode.Contracts ? Visibility.Visible : Visibility.Collapsed;
-        ObjectTotals.DataContext = null;
-        DocumentCards.ItemsSource = null;
-        StatusText.Text = $"{o.Name} · загрузка карточек SQL Server…";
-        var cacheKey = (o.Id, mode);
-        var cached = _objectCardCache.GetValueOrDefault(cacheKey);
-        var cachedRevision = _objectCardCacheRevision;
-        (ObjectDocuments Documents, string Revision) loaded;
-        try
-        {
-            loaded = await Task.Run(() =>
-            {
-                using var read = SqlServerDatabase.Open(connectionString);
-                var before = SqlServerDatabase.Revision(read);
-                if (string.IsNullOrWhiteSpace(before) ||
-                    !Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot))
-                    throw new InvalidOperationException("Состав документов или реквизиты объекта изменились. Нажмите F5.");
-                var result = cached is not null && cachedRevision == before
-                    ? cached
-                    : Workspace.ReadObjectDocuments(read, o, documentsSnapshot, mode);
-                if (before != SqlServerDatabase.Revision(read))
-                    throw new InvalidOperationException("Данные изменились во время загрузки карточек. Нажмите F5.");
-                return (result, before);
-            });
-        }
-        catch (Exception ex)
-        {
-            if (IsCurrent())
-            {
-                ObjectCardsStatus.Text = "Не удалось загрузить документы. Нажмите F5, чтобы повторить.";
-                StatusText.Text = "Не удалось загрузить документы: " + ex.Message;
-                LogError(ex);
-            }
-            return;
-        }
-        // A different object/estimate may have been selected before SQL replied.
-        if (!IsCurrent()) return;
-        if (_objectCardCacheRevision != loaded.Revision || _objectCardCache.Count >= 24)
-            _objectCardCache.Clear();
-        _objectCardCacheRevision = loaded.Revision;
-        var documents = loaded.Documents;
-        _objectCardCache[cacheKey] = documents;
-        ObjectTotals.DataContext = documents;
-        _objectTileLayout = null;
-        ObjectProgressCard.Visibility = documents.ShowProgress ? Visibility.Visible : Visibility.Collapsed;
-        // The final tile is the real Python "Новое КП" action. Financial
-        // totals and document count intentionally use documents.Cards only.
-        DocumentCards.ItemsSource = ObjectCardLayout.AppendNewContract(
-            documents.Cards, ObjectNewKpButton.IsEnabled);
-        ObjectCardsStatus.Visibility = Visibility.Collapsed;
-        ObjectTotals.Visibility = ObjectCardsScroll.Visibility = Visibility.Visible;
-        ObjectTotalValue.Text = Money.Format(documents.Total);
-        ObjectTotalSub.Visibility = documents.VatTop > .005m ? Visibility.Visible : Visibility.Collapsed;
-        ObjectTotalSub.Text = $"материалы + СМР {Money.Format(documents.Total - documents.VatTop)} + НДС сверху {Money.Format(documents.VatTop)}";
-        ObjectMaterialsValue.Text = Money.Format(documents.Materials);
-        ObjectSmrValue.Text = Money.Format(documents.Smr);
-        ObjectMaterialsCaption.Text = documents.VatTop > .005m ? "Материалы (без НДС)" : "Материалы";
-        ObjectSmrCaption.Text = documents.VatTop > .005m ? "СМР (без НДС)" : "СМР";
-        ResizeCards();
-        StatusText.Text = $"{o.Name}  ·  документов: {documents.Cards.Count}  ·  SQL Server";
-    }
-
     private DirectorView CreateDirectorView()
     {
         var view = new DirectorView(_sqlConnectionString!);
@@ -620,7 +512,9 @@ public partial class MainWindow : Window
     {
         ++_estimateOpenGeneration; // Invalidate background navigation, including object/home switches.
         CancelEstimateCacheValidation();
+        _objectCardTransitionPending = false;
         PageHost.Content = page;
+        PageHost.IsEnabled = true;
         EmptyPage.Visibility = page is null ? Visibility.Visible : Visibility.Collapsed;
         ScheduleEstimateCacheTrim();
     }
@@ -702,7 +596,7 @@ public partial class MainWindow : Window
         void Run(Action<ObjectRow> action, bool writes = true)
         {
             var fresh = _objects.FirstOrDefault(o => o.Id == obj.Id);
-            if (!ReferenceEquals(PageHost.Content, ObjectPage) || _selectedObject?.Id != obj.Id ||
+            if (_objectCardTransitionPending || !ReferenceEquals(PageHost.Content, ObjectPage) || _selectedObject?.Id != obj.Id ||
                 connection != _sqlConnectionString || mode != CurrentMode ||
                 fresh is null || fresh.Archived != obj.Archived || fresh.ArchivedOn != obj.ArchivedOn ||
                 (writes && !SqlWritesEnabled))

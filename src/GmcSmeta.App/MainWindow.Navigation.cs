@@ -228,7 +228,7 @@ public partial class MainWindow
 
             // Do not detach a dirty editor if its document disappeared while
             // this independent read was running. Existing save/readback owns it.
-            if (PageHost.Content is EstimateView editing && !editing.CanTransferDocument &&
+            if (_openDocumentId is not null && PageHost.Content is EstimateView editing && !editing.CanTransferDocument &&
                 !loaded.Documents.Any(d => d.Id == _openDocumentId &&
                     loaded.Objects.Any(o => o.Id == d.ObjectId)))
             {
