@@ -60,6 +60,8 @@ public sealed class ProcurementPreviewRow
     public string GroupNumber { get; set; } = "";
     public string GroupDisplayNumber { get; set; } = "";
     public string GroupIdentity { get; set; } = "";
+    public string GroupBackground => ParentSystemId is not null &&
+        GroupIdentity.StartsWith("system:", StringComparison.Ordinal) ? "#E8F5FC" : "#F1F4F9";
     public string EstimateName { get; init; } = "";
     public string NameTooltip => (BuyName == EstimateName ? BuyName : BuyName + "\nВ смете: " + EstimateName) + (Flags.Length > 0 ? "\n⚠ " + Flags : "");
     public bool HasProblem => FlagItems.Count > 0;

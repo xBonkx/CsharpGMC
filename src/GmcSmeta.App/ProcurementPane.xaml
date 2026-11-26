@@ -6,7 +6,18 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <UserControl.Resources>
-        <Style x:Key="ProcurementCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}"/>
+        <Style x:Key="ProcurementCell" TargetType="DataGridCell" BasedOn="{StaticResource CompactCostCell}">
+            <Setter Property="Padding" Value="4,4"/>
+        </Style>
+        <Style x:Key="ProcurementHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
+            <Setter Property="Padding" Value="6,8"/>
+        </Style>
+        <Style x:Key="ProcurementTextHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ProcurementHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ProcurementMoneyHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ProcurementHeader}">
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+        </Style>
         <Style x:Key="ProcurementOrange" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
             <Setter Property="Background" Value="#F97316"/>
             <Setter Property="BorderBrush" Value="#F97316"/>
@@ -213,12 +224,12 @@
                         Margin="0,0,2,4" Click="ProcurementSortMenu_Click"/>
             </WrapPanel>
         </DockPanel>
-        <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="24" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+        <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource ProcurementHeader}" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
                   Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="BuyGrid" Grid.Row="2" Margin="0,0,0,0"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0" CanUserSortColumns="False"
-                  SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2"
+                  SelectionMode="Extended" SelectionUnit="FullRow"
                   BeginningEdit="BuyGrid_BeginningEdit" CellEditEnding="BuyGrid_CellEditEnding"
                   ContextMenuOpening="BuyGrid_ContextMenuOpening"
                   SelectionChanged="BuyGrid_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.IsVirtualizingWhenGrouping="True">
@@ -238,7 +249,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="{x:Type GroupItem}">
                                         <StackPanel>
-                                            <Grid MinHeight="24" Background="#F1F4F9">
+                                            <Grid MinHeight="27" Background="{Binding Items[0].GroupBackground, FallbackValue=#F1F4F9}">
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                 <ToggleButton x:Name="GroupToggle" IsChecked="True" Cursor="Hand"
                                                               Loaded="ProcurementGroupToggle_Loaded" Click="ProcurementGroupToggle_Click" DataContextChanged="ProcurementGroupToggle_DataContextChanged"
@@ -272,16 +283,25 @@
                 </GroupStyle>
             </DataGrid.GroupStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="64" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="190" IsReadOnly="True" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="64" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="190" IsReadOnly="True" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <DockPanel LastChildFill="True" ToolTip="{Binding NameTooltip}">
-                                <TextBlock DockPanel.Dock="Left" Text="⚠" Foreground="#B45309" Margin="0,0,4,0" VerticalAlignment="Center">
-                                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers><DataTrigger Binding="{Binding HasProblem}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                                    </Style></TextBlock.Style>
-                                </TextBlock>
+                                <Viewbox DockPanel.Dock="Left" Width="16" Height="16" Margin="0,0,4,0"
+                                         VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <Viewbox.Style>
+                                        <Style TargetType="Viewbox">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasProblem}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Viewbox.Style>
+                                    <Canvas Width="24" Height="24">
+                                        <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#B45309"/>
+                                    </Canvas>
+                                </Viewbox>
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
                                     <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
                                         <Setter Property="TextWrapping" Value="Wrap"/>
@@ -290,17 +310,17 @@
                                             <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
                                                 <Setter Property="TextWrapping" Value="NoWrap"/>
                                                 <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                            </DataTrigger><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1D4ED8"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
+                                            </DataTrigger><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1E40AF"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
                                     </Style></TextBlock.Style>
                                 </TextBlock>
                             </DockPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="120" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
-                <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource CompactCostHeader}">
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="120" HeaderStyle="{StaticResource ProcurementTextHeader}" ElementStyle="{StaticResource CompactCostText}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Border CornerRadius="5" Padding="6,1" Margin="0" HorizontalAlignment="Left"
@@ -379,11 +399,11 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Заявка / счёт" Width="130" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTemplateColumn Header="Заявка / счёт" Width="130" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding OrderCaption}" ToolTip="{Binding OrderCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding OrderRef, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Ожидаем" Width="86" HeaderStyle="{StaticResource CompactCostHeader}">
+                <DataGridTemplateColumn Header="Ожидаем" Width="86" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <Border CornerRadius="5" Padding="4,1" Margin="0" HorizontalAlignment="Center" ToolTip="{Binding DueDate}">
                             <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/>
@@ -399,24 +419,23 @@
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding DueDate, Mode=OneWay}" Style="{StaticResource CompactCostCenterEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Пришло" Binding="{Binding Received}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="Выдано" Binding="{Binding Issued}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="Дата выдачи" Binding="{Binding IssueDateText}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTemplateColumn Header="Примечание / замена" Width="200" MinWidth="100" HeaderStyle="{StaticResource CompactCostTextHeader}">
+                <DataGridTextColumn Header="Пришло" Binding="{Binding Received}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn Header="Выдано" Binding="{Binding Issued}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn Header="Дата выдачи" Binding="{Binding IssueDateText}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTemplateColumn Header="Примечание / замена" Width="200" MinWidth="100" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding NoteCaption}" ToolTip="{Binding NoteCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding Note, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn x:Name="ProcCostColumn" Header="Наша цена" Binding="{Binding CostPrice, Mode=TwoWay}" Width="90" Visibility="Collapsed" ElementStyle="{StaticResource CompactCostMoney}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
-                <DataGridTextColumn x:Name="ProcPriceColumn" Header="Цена клиенту" Binding="{Binding Price}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
-                <DataGridTextColumn x:Name="ProcMarginColumn" Header="Маржа" Binding="{Binding MarginText}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
+                <DataGridTextColumn x:Name="ProcCostColumn" Header="Наша цена" Binding="{Binding CostPrice, Mode=TwoWay}" Width="90" Visibility="Collapsed" ElementStyle="{StaticResource CompactCostMoney}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}" HeaderStyle="{StaticResource ProcurementMoneyHeader}"/>
+                <DataGridTextColumn x:Name="ProcPriceColumn" Header="Цена клиенту" Binding="{Binding Price}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ProcurementMoneyHeader}"/>
+                <DataGridTextColumn x:Name="ProcMarginColumn" Header="Маржа" Binding="{Binding MarginText}" Width="100" Visibility="Collapsed" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ProcurementMoneyHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
-                    <Setter Property="MinHeight" Value="23"/>
+                    <Setter Property="MinHeight" Value="27"/>
                     <Setter Property="Background" Value="White"/>
                     <Style.Triggers>
-                        <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger>
                         <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger>
                         <DataTrigger Binding="{Binding IsSub}" Value="True"><Setter Property="FontStyle" Value="Italic"/></DataTrigger>
                         <DataTrigger Binding="{Binding OutOfKp}" Value="True"><Setter Property="FontStyle" Value="Italic"/></DataTrigger>
