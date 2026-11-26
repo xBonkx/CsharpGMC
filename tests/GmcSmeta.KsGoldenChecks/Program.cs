@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
+using System.Xml.Linq;
 using System.Text.Json;
 using ClosedXML.Excel;
 using PdfSharp.Pdf.IO;
@@ -37,6 +39,12 @@ internal static class Program
                 () => CheckMultiDs(frozenForm));
             Check(form + ": VOR numeric quantities without dangling separator",
                 () => CheckVorQuantityFormat(frozenForm));
+            foreach(var count in new[] { 2,300 })
+            {
+                var frozenCount=count;
+                Check(form + ": VOR print footer with " + count + " rows",
+                    () => CheckVorPrintFooter(frozenForm,frozenCount));
+            }
         }
 
         foreach (var form in new[] { "dns", "r4" })
@@ -404,6 +412,44 @@ internal static class Program
             MoneyEquals(item.GetProperty("vat").GetDecimal(), calculated.Vat,
                 label + " Python VAT");
         }
+    }
+
+    private static void CheckVorPrintFooter(string form,int count)
+    {
+        var package=Fixture(form,count);
+        using var book=KsVorForms.Create(package,package.Report.Acts[0].Id);
+        using var stream=new MemoryStream();
+        book.SaveAs(stream);
+        stream.Position=0;
+        // Verify the actual XLSX XML, not just the in-memory ClosedXML
+        // flags: the print engine reads these attributes and footer fields.
+        using var zip=new ZipArchive(stream,ZipArchiveMode.Read,leaveOpen:true);
+        using var sheetStream=zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();
+        var sheet=XDocument.Load(sheetStream);
+        XNamespace ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        var setup=sheet.Root!.Element(ns+"pageSetup")!;
+        Assert((string?)setup.Attribute("firstPageNumber")=="1",form+" first page must be 1");
+        Assert(IsTrue(setup.Attribute("useFirstPageNumber")),form+" explicit first-page number");
+        Assert((string?)setup.Attribute("fitToWidth")=="1",form+" print width");
+        var hf=sheet.Root.Element(ns+"headerFooter");
+        var first=hf?.Element(ns+"firstFooter")?.Value??"";
+        var odd=hf?.Element(ns+"oddFooter")?.Value??"";
+        Assert(string.IsNullOrWhiteSpace(first),form+" first footer must be blank");
+        if(form=="dns")
+        {
+            Assert(string.IsNullOrWhiteSpace(odd),"DNS must remain without page numbering");
+        }
+        else
+        {
+            Assert(IsTrue(hf?.Attribute("differentFirst")),form+" different first page");
+            Assert(!IsTrue(hf?.Attribute("differentOddEven")),form+" subsequent pages share footer");
+            Assert(odd.Contains("Страница") && odd.Contains("&P"),form+" dynamic page number");
+            Assert(odd.StartsWith(form=="r4"?"&C":"&R",StringComparison.Ordinal),
+                form+" original footer alignment");
+            if(form=="r4") Assert(odd.Contains("&N"),"R4 must retain total page count");
+        }
+
+        static bool IsTrue(XAttribute? attribute) => attribute?.Value is "1" or "true";
     }
 
     private static void CheckVorQuantityFormat(string form)

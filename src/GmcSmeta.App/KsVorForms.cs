@@ -68,7 +68,32 @@ public static class KsVorForms
         ws.PageSetup.PrintAreas.Clear();
         ws.PageSetup.PrintAreas.Add("A1:"+last+end);
         ws.PageSetup.FitToPages(1,0);
+        ConfigurePageNumbers(ws.PageSetup);
         ws.ShowGridLines=false;
+    }
+
+    private static void ConfigurePageNumbers(IXLPageSetup setup)
+    {
+        // The standard template contains firstPageNumber="0". ClosedXML
+        // serializes an explicit start number, so never inherit that zero.
+        setup.FirstPageNumber=1;
+        var footer=setup.Footer;
+        var items=new[] { footer.Left,footer.Center,footer.Right };
+        var original=items.Select(item=>item.GetText(XLHFOccurrence.OddPages)).ToArray();
+        // DNS has no page footer: leave it that way. The other VOR templates
+        // contain only page numbering, no signatures or document identifiers.
+        if(!original.Any(value=>value.Contains("&P",StringComparison.Ordinal)))
+            return;
+
+        // Excel determines actual pagination using printer settings. Suppress
+        // the first-page footer (also on a one-page sheet) without guessing
+        // a row count or scaling long documents to one unreadable page.
+        setup.DifferentFirstPageOnHF=true;
+        setup.DifferentOddEvenPagesOnHF=false;
+        footer.Clear();
+        for(int i=0;i<items.Length;i++)
+            if(original[i].Length>0)
+                items[i].AddText(original[i],XLHFOccurrence.OddPages);
     }
 
     private static void Style(IXLWorksheet ws,int row,IXLStyle[] styles)
