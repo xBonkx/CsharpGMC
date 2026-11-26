@@ -51,7 +51,7 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         _unit = row.Unit;
         _qty = row.IsSystem ? "" : row.Qty.ToString("0.###", Ru);
         _price = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
-        _purchase = row.PurchasePrice?.ToString("N2", Ru) ?? "";
+        _purchase = row.IsSystem || row.IsSub ? "" : row.PurchasePrice?.ToString("N2", Ru) ?? "";
         _work = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
         _note = row.Note;
         _basis = row.Basis;
@@ -70,7 +70,7 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         if ((_dirtyText & DirtyText.Price) != 0)
             PriceText = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
         if ((_dirtyText & DirtyText.Purchase) != 0)
-            PurchaseText = row.PurchasePrice?.ToString("N2", Ru) ?? "";
+            PurchaseText = row.IsSystem || row.IsSub ? "" : row.PurchasePrice?.ToString("N2", Ru) ?? "";
         if ((_dirtyText & DirtyText.Work) != 0)
             WorkText = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
         _dirtyText = DirtyText.None;
@@ -169,7 +169,10 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         set
         {
             if (ChangeNumeric(ref _work, value, DirtyText.Work))
+            {
                 OnPropertyChanged(nameof(WorkDisplayText));
+                OnPropertyChanged(nameof(HasNoWorkPrice));
+            }
         }
     }
     public string Note { get => _note; set => Change(ref _note, value); }
@@ -183,7 +186,7 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     public bool AreaManualFlag => _areaManualFlag;
     public bool IsAreaSummary => Source.IsAreaSummary;
     public decimal? DisplayWorkAmount =>
-        IsSystem || IsSub || IsVirtual || Source.WorkPrice is not decimal work ? null :
+        IsSystem || IsSub || IsVirtual || Source.WorkPrice is not decimal work || work == 0m ? null :
         Source.Qty * work;
 
     public void FillArea()
@@ -264,7 +267,11 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     public string DisplayAmountText => IsSub ? "" : N2(IsGroup || IsSystem ? Source.Amount : OptimisticAmount());
 
     // Python: money(p.work_price) if p.work_price else "—" (СМР «по поз.»); subs stay empty.
-    public string WorkDisplayText => _work.Length == 0 ? "" : NumberText.Parse(_work) == 0m ? "—" : _work;
+    public bool HasNoWorkPrice => !IsSystem && !IsSub && !IsVirtual && !OutOfKp &&
+        (string.IsNullOrWhiteSpace(_work) || NumberText.Parse(_work) == 0m);
+
+    public string WorkDisplayText => IsSystem || IsSub || IsTypeHeader ? "" :
+        string.IsNullOrWhiteSpace(_work) || NumberText.Parse(_work) == 0m ? "—" : _work;
 
     private decimal OptimisticAmount()
     {

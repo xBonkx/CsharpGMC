@@ -270,7 +270,10 @@ public partial class EstimateView : UserControl
 
         TransportCard.Visibility = Visibility.Visible;
         TransportEdit.Text = est.Totals.Transport == 0m ? "0" : N2(est.Totals.Transport);
-        PnrCard.Visibility = Visibility.Visible;
+        // Python kp_editor._fill_totals: keep a zero PNR field only in position-based SMR.
+        // Other modes can enter the amount through the dedicated «Итоги» tab.
+        PnrCard.Visibility = est.SmrMode == "pos" || est.Totals.Pnr != 0m
+            ? Visibility.Visible : Visibility.Collapsed;
         PnrEdit.Text = est.Totals.Pnr == 0m ? "0" : N2(est.Totals.Pnr);
         SmrEdit.Text = est.SmrMode == "percent"
             ? NumberText.QtyText(est.SmrPercent)
@@ -1153,6 +1156,7 @@ public partial class EstimateView : UserControl
                 ? Visibility.Collapsed : Visibility.Visible;
         }
         PurchaseToggle.IsChecked = _uiSettings.PurchaseVisible;
+        PurchaseColumn.Visibility = _uiSettings.PurchaseVisible ? Visibility.Visible : Visibility.Collapsed;
         SetTotalsHidden(_uiSettings.TotalsHidden);
     }
 

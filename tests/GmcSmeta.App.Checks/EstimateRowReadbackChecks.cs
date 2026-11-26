@@ -74,6 +74,29 @@ internal static class EstimateRowReadbackChecks
         first.TryReuseAuthoritative(first.Source);
         first.FillArea();
         if (changed.Count != 0) throw new Exception("Repeated clean readback emitted notifications.");
+        CheckMissingWorkPrice(first.Source);
         Console.WriteLine("Estimate formatted readback and area notifications OK (25000 rows).");
+    }
+
+    private static void CheckMissingWorkPrice(EstimateRow source)
+    {
+        foreach (var missing in new decimal?[] { null, 0m })
+        {
+            var row = new EditableEstimateRow(source with { WorkPrice = missing });
+            if (row.WorkDisplayText != "—" || !row.HasNoWorkPrice || row.DisplayWorkAmount.HasValue)
+                throw new Exception("Missing work price must display a dash and no work amount.");
+            row.WorkText = "12";
+            if (row.HasNoWorkPrice || row.WorkDisplayText != "12")
+                throw new Exception("Typed work price did not clear the missing-price presentation.");
+            row.TryReuseAuthoritative(row.Source);
+            if (!row.HasNoWorkPrice || row.WorkDisplayText != "—")
+                throw new Exception("Readback did not restore missing work price.");
+        }
+        var priced = new EditableEstimateRow(source with { WorkPrice = 12m });
+        if (priced.HasNoWorkPrice || priced.DisplayWorkAmount != source.Qty * 12m)
+            throw new Exception("Existing work price presentation changed.");
+        var extra = new EditableEstimateRow(source with { WorkPrice = null, OutOfKp = true });
+        if (extra.HasNoWorkPrice || extra.WorkDisplayText != "—")
+            throw new Exception("Out-of-KP work should not have a missing-price warning.");
     }
 }

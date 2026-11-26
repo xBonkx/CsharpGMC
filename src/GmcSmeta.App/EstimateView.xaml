@@ -199,6 +199,18 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Python kp_editor.pos_item: missing work price is red only for actual in-KP rows. -->
+        <Style x:Key="WorkPrice" TargetType="TextBlock" BasedOn="{StaticResource Money}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasNoWorkPrice}" Value="True">
+                    <Setter Property="Foreground" Value="#DC2626"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Share the header template, including sort indicator and resize grips. -->
         <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource ReportGridHeader}">
             <Setter Property="Padding" Value="6,8"/>
@@ -278,6 +290,20 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="EstimateWorkPriceCell" TargetType="DataGridCell" BasedOn="{StaticResource EstimateCell}">
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasNoWorkPrice}" Value="True"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="False"/>
+                        <Condition Binding="{Binding IsEditing, RelativeSource={RelativeSource Self}}" Value="False"/>
+                        <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource Self}}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="#FDF0F0"/>
+                    <Setter Property="ToolTip" Value="Цена работы не указана — двойной щелчок, чтобы вписать"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="EstimateRow" TargetType="DataGridRow">
             <Setter Property="MinHeight" Value="27"/>
             <Setter Property="Background" Value="White"/>
@@ -850,10 +876,10 @@
                                         Width="130" ElementStyle="{StaticResource Money}" IsReadOnly="True"/>
                     <DataGridTextColumn x:Name="PurchaseColumn" Header="Закупка" Binding="{Binding PurchaseText, Mode=TwoWay}"
                                         Width="110" ElementStyle="{StaticResource Money}" EditingElementStyle="{StaticResource EstimateMoneyEditor}" Visibility="Collapsed"/>
-                    <DataGridTemplateColumn x:Name="WorkColumn" Header="Работа за ед." Width="118" Visibility="Collapsed">
+                    <DataGridTemplateColumn x:Name="WorkColumn" Header="Работа за ед." Width="118" Visibility="Collapsed" CellStyle="{StaticResource EstimateWorkPriceCell}">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding WorkDisplayText}" Style="{StaticResource Money}"/>
+                                <TextBlock Text="{Binding WorkDisplayText}" Style="{StaticResource WorkPrice}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                         <DataGridTemplateColumn.CellEditingTemplate>
