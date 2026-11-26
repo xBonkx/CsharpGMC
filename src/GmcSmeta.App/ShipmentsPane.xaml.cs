@@ -576,6 +576,12 @@ public partial class ShipmentsPane : UserControl
     private void RowFilter_Changed(object sender, SelectionChangedEventArgs e) => RefreshRowFilter();
     private void RowSearch_Changed(object sender, TextChangedEventArgs e) => RefreshRowFilter();
 
+    private void ClearShipmentSearch_Click(object sender, RoutedEventArgs e)
+    {
+        RowSearch.Clear();
+        RowSearch.Focus();
+    }
+
     private void RefreshRowFilter()
     {
         if (!_building && !_quantityBusy && LinesGrid?.ItemsSource is ListCollectionView { IsEditingItem: false } view)
