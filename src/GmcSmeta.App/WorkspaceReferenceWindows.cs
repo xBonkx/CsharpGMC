@@ -35,8 +35,8 @@ public sealed class CompanyWindow : Window
     public CompanyWindow(string connectionString)
     {
         _connectionString = connectionString;
-        Title = "Наши организации"; Width = 760; Height = 530;
-        MinWidth = 650; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "Наши организации"; Width = 860; Height = 620;
+        MinWidth = 750; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         WorkspaceWindowUi.ApplyChrome(this);
         var root = new DockPanel { Margin = new Thickness(22, 18, 22, 18) };
         Content = root;
@@ -54,7 +54,7 @@ public sealed class CompanyWindow : Window
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
 
         var layout = new Grid();
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(232) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var left = new DockPanel { Margin = new Thickness(0, 0, 12, 0) };
@@ -78,7 +78,7 @@ public sealed class CompanyWindow : Window
             Grid.SetRow(label, i); Grid.SetColumn(label, 0); form.Children.Add(label);
             var entry = new TextBox { Margin = new Thickness(0, 4, 0, 4),
                 AcceptsReturn = col.Multiline, TextWrapping = col.Multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
-                MinHeight = col.Multiline ? 50 : 29, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                MinHeight = col.Multiline ? 60 : 32, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             _fields[col.Id] = entry;
             entry.TextChanged += (_, _) => { if (!_loading) _dirty = true; };
             Grid.SetRow(entry, i); Grid.SetColumn(entry, 1); form.Children.Add(entry);
@@ -88,13 +88,17 @@ public sealed class CompanyWindow : Window
         Grid.SetColumn(logoCaption, 0); Grid.SetRow(logoCaption, Columns.Length);
         form.Children.Add(logoCaption);
         var logoControls = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
-        logoControls.Children.Add(_logoView);
-        logoControls.Children.Add(WorkspaceWindowUi.Buttons(
-            WorkspaceWindowUi.Button("Выбрать…", (_, _) => PickLogo()),
-            WorkspaceWindowUi.Button("Убрать", (_, _) =>
-            {
-                _logo = null; _logoView.Source = null; _dirty = true;
-            })));
+        logoControls.Children.Add(ReferenceWindowUi.LogoPreview(_logoView));
+        var chooseLogo=WorkspaceWindowUi.Button("Выбрать…", (_,_)=>PickLogo());
+        WorkspaceWindowUi.StyleButton(chooseLogo,icon:"IconLabelUpload");
+        var clearLogo=WorkspaceWindowUi.Button("Убрать", (_,_)=>
+        {
+            _logo = null; _logoView.Source = null; _dirty = true;
+        });
+        WorkspaceWindowUi.StyleButton(clearLogo,icon:"IconLabelX");
+        var logoButtons=WorkspaceWindowUi.Buttons(chooseLogo,clearLogo);
+        logoButtons.HorizontalAlignment=HorizontalAlignment.Left;logoButtons.Margin=new Thickness(0,6,0,0);
+        logoControls.Children.Add(logoButtons);
         Grid.SetColumn(logoControls, 1); Grid.SetRow(logoControls, Columns.Length);
         form.Children.Add(logoControls);
         var scroll = new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -296,10 +300,10 @@ public sealed class CompanyWindow : Window
 public sealed class TagsWindow : Window
 {
     private readonly string _connectionString;
-    private readonly ListBox _list = new() { Width = 225, DisplayMemberPath = "Name" };
-    private readonly TextBox _name = new() { MinHeight = 30 };
+    private readonly ListBox _list = new() { Width = 230, DisplayMemberPath = "Name" };
+    private readonly TextBox _name = new() { MinHeight = 32 };
     private readonly TextBox _note = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
-        Height = 64, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Height = 60, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly TextBlock _usage = WorkspaceWindowUi.Hint("");
     private readonly Dictionary<string, CheckBox> _rules = [];
     private IReadOnlyList<SqlServerWorkspaceNavigation.TagEntry> _tags = [];
@@ -340,7 +344,7 @@ public sealed class TagsWindow : Window
         buttons.Margin = new Thickness(0, 9, 0, 0);
         DockPanel.SetDock(buttons, Dock.Bottom); root.Children.Add(buttons);
         var body = new Grid();
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(238) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(242) });
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var left = new DockPanel { Margin = new Thickness(0, 0, 12, 0) };
         Grid.SetColumn(left, 0); body.Children.Add(left);
@@ -351,15 +355,16 @@ public sealed class TagsWindow : Window
         left.Children.Add(_list);
 
         var right = new StackPanel();
-        right.Children.Add(new TextBlock { Text = "Название", Margin = new Thickness(0, 0, 0, 4) });
+        right.Children.Add(new TextBlock { Text = "Название", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 4) });
         right.Children.Add(_name);
-        right.Children.Add(new TextBlock { Text = "Правила", Margin = new Thickness(0, 12, 0, 6) });
+        right.Children.Add(new TextBlock { Text = "Правила", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 12, 0, 6) });
         foreach (var (key, caption) in Rules)
         {
-            var cb = new CheckBox { Content = caption, Margin = new Thickness(0, 0, 0, 7) };
+            var cb = new CheckBox { Content = new TextBlock { Text=caption, TextWrapping=TextWrapping.Wrap }, Margin = new Thickness(0, 0, 0, 7) };
+            System.Windows.Automation.AutomationProperties.SetName(cb,caption);
             _rules[key] = cb; right.Children.Add(cb);
         }
-        right.Children.Add(new TextBlock { Text = "Примечание", Margin = new Thickness(0, 8, 0, 4) });
+        right.Children.Add(new TextBlock { Text = "Примечание", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 4) });
         right.Children.Add(_note);
         _usage.Margin = new Thickness(0, 8, 0, 0);
         right.Children.Add(_usage);

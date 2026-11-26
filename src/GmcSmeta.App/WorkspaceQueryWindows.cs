@@ -145,8 +145,13 @@ public sealed class GlobalSearchWindow : Window
         _input.SetResourceReference(FrameworkElement.StyleProperty, "PythonSearch");
         var panel = new DockPanel { Margin = new Thickness(18, 16, 18, 16) };
         Content = panel;
-        DockPanel.SetDock(_input, Dock.Top);
-        panel.Children.Add(_input);
+        var search = ReferenceWindowUi.Search(_input,"Объект, КП, договор или позиция: «Махалина», «Ballu BSO», «№ 5»…");
+        DockPanel.SetDock(search, Dock.Top);
+        panel.Children.Add(search);
+        var resultStyle = new Style(typeof(ListBoxItem));
+        resultStyle.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(8,6,8,6)));
+        resultStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,new Binding("Display")));
+        _results.ItemContainerStyle = resultStyle;
         _status.Margin = new Thickness(0, 8, 0, 8);
         DockPanel.SetDock(_status, Dock.Top);
         panel.Children.Add(_status);
@@ -280,14 +285,14 @@ public sealed class CatalogWindow : Window
         _filter.SetResourceReference(FrameworkElement.StyleProperty, "PythonSearch");
         var root = new DockPanel { Margin = WorkspaceWindowUi.Pad };
         Content = root;
-        var heading = WorkspaceWindowUi.Heading(Title);
+        var heading = WorkspaceWindowUi.Heading("Справочник");
         DockPanel.SetDock(heading, Dock.Top);
         root.Children.Add(heading);
         var hint = WorkspaceWindowUi.Hint("Наполняется из КП. Цена — последняя записанная; история содержит источник и дату.");
         DockPanel.SetDock(hint, Dock.Top); root.Children.Add(hint);
-        DockPanel.SetDock(_filter, Dock.Top);
-        _filter.Margin = new Thickness(0, 0, 0, 8);
-        root.Children.Add(_filter);
+        var search = ReferenceWindowUi.Search(_filter,"Поиск: несколько слов в любом порядке, например «клапан 500 250»");
+        DockPanel.SetDock(search, Dock.Top); search.Margin = new Thickness(0,0,0,8);
+        root.Children.Add(search);
 
         var pager = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(pager, Dock.Top); root.Children.Add(pager);
@@ -298,26 +303,31 @@ public sealed class CatalogWindow : Window
         pager.Children.Add(_count);
 
         var footer = WorkspaceWindowUi.Buttons(
-            WorkspaceWindowUi.Button("Переименовать / объединить", async (_, _) => await RenameAsync()),
-            WorkspaceWindowUi.Button("Удалить", async (_, _) => await DeleteAsync()),
             WorkspaceWindowUi.Button("Обновить", async (_, _) => await ReloadAsync()),
             WorkspaceWindowUi.Button("Закрыть", (_, _) => Close()));
         footer.Margin = new Thickness(0, 8, 0, 0);
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
 
         var sections = new Grid();
-        sections.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star) });
-        sections.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        sections.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) });
+        sections.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star), MinHeight=90 });
+        sections.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+        sections.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star), MinHeight=120 });
         _items.Columns.Add(WorkspaceWindowUi.Column("Наименование", "Name"));
         _items.Columns.Add(WorkspaceWindowUi.Column("Ед.", "Unit", 70));
         _items.Columns.Add(WorkspaceWindowUi.Column("Цена", "PriceText", 110));
         _items.Columns.Add(WorkspaceWindowUi.Column("Закуп.", "PurchaseText", 110));
         _items.Columns.Add(WorkspaceWindowUi.Column("Исп.", "Uses", 70));
         sections.Children.Add(_items); Grid.SetRow(_items, 0);
-        var historyCaption = WorkspaceWindowUi.Heading("История цен");
-        historyCaption.Margin = new Thickness(0, 10, 0, 6);
-        sections.Children.Add(historyCaption); Grid.SetRow(historyCaption, 1);
+        var splitter=ReferenceWindowUi.HistorySplitter();
+        sections.Children.Add(splitter); Grid.SetRow(splitter,1);
+        var historyPanel=new DockPanel{Margin=new Thickness(0,6,0,0)};
+        var historyBar=new DockPanel{Margin=new Thickness(0,0,0,6)};
+        var historyActions=WorkspaceWindowUi.Buttons(
+            WorkspaceWindowUi.Button("Переименовать / объединить", async (_,_)=>await RenameAsync()),
+            WorkspaceWindowUi.Button("Удалить", async (_,_)=>await DeleteAsync()));
+        DockPanel.SetDock(historyActions,Dock.Right);historyBar.Children.Add(historyActions);
+        historyBar.Children.Add(WorkspaceWindowUi.Heading("История цен"));
+        DockPanel.SetDock(historyBar,Dock.Top);historyPanel.Children.Add(historyBar);
         _history.Columns.Add(WorkspaceWindowUi.Column("Объект", "Object"));
         _history.Columns.Add(WorkspaceWindowUi.Column("Документ", "Contract"));
         _history.Columns.Add(WorkspaceWindowUi.Column("Дата", "Date", 110));
@@ -329,7 +339,7 @@ public sealed class CatalogWindow : Window
         _items.CanUserReorderColumns = true;
         TableColumnMenu.SetKey(_history, "catalog-price-history");
         _history.CanUserReorderColumns = true;
-        sections.Children.Add(_history); Grid.SetRow(_history, 2);
+        historyPanel.Children.Add(_history);sections.Children.Add(historyPanel); Grid.SetRow(historyPanel, 2);
         root.Children.Add(sections);
 
         _delay.Tick += async (_, _) => { _delay.Stop(); _page = 0; await ReloadAsync(); };

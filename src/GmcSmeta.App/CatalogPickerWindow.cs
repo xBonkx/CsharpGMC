@@ -67,7 +67,7 @@ public sealed class CatalogPickerWindow : Window
             throw new ArgumentException("Не задана ревизия сметы.", nameof(expectedRevision));
         _connectionString = connectionString;
         _expectedRevision = expectedRevision;
-        Title = "Из справочника"; Width = 980; Height = 660;
+        Title = "Справочник номенклатуры"; Width = 980; Height = 680;
         MinWidth = 720; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = System.Windows.Media.Brushes.White;
 
@@ -76,15 +76,15 @@ public sealed class CatalogPickerWindow : Window
         var root = new DockPanel { Margin = WorkspaceWindowUi.Pad };
         Content = root;
 
-        var heading = WorkspaceWindowUi.Heading("Из справочника");
+        var heading = WorkspaceWindowUi.Heading($"Добавить из справочника → {targetName}");
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var hint = WorkspaceWindowUi.Hint(
             $"Куда: {targetName}. Отметьте позиции и укажите количество — цена и закуп подставятся из справочника. " +
             "Отметки сохраняются при поиске и листании.");
         DockPanel.SetDock(hint, Dock.Top); root.Children.Add(hint);
-        DockPanel.SetDock(_filter, Dock.Top);
-        _filter.Margin = new Thickness(0, 0, 0, 8);
-        root.Children.Add(_filter);
+        var search = ReferenceWindowUi.Search(_filter,"Поиск: несколько слов в любом порядке, например «клапан 500 250»");
+        DockPanel.SetDock(search, Dock.Top);search.Margin = new Thickness(0,0,0,8);
+        root.Children.Add(search);
 
         var pager = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(pager, Dock.Top); root.Children.Add(pager);
@@ -104,11 +104,11 @@ public sealed class CatalogPickerWindow : Window
         DockPanel.SetDock(pageSelection, Dock.Top);
         root.Children.Add(pageSelection);
 
-        var add = WorkspaceWindowUi.Button("Добавить", (_, _) => Accept());
+        var add = WorkspaceWindowUi.Button("Добавить в КП", (_, _) => Accept());
         WorkspaceWindowUi.StyleButton(add, primary: true, icon: "IconLabelPlus");
         add.IsDefault = true;
-        var footer = WorkspaceWindowUi.Buttons(add,
-            WorkspaceWindowUi.Button("Отмена", (_, _) => DialogResult = false));
+        var footer = WorkspaceWindowUi.Buttons(
+            WorkspaceWindowUi.Button("Отмена", (_, _) => DialogResult = false),add);
         footer.Margin = new Thickness(0, 8, 0, 0);
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
 
