@@ -80,7 +80,34 @@ internal static class PilotFinanceBatchCases
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision,
             "Read-only finance batch changed revision or retained an active reader");
 
+        CheckProgressRead(conn, contractId, unit, signed, revision);
         CheckLargeActs(p, conn, id, unit);
+    }
+
+    private static void CheckProgressRead(SqlConnection conn, int contractId, long position,
+        long signed, string revision)
+    {
+        var original = SqlServerActs.SummaryWithExtras(conn, contractId);
+        using var cancellation = new CancellationTokenSource();
+        var current = SqlServerActs.SummaryWithExtras(conn, contractId, cancellation.Token);
+        PilotRunner.Check(current.Summary.Acts.SequenceEqual(original.Summary.Acts) &&
+            current.Summary.Systems.SequenceEqual(original.Summary.Systems) &&
+            current.Summary.Positions.Count == original.Summary.Positions.Count &&
+            current.Summary.Positions.Zip(original.Summary.Positions).All(pair =>
+                pair.First.PerAct.OrderBy(p => p.Key).SequenceEqual(pair.Second.PerAct.OrderBy(p => p.Key)) &&
+                (pair.First with { PerAct = pair.Second.PerAct }) == pair.Second) &&
+            current.Extras.Count == original.Extras.Count &&
+            current.Summary.Positions.Single(p => p.PositionId == position).PerAct[signed] == 1m &&
+            Totals.ReadOne(conn, contractId, cancellation.Token) == Totals.ReadOne(conn, contractId),
+            "Cancellable progress projection changed rows or totals");
+        cancellation.Cancel();
+        try
+        {
+            SqlServerActs.SummaryWithExtras(conn, contractId, cancellation.Token);
+            throw new InvalidOperationException("Cancelled progress read did not throw.");
+        }
+        catch (OperationCanceledException) { }
+        PilotRunner.Check(SqlServerDatabase.Revision(conn) == revision, "Progress read changed revision");
     }
 
     private static void CheckLargeActs(PilotRunner p, SqlConnection conn, long contractId, long position)

@@ -6,6 +6,19 @@ namespace GmcSmeta.Core.Tests;
 public sealed class KsActsParityTests
 {
     [Fact]
+    public void CancelledProgressReadDoesNotUseClosedConnection()
+    {
+        using var conn = new Microsoft.Data.SqlClient.SqlConnection(
+            "Server=invalid;Database=GmcSmetaPilot_Progress;Integrated Security=true");
+        var token = new CancellationToken(canceled: true);
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.SummaryWithExtras(conn, 1, token));
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.ActsOf(conn, 1, token: token));
+        Assert.Throws<OperationCanceledException>(() => SqlServerActs.ReadIssued(conn, 1, token: token));
+        Assert.Throws<OperationCanceledException>(() => Totals.ReadOne(conn, 1, token));
+        Assert.Equal(System.Data.ConnectionState.Closed, conn.State);
+    }
+
+    [Fact]
     public void SystemSmrSplitPreservesExactCentsAndLastSystemGetsRemainder()
     {
         var rows=new[]

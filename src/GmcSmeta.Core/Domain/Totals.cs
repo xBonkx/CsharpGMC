@@ -106,6 +106,14 @@ public static partial class Totals
     /// Calculate one contract without scanning every contract/system/position
     /// in the database. Identical decimal formula to ReadAll.
     /// </summary>
+    public static ContractTotals? ReadOne(Microsoft.Data.SqlClient.SqlConnection conn, int contractId,
+        CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (contractId <= 0) return null;
+        return ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out _, token: token).SingleOrDefault();
+    }
+
     public static ContractTotals? ReadOne(DbConnection conn, int contractId)
     {
         if (contractId <= 0) return null;
