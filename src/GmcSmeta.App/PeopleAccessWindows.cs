@@ -21,8 +21,7 @@ public static class PeopleAccessWindows
 
     public static bool? OpenOrders(Window? owner, string connectionString, long objectId)
     {
-        var database = new SqlServerPeopleAccess(connectionString);
-        var dialog = new OrdersWindow(database, objectId);
+        var dialog = new OrdersWindow(connectionString, objectId);
         if (owner is not null) dialog.Owner = owner;
         return dialog.ShowDialog();
     }

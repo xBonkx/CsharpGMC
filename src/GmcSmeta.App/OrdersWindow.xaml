@@ -17,7 +17,7 @@
                     BorderBrush="#F97316" FontWeight="SemiBold" Margin="0,0,10,0"/>
             <Button Content="Закрыть" Click="Close_Click" Padding="14,8"/>
         </WrapPanel>
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="OrderContent" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <Grid>
                     <Grid.ColumnDefinitions>

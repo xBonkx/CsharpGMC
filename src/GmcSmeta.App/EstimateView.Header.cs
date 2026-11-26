@@ -182,7 +182,7 @@ public partial class EstimateView
     private void ShowOrders_Click(object sender, RoutedEventArgs e)
     {
         ExtraActionsExpander.IsOpen = false;
-        new OrdersWindow(new SqlServerPeopleAccess(_sqlConnectionString), _objectId)
+        new OrdersWindow(_sqlConnectionString, _objectId)
         {
             Owner = Window.GetWindow(this)
         }.ShowDialog();

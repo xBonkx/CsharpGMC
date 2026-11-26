@@ -25,7 +25,7 @@ public partial class MainWindow
 
     private void ObjectOrders_Click(object sender, RoutedEventArgs e) =>
         OpenObjectTool("Приказы", (connection, obj) =>
-            new OrdersWindow(new SqlServerPeopleAccess(connection), obj.Id));
+            new OrdersWindow(connection, obj.Id));
 
     private void OpenObjectTool(string title, Func<string, ObjectRow, Window> create) =>
         OpenObjectTool(_selectedObject, title, create);

@@ -13,13 +13,15 @@ namespace GmcSmeta.App;
 
 public partial class OrdersWindow : Window
 {
-    private readonly SqlServerPeopleAccess _db;
+    private SqlServerPeopleAccess _db = null!;
+    private CancellationTokenSource? _initialCancellation;
+    private bool _closed;
     private readonly long _objectId;
-    private readonly AccessSite _site;
-    private readonly List<PeoplePerson> _people;
-    private readonly List<AccessCompany> _companies;
+    private AccessSite _site = null!;
+    private List<PeoplePerson> _people = new();
+    private List<AccessCompany> _companies = new();
     private readonly List<OrderTemplateChoice> _templates = new();
-    private string _revision;
+    private string _revision = "";
     private string _folder = "";
     private bool _initializing = true;
     private bool _registrationUncertain;
@@ -36,47 +38,101 @@ public partial class OrdersWindow : Window
     }
     private sealed record OrderHistoryItem(AccessHistory History, string Label);
 
+    public OrdersWindow(string connectionString, long objectId)
+        : this(token => new SqlServerPeopleAccess(connectionString, token), objectId) { }
+
     public OrdersWindow(SqlServerPeopleAccess database, long objectId)
+        : this(_ => database, objectId) { }
+
+    private OrdersWindow(Func<CancellationToken, SqlServerPeopleAccess> createDatabase, long objectId)
     {
-        _db = database;
         _objectId = objectId;
         InitializeComponent();
-        _site = _db.Site(objectId);
-        var loaded = _db.Load(false);
-        _people = loaded.People.Where(p => p.Active).ToList();
-        _revision = loaded.Revision;
-        _companies = _db.Companies().ToList();
-        ObjectName.Text = _site.Name;
-        PersonBox.ItemsSource = _people;
-        var lastResponsible = LastResponsible(_db.History(objectId, "order"));
-        PersonBox.SelectedItem = _people.FirstOrDefault(p => p.Id == lastResponsible) ??
-            _people.FirstOrDefault(p => p.Post.Contains("прораб",
-                StringComparison.OrdinalIgnoreCase)) ?? _people.FirstOrDefault();
-        ContractBox.Text = ContractReference(_site);
-        SiteBox.Text = PeopleRules.Clean(string.IsNullOrWhiteSpace(_site.SiteFull) ?
-            (string.IsNullOrWhiteSpace(_site.Address) ? _site.Name : _site.Address) : _site.SiteFull)
-            .Trim('«', '»', '"', ' ');
-        DayPicker.SelectedDate = DateTime.Today;
-        NumberBox.Text = DateTime.Today.ToString("dd/MM", CultureInfo.InvariantCulture) + "-01";
-        _folder = Directory.Exists(_site.Folder) ? Path.Combine(_site.Folder, "допуск") :
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Допуск", PeopleRules.SafeFileName(_site.Name), "допуск");
-        FolderInfo.Text = _folder;
-        var uncheckedNames = DisabledTemplates();
-        foreach (var path in PeopleDocuments.Templates())
-            _templates.Add(new OrderTemplateChoice { Path = path, Title = PeopleDocuments.TemplateTitle(path),
-                Checked = !uncheckedNames.Contains(Path.GetFileName(path)) });
-        TemplateList.ItemsSource = _templates;
-        if (_templates.Count == 0)
-            StatusInfo.Text = "Нет Word-шаблонов. Положите .docx в папку шаблонов.";
-        if (_people.Count == 0)
+        OrderContent.IsEnabled = false;
+        MakeButton.IsEnabled = false;
+        ObjectName.Text = "Загрузка данных объекта и приказов…";
+        Loaded += async (_, _) => await InitializeAsync(createDatabase);
+        Closed += (_, _) =>
         {
-            MakeButton.IsEnabled = false;
-            StatusInfo.Text = "Нет активных сотрудников. Добавьте человека в общий справочник.";
+            _closed = true;
+            _initialCancellation?.Cancel();
+        };
+    }
+
+    private async Task InitializeAsync(Func<CancellationToken, SqlServerPeopleAccess> createDatabase)
+    {
+        if (_closed || !_initializing || _initialCancellation is not null) return;
+        using var cancellation = new CancellationTokenSource();
+        _initialCancellation = cancellation;
+        var token = cancellation.Token;
+        try
+        {
+            var snapshot = await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                var db = createDatabase(token);
+                var site = db.Site(_objectId, token);
+                var directory = db.Load(false, token);
+                var people = directory.People.Where(p => p.Active).ToList();
+                var companies = db.Companies(token).ToList();
+                var history = db.History(_objectId, "order", token);
+                token.ThrowIfCancellationRequested();
+                var folder = Directory.Exists(site.Folder) ? Path.Combine(site.Folder, "допуск") :
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                        "Допуск", PeopleRules.SafeFileName(site.Name), "допуск");
+                token.ThrowIfCancellationRequested();
+                return (Db: db, Site: site, People: people, Revision: directory.Revision,
+                    Companies: companies, History: history, Folder: folder);
+            }, token);
+            if (_closed || token.IsCancellationRequested) return;
+            _db = snapshot.Db;
+            _site = snapshot.Site;
+            _people = snapshot.People;
+            _revision = snapshot.Revision;
+            _companies = snapshot.Companies;
+            _folder = snapshot.Folder;
+            ObjectName.Text = _site.Name;
+            PersonBox.ItemsSource = _people;
+            var lastResponsible = LastResponsible(snapshot.History);
+            PersonBox.SelectedItem = _people.FirstOrDefault(p => p.Id == lastResponsible) ??
+                _people.FirstOrDefault(p => p.Post.Contains("прораб",
+                    StringComparison.OrdinalIgnoreCase)) ?? _people.FirstOrDefault();
+            ContractBox.Text = ContractReference(_site);
+            SiteBox.Text = PeopleRules.Clean(string.IsNullOrWhiteSpace(_site.SiteFull) ?
+                (string.IsNullOrWhiteSpace(_site.Address) ? _site.Name : _site.Address) : _site.SiteFull)
+                .Trim('«', '»', '"', ' ');
+            DayPicker.SelectedDate = DateTime.Today;
+            NumberBox.Text = DateTime.Today.ToString("dd/MM", CultureInfo.InvariantCulture) + "-01";
+            FolderInfo.Text = _folder;
+            var uncheckedNames = DisabledTemplates();
+            foreach (var path in PeopleDocuments.Templates())
+                _templates.Add(new OrderTemplateChoice { Path = path, Title = PeopleDocuments.TemplateTitle(path),
+                    Checked = !uncheckedNames.Contains(Path.GetFileName(path)) });
+            TemplateList.ItemsSource = _templates;
+            if (_templates.Count == 0)
+                StatusInfo.Text = "Нет Word-шаблонов. Положите .docx в папку шаблонов.";
+            if (_people.Count == 0)
+            {
+                MakeButton.IsEnabled = false;
+                StatusInfo.Text = "Нет активных сотрудников. Добавьте человека в общий справочник.";
+            }
+            ApplyHistory(snapshot.History);
+            _initializing = false;
+            UpdateInflection();
+            OrderContent.IsEnabled = true;
+            MakeButton.IsEnabled = _people.Count > 0;
         }
-        RefreshHistory();
-        _initializing = false;
-        UpdateInflection();
+        catch (Exception ex)
+        {
+            if (_closed || token.IsCancellationRequested) return;
+            _revision = "";
+            Error(ex.Message);
+            Close();
+        }
+        finally
+        {
+            _initialCancellation = null;
+        }
     }
 
     private static long? LastResponsible(IReadOnlyList<AccessHistory> history)
@@ -128,9 +184,10 @@ public partial class OrdersWindow : Window
             string.IsNullOrWhiteSpace(when) ? "" : "от " + when
         }.Where(x => x.Length > 0));
     }
-    private void RefreshHistory()
+    private void RefreshHistory() => ApplyHistory(_db.History(_objectId, "order"));
+
+    private void ApplyHistory(IReadOnlyList<AccessHistory> history)
     {
-        var history = _db.History(_objectId, "order");
         OrderHistory.ItemsSource = history.Select(x => new OrderHistoryItem(x,
             $"{x.CreatedAt:dd.MM.yyyy HH:mm} · {x.User}")).ToArray();
     }
@@ -195,6 +252,7 @@ public partial class OrdersWindow : Window
     }
     private void Make_Click(object sender, RoutedEventArgs e)
     {
+        if (_closed || _initializing || string.IsNullOrWhiteSpace(_revision)) return;
         if (_registrationUncertain) { Error("Проверьте журнал и файлы, затем заново откройте окно."); return; }
         var chosen = _templates.Where(x => x.Checked).ToArray();
         if (chosen.Length == 0) { Error("Отметьте хотя бы один шаблон приказа."); return; }

@@ -1143,7 +1143,7 @@ public partial class MainWindow : Window
                 OpenObjectTool(obj, "Допуск", (connection, current) => new PeopleWindow(connection, current.Id)), "Users");
             AddObjectCommand("Приказы об ответственных…", obj =>
                 OpenObjectTool(obj, "Приказы", (connection, current) =>
-                    new OrdersWindow(new SqlServerPeopleAccess(connection), current.Id)), "File");
+                    new OrdersWindow(connection, current.Id)), "File");
             menu.Items.Add(new Separator());
             AddObjectCommand(selected.Archived ? "Вернуть в работу" : "Завершить объект (в архив)…",
                 FinishSqlServerObject, "Check");
