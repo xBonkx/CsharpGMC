@@ -75,7 +75,10 @@ public sealed class EstimateMoneyCardSourceTests
         var header = File.ReadAllText(Path.Combine(app, "EstimateView.Header.cs"));
         Assert.Contains("SmrEdit.Text = est.SmrMode == \"percent\"", code);
         Assert.Contains("NumberText.QtyText(est.SmrPercent)", code);
-        Assert.Contains("SmrEdit.IsReadOnly = est.Locked || pct || bySys || byPos", header);
+        Assert.Contains("SmrEdit.IsReadOnly = est.Locked || est.MoneyFromStages || (!pct && mode != \"sum\")", header);
+        Assert.Contains("SaveTotalsFieldFromEdit(SmrEdit, \"smr_percent\", _estimate.SmrPercent", header);
+        Assert.Contains("SmrEdit.Text.Trim() == NumberText.QtyText(_estimate.SmrPercent)", header);
+        Assert.Contains("displayedRevision != _serverRevision", header);
         Assert.Contains("box.IsReadOnly) return;", header);
         Assert.Contains("TransportEdit.Text = est.Totals.Transport == 0m ? \"0\" : N2(est.Totals.Transport)", code);
         Assert.Contains("PnrEdit.Text = est.Totals.Pnr == 0m ? \"0\" : N2(est.Totals.Pnr)", code);

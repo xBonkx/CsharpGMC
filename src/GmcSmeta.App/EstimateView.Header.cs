@@ -278,11 +278,11 @@ public partial class EstimateView
         var byPos = mode == "pos";
         var bySys = mode == "systems";
         var pct = mode == "percent";
-        SmrEdit.IsReadOnly = est.Locked || pct || bySys || byPos;
+        SmrEdit.IsReadOnly = est.Locked || est.MoneyFromStages || (!pct && mode != "sum");
         SmrEdit.ToolTip = byPos
             ? "СМР по позициям: сумма работ по строкам — правится в колонке «Работа за ед.»"
             : bySys ? "СМР по системам: правится в строках систем"
-            : pct ? $"Сохранённый процент от материалов (только просмотр): {NumberText.QtyText(est.SmrPercent)}% = {N2(est.Totals.Smr)} ₽"
+            : pct ? $"Процент от материалов (Enter — сохранить): {NumberText.QtyText(est.SmrPercent)}% = {N2(est.Totals.Smr)} ₽"
             : "СМР: общая сумма (Enter — сохранить)";
         switch (mode)
         {
@@ -307,6 +307,11 @@ public partial class EstimateView
         if ((pct || bySys || byPos) && est.Statistics.WorkRows != 0)
             SmrHintText.Text += (SmrHintText.Text.Length == 0 ? "" : " · ") +
                 $"+ монтаж строками {N2(est.Statistics.WorkRows)}";
+        if (est.MoneyFromStages)
+        {
+            SmrEdit.ToolTip = "СМР определяется этапами и остатком";
+            SmrHintText.Text = "сумма СМР этапов и остатка";
+        }
         SmrHintText.Visibility = string.IsNullOrEmpty(SmrHintText.Text)
             ? Visibility.Collapsed : Visibility.Visible;
         TransportEdit.IsReadOnly = est.Locked;
@@ -323,8 +328,19 @@ public partial class EstimateView
         e.Handled = true;
     }
 
-    private void SmrEdit_Commit(object sender, RoutedEventArgs e) => SaveTotalsFieldFromEdit(
-        SmrEdit, "smr_amount", _estimate?.Statistics.Smr, "СМР");
+    private void SmrEdit_Commit(object sender, RoutedEventArgs e)
+    {
+        if (_estimate?.SmrMode != "percent")
+        {
+            SaveTotalsFieldFromEdit(SmrEdit, "smr_amount", _estimate?.Statistics.Smr, "СМР");
+            return;
+        }
+        if (SmrEdit.IsReadOnly) return;
+        // The display rounds to three fractional digits. Merely leaving the field
+        // must not overwrite a stored percentage with higher precision.
+        if (SmrEdit.Text.Trim() == NumberText.QtyText(_estimate.SmrPercent)) return;
+        SaveTotalsFieldFromEdit(SmrEdit, "smr_percent", _estimate.SmrPercent, "Процент СМР");
+    }
 
     private void TransportEdit_Commit(object sender, RoutedEventArgs e) => SaveTotalsFieldFromEdit(
         TransportEdit, "transport_amount", _estimate?.Totals.Transport, "Транспорт");
@@ -340,10 +356,17 @@ public partial class EstimateView
             SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
             return;
         }
+        var displayedRevision = field == "smr_percent" ? _publishedEstimateRevision : null;
+        if (field == "smr_percent" && (string.IsNullOrEmpty(displayedRevision) ||
+            displayedRevision != _serverRevision || Volatile.Read(ref _pendingWrites) != 0))
+        {
+            SetStatus("Сначала дождись сверки сметы с сервером.", true);
+            return;
+        }
         var text = box.Text.Trim();
         decimal? value;
         if (text.Length == 0)
-            value = null;
+            value = field == "smr_percent" ? 0m : null;
         else if (NumberText.Parse(text) is { } parsed)
             value = parsed;
         else
@@ -357,7 +380,7 @@ public partial class EstimateView
             return;
         }
         if (value == current || (value is null && current == 0m)) return;
-        await SaveTotalsFieldAsync(field, value, caption);
+        await SaveTotalsFieldAsync(field, value, caption, displayedRevision);
     }
 
     private async Task<bool> SaveTotalsFieldAsync(string field, decimal? value, string caption,

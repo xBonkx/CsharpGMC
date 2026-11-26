@@ -69,6 +69,7 @@ public sealed record EstimateDocument(
     public EstimateStatistics Statistics { get; init; } = new(0, 0, 0);
     public string SmrMode { get; init; } = "";
     public decimal SmrPercent { get; init; }
+    public bool MoneyFromStages { get; init; }
     public bool BasisAllowed { get; init; }
     // Этап подготовки КП (kp_workflow.PHASES эталона): volumes / prices / review / ready / sent.
     public string KpPhase { get; init; } = "";
@@ -241,6 +242,12 @@ public static partial class EstimateReader
     {
         var cmd = conn.CreateCommand();
         cmd.CommandText = WithDiscountColumn(conn, BatchSql);
+        if (conn is Microsoft.Data.SqlClient.SqlConnection)
+            cmd.CommandText = cmd.CommandText.Replace("FROM contracts c JOIN objects",
+                ", CASE WHEN c.stage_of IS NULL AND EXISTS (SELECT 1 FROM contracts st " +
+                "WHERE st.stage_of=c.id AND st.stage_sum IS NOT NULL AND ISNULL(st.stage_rest,0)=0) " +
+                "THEN 1 ELSE 0 END AS money_from_stages FROM contracts c JOIN objects",
+                StringComparison.Ordinal);
         var parameter = cmd.CreateParameter();
         parameter.ParameterName = "@id";
         parameter.Value = contractId;
@@ -369,6 +376,7 @@ public static partial class EstimateReader
         {
             SmrMode = head.SmrMode,
             SmrPercent = head.SmrPercent,
+            MoneyFromStages = head.MoneyFromStages,
             BasisAllowed = AreaCellPresentation.IsBasisAllowed(head.Form, rules.Has(head.Form, "basis")),
             Statistics = Statistics(totals, positions),
             KpPhase = head.KpPhase,
@@ -407,6 +415,7 @@ public static partial class EstimateReader
         public string KpPhase = "";
         public decimal SmrAmount;
         public decimal SmrPercent;
+        public bool MoneyFromStages;
         public decimal Transport;
         public decimal Pnr;
         public decimal DiscountPercent;
@@ -443,7 +452,10 @@ public static partial class EstimateReader
             Pnr = Dec(r, 16),
             DeclaredMaterial = r.IsDBNull(17)?null:Dec(r,17),
             DeclaredTotal = r.IsDBNull(18)?null:Dec(r,18),
-            DiscountPercent = r.FieldCount > 19 ? DiscountPolicy.ReadPercent(r, 19) : 0m,
+            DiscountPercent = r.FieldCount > 19 && r.GetName(19) != "money_from_stages"
+                ? DiscountPolicy.ReadPercent(r, 19) : 0m,
+            MoneyFromStages = r.GetName(r.FieldCount - 1) == "money_from_stages" &&
+                Convert.ToBoolean(r.GetValue(r.FieldCount - 1), CultureInfo.InvariantCulture),
         };
     }
 

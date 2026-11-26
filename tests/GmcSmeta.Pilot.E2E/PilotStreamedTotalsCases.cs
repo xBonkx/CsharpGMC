@@ -58,6 +58,45 @@ internal static class PilotStreamedTotalsCases
                 "Totals read changed SQL revision");
         }
 
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'percent' WHERE id=@id", ("@id", id));
+        var percentRevision = p.Revision();
+        var beforePercent = EstimateReader.Load(conn, contractId);
+        var savedPercent = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+            "smr_percent", 25.125m, percentRevision);
+        PilotRunner.Check(savedPercent.Saved && p.Revision() != percentRevision, "Percent save failed");
+        var afterPercent = EstimateReader.Load(conn, contractId);
+        PilotRunner.Check(afterPercent.SmrMode == "percent" && afterPercent.SmrPercent == 25.125m &&
+            afterPercent.Totals.Smr == GmcSmeta.Core.Money.Round2(afterPercent.Totals.Materials * 25.125m / 100m) &&
+            beforePercent.Totals.Transport == afterPercent.Totals.Transport &&
+            beforePercent.Totals.Pnr == afterPercent.Totals.Pnr &&
+            beforePercent.PositionsInOrder.SequenceEqual(afterPercent.PositionsInOrder), "Percent changed unrelated data");
+        var stable = p.Revision();
+        void RejectPercent(decimal value, string revision)
+        {
+            var rejected = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId, "smr_percent", value, revision);
+            PilotRunner.Check(!rejected.Saved && p.Revision() == stable &&
+                EstimateReader.Load(conn, contractId).SmrPercent == 25.125m, "Rejected percent changed data");
+        }
+        RejectPercent(50m, percentRevision);
+        RejectPercent(-1m, stable);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET locked=1 WHERE id=@id", ("@id", id));
+        RejectPercent(50m, stable);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET locked=0,smr_mode=N'sum' WHERE id=@id", ("@id", id));
+        RejectPercent(50m, stable);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'percent' WHERE id=@id", ("@id", id));
+        var child = SqlServerWorkspace.CreateEmptyContract(p.PilotConnection, obj,
+            new SqlServerWorkspace.NewContractData("kp", "QA-STAGE-PERCENT", "", "Stage QA", null, null), p.Revision());
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET stage_of=@id,stage_sum=100,stage_rest=0 WHERE id=@child",
+            ("@id", id), ("@child", child));
+        stable = p.Revision();
+        PilotRunner.Check(EstimateReader.Load(conn, contractId).MoneyFromStages, "Stage money flag missing");
+        RejectPercent(50m, stable);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET stage_of=NULL,stage_sum=NULL WHERE id=@child", ("@child", child));
+        PilotRunner.Check(!EstimateReader.Load(conn, contractId).MoneyFromStages, "Stage money flag not cleared");
+        PilotRunner.Check(SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+            "smr_percent", null, p.Revision()).Saved && EstimateReader.Load(conn, contractId).SmrPercent == 0m,
+            "Clearing percentage must store zero, not NULL");
+
         var large = Totals.ReadAll(conn).ToDictionary(t => t.Id);
         foreach (var key in new[] { p.SmallContract, p.LargeContract })
         {

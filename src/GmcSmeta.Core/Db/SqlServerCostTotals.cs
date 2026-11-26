@@ -134,7 +134,7 @@ public static class SqlServerCostTotals
     private static readonly string[] NumericFields =
     {
         "pnr_cost", "transport_cost", "consumables_cost", "other_cost", "reserve_cost",
-        "pnr_amount", "transport_amount", "smr_amount",
+        "pnr_amount", "transport_amount", "smr_amount", "smr_percent",
     };
 
     /// <summary>
@@ -149,6 +149,12 @@ public static class SqlServerCostTotals
             return SqlServerDatabase.SaveResult.Fail("Эта статья не редактируется.", expectedRevision);
         if (value < 0m)
             return SqlServerDatabase.SaveResult.Fail("Отрицательные расходы или суммы недопустимы.", expectedRevision);
+        if (field == "smr_percent")
+        {
+            value ??= 0m;
+            if (value > NumberText.MaxNumber)
+                return SqlServerDatabase.SaveResult.Fail("Слишком большой процент СМР.", expectedRevision);
+        }
         var builder = new SqlConnectionStringBuilder(connectionString);
         if (!builder.InitialCatalog.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Запись разрешена только в GmcSmetaPilot_*.");
@@ -165,7 +171,7 @@ public static class SqlServerCostTotals
         decimal old = 0m, workRows = 0m;
         using (var read = new SqlCommand(
             "SELECT locked, stage_of, smr_mode, form, pnr_cost, transport_cost, consumables_cost, " +
-            "other_cost, reserve_cost, pnr_amount, transport_amount, smr_amount " +
+            "other_cost, reserve_cost, pnr_amount, transport_amount, smr_amount, smr_percent " +
             "FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
@@ -176,12 +182,13 @@ public static class SqlServerCostTotals
             smrMode = r.IsDBNull(2) ? "sum" : r.GetString(2);
             form = r.IsDBNull(3) ? "" : r.GetString(3);
             var values = new Dictionary<string, decimal>();
-            for (var i = 0; i < 8; i++)
+            for (var i = 0; i < 9; i++)
             {
                 var name = i switch
                 {
                     0 => "pnr_cost", 1 => "transport_cost", 2 => "consumables_cost", 3 => "other_cost",
-                    4 => "reserve_cost", 5 => "pnr_amount", 6 => "transport_amount", _ => "smr_amount",
+                    4 => "reserve_cost", 5 => "pnr_amount", 6 => "transport_amount",
+                    7 => "smr_amount", _ => "smr_percent",
                 };
                 values[name] = r.IsDBNull(4 + i) ? 0m
                     : Money.FromDouble(Convert.ToDouble(r.GetValue(4 + i), CultureInfo.InvariantCulture));
@@ -190,7 +197,7 @@ public static class SqlServerCostTotals
         }
         if ((field == "pnr_amount" || field == "transport_amount") && locked)
             return SqlServerDatabase.SaveResult.Fail("Смета подписана — сумму клиенту здесь не поменять", rev);
-        if (field == "smr_amount")
+        if (field is "smr_amount" or "smr_percent")
         {
             using (var stages = new SqlCommand(
                 "SELECT TOP(1) 1 FROM dbo.contracts WHERE stage_of=@id AND stage_sum IS NOT NULL " +
@@ -199,9 +206,13 @@ public static class SqlServerCostTotals
                 stages.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
                 fromStages = stages.ExecuteScalar() is not null;
             }
-            var smrEditable = !locked && smrMode == "sum" && (stageOf is not null || !fromStages);
+            var requiredMode = field == "smr_percent" ? "percent" : "sum";
+            var smrEditable = !locked && smrMode == requiredMode && (stageOf is not null || !fromStages);
             if (!smrEditable)
                 return SqlServerDatabase.SaveResult.Fail("Этот итог СМР рассчитывается или заблокирован", rev);
+        }
+        if (field == "smr_amount")
+        {
             // «Монтаж …» строки: их розница уже в СМР — введённое значение уходит в смр_amount.
             using (var rows = new SqlCommand(
                 "SELECT COALESCE(SUM(ROUND(p.qty*ISNULL(p.price,0),2)),0) FROM dbo.positions p " +
