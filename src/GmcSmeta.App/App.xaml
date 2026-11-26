@@ -571,7 +571,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#E8F0FE"/><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#BFD3FB"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#D9E6FD"/></Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -622,7 +626,9 @@
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="#0F172A"/>
             <Setter Property="CaretBrush" Value="#0F172A"/>
-            <Setter Property="SelectionBrush" Value="#C9DBFB"/>
+            <Setter Property="SelectionBrush" Value="#2563EB"/>
+            <Setter Property="SelectionTextBrush" Value="White"/>
+            <Setter Property="SelectionOpacity" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -652,6 +658,7 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="Segment" TargetType="RadioButton">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="FontWeight" Value="Medium"/>
@@ -667,7 +674,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SegmentBorder" Property="Background" Value="#E4E8EF"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="SegmentBorder" Property="Background" Value="#E8F0FE"/><Setter TargetName="SegmentBorder" Property="BorderBrush" Value="#2563EB"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SegmentBorder" Property="BorderBrush" Value="#2563EB"/></Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="SegmentBorder" Property="Background" Value="White"/>
                                 <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="#D0D7E2"/>
@@ -682,6 +688,7 @@
         <!-- Python ui/theme.py QPushButton[tab=true] v3:
              unselected white pill, selected vertical blue gradient. -->
         <Style x:Key="ObjectTab" TargetType="RadioButton" BasedOn="{StaticResource Segment}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
@@ -716,9 +723,6 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#1E40AF"/>
-                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -726,6 +730,7 @@
         </Style>
         <!-- Python tab=true, sub=true: secondary selection stays light. -->
         <Style x:Key="ObjectSubTab" TargetType="RadioButton" BasedOn="{StaticResource ObjectTab}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -747,9 +752,6 @@
                                 <Setter TargetName="SubTabBorder" Property="Background" Value="#E8F0FE"/>
                                 <Setter TargetName="SubTabBorder" Property="BorderBrush" Value="#2563EB"/>
                                 <Setter Property="Foreground" Value="#1E40AF"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="SubTabBorder" Property="BorderBrush" Value="#1E40AF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>
@@ -810,6 +812,7 @@
             <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style x:Key="PythonToolToggle" TargetType="ToggleButton">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="Background" Value="#FFFFFF"/>
@@ -834,18 +837,19 @@
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/>
                                 <Setter Property="Foreground" Value="#1E40AF"/>
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#D9E6FD"/>
+                            </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/>
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/>
                                 <Setter Property="Foreground" Value="#1E40AF"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E40AF"/>
-                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
-                                <Setter Property="Opacity" Value="0.6"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -952,7 +956,9 @@
                                 <Setter TargetName="InputChrome" Property="Background" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="InputChrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="InputChrome" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1044,6 +1050,7 @@
         </Style>
         <!-- Python proc_view.py filter chips are exclusive selection, not checkboxes. -->
         <Style x:Key="PythonFilterRadio" TargetType="RadioButton">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="Foreground" Value="#0F172A"/>
@@ -1076,9 +1083,6 @@
                                 <Setter Property="Foreground" Value="White"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="FilterSurface" Property="BorderBrush" Value="#1E40AF"/>
-                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.5"/>
                             </Trigger>
@@ -1090,6 +1094,7 @@
 
         <!-- Compact live-grid chrome: constant thickness, no per-cell converter. -->
         <Style x:Key="PythonGridCell" TargetType="DataGridCell">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Padding" Value="{StaticResource LayoutCellPadding}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -1187,6 +1192,7 @@
         </Style>
         <!-- cost_view: переключатели «Без закупа»/«Без цены» (QToolButton с заливкой). -->
         <Style x:Key="MatFilterToggleWarm" TargetType="ToggleButton">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Background" Value="#FFF8EC"/>
             <Setter Property="BorderBrush" Value="#EACD9C"/>
             <Setter Property="Foreground" Value="#99631E"/>
@@ -1213,6 +1219,11 @@
                                 <Setter Property="Foreground" Value="#1E40AF"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -1224,6 +1235,7 @@
             <Setter Property="Foreground" Value="#0F172A"/>
         </Style>
         <Style x:Key="PythonSecondaryTab" TargetType="TabItem">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
@@ -1247,6 +1259,9 @@
                                 <Setter TargetName="TabUnderline" Property="BorderBrush" Value="#2563EB"/>
                                 <Setter Property="Foreground" Value="#2563EB"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

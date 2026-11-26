@@ -24,11 +24,11 @@ WIN-26 сняты с активного контроля. Итог провер�
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 83 | 157 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
+| [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 82 | 158 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [PERFORMANCE_TODO_20261124.md](PERFORMANCE_TODO_20261124.md) | 58 | 18 | 38 | 2 | 0 | 0 | 0 | 0 | 0 |
 | [CONTEXT_MENU_TODO_20261124.md](CONTEXT_MENU_TODO_20261124.md) | 49 | 8 | 41 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [FUNCTIONAL_BUG_TODO_20261124.md](FUNCTIONAL_BUG_TODO_20261124.md) | 54 | 0 | 1 | 53 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **Всего** | 403 | 109 | 237 | 57 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **Всего** | 403 | 108 | 238 | 57 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 Открыто до приёмки: **403**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
 
@@ -278,7 +278,7 @@ WIN-26 сняты с активного контроля. Итог провер�
 | [QA-12](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L609) | P1 | 1920×1080. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [QA-13](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L611) | P2 | 1366×768 и 2560×1440. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [QA-14](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L613) | P1 | Windows DPI 100%,125%,150%. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
-| [QA-15](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L615) | P1 | Normal/hover/selection/edit/disabled/focus. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
+| [QA-15](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L615) | P1 | Normal/hover/selection/edit/disabled/focus. | PARTIAL | 27.11.2026: shared focus/selection states, source checks; journal. | Windows: actual normal/hover/pressed/selected/edit/disabled/focus matrix. |
 | [QA-16](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L617) | P0 | Регрессия редактирования, копирования/вставки, выделения, горячих клавиш, сортировки. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [QA-17](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L619) | P0 | Производительность на 2500+ строк. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |
 | [QA-18](https://github.com/xBonkx/CsharpGMC/blob/4ece8d0cc2b232d193c463ef17f075c2d3f0e42a/csharp/docs/UI_VISUAL_TODO_20261124.md#L621) | P0 | Сборка и регрессионные тесты перед публикацией. | UNVERIFIED | Нет индивидуальной отметки; сверить исходники и журнал | Определить остаток по критерию источника, затем проверить |

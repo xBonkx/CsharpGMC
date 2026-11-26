@@ -149,10 +149,16 @@
                                               RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="ExportChrome" Property="BorderBrush" Value="#9A3412"/>
-                                <Setter TargetName="ExportChrome" Property="BorderThickness" Value="2"/>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ExportChrome" Property="Background" Value="#FFE2C7"/>
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="Tag" Value="now"/>
+                                    <Condition Property="IsPressed" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="ExportChrome" Property="Background" Value="#C2410C"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

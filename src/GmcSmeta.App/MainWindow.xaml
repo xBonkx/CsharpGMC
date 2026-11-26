@@ -59,6 +59,7 @@
             </Setter>
         </Style>
         <Style x:Key="SidebarMenuHeader" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="32"/>
             <Setter Property="Padding" Value="0"/>
@@ -86,7 +87,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsSubmenuOpen" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter TargetName="Chrome" Property="BorderBrush" Value="#BFD3FB"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
