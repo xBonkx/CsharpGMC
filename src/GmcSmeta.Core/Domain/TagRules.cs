@@ -20,6 +20,25 @@ public sealed class TagRules
         return Read(r);
     }
 
+    // Object cards need names and exactly the same rule snapshot for both
+    // estimate and finance projections. Read both in one SQL Server command.
+    internal static TagRules LoadWithNames(Microsoft.Data.SqlClient.SqlConnection conn,
+        out Dictionary<string, string> names)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT [key], rules, name FROM tags";
+        using var reader = cmd.ExecuteReader();
+        var result = new TagRules();
+        names = new Dictionary<string, string>();
+        while (reader.Read())
+        {
+            result.ReadCurrent(reader);
+            var key = reader.IsDBNull(0) ? "" : reader.GetString(0);
+            names[key] = reader.IsDBNull(2) ? "" : reader.GetString(2);
+        }
+        return result;
+    }
+
     /// <summary>Читает правила из уже открытого reader'а (батч загрузки сметы).</summary>
     public static TagRules Read(DbDataReader r)
     {

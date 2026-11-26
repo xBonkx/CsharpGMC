@@ -19,24 +19,28 @@ public static partial class EstimateReader
     private const int CardBatchSize = 32;
 
     public static IReadOnlyDictionary<int, EstimateCardData> LoadCardsSql(
-        SqlConnection conn, IEnumerable<int> contractIds)
+        SqlConnection conn, IEnumerable<int> contractIds) =>
+        LoadCardsSql(conn, contractIds, null);
+
+    internal static IReadOnlyDictionary<int, EstimateCardData> LoadCardsSql(
+        SqlConnection conn, IEnumerable<int> contractIds, TagRules? knownRules)
     {
         var ids = contractIds.Distinct().OrderBy(id => id).ToArray();
         if (ids.Any(id => id <= 0)) throw new ArgumentOutOfRangeException(nameof(contractIds));
         var result = new Dictionary<int, EstimateCardData>(ids.Length);
         foreach (var batch in ids.Chunk(CardBatchSize))
-            ReadCardBatch(conn, batch, result);
+            ReadCardBatch(conn, batch, result, knownRules);
         return result;
     }
 
     private static void ReadCardBatch(SqlConnection conn, int[] ids,
-        Dictionary<int, EstimateCardData> result)
+        Dictionary<int, EstimateCardData> result, TagRules? knownRules)
     {
         var scope = new ContractReadScope(ids);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = WithDiscountColumn(conn,
             HeadSql.Replace("c.id = @id", scope.Predicate("c.id"), StringComparison.Ordinal) +
-            "SELECT [key], rules FROM tags;" +
+            (knownRules is null ? "SELECT [key], rules FROM tags;" : "") +
             "SELECT id, parent_id, smr_amount, contract_id FROM systems WHERE " +
             scope.Predicate("contract_id") + " ORDER BY [order], id;" +
             "SELECT p.id, p.system_id, p.parent_id, p.name, p.qty, p.price, p.out_of_kp, p.work_price, sy.contract_id " +
@@ -59,8 +63,12 @@ public static partial class EstimateReader
                 throw new InvalidOperationException("Неполный пакет карточек SQL Server.");
         }
 
-        Next();
-        var rules = TagRules.Read(reader);
+        var rules = knownRules;
+        if (rules is null)
+        {
+            Next();
+            rules = TagRules.Read(reader);
+        }
         Next();
         var systems = ids.ToDictionary(id => id, _ => new List<SystemRow>());
         while (reader.Read())

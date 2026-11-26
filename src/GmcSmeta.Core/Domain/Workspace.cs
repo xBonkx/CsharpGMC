@@ -233,20 +233,25 @@ public static class Workspace
         var docs = all.Where(d => mode == NavigationMode.Archive ||
             (mode == NavigationMode.Kp ? d.Kind == "kp" : d.Kind is "main" or "dop")).ToList();
         var counted = CountedDocumentIds(all, mode);
-        var finances = conn is Microsoft.Data.SqlClient.SqlConnection sql
-            ? FinanceReader.ReadSelected(sql, docs.Select(doc => doc.Id), out _)
-            : FinanceReader.ReadAll(conn);
-        var tags = new Dictionary<string, string>();
-        using (var cmd = conn.CreateCommand())
+        IReadOnlyDictionary<int, ContractFinance> finances;
+        IReadOnlyDictionary<int, EstimateCardData>? estimates = null;
+        Dictionary<string, string> tags;
+        if (conn is Microsoft.Data.SqlClient.SqlConnection sql)
         {
-            // [key] — зарезервированное слово SQL Server; SQLite тоже понимает [квадратные скобки].
+            var rules = TagRules.LoadWithNames(sql, out tags);
+            estimates = EstimateReader.LoadCardsSql(sql, docs.Select(doc => doc.Id), rules);
+            finances = FinanceReader.ReadForCards(sql, estimates.Values.Select(e => e.Totals).ToArray(), rules);
+        }
+        else
+        {
+            // Preserve the existing offline fixture route.
+            finances = FinanceReader.ReadAll(conn);
+            tags = new Dictionary<string, string>();
+            using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT [key], name FROM tags";
             using var reader = cmd.ExecuteReader();
             while (reader.Read()) tags[Str(reader, 0)] = Str(reader, 1);
         }
-        var estimates = conn is Microsoft.Data.SqlClient.SqlConnection cardSql
-            ? EstimateReader.LoadCardsSql(cardSql, docs.Select(doc => doc.Id))
-            : null;
         var docsById = docs.ToDictionary(d => d.Id);
         var cards = new List<ObjectDocumentCard>(docs.Count);
         foreach (var doc in OrderDocumentCards(docs))

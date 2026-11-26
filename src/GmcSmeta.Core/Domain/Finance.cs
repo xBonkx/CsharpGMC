@@ -142,6 +142,27 @@ public static class FinanceReader
         return result;
     }
 
+    // Object cards already own the current estimate totals and tag rules.
+    // ReadFinance/ReadActsCore consume only Id, Form and VatRate from totals;
+    // do not fetch positions/systems/counts a second time for those fields.
+    // Caller owns the revision fence over both projections.
+    internal static IReadOnlyDictionary<int, ContractFinance> ReadForCards(
+        Microsoft.Data.SqlClient.SqlConnection conn,
+        IReadOnlyCollection<ContractTotals> cardTotals, TagRules rules)
+    {
+        var ordered = cardTotals.OrderBy(t => t.Id).ToArray();
+        if (ordered.Any(t => t.Id <= 0) || ordered.Select(t => t.Id).Distinct().Count() != ordered.Length)
+            throw new ArgumentException("Некорректный набор документов карточек.", nameof(cardTotals));
+        var result = new Dictionary<int, ContractFinance>(ordered.Length);
+        foreach (var batch in ordered.Chunk(ContractReadScope.BatchSize))
+        {
+            var scope = new ContractReadScope(batch.Select(t => t.Id));
+            foreach (var pair in ReadFinance(conn, batch, rules, scope))
+                result.Add(pair.Key, pair.Value);
+        }
+        return result;
+    }
+
     private static IReadOnlyDictionary<int, ContractFinance> ReadFinance(DbConnection conn,
         IReadOnlyList<ContractTotals> contractTotals, TagRules rules, ContractReadScope? scope)
     {

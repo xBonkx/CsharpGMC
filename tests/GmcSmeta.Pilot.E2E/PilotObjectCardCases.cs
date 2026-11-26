@@ -13,6 +13,16 @@ internal static class PilotObjectCardCases
         var (objects, documents) = Workspace.ReadNavigation(conn);
         var ids = documents.Select(d => d.Id).ToArray();
         var batch = EstimateReader.LoadCardsSql(conn, ids.Concat(ids));
+        // Independent legacy finance route: still reads its own totals/rules.
+        var expectedFinance = FinanceReader.ReadSelected(conn, ids.Concat(ids), out _);
+        var expectedTags = new Dictionary<string, string>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT [key], name FROM tags";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                expectedTags[reader.GetString(0)] = reader.IsDBNull(1) ? "" : reader.GetString(1);
+        }
         PilotRunner.Check(batch.Count == ids.Length &&
             EstimateReader.LoadCardsSql(conn, Array.Empty<int>()).Count == 0,
             "Duplicate or empty card scope changed");
@@ -36,11 +46,20 @@ internal static class PilotObjectCardCases
                 Workspace.OrderDocumentCards(selected).Select(d => d.Id)),
                 "Card order or mode filter changed");
             foreach (var card in page.Cards)
+            {
                 PilotRunner.Check(card.Estimate == batch[card.Id],
                     "Workspace did not publish the matching card projection");
+                PilotRunner.Check(card.Finance == expectedFinance[card.Id],
+                    "Shared card totals changed finance, acts, coverage or costs");
+                PilotRunner.Check(card.TagName == expectedTags.GetValueOrDefault(card.Estimate.Form, card.Estimate.Form),
+                    "Shared tag snapshot changed customer label");
+            }
             var counted = Workspace.CountedDocumentIds(
                 documents.Where(d => d.ObjectId == obj.Id).ToList(), mode);
             var expected = selected.Where(d => counted.Contains(d.Id)).Select(d => batch[d.Id]).ToList();
+            PilotRunner.Check(page.Finance == ContractFinance.Sum(
+                selected.Where(d => counted.Contains(d.Id)).Select(d => expectedFinance[d.Id])),
+                "Object aggregate finance changed");
             PilotRunner.Check(page.Total == expected.Sum(d => d.Totals.Total) &&
                 page.Materials == expected.Sum(d => d.Statistics.Materials) &&
                 page.Smr == expected.Sum(d => d.Statistics.Smr) &&
