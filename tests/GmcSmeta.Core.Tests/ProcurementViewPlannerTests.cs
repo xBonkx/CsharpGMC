@@ -74,6 +74,29 @@ public sealed class ProcurementViewPlannerTests
     }
 
     [Fact]
+    public void AllModesAndSorts_MatchForOrderedAndShuffledInputIncludingTiedIndices()
+    {
+        var ordered = new[]
+        {
+            Row(10, 0, "П1", "Труба", supplier: "Цех", status: "issued", cost: 5, systemId: 1),
+            Row(20, 0, "П1", "труба", supplier: "цех", status: "none", cost: 5, systemId: 2),
+            Row(30, 2, "П1", "Клапан", supplier: "", status: "paid", systemId: 1),
+            Row(40, 4, "В1", "Труба", supplier: "А", status: "stock", cost: 10, systemId: 3)
+        };
+        var shuffled = new[] { ordered[1], ordered[3], ordered[0], ordered[2] };
+        foreach (var mode in ProcurementViewPlanner.Modes)
+        foreach (var sort in ProcurementViewPlanner.Sorts)
+            Assert.Equal(ProcurementViewPlanner.Build(ordered, mode.Code, sort.Code).ToArray(),
+                ProcurementViewPlanner.Build(shuffled, mode.Code, sort.Code).ToArray());
+
+        var kp = ProcurementViewPlanner.Build(ordered, "kp", "kp");
+        Assert.Equal(new long[] { 10, 30, 20, 40 }, kp.Select(x => x.PositionId));
+        Assert.Contains("· #1", kp[0].GroupLabel);
+        Assert.Contains("· #2", kp[2].GroupLabel);
+        Assert.Equal(new long[] { 20, 40, 10, 30 }, shuffled.Select(x => x.PositionId));
+    }
+
+    [Fact]
     public void InvalidModeOrSort_ThrowsWithoutMutation()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ProcurementViewPlanner.Build([], "unknown", "kp"));

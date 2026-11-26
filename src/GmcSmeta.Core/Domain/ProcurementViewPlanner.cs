@@ -43,7 +43,20 @@ public static class ProcurementViewPlanner
         ArgumentNullException.ThrowIfNull(rows);
         if (!Modes.Any(x => x.Code == mode)) throw new ArgumentOutOfRangeException(nameof(mode));
         if (!Sorts.Any(x => x.Code == sort)) throw new ArgumentOutOfRangeException(nameof(sort));
-        var all = rows.OrderBy(x => x.OriginalIndex).ThenBy(x => x.PositionId).ToList();
+        // The WPF snapshot and its filtered subsets normally already have
+        // original order. Keep the public API safe for arbitrary input.
+        IReadOnlyList<ProcurementViewSource> all = rows;
+        for (var i = 1; i < rows.Count; i++)
+        {
+            var previous = rows[i - 1];
+            var current = rows[i];
+            if (previous.OriginalIndex > current.OriginalIndex ||
+                (previous.OriginalIndex == current.OriginalIndex && previous.PositionId > current.PositionId))
+            {
+                all = rows.OrderBy(x => x.OriginalIndex).ThenBy(x => x.PositionId).ToArray();
+                break;
+            }
+        }
 
         IEnumerable<ProcurementViewSource> Sort(IEnumerable<ProcurementViewSource> source)
         {
@@ -71,7 +84,8 @@ public static class ProcurementViewPlanner
                         Array.IndexOf(StatusOrder, x.Status) is var k && k >= 0 ? k : 99)
                     .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => x.OriginalIndex),
-                _ => source.OrderBy(x => x.OriginalIndex).ThenBy(x => x.PositionId),
+                // Every source is either all or a stable subsequence of all.
+                _ => source,
             };
         }
 
@@ -82,12 +96,13 @@ public static class ProcurementViewPlanner
 
         if (mode == "kp")
         {
-            var duplicateNames = all.GroupBy(x => x.SystemId)
+            var systemGroups = all.GroupBy(x => x.SystemId).ToArray();
+            var duplicateNames = systemGroups
                 .Select(g => (g.Key, g.First().SystemName))
                 .GroupBy(x => x.SystemName, StringComparer.OrdinalIgnoreCase)
                 .Where(g => g.Count() > 1)
                 .Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return all.GroupBy(x => x.SystemId)
+            return systemGroups
                 .SelectMany(g =>
                 {
                     var title = g.First().SystemName;

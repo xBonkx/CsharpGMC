@@ -58,6 +58,41 @@ public class ProcurementViewFilterTests
     }
 
     [Fact]
+    public void Counts_MatchIndividualFilters_AndEnumerateLargeSnapshotOnce()
+    {
+        string[] statuses = ["none", "skip", "zero", "fact", "ordered", "invoice", "paid",
+            "shop_queued", "shop_work", "stock", "part_stock", "issued", "part_issued", "unknown"];
+        var rows = Enumerable.Range(0, 25000).Select(i =>
+            (Status: statuses[i % statuses.Length], IsWork: i % 7 == 0,
+                Flags: (IReadOnlyList<string>)(i % 5 == 0 ? new[] { "ПРОСРОЧЕНА ПОСТАВКА", "замена" }
+                    : i % 3 == 0 ? new[] { "вне КП" } : Array.Empty<string>()),
+                Source: i % 4 == 0 ? "shop" : "buy")).ToArray();
+        var enumerated = 0;
+        IEnumerable<(string Status, bool IsWork, IReadOnlyList<string> Flags, string Source)> Once()
+        {
+            foreach (var row in rows)
+            {
+                enumerated++;
+                yield return row;
+            }
+        }
+        var counts = ProcurementViewFilter.CountCategories(Once());
+        Assert.Equal(rows.Length, enumerated);
+        int Expected(string category) => rows.Count(row =>
+            ProcurementViewFilter.Matches(category, row.Status, "", row.IsWork, row.Flags, row.Source));
+        Assert.Equal(Expected("all"), counts.All);
+        Assert.Equal(Expected("none"), counts.None);
+        Assert.Equal(Expected("work"), counts.Work);
+        Assert.Equal(Expected("late"), counts.Late);
+        Assert.Equal(Expected("shop"), counts.Shop);
+        Assert.Equal(Expected("stock"), counts.Stock);
+        Assert.Equal(Expected("issued"), counts.Issued);
+        Assert.Equal(Expected("problem"), counts.Problem);
+        Assert.Equal(default(ProcurementViewFilter.CategoryCounts),
+            ProcurementViewFilter.CountCategories(rows.Take(0)));
+    }
+
+    [Fact]
     public void UnknownCategoryAndNullFlags_AreRejected()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>

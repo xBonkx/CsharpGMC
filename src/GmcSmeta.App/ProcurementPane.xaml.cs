@@ -323,10 +323,6 @@ public partial class ProcurementPane : UserControl
         catch (Exception ex) { SetStatus("Ошибка загрузки закупок: " + ex.Message); }
     }
 
-    private int CategoryCount(string category) =>
-        _allRows.Count(row => ProcurementViewFilter.Matches(category, row.StatusCode,
-            row.Stage, row.Work, row.FlagItems, row.Source));
-
     private void RebuildScopeFilters()
     {
         // Python proc_view.py:load keeps the selected supplier and selected
@@ -446,16 +442,18 @@ public partial class ProcurementPane : UserControl
         static void SetChip(RadioButton button, string label, int count) =>
             button.Content = count > 0 ? $"{label} · {count}" : label;
 
-        SetChip(ProcFilterAll, "Все", CategoryCount("all"));
-        SetChip(ProcFilterNone, "Не заказано", CategoryCount("none"));
-        SetChip(ProcFilterWork, "В работе", CategoryCount("work"));
-        SetChip(ProcFilterLate, "Просрочено", CategoryCount("late"));
-        SetChip(ProcFilterShop, "Цех", CategoryCount("shop"));
-        SetChip(ProcFilterStock, "На складе", CategoryCount("stock"));
-        ProcFilterIssued.Content = $"Выдано · {CategoryCount("issued")} из {CategoryCount("all")}";
-        SetChip(ProcFilterProblem, "Проблемы", CategoryCount("problem"));
-        ProcFilterLate.Visibility = CategoryCount("late") > 0 || _activeCategory == "late" ? Visibility.Visible : Visibility.Collapsed;
-        ProcFilterShop.Visibility = CategoryCount("shop") > 0 || _activeCategory == "shop" ? Visibility.Visible : Visibility.Collapsed;
+        var counts = ProcurementViewFilter.CountCategories(_allRows.Select(row =>
+            (row.StatusCode, row.Work, (IReadOnlyList<string>)row.FlagItems, row.Source)));
+        SetChip(ProcFilterAll, "Все", counts.All);
+        SetChip(ProcFilterNone, "Не заказано", counts.None);
+        SetChip(ProcFilterWork, "В работе", counts.Work);
+        SetChip(ProcFilterLate, "Просрочено", counts.Late);
+        SetChip(ProcFilterShop, "Цех", counts.Shop);
+        SetChip(ProcFilterStock, "На складе", counts.Stock);
+        ProcFilterIssued.Content = $"Выдано · {counts.Issued} из {counts.All}";
+        SetChip(ProcFilterProblem, "Проблемы", counts.Problem);
+        ProcFilterLate.Visibility = counts.Late > 0 || _activeCategory == "late" ? Visibility.Visible : Visibility.Collapsed;
+        ProcFilterShop.Visibility = counts.Shop > 0 || _activeCategory == "shop" ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ProcurementCategory_Checked(object sender, RoutedEventArgs e)
