@@ -168,6 +168,7 @@ internal static class Program
         CheckEstimateRowViewIndex();
         CheckEstimateVisibleRowPresentation();
         CheckProcurementUnchangedDisplay();
+        CheckShipmentTabReuse();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -393,6 +394,26 @@ internal static class Program
         if (changes != 0)
             throw new Exception("An unchanged visible row must not raise redundant notifications.");
         Console.WriteLine("Estimate visible-row presentation and grouping transitions OK.");
+    }
+
+    private static void CheckShipmentTabReuse()
+    {
+        static void Expect(bool expected, string? cached, string displayed,
+            string observed, long current, long requested, bool dirty = false)
+        {
+            if (ShipmentsPane.CanReuseShipmentSnapshot(cached, displayed, observed,
+                current, requested, dirty) != expected)
+                throw new Exception("Shipment tab reuse accepted an invalid snapshot or rejected a clean one.");
+        }
+        Expect(true, "r1", "r1", "r1", 42, 42);
+        Expect(true, "r1", "r1", "r1", 0, 0); // confirmed empty object
+        Expect(false, "r1", "r1", "r2", 42, 42);
+        Expect(false, "r1", "r2", "r2", 42, 42); // newer write receipt
+        Expect(false, null, "r1", "r1", 42, 42); // invalidated by incremental write
+        Expect(false, "r1", "r1", "r1", 42, 43);
+        Expect(false, "r1", "r1", "r1", 42, 42, dirty: true);
+        Expect(false, "", "", "", 0, 0);
+        Console.WriteLine("Shipment tab revision, selection and readback guards OK.");
     }
 
     private static void CheckProcurementUnchangedDisplay()

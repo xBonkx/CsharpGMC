@@ -415,7 +415,7 @@ public partial class EstimateView : UserControl
                     if (_contractShipmentsPane is null)
                         ContractShipmentsHost.Content = _contractShipmentsPane =
                             new ShipmentsPane(_sqlConnectionString, _objectId, _estimate.ObjectName);
-                    else if (was != page) _contractShipmentsPane.RefreshFromSqlServer();
+                    else if (was != page) _contractShipmentsPane.RefreshOnTabReturn();
                     break;
             }
         }

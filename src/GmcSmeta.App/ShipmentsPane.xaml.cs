@@ -61,6 +61,7 @@ public partial class ShipmentsPane : UserControl
     private long _attachmentGeneration;
     private bool _needsReloadAfterAttach = true;
     private ObjectSnapshot? _objectSnapshot;
+    private bool _shipmentSnapshotMayReuse;
     private bool _quantityBusy;
     private long _editingFixedId;
     private bool IsEditingFixed => Current is { Fixed: true } current && current.Id == _editingFixedId;
@@ -161,6 +162,7 @@ public partial class ShipmentsPane : UserControl
             ++_viewportGeneration;
             _revision = "";
             _objectSnapshot = null;
+            _shipmentSnapshotMayReuse = false;
             _needsReloadAfterAttach = true;
             _building = false;
         };
@@ -181,6 +183,20 @@ public partial class ShipmentsPane : UserControl
         }
     }
 
+    internal void RefreshOnTabReturn()
+    {
+        if (IsLoaded && !_quantityBusy && !_building && !HasHeaderDraft() &&
+            LinesGrid.ItemsSource is not ListCollectionView { IsEditingItem: true })
+            _ = ReloadAsync(allowUnchanged: true);
+    }
+
+    internal static bool CanReuseShipmentSnapshot(string? objectRevision, string displayedRevision,
+        string observedRevision, long displayedId, long requestedId, bool requiresReadback) =>
+        !requiresReadback && displayedId == requestedId &&
+        !string.IsNullOrWhiteSpace(displayedRevision) &&
+        string.Equals(objectRevision, displayedRevision, StringComparison.Ordinal) &&
+        string.Equals(displayedRevision, observedRevision, StringComparison.Ordinal);
+
     private List<SqlServerShipments.ShipmentInfo> _shipments = new();
 
     private sealed record ObjectSnapshot(string Revision,
@@ -193,7 +209,8 @@ public partial class ShipmentsPane : UserControl
 
     // Only plain data leaves the worker. No WPF objects or control state is
     // read there; the displayed revision is assigned only after publishing.
-    private ShipmentSnapshot ReadSnapshot(long requestedId, long editingFixedId, ObjectSnapshot? cached)
+    private ShipmentSnapshot? ReadSnapshot(long requestedId, long editingFixedId,
+        ObjectSnapshot? cached, string reusableRevision)
     {
         using var conn = SqlServerDatabase.Open(_connectionString);
         for (var attempt = 0; attempt < 2; attempt++)
@@ -201,6 +218,11 @@ public partial class ShipmentsPane : UserControl
             var revision = SqlServerDatabase.Revision(conn);
             if (string.IsNullOrEmpty(revision))
                 throw new InvalidOperationException("Отсутствует ревизия SQL Server.");
+            // Null means the complete published view is still current, not
+            // merely that the object-wide candidates can be reused.
+            if (attempt == 0 && !string.IsNullOrWhiteSpace(reusableRevision) &&
+                string.Equals(reusableRevision, revision, StringComparison.Ordinal))
+                return null;
             var obj = cached is not null && cached.Revision == revision ? cached :
                 ReadObjectSnapshot(conn, revision);
             var current = obj.Shipments.FirstOrDefault(s => s.Id == requestedId) ??
@@ -252,7 +274,8 @@ public partial class ShipmentsPane : UserControl
         return new ObjectSnapshot(revision, shipments, documents, candidates);
     }
 
-    private async Task ReloadAsync(bool preserveStatus = false, long? requestedId = null, bool reuseObject = false)
+    private async Task ReloadAsync(bool preserveStatus = false, long? requestedId = null,
+        bool reuseObject = false, bool allowUnchanged = false)
     {
         if (!IsLoaded || _building) return;
         var generation = ++_loadGeneration;
@@ -261,16 +284,42 @@ public partial class ShipmentsPane : UserControl
         var gridState = targetId == _shipmentId && _revision.Length > 0 ? CaptureGridState() : null;
         var editingFixedId = _editingFixedId;
         var cached = reuseObject ? _objectSnapshot : null;
+        var reusableRevision = allowUnchanged && CanReuseShipmentSnapshot(
+            _objectSnapshot?.Revision, _revision, _revision, _shipmentId, targetId,
+            !_shipmentSnapshotMayReuse || _needsReloadAfterAttach || _quantityBusy ||
+            editingFixedId != 0 || (Current?.Id ?? 0) != _shipmentId || HasHeaderDraft() ||
+            LinesGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
+            ? _revision : "";
+        _shipmentSnapshotMayReuse = false;
         _revision = string.Empty;
         _building = true;
         IsEnabled = false;
-        ++_viewportGeneration;
+        // Do not cancel a queued viewport restoration for a revision-only hit.
+        if (reusableRevision.Length == 0) ++_viewportGeneration;
         SetStatus("Загрузка ведомости из SQL Server…");
         try
         {
             StartupTrace.Mark("shipment_load_begin");
-            var snapshot = await Task.Run(() => ReadSnapshot(targetId, editingFixedId, cached));
+            var snapshot = await Task.Run(() => ReadSnapshot(targetId, editingFixedId, cached, reusableRevision));
             if (generation != _loadGeneration || !IsLoaded) return;
+            if (snapshot is null)
+            {
+                if (!CanReuseShipmentSnapshot(_objectSnapshot?.Revision, reusableRevision,
+                    reusableRevision, _shipmentId, targetId,
+                    _needsReloadAfterAttach || _quantityBusy || _editingFixedId != 0 ||
+                    (Current?.Id ?? 0) != _shipmentId || HasHeaderDraft() ||
+                    LinesGrid.ItemsSource is ListCollectionView { IsEditingItem: true }))
+                {
+                    SetStatus("Данные ведомости требуют сверки. Нажмите «Обновить».");
+                    return;
+                }
+                _revision = reusableRevision;
+                _shipmentSnapshotMayReuse = true;
+                FooterText.Text = previousMessage;
+                StartupTrace.Mark("shipment_tab_revision_hit");
+                return;
+            }
+            if (reusableRevision.Length > 0) ++_viewportGeneration;
             _shipments = snapshot.Object.Shipments.ToList();
             if (!ShipmentCombo.Items.OfType<ShipmentItem>().Select(i => i.Info).SequenceEqual(_shipments))
             {
@@ -285,6 +334,7 @@ public partial class ShipmentsPane : UserControl
                 ClearShipment("Ведомостей пока нет — создайте «+ Ведомость».");
             _objectSnapshot = snapshot.Object;
             _revision = snapshot.Object.Revision;
+            _shipmentSnapshotMayReuse = true;
             _needsReloadAfterAttach = false;
             NewShipmentButton.IsEnabled = true;
             if (preserveStatus && !string.IsNullOrWhiteSpace(previousMessage))
@@ -482,6 +532,7 @@ public partial class ShipmentsPane : UserControl
             UpdateSummary(changes.Shipment.Lines);
             RestoreGridState(state);
             _objectSnapshot = null; // incremental writes invalidate object-wide stock/header cache
+            _shipmentSnapshotMayReuse = false;
             _revision = changes.Revision;
             return true;
         }
@@ -767,6 +818,8 @@ public partial class ShipmentsPane : UserControl
         if (!CanStartWrite || !IsEditable || !RequireSavedHeader() ||
             !ReferenceEquals(e.Column, QtyColumn) || e.Row.Item is not ShipmentPreviewRow { CanChange: true })
             e.Cancel = true;
+        else
+            _shipmentSnapshotMayReuse = false; // TwoWay input may survive even a cancelled edit.
     }
 
     private async void LinesGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
