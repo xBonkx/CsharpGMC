@@ -26,6 +26,7 @@ public partial class OrdersWindow : Window
     private string _folder = "";
     private bool _initializing = true;
     private bool _registrationUncertain;
+    private bool _issuing;
     private static readonly string TemplateSettings = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "GMC-Smeta-Next", "orders-off.json");
@@ -53,6 +54,7 @@ public partial class OrdersWindow : Window
         MakeButton.IsEnabled = false;
         ObjectName.Text = "Загрузка данных объекта и приказов…";
         Loaded += async (_, _) => await InitializeAsync(createDatabase);
+        Closing += (_, e) => { if (_issuing) e.Cancel = true; };
         Closed += (_, _) =>
         {
             _closed = true;
@@ -186,8 +188,6 @@ public partial class OrdersWindow : Window
             string.IsNullOrWhiteSpace(when) ? "" : "от " + when
         }.Where(x => x.Length > 0));
     }
-    private void RefreshHistory() => ApplyHistory(_db.History(_objectId, "order"));
-
     private void ApplyHistory(IReadOnlyList<AccessHistory> history)
     {
         OrderHistory.ItemsSource = history.Select(x => new OrderHistoryItem(x,
@@ -238,7 +238,7 @@ public partial class OrdersWindow : Window
 
     private async void OpenHistory_Click(object sender, RoutedEventArgs e)
     {
-        if (_closed || _initializing || _historyOpenCancellation is not null ||
+        if (_closed || _initializing || _issuing || _historyOpenCancellation is not null ||
             OrderHistory.SelectedItem is not OrderHistoryItem selected) return;
         using var cancellation = new CancellationTokenSource();
         _historyOpenCancellation = cancellation;
@@ -271,90 +271,70 @@ public partial class OrdersWindow : Window
             }
         }
     }
-    private void Make_Click(object sender, RoutedEventArgs e)
+    private async void Make_Click(object sender, RoutedEventArgs e)
     {
         if (_closed || _initializing || string.IsNullOrWhiteSpace(_revision)) return;
         if (_historyOpenCancellation is not null) return;
+        if (_issuing) return;
         if (_registrationUncertain) { Error("Проверьте журнал и файлы, затем заново откройте окно."); return; }
-        var chosen = _templates.Where(x => x.Checked).ToArray();
+        var chosen = _templates.Where(x => x.Checked)
+            .Select(x => new OrderIssueService.Template(x.Path, x.Title)).ToArray();
         if (chosen.Length == 0) { Error("Отметьте хотя бы один шаблон приказа."); return; }
         if (PersonBox.SelectedItem is not PeoplePerson person) { Error("Выберите ответственного."); return; }
         if (DayPicker.SelectedDate is not DateTime when) { Error("Выберите дату."); return; }
         var number = PeopleRules.Clean(NumberBox.Text);
         if (!Regex.IsMatch(number, @"\d+\D*$")) { Error("Номер должен заканчиваться числом."); return; }
-        var operation = Guid.NewGuid();
-        var generated = new List<string>();
-        string? current = null;
-        bool registrationStarted = false;
+        var site = PeopleRules.Clean(SiteBox.Text);
+        if (site.Length == 0) { Error("Укажите объект в приказе."); return; }
+        var request = new OrderIssueService.Request(_objectId, _site, _companies.ToArray(),
+            person with { }, when, number, NumberBox.Text, ContractBox.Text.Trim(), site,
+            _folder, _revision, chosen, Guid.NewGuid());
+
+        _issuing = true;
+        OrderContent.IsEnabled = false;
+        MakeButton.IsEnabled = false;
+        CloseButton.IsEnabled = false;
+        StatusInfo.Text = "Формирование приказов и регистрация в SQL Server…";
         try
         {
-            Directory.CreateDirectory(_folder);
-            var company = _companies.FirstOrDefault(c =>
-                c.Name.Contains("ГМЦ", StringComparison.OrdinalIgnoreCase)) ?? _companies.FirstOrDefault();
-            var site = PeopleRules.Clean(SiteBox.Text);
-            if (site.Length == 0) throw new ArgumentException("Укажите объект в приказе.");
-            // A new revision is required whenever another client edited the people dictionary.
-            var latest = _db.Load(false);
-            if (latest.Revision != _revision || _db.Site(_objectId) != _site ||
-                !_db.Companies().SequenceEqual(_companies))
-                throw new System.Data.DBConcurrencyException("Сотрудники, объект или реквизиты изменились. Перезапустите окно.");
-            foreach (var choice in chosen)
+            // No cancellation after dispatch: generated files and SQL registration
+            // must reach a known outcome, even on a slow network.
+            var result = await Task.Run(() => OrderIssueService.Issue(_db, request));
+            if (!result.Registered)
             {
-                if (!File.Exists(choice.Path))
-                    throw new FileNotFoundException("Не найден Word-шаблон.", choice.Path);
-                var name = PeopleRules.SafeFileName("Приказ №" +
-                    number.Replace('/', '-') + " " + choice.Title);
-                current = PeopleDocuments.UniquePath(_folder, name, ".docx");
-                var mapping = PeopleDocuments.OrderMapping(_site, person, company,
-                    when, number, ContractBox.Text.Trim(), site);
-                PeopleDocuments.FillDocx(choice.Path, current, mapping);
-                generated.Add(current); // only a successfully published file belongs to this operation
-                using (var docx = System.IO.Compression.ZipFile.OpenRead(current))
-                    if (docx.GetEntry("word/document.xml") is null)
-                        throw new InvalidDataException("Word-документ повреждён.");
-                current = null;
-                number = PeopleRules.NextNumber(number);
+                _registrationUncertain = true;
+                _revision = "";
+                StatusInfo.Text = "Исход COMMIT не подтверждён. Файлы оставлены на месте; не создавайте их повторно.";
+                Error(result.Warning ?? StatusInfo.Text);
+                return;
             }
-            var snapshot = new OrderSnapshot(person.Id, person.Fio, generated, NumberBox.Text, operation);
-            registrationStarted = true;
-            _revision = _db.RegisterExport(_objectId, "order", _folder,
-                JsonSerializer.Serialize(snapshot), operation, _revision, site).Revision;
+
+            // Registration succeeded. A later history or shell failure is not an
+            // export failure and must never trigger deletion or another registration.
+            _revision = result.Revision ?? "";
+            StatusInfo.Text = $"Сформировано {result.Count} приказов, история записана в SQL Server.";
+            if (result.History is not null) ApplyHistory(result.History);
+            if (result.Warning is not null)
+            {
+                StatusInfo.Text += " " + result.Warning;
+                return;
+            }
             try { SaveTemplateSettings(); }
-            catch (IOException) { /* optional UI preference cannot invalidate issued orders */ }
-            StatusInfo.Text = $"Сформировано {generated.Count} приказов, история записана в SQL Server.";
-            RefreshHistory();
-            Process.Start(new ProcessStartInfo(_folder) { UseShellExecute = true });
+            catch (Exception) { /* optional UI preference cannot invalidate issued orders */ }
+            try { Process.Start(new ProcessStartInfo(request.Folder) { UseShellExecute = true }); }
+            catch (Exception ex) { StatusInfo.Text += " Не удалось открыть папку: " + ex.Message; }
         }
         catch (Exception ex)
         {
-            bool recorded = false;
-            if (registrationStarted)
-            {
-                try { recorded = _db.WasRegistered(_objectId, operation); }
-                catch { /* Connection interrupted: do not assume that the commit failed. */ }
-            }
-            if (recorded)
-            {
-                StatusInfo.Text = "Приказы созданы; регистрация подтверждена повторным чтением SQL Server.";
-                RefreshHistory();
-                return;
-            }
-            if (!registrationStarted)
-            {
-                // No SQL write has begun: partial batch output is safe to remove.
-                foreach (var path in generated)
-                {
-                    try { if (File.Exists(path)) File.Delete(path); }
-                    catch { /* report original export failure; don't overwrite existing files */ }
-                }
-            }
-            else
-            {
-                _registrationUncertain = true;
-                MakeButton.IsEnabled = false;
-                StatusInfo.Text = "Исход COMMIT не подтверждён. Файлы оставлены на месте; не создавайте их повторно.";
-            }
+            StatusInfo.Text = "Не удалось завершить формирование приказов.";
             Error(ex.Message);
+        }
+        finally
+        {
+            _issuing = false;
+            OrderContent.IsEnabled = true;
+            CloseButton.IsEnabled = true;
+            MakeButton.IsEnabled = !_registrationUncertain && _revision.Length > 0 && _people.Count > 0;
         }
     }
     private void Error(string message) =>

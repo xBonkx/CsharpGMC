@@ -60,7 +60,7 @@ public sealed class OrderHistoryFileResolverTests
         Assert.NotNull(root);
         var source = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "OrdersWindow.xaml.cs"));
         var open = source[source.IndexOf("private async void OpenHistory_Click", StringComparison.Ordinal)..
-            source.IndexOf("private void Make_Click", StringComparison.Ordinal)];
+            source.IndexOf("private async void Make_Click", StringComparison.Ordinal)];
         Assert.Contains("await Task.Run(() => OrderHistoryFileResolver.Resolve(selected.History, token), token)", open);
         Assert.Contains("!ReferenceEquals(OrderHistory.SelectedItem, selected)", open);
         Assert.True(open.IndexOf("if (_closed || token.IsCancellationRequested", StringComparison.Ordinal) <

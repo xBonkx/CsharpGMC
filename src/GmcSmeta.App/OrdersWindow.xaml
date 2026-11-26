@@ -15,7 +15,7 @@
             <Button x:Name="MakeButton" Content="Сформировать приказы" ContentTemplate="{StaticResource IconLabelFile}" Click="Make_Click"
                     Padding="16,8" Background="#F97316" Foreground="White"
                     BorderBrush="#F97316" FontWeight="SemiBold" Margin="0,0,10,0"/>
-            <Button Content="Закрыть" Click="Close_Click" Padding="14,8"/>
+            <Button x:Name="CloseButton" Content="Закрыть" Click="Close_Click" Padding="14,8"/>
         </WrapPanel>
         <ScrollViewer x:Name="OrderContent" VerticalScrollBarVisibility="Auto">
             <StackPanel>
