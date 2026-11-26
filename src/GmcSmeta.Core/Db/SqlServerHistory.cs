@@ -23,15 +23,21 @@ public static class SqlServerHistory
     /// Заголовок и объект документа для окна истории. null — документ не найден
     /// (Python в этом случае просто не открывает окно).
     /// </summary>
-    public static HistoryScope? ContractScope(string connectionString, long contractId)
+    public static HistoryScope? ContractScope(string connectionString, long contractId,
+        CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
         using var cmd = new SqlCommand(
             "SELECT c.kind,c.number,c.[date],c.name,o.name FROM dbo.contracts c " +
             "JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var r = cmd.ExecuteReader();
-        if (!r.Read()) return null;
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        if (!r.Read()) { token.ThrowIfCancellationRequested(); return null; }
+        token.ThrowIfCancellationRequested();
         string Text(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
         return new HistoryScope(
             Documents.ContractTitleText(Text(0), Text(1), Text(2), Text(3)), Text(4));
@@ -44,10 +50,13 @@ public static class SqlServerHistory
     /// список, не исключение.
     /// </summary>
     public static IReadOnlyList<HistoryEntry> List(string connectionString,
-        long? contractId = null, int limit = Limit)
+        long? contractId = null, int limit = Limit, CancellationToken token = default)
     {
         if (limit is < 1 or > Limit) throw new ArgumentOutOfRangeException(nameof(limit));
-        using var conn = SqlServerDatabase.Open(connectionString);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
         using var cmd = new SqlCommand(
             "SELECT TOP (@limit) id,ts,[user],entity,entity_id,action,details,contract_id,object_id " +
             "FROM dbo.change_log " +
@@ -60,10 +69,12 @@ public static class SqlServerHistory
         cmd.Parameters.Add("@contractId", SqlDbType.BigInt).Value =
             contractId is long id ? id : DBNull.Value;
 
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var rows = new List<HistoryEntry>();
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             string Text(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             long? Id(int i) => r.IsDBNull(i) ? null : Convert.ToInt64(r.GetValue(i), CultureInfo.InvariantCulture);
             rows.Add(new HistoryEntry(
@@ -71,6 +82,7 @@ public static class SqlServerHistory
                 r.IsDBNull(1) ? null : Convert.ToDateTime(r.GetValue(1), CultureInfo.InvariantCulture),
                 Text(2), Text(3), Id(4), Text(5), Text(6), Id(7), Id(8)));
         }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 }

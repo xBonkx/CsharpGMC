@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — фоновая загрузка журнала изменений (PERF-047)
+
+27.11.2026 ChatGPT / main (база c60c556) — PERF-047 PARTIAL, History: синхронные ContractScope/List и проекция 3000 строк из конструктора HistoryWindow перенесены в Task.Run после Loaded; статус загрузки, ошибка/отсутствующий документ, отмена Closed и guard публикации. SqlServerHistory принимает необязательный CancellationToken, использует существующие guarded OpenAsync и SqlReadCancellation; SELECT, scope, TOP/порядок и read-only сохранены. SearchLine кэшируется один раз на строку вместо склейки при каждом поиске. Добавлены два теста (отмена до подключения и source lifecycle). Статическая сверка; Windows build/xUnit/SQL Pilot не запускались, фактическое ускорение не измерено. Приёмка: глобальная/документная история 0/3000 строк, медленный SQL, закрытие в ходе чтения, ошибки/удалённый договор, ввод поиска до окончания загрузки, повторное открытие, p50/p95. Остальные вспомогательные модули остаются открыты. БД/миграции/релиз не изменены.
+
 ## 27.11.2026 — значок превышения в таблице выдачи (SHIP-VIS-05)
 
 27.11.2026 ChatGPT / main (база 6340bd9) — SHIP-VIS-05 PARTIAL: Python aa6b34dcf0314df93086a297f01d549ff58cf705 ship_view.py `_set_row` icon("alert", C["warn"], 14), theme.py alert path/stroke 1.9 round/#B45309. В ShipmentNowCell добавлен штатный GlyphAlert 14 DIP, видимый только при StockOverrun; при выделении белый для контраста, при редактировании скрыт. Сохранены DataGridTextColumn, TextBox editor, ContentPresenter, focus overlay и обработчики записи. Без изменений SQL/БД, фильтров/выбора/виртуализации. Source regression проверяет размер/ресурс/условия/редактор/focus. Статическая сверка, Windows build/xUnit/GUI не запускались; проверить DPI, клавиатуру, edit/cancel, 2500+ строк и readback превышение→норма→превышение. Цвет выделения — адаптация WPF.

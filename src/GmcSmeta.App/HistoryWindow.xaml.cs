@@ -22,16 +22,51 @@ public partial class HistoryWindow : Window
     private readonly List<Row> _all = [];
     private string _summaryText = "";
     private bool _historyLoaded;
+    private CancellationTokenSource? _loadCancellation;
 
     public HistoryWindow(string connectionString, long? contractId = null)
     {
         InitializeComponent();
 
-        SqlServerHistory.HistoryScope? scope = null;
-        if (contractId is long id)
+        TitleText.Text = Title;
+        SubtitleText.Text = "Загрузка истории…";
+        Loaded += async (_, _) => await LoadHistoryAsync(connectionString, contractId);
+        Closed += (_, _) => _loadCancellation?.Cancel();
+    }
+
+    private async Task LoadHistoryAsync(string connectionString, long? contractId)
+    {
+        if (_historyLoaded || _loadCancellation is not null) return;
+        using var cancellation = new CancellationTokenSource();
+        _loadCancellation = cancellation;
+        var token = cancellation.Token;
+        try
         {
-            scope = SqlServerHistory.ContractScope(connectionString, id);
-            if (scope is null)
+            var snapshot = await Task.Run(() =>
+            {
+                var scope = contractId is long id
+                    ? SqlServerHistory.ContractScope(connectionString, id, token)
+                    : null;
+                if (contractId.HasValue && scope is null)
+                    return (Scope: scope, Rows: Array.Empty<Row>());
+                var prefixes = scope is null ? Array.Empty<string>() : new[]
+                {
+                    $"{scope.Title} / ",
+                    $"{scope.Title}: ",
+                    $"{scope.ObjectName} / {scope.Title} / ",
+                };
+                var entries = SqlServerHistory.List(connectionString, contractId, token: token);
+                var rows = new Row[entries.Count];
+                for (var i = 0; i < entries.Count; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    rows[i] = new Row(entries[i], prefixes);
+                }
+                return (Scope: scope, Rows: rows);
+            }, token);
+            if (token.IsCancellationRequested || !IsLoaded) return;
+            var scope = snapshot.Scope;
+            if (contractId.HasValue && scope is null)
             {
                 Title = "История документа";
                 TitleText.Text = Title;
@@ -40,26 +75,27 @@ public partial class HistoryWindow : Window
                 EmptyText.Visibility = Visibility.Visible;
                 return;
             }
-            Title = $"История: {scope.Title}";
+            if (scope is not null) Title = $"История: {scope.Title}";
+            TitleText.Text = Title;
+            _all.AddRange(snapshot.Rows);
+            _summaryText = scope is null
+                ? $"Все действия в базе — последние {SqlServerHistory.Limit}"
+                : $"{scope.ObjectName} · всё, что меняли в этом документе (и ведомости объекта), свежее сверху";
+            _historyLoaded = true;
+            ApplyFilter();
         }
-
-        TitleText.Text = Title;
-        var prefixes = scope is null
-            ? Array.Empty<string>()
-            : new[]
-            {
-                $"{scope.Title} / ",
-                $"{scope.Title}: ",
-                $"{scope.ObjectName} / {scope.Title} / ",
-            };
-
-        var entries = SqlServerHistory.List(connectionString, contractId);
-        _all.AddRange(entries.Select(entry => new Row(entry, prefixes)));
-        _summaryText = scope is null
-            ? $"Все действия в базе — последние {SqlServerHistory.Limit}"
-            : $"{scope.ObjectName} · всё, что меняли в этом документе (и ведомости объекта), свежее сверху";
-        _historyLoaded = true;
-        ApplyFilter();
+        catch (Exception ex)
+        {
+            // SQL cancellation may surface as SqlException rather than OperationCanceledException.
+            if (token.IsCancellationRequested || !IsLoaded) return;
+            SubtitleText.Text = "Не удалось загрузить историю.";
+            EmptyText.Text = ex.Message;
+            EmptyText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            _loadCancellation = null;
+        }
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
@@ -105,6 +141,7 @@ public partial class HistoryWindow : Window
             What = HistoryPresentation.EntityLabel(entry.Entity);
             Action = HistoryPresentation.ActionLabel(entry.Action);
             Details = HistoryPresentation.ShortDetails(entry.Details, prefixes);
+            SearchLine = string.Join(" ", When, Who, What, Action, Details);
             RowBrush = HistoryPresentation.TintKey(entry.Action) switch
             {
                 "delete" => DeleteTint,
@@ -122,6 +159,6 @@ public partial class HistoryWindow : Window
         public Brush RowBrush { get; }
 
         /// <summary>history_dialog.apply склеивает ровно пять показанных колонок.</summary>
-        public string SearchLine => string.Join(" ", When, Who, What, Action, Details);
+        public string SearchLine { get; }
     }
 }
