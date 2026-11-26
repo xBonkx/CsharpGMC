@@ -27,6 +27,11 @@ internal static class Program
                 LegacySummaryChecks.Run();
                 return 0;
             }
+            if (args.Length == 1 && args[0] == "--estimate-footer-check")
+            {
+                EstimateFooterLayoutChecks.Run();
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--offline-check")
             {
                 var offline = CreateApplication();
@@ -194,6 +199,7 @@ internal static class Program
         CheckSignedActTabReuse();
         LazyContractActsChecks.Run();
         LazyEstimateTotalsChecks.Run();
+        EstimateFooterLayoutChecks.Run();
         LazyEstimateMaterialsChecks.Run();
         LazyEstimateSummaryChecks.Run();
         CheckKsReferenceHighlights();

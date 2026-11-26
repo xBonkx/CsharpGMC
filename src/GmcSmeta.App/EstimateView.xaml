@@ -327,7 +327,6 @@
         </Style>
 
         <Style x:Key="Card" TargetType="Border" BasedOn="{StaticResource PythonTile}">
-            <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="MinWidth" Value="0"/>
         </Style>
         <Style x:Key="CardCaption" TargetType="TextBlock" BasedOn="{StaticResource PythonTileLabel}"/>
@@ -969,14 +968,14 @@
         <Border x:Name="TotalsFooterPanel" Grid.Row="5" Padding="24,12,24,14" Background="Transparent"
                 BorderThickness="0">
             <DockPanel LastChildFill="True">
-                <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top"
+                <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,0,0,0"
                         Style="{StaticResource DocumentFlatTool}" MinHeight="30"
                         Content="Скрыть итоги" ContentTemplate="{StaticResource IconLabelArrowDown}"
                         Foreground="#64748B" Click="ToggleTotals_Click"/>
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
-                               Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <UniformGrid x:Name="TotalsCards" Columns="4">
+                               Foreground="#64748B" VerticalAlignment="Center"/>
+                    <local:EstimateTotalsCardsPanel x:Name="TotalsCards" Columns="4">
                 <Border x:Name="MaterialsCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
                         <TextBlock x:Name="MaterialsCaption" Text="Материалы" Style="{StaticResource CardCaption}"/>
@@ -1024,7 +1023,7 @@
                         </Border>
                     </StackPanel>
                 </Border>
-                <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}" Margin="0,0,10,0">
+                <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}">
                     <StackPanel>
                         <TextBlock Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"
@@ -1035,7 +1034,7 @@
                                    Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
-                    </UniformGrid>
+                    </local:EstimateTotalsCardsPanel>
                 </Grid>
             </DockPanel>
         </Border>
