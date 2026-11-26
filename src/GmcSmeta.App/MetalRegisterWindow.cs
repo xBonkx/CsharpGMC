@@ -28,16 +28,20 @@ internal sealed class MetalRegisterWindow : Window
         Title = "Учёт металла";
         Width = 1200; Height = 700; MinWidth = 820; MinHeight = 490;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = Brushes.White;
+        WorkspaceWindowUi.ApplyChrome(this);
+        SetResourceReference(FontFamilyProperty,"UiFontFamily");
+        SetResourceReference(FontSizeProperty,"UiBodySize");
+        _tabs.SetResourceReference(FrameworkElement.StyleProperty,"PythonTabbedPane");
         _warehouse = new SqlServerMetalWarehouse(connectionString);
         var dock = new DockPanel { Margin = new Thickness(12) };
         Content = dock;
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0,0,0,9) };
+        var header = new WrapPanel { Margin = new Thickness(0,0,0,9) };
         DockPanel.SetDock(header,Dock.Top);
         dock.Children.Add(header);
         void Button(string title, RoutedEventHandler action)
         {
-            var button = new Button { Content=title,Padding=new Thickness(11,6,11,6),Margin=new Thickness(0,0,8,0) };
+            var button = new Button { Content=title,Padding=new Thickness(14,6,14,6),Margin=new Thickness(0,0,6,6) };
+            button.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
             button.Click += action; header.Children.Add(button);
         }
         Button("Загрузить Excel…",Import_Click);
@@ -45,6 +49,8 @@ internal sealed class MetalRegisterWindow : Window
         Button("Выгрузить Excel…",Export_Click);
         Button("Сверка для склада…",Opening_Click);
         Button("Обновить",Refresh_Click);
+        _status.TextWrapping = TextWrapping.Wrap;
+        _status.Margin = new Thickness(0,8,0,0);
         DockPanel.SetDock(_status,Dock.Bottom);
         dock.Children.Add(_status);
         dock.Children.Add(_tabs);
@@ -207,7 +213,8 @@ internal sealed class MetalRegisterSheet : UserControl
         AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false,
         EnableRowVirtualization = true,
         EnableColumnVirtualization = true, SelectionUnit = DataGridSelectionUnit.Cell,
-        GridLinesVisibility = DataGridGridLinesVisibility.All
+        GridLinesVisibility = DataGridGridLinesVisibility.All, MinRowHeight = 27,
+        HeadersVisibility = DataGridHeadersVisibility.All, RowHeaderWidth = 48
     };
     private readonly ComboBox _sections = new() { MinWidth = 230, Margin = new Thickness(6,0,0,4) };
     private readonly List<(int Header,string Name)> _sectionRows = [];
@@ -249,6 +256,10 @@ internal sealed class MetalRegisterSheet : UserControl
         }
         _table.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
         _table.BeginningEdit += OnBeginningEdit;
+        _table.LoadingRow += (_, e) =>
+        {
+            e.Row.Header = e.Row.Item is MetalGridRow row ? row.ExcelRow : null;
+        };
         dock.Children.Add(_table);
         if (HasSections) _sections.SelectedIndex = 0;
         else SetSection(-1);
@@ -283,6 +294,7 @@ internal sealed class MetalRegisterSheet : UserControl
                 !_sheet.Cell(_heading,col).CachedValue.IsBlank ||
                 rows.Any(row => !_sheet.Cell(row,col).CachedValue.IsBlank ||
                                _sheet.Cell(row,col).HasFormula)).ToList();
+        _table.ColumnHeaderHeight = _heading == 0 ? 32 : 72;
         _table.Columns.Clear();
         for (var col = 0; col < _columns.Count; col++)
         {
@@ -299,7 +311,8 @@ internal sealed class MetalRegisterSheet : UserControl
                     Mode=BindingMode.TwoWay, UpdateSourceTrigger=UpdateSourceTrigger.LostFocus
                 },
                 SortMemberPath=indexName,
-                ElementStyle = (Style)Application.Current.FindResource("CompactCostText"),
+                ElementStyle = DisplayStyle(indexName),
+                CellStyle = CellStyle(indexName),
                 EditingElementStyle = (Style)Application.Current.FindResource("CompactCostEditor"),
                 HeaderStyle = (Style)Application.Current.FindResource("KsTextHeader"),
                 Width = col == 0 ? 205 : 145
@@ -312,6 +325,54 @@ internal sealed class MetalRegisterSheet : UserControl
             System.Text.Encoding.UTF8.GetBytes(_sheet.Name)))[..16];
         TableColumnMenu.RefreshDynamic(_table, "metal-register-" + sheetKey + "-" +
             _heading.ToString(CultureInfo.InvariantCulture), ownHeaderMenu: true);
+        if (_table.Items.Count > 0 && _table.Columns.Count > 0)
+            _table.ScrollIntoView(_table.Items[0],_table.Columns[0]);
+    }
+
+    private static Style DisplayStyle(string key)
+    {
+        var style = new Style(typeof(TextBlock),(Style)Application.Current.FindResource("CompactCostText"));
+        style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty,
+            new Binding { Converter = new SheetCellPresentation(key,"alignment") }));
+        style.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,
+            new Binding { Converter = new SheetCellPresentation(key,"tooltip") }));
+        return style;
+    }
+
+    private static Style CellStyle(string key)
+    {
+        var style = new Style(typeof(DataGridCell),(Style)Application.Current.FindResource("CompactCostCell"));
+        style.Setters.Add(new Setter(Control.BackgroundProperty,
+            new Binding { Converter = new SheetCellPresentation(key,"background") }));
+        return style; // inherited selection/edit triggers take priority over the background setter
+    }
+
+    private sealed class SheetCellPresentation(string key,string kind) : IValueConverter
+    {
+        private static readonly Brush FormulaBrush = MakeFormulaBrush();
+        private static Brush MakeFormulaBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0xE8,0xEF,0xF9));
+            brush.Freeze();
+            return brush;
+        }
+
+        public object Convert(object value,Type targetType,object parameter,CultureInfo culture)
+        {
+            if (value is not MetalGridRow row ||
+                !int.TryParse(key.AsSpan(1),out var col) || col < 0 || col >= row.Page._columns.Count)
+                return DependencyProperty.UnsetValue;
+            var cell = row.Page._sheet.Cell(row.ExcelRow,row.Page._columns[col]);
+            return kind switch
+            {
+                "background" => cell.HasFormula ? FormulaBrush : Brushes.Transparent,
+                "alignment" => cell.HasFormula || cell.CachedValue.IsNumber ? TextAlignment.Right : TextAlignment.Left,
+                "tooltip" => cell.HasFormula ? "=" + cell.FormulaA1.TrimStart('=') : row[key],
+                _ => DependencyProperty.UnsetValue
+            };
+        }
+        public object ConvertBack(object value,Type targetType,object parameter,CultureInfo culture) =>
+            Binding.DoNothing;
     }
 
     private void OnBeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
@@ -387,6 +448,7 @@ internal sealed class MetalRegisterSheet : UserControl
     {
         private readonly MetalRegisterSheet _page;
         public int ExcelRow { get; }
+        internal MetalRegisterSheet Page => _page;
         public MetalGridRow(MetalRegisterSheet page,int row) { _page=page;ExcelRow=row; }
         public string this[string key]
         {

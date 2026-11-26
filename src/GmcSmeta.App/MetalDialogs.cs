@@ -33,14 +33,14 @@ internal abstract class MetalFormDialog : Window
         _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var text = new TextBlock
         {
-            Text = caption, VerticalAlignment = VerticalAlignment.Center,
+            Text = caption, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0,0,9,9)
         };
         Grid.SetRow(text,_nextRow);
         Grid.SetColumn(text,0);
         _grid.Children.Add(text);
         input.Margin = new Thickness(0,0,0,9);
-        input.MinHeight = 30;
+        input.MinHeight = 32;
         Grid.SetRow(input,_nextRow);
         Grid.SetColumn(input,1);
         _grid.Children.Add(input);
@@ -267,7 +267,7 @@ internal sealed class MetalOpeningPreviewDialog : Window
         };
         approve.Click += (_, _) => DialogResult = true;
         WorkspaceWindowUi.StyleButton(cancel);
-        WorkspaceWindowUi.StyleButton(approve, primary: true, icon: "IconLabelCheck");
+        WorkspaceWindowUi.StyleButton(approve, primary: true);
         buttons.Children.Add(approve);
         bottom.Children.Add(buttons);
         var grid = new DataGrid
@@ -277,11 +277,24 @@ internal sealed class MetalOpeningPreviewDialog : Window
             EnableRowVirtualization = true
         };
         WorkspaceWindowUi.StyleTable(grid);
+        grid.MinRowHeight = 27;
         void Col(string header,string binding,DataGridLength width)
         {
             var column = new DataGridTextColumn { Header = header, Binding = new Binding(binding), Width = width };
             WorkspaceWindowUi.StyleColumn(column, binding is "Category" or "Material" ? TextAlignment.Left :
                 binding == "Match" ? TextAlignment.Center : TextAlignment.Right);
+            if (binding == "Balance")
+            {
+                var style = new Style(typeof(DataGridCell),(Style)Application.Current.FindResource("CompactCostCell"));
+                var mismatch = new DataTrigger { Binding = new Binding("Match"), Value = "⚠" };
+                mismatch.Setters.Add(new Setter(Control.BackgroundProperty,new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0xFF,0xF2,0xD7))));
+                style.Triggers.Add(mismatch);
+                var selection = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
+                selection.Setters.Add(new Setter(Control.BackgroundProperty,Application.Current.FindResource("GridSelectionBrush")));
+                style.Triggers.Add(selection);
+                column.CellStyle = style;
+            }
             grid.Columns.Add(column);
         }
         Col("Категория","Category",125); Col("Материал","Material",new DataGridLength(1,DataGridLengthUnitType.Star));

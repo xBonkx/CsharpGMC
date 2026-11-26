@@ -18,6 +18,14 @@ public sealed class MetalAreaConverter : IValueConverter
         Binding.DoNothing;
 }
 
+public sealed class MetalPaidTextConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? "Оплачено" : "Ожидается";
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
+
 public partial class MetalWarehouseWindow : Window
 {
     private readonly string _connection;
@@ -30,6 +38,15 @@ public partial class MetalWarehouseWindow : Window
     private bool _writeUncertain;
     private bool CanWrite => IsLoaded && !_busy && !_writeUncertain && _snapshot is not null && _store is not null;
     private const int JournalSize = 200;
+    private static readonly Brush MetalDeficitBrush = FrozenBrush(0xB4,0x23,0x18);
+    private static readonly Brush MetalNormalBrush = FrozenBrush(0x0F,0x17,0x2A);
+
+    private static Brush FrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r,g,b));
+        brush.Freeze();
+        return brush;
+    }
 
     public MetalWarehouseWindow(string connectionString)
     {
@@ -111,6 +128,7 @@ public partial class MetalWarehouseWindow : Window
         var fields = new[] { TotalOwned, TotalOurs, TotalSupplier, TotalNeed, TotalDeficit };
         for (var i = 0; i < 5; i++)
             fields[i].Text = MetalWarehouseRules.SqmText(totals[i]) + " м²";
+        TotalDeficit.Foreground = totals[4] > 0 ? MetalDeficitBrush : MetalNormalBrush;
         FillSelectedMaterial();
     }
 
