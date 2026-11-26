@@ -14,6 +14,7 @@
              область ровно; ограничивать размер руками не нужно. -->
     <Window.Resources>
         <Style x:Key="SidebarIconButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#64748B"/>
             <Setter Property="Width" Value="32"/>
@@ -29,7 +30,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#D9E6FD"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -37,8 +37,7 @@
             </Setter>
         </Style>
         <Style x:Key="SidebarHomeButton" TargetType="Button">
-            <!-- The template already renders a keyboard-focus border; suppress the second adorner. -->
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#0F172A"/>
             <Setter Property="FontSize" Value="{StaticResource UiAppTitleSize}"/>
@@ -54,7 +53,6 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="#2563EB"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -171,6 +169,7 @@
             </Setter>
         </Style>
         <Style x:Key="DocumentCardButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -189,7 +188,6 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CardBorder" Property="BorderBrush" Value="#2563EB"/></Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="CardBorder" Property="BorderBrush" Value="#2563EB"/></Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="CardBorder" Property="Background" Value="#F9FAFC"/></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -265,6 +263,7 @@
         <!-- Python object_view.py NewCard: a dashed tile at the end of the same
              responsive WrapPanel, not a detached button below the grid. -->
         <Style x:Key="NewContractCardButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="MinWidth" Value="300"/>
@@ -289,9 +288,6 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="DashedOutline" Property="Stroke" Value="#2563EB"/>
                                 <Setter Property="Background" Value="#F9FAFC"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="DashedOutline" Property="Stroke" Value="#2563EB"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>

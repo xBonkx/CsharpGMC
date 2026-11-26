@@ -535,7 +535,22 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- WPF displays this adorner for keyboard navigation, not ordinary
+             mouse focus restored when a modal window closes. -->
+        <Style x:Key="ButtonKeyboardFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Rectangle Margin="2" RadiusX="6" RadiusY="6"
+                                   Stroke="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"
+                                   StrokeThickness="1" StrokeDashArray="2 2"
+                                   SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="Background" Value="White"/>
@@ -554,7 +569,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#E8F0FE"/><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#BFD3FB"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#D9E6FD"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2563EB"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -592,7 +606,6 @@
                             </Setter>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="PrimaryBorder" Property="Background" Value="#1E40AF"/></Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="PrimaryBorder" Property="BorderBrush" Value="#0F172A"/></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="PrimaryBorder" Property="Background" Value="#A9BEEA"/><Setter TargetName="PrimaryBorder" Property="BorderBrush" Value="#A9BEEA"/></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -747,6 +760,7 @@
         <!-- Contract pages which open separate windows: visually match unchecked Python
              navigation tabs without pretending to be a selected RadioButton. -->
         <Style x:Key="PythonTabAction" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -772,9 +786,6 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="TabSurface" Property="Background" Value="#D9E6FD"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="TabSurface" Property="BorderBrush" Value="#1E40AF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>
@@ -880,7 +891,6 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="PrimaryChrome" Property="Background" Value="#1B4FC9"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="PrimaryChrome" Property="BorderBrush" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="PrimaryChrome" Property="Background" Value="#A9BEEA"/>
                                 <Setter TargetName="PrimaryChrome" Property="BorderBrush" Value="#A9BEEA"/>
@@ -908,7 +918,6 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#EA580C"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#C2410C"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#9A3412"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Background" Value="#FDBA74"/><Setter TargetName="Chrome" Property="BorderBrush" Value="#FDBA74"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1548,9 +1557,6 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="DangerSurface" Property="Background" Value="#991B1B"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="DangerSurface" Property="BorderBrush" Value="#0F172A"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.5"/>
