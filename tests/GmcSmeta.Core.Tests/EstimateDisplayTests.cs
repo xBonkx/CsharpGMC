@@ -16,6 +16,11 @@ public class EstimateDisplayTests
     [InlineData("ПНР шкафа", true)]
     [InlineData("Работы по монтажу", true)]
     [InlineData("Установка", false)]
+    [InlineData("Монтаж2", false)]
+    [InlineData("монтаж_шкафа", true)]
+    [InlineData("Демонтажный", false)]
+    [InlineData("ПНР", false)]
+    [InlineData("   ", false)]
     public void WorkNames_MatchPythonBoundaries(string name, bool work) =>
         Assert.Equal(work, EstimateStatistics.IsWorkName(name));
 

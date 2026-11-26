@@ -117,8 +117,21 @@ public static partial class Totals
     /// </summary>
     public static ContractTotals CalculateOne(TagRules tags, TotalsContract contract,
         IReadOnlyList<TotalsSystem> systems, IReadOnlyList<TotalsPosition> positions,
-        int positionCount)
+        int positionCount) =>
+        CalculateOneFromRows(tags, contract, systems, positions,
+            static p => p.SystemId, static p => !p.IsChild && !p.OutOfKp,
+            static p => p, positionCount);
+
+    // Keep references to existing estimate rows instead of first creating a
+    // full TotalsPosition array and then copying every top row into another list.
+    // Preserve the supplied system order and the original order within a system.
+    internal static ContractTotals CalculateOneFromRows<TPosition>(TagRules tags,
+        TotalsContract contract, IEnumerable<TotalsSystem> systems,
+        IReadOnlyList<TPosition> positions, Func<TPosition, int> systemId,
+        Func<TPosition, bool> included, Func<TPosition, TotalsPosition> project,
+        int positionCount, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var contractRow = new ContractRow
         {
             Id = contract.Id,
@@ -132,21 +145,44 @@ public static partial class Totals
             Pnr = contract.Pnr,
             DiscountPercent = contract.DiscountPercent,
         };
-        var systemsMap = new Dictionary<int, List<SystemRow>>
-        {
-            [contract.Id] = systems.Select(s => new SystemRow(s.Id, s.SmrAmount)).ToList(),
-        };
-        var positionsMap = new Dictionary<int, List<PositionRow>>();
+        var positionsMap = new Dictionary<int, List<TPosition>>();
         foreach (var p in positions)
         {
-            // Как scoped-запрос ReadPositions: в итоги входят только верхние строки.
-            if (p.IsChild) continue;
-            if (!positionsMap.TryGetValue(p.SystemId, out var list))
-                positionsMap[p.SystemId] = list = new List<PositionRow>();
-            list.Add(new PositionRow(p.Qty, p.Price, p.WorkPrice, p.OutOfKp));
+            token.ThrowIfCancellationRequested();
+            if (!included(p)) continue;
+            var id = systemId(p);
+            if (!positionsMap.TryGetValue(id, out var list))
+                positionsMap[id] = list = new List<TPosition>();
+            list.Add(p);
         }
-        return Calculate(tags, new[] { contractRow }, systemsMap, positionsMap,
-            new Dictionary<int, int> { [contract.Id] = positionCount }).Single();
+
+        var roundRows = tags.Has(contract.Form, "round_rows");
+        decimal materials = 0m, workSum = 0m, systemsSmr = 0m;
+        foreach (var sys in systems)
+        {
+            token.ThrowIfCancellationRequested();
+            systemsSmr += sys.SmrAmount;
+            if (!positionsMap.TryGetValue(sys.Id, out var list)) continue;
+            decimal systemSum = 0m;
+            foreach (var row in list)
+            {
+                token.ThrowIfCancellationRequested();
+                var p = project(row);
+                AccumulatePosition(ref systemSum, ref workSum, p.Qty, p.Price, p.WorkPrice, roundRows);
+            }
+            materials += systemSum;
+        }
+        token.ThrowIfCancellationRequested();
+        return FinishContract(contractRow, tags.Has(contract.Form, "vat_top"),
+            materials, workSum, systemsSmr, positionCount);
+    }
+
+    private static void AccumulatePosition(ref decimal systemSum, ref decimal workSum,
+        decimal qty, decimal price, decimal workPrice, bool roundRows)
+    {
+        var amount = qty * price;
+        systemSum += roundRows ? Money.Round2(amount) : amount;
+        workSum += qty * workPrice;
     }
 
     private static IReadOnlyList<ContractTotals> Calculate(TagRules tags,
@@ -172,9 +208,7 @@ public static partial class Totals
                 foreach (var p in rows)
                 {
                     if (p.OutOfKp) continue;
-                    var amount = p.Qty * p.Price;
-                    systemSum += roundRows ? Money.Round2(amount) : amount;
-                    workSum += p.Qty * p.WorkPrice;
+                    AccumulatePosition(ref systemSum, ref workSum, p.Qty, p.Price, p.WorkPrice, roundRows);
                 }
                 materials += systemSum;
             }

@@ -83,9 +83,13 @@ public sealed record EstimateStatistics(decimal Materials, decimal Smr, decimal 
     public static bool IsWorkName(string name)
     {
         var text = name.Trim().ToLowerInvariant();
-        if (new[] { "пусконалад", "пуско-налад", "пнр ", "работы по " }.Any(p => text.StartsWith(p, StringComparison.Ordinal))) return true;
-        return new[] { "монтаж", "демонтаж", "наладка" }.Any(word => text == word ||
-            text.StartsWith(word, StringComparison.Ordinal) && !char.IsLetterOrDigit(text[word.Length]));
+        if (text.StartsWith("пусконалад", StringComparison.Ordinal) ||
+            text.StartsWith("пуско-налад", StringComparison.Ordinal) ||
+            text.StartsWith("пнр ", StringComparison.Ordinal) ||
+            text.StartsWith("работы по ", StringComparison.Ordinal)) return true;
+        bool Word(string word) => text == word ||
+            text.StartsWith(word, StringComparison.Ordinal) && !char.IsLetterOrDigit(text[word.Length]);
+        return Word("монтаж") || Word("демонтаж") || Word("наладка");
     }
 }
 
@@ -351,7 +355,7 @@ public static partial class EstimateReader
         }
 
         token.ThrowIfCancellationRequested();
-        var totals = CalculateTotals(head, rules, systems, positions);
+        var totals = CalculateTotals(head, rules, systems, positions, token);
 
         // SortKey is assigned monotonically as rows are appended.
         var inOrder = rows.Where(r => r.Kind == RowKind.Position).ToList();
@@ -370,25 +374,6 @@ public static partial class EstimateReader
             DeclaredMaterial = head.DeclaredMaterial,
             DeclaredTotal = head.DeclaredTotal
         };
-    }
-
-    private static ContractTotals CalculateTotals(Head head, TagRules rules,
-        IReadOnlyList<SystemRow> systems, IReadOnlyList<PositionRow> positions) =>
-        Totals.CalculateOne(rules,
-            new TotalsContract(head.ContractId, head.Kind, head.Form, head.VatRate,
-                head.SmrMode, head.SmrAmount, head.SmrPercent, head.Transport, head.Pnr, head.DiscountPercent),
-            systems.Select(s => new TotalsSystem(s.Id, s.SmrAmount)).ToList(),
-            positions.Select(p => new TotalsPosition(p.SystemId, p.Qty, p.Price,
-                p.WorkPrice ?? 0m, p.OutOfKp, p.ParentId is not null)).ToList(),
-            positions.Count);
-
-    private static EstimateStatistics Statistics(ContractTotals totals, IReadOnlyList<PositionRow> positions)
-    {
-        // Python work_rows_sum rounds the sum once, independently of round_rows.
-        var work = decimal.Round(positions.Where(p => p.ParentId is null && !p.OutOfKp && EstimateStatistics.IsWorkName(p.Name))
-            .Sum(p => p.Qty * p.Price), 2, MidpointRounding.ToEven);
-        return new EstimateStatistics(decimal.Round(totals.Materials - work, 2, MidpointRounding.ToEven),
-            decimal.Round(totals.Smr + work, 2, MidpointRounding.ToEven), work);
     }
 
     private static EstimateRow MakeRow(PositionRow p, int level, bool roundRows, int sortKey, string num)
