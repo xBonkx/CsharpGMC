@@ -28,6 +28,9 @@ public partial class EstimateView
     private InlineStagesSnapshot? _inlineStagesData;
     private string _inlineStagesFilter = StageAllocationPresentation.All;
     private readonly List<DataGridColumn> _inlineStageColumns = new();
+    private readonly record struct StageColumnKey(long Id, string Title, bool Locked);
+    private StageColumnKey[] _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
+    private IReadOnlyList<string> _blankStageLabels = Array.Empty<string>();
 
     private async void EstimateView_Loaded(object sender, RoutedEventArgs e)
     {
@@ -73,7 +76,13 @@ public partial class EstimateView
         foreach (var column in _inlineStageColumns)
             EstimateGrid.Columns.Remove(column);
         _inlineStageColumns.Clear();
-        foreach (var row in _rows) row.StageDisplay = Array.Empty<string>();
+        _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
+        _blankStageLabels = Array.Empty<string>();
+        foreach (var row in _rows)
+        {
+            row.StageDisplay = Array.Empty<string>();
+            row.StageOverrun = false;
+        }
         if (_estimate is not null) ApplyFilter();
         var stored = _uiSettings.StageModeKp ?? new List<int>();
         stored.Remove(_contractId);
@@ -121,6 +130,8 @@ public partial class EstimateView
             });
             if (!_inlineStagesOn || _detached || version != _inlineStagesVersion) return false;
             _inlineStagesData = data;
+            _blankStageLabels = Array.AsReadOnly(
+                Enumerable.Repeat("", data.Stages.Count + 1).ToArray());
             RebuildInlineStageColumns();
             DrawInlineStageCards();
             ApplyFilter();
@@ -161,10 +172,16 @@ public partial class EstimateView
 
     private void RebuildInlineStageColumns()
     {
-        foreach (var col in _inlineStageColumns) EstimateGrid.Columns.Remove(col);
-        _inlineStageColumns.Clear();
         var data = _inlineStagesData;
         if (data is null) return;
+        var keys = data.Stages.Select(s => new StageColumnKey(s.Id, ShortStageName(s.Name), s.Locked)).ToArray();
+        if (_inlineStageColumnKeys.SequenceEqual(keys) &&
+            _inlineStageColumns.Count == keys.Length + 1 &&
+            _inlineStageColumns.All(EstimateGrid.Columns.Contains))
+            return;
+        foreach (var col in _inlineStageColumns) EstimateGrid.Columns.Remove(col);
+        _inlineStageColumns.Clear();
+        _inlineStageColumnKeys = keys;
         for (var i = 0; i <= data.Stages.Count; i++)
         {
             var rest = i == data.Stages.Count;
@@ -227,11 +244,13 @@ public partial class EstimateView
                 Foreground = StageBrush("#64748B"), Margin = new Thickness(3)
             });
         }
+        var metrics = StageAllocationPresentation.Summarize(data.Stages.Count,
+            data.Rows.Values.Select(r => (r.Price, r.Rest, (IReadOnlyList<decimal>)r.PerStage)));
         for (var i = 0; i < data.Stages.Count; i++)
         {
             var stage = data.Stages[i];
             var total = data.DocumentTotals.GetValueOrDefault(stage.Id);
-            var count = data.Rows.Values.Count(r => r.PerStage[i] > StageAllocationPresentation.Epsilon);
+            var count = metrics.AssignedCounts[i];
             var hasDifference = stage.StageSum is decimal goal && Math.Abs(total - goal) >= 1m;
             var second = $"{N2(total)} ₽ · строк {count}" +
                 (stage.StageSum is null ? "" :
@@ -248,14 +267,9 @@ public partial class EstimateView
                 $"{N2(total)} ₽", "#F8FAFC", false);
         }
 
-        var rows = data.Rows.Values.ToArray();
-        var leftCount = rows.Count(r => Math.Abs(r.Rest) > StageAllocationPresentation.Epsilon);
-        var over = rows.Count(r => r.Rest < -StageAllocationPresentation.Epsilon);
-        var leftMoney = StageAllocationPresentation.AmountOfRemaining(
-            rows.Select(r => (r.Price, r.Rest)));
         InlineStagesSummary.Text =
-            $"Не распределено строк: {leftCount} · на {N2(leftMoney)} ₽" +
-            (over > 0 ? $" · Перебор: {over}" : "");
+            $"Не распределено строк: {metrics.UnassignedCount} · на {N2(metrics.RemainingAmount)} ₽" +
+            (metrics.OverrunCount > 0 ? $" · Перебор: {metrics.OverrunCount}" : "");
     }
 
     private void AddCard(long id, string name, string secondLine, string tint, bool warning)
@@ -483,25 +497,39 @@ public partial class EstimateView
     private void FillInlineStageCells(EditableEstimateRow row)
     {
         var data = _inlineStagesData;
-        if (!_inlineStagesOn || data is null) return;
+        if (!_inlineStagesOn || data is null || row.HasStagePresentation(_inlineStagesVersion)) return;
+        if (row.IsSystem || row.IsSub || row.IsTypeHeader)
+        {
+            row.PublishStagePresentation(_inlineStagesVersion, _blankStageLabels, false);
+            return;
+        }
+
+        // Real positions already contain all the authoritative allocation
+        // values. Only synthetic equal-position groups need aggregation.
+        if (!row.IsGroup)
+        {
+            if (data.Rows.TryGetValue(row.Id, out var source))
+                row.PublishStagePresentation(_inlineStagesVersion,
+                    StageAllocationPresentation.CellLabels(source.PerStage, source.Rest),
+                    source.Rest < -StageAllocationPresentation.Epsilon);
+            else
+                row.PublishStagePresentation(_inlineStagesVersion, _blankStageLabels, false);
+            return;
+        }
+
         var values = new decimal[data.Stages.Count];
         decimal remaining = 0;
         var hasMember = false;
-        if (!row.IsSystem && !row.IsSub && !row.IsTypeHeader)
+        foreach (var id in row.GroupMemberIds)
         {
-            IEnumerable<long> ids = row.IsGroup ? row.GroupMemberIds : new[] { (long)row.Id };
-            foreach (var id in ids)
-            {
-                if (!data.Rows.TryGetValue(checked((int)id), out var found)) continue;
-                hasMember = true;
-                for (var i = 0; i < values.Length; i++) values[i] += found.PerStage[i];
-                remaining += found.Rest;
-            }
+            if (!data.Rows.TryGetValue(checked((int)id), out var found)) continue;
+            hasMember = true;
+            for (var i = 0; i < values.Length; i++) values[i] += found.PerStage[i];
+            remaining += found.Rest;
         }
-        var labels = values.Select(StageAllocationPresentation.Qty).ToList();
-        labels.Add(hasMember ? StageAllocationPresentation.RemainingText(remaining) : "");
-        row.StageDisplay = labels;
-        row.StageOverrun = hasMember && remaining < -StageAllocationPresentation.Epsilon;
+        row.PublishStagePresentation(_inlineStagesVersion,
+            hasMember ? StageAllocationPresentation.CellLabels(values, remaining) : _blankStageLabels,
+            hasMember && remaining < -StageAllocationPresentation.Epsilon);
     }
 
     /// <summary>
@@ -511,8 +539,11 @@ public partial class EstimateView
     private List<EditableEstimateRow> ApplyInlineStagesFilter(List<EditableEstimateRow> rows)
     {
         if (!_inlineStagesOn || _inlineStagesData is null) return rows;
-        foreach (var row in rows) FillInlineStageCells(row);
-        if (_inlineStagesFilter == StageAllocationPresentation.All) return rows;
+        if (_inlineStagesFilter == StageAllocationPresentation.All)
+        {
+            foreach (var row in rows) FillInlineStageCells(row);
+            return rows;
+        }
 
         var keep = StageFilterAncestors.Mark(rows.Count,
             i => rows[i].DisplayIndentLevel,
@@ -526,7 +557,14 @@ public partial class EstimateView
                         source.Rest, source.PerStage, _inlineStagesFilter);
                 return row.IsGroup ? row.GroupMemberIds.Any(Matches) : Matches(row.Id);
             });
-        return rows.Where((_, i) => keep[i]).ToList();
+        var visible = new List<EditableEstimateRow>();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (!keep[i]) continue;
+            FillInlineStageCells(rows[i]);
+            visible.Add(rows[i]);
+        }
+        return visible;
     }
 
     private async void OpenStagesDialog_Click(object sender, RoutedEventArgs e)

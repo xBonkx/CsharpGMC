@@ -28,6 +28,11 @@ public sealed class MaterialsViewMenuSourceTests
         var stages = File.ReadAllText(Path.Combine(app, "EstimateView.InlineStages.cs"));
         Assert.Contains("StageFilterAncestors.Mark(rows.Count,", stages);
         Assert.Contains("if (_inlineStagesFilter == filter) return;", stages);
+        Assert.Contains("row.HasStagePresentation(_inlineStagesVersion)", stages);
+        Assert.Contains("_inlineStageColumnKeys.SequenceEqual(keys)", stages);
+        Assert.Contains("if (!keep[i]) continue;", stages);
+        Assert.Contains("FillInlineStageCells(rows[i]);", stages);
+        Assert.Contains("StageAllocationPresentation.Summarize(data.Stages.Count,", stages);
         Assert.Contains("if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;", code);
         Assert.Contains("ContextMenuIcons.Create(\"Вернуть как в КП\", \"X\")", code);
         var icons = File.ReadAllText(Path.Combine(app, "Theme", "ToolbarIcons.xaml"));

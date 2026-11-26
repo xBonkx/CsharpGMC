@@ -75,7 +75,36 @@ internal static class EstimateRowReadbackChecks
         first.FillArea();
         if (changed.Count != 0) throw new Exception("Repeated clean readback emitted notifications.");
         CheckMissingWorkPrice(first.Source);
+        CheckStagePresentation(rows);
         Console.WriteLine("Estimate formatted readback and area notifications OK (25000 rows).");
+    }
+
+    private static void CheckStagePresentation(EditableEstimateRow[] rows)
+    {
+        var labels = StageAllocationPresentation.CellLabels(new decimal[] { 1, 0 }, 2);
+        foreach (var row in rows) row.PublishStagePresentation(1, labels, false);
+        var changed = 0;
+        foreach (var row in rows)
+            row.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(EditableEstimateRow.StageDisplay) or nameof(EditableEstimateRow.StageOverrun))
+                    changed++;
+            };
+        foreach (var row in rows)
+        {
+            if (!row.HasStagePresentation(1) || row.HasStagePresentation(2))
+                throw new Exception("Stage cache reused wrong version.");
+            row.PublishStagePresentation(2, labels.ToArray(), false);
+        }
+        if (changed != 0) throw new Exception("Equal stage labels emitted change notifications.");
+        var first = rows[0];
+        first.PublishStagePresentation(3, StageAllocationPresentation.CellLabels(new decimal[] { 2, 1 }, -1), true);
+        if (changed != 2 || !first.HasStagePresentation(3) || !first.StageOverrun)
+            throw new Exception("Stage readback did not publish changed cells.");
+        first.StageDisplay = Array.Empty<string>();
+        first.StageOverrun = false;
+        if (first.HasStagePresentation(3) || first.StageDisplay.Count != 0 || first.StageOverrun)
+            throw new Exception("Stage mode exit did not invalidate the cache.");
     }
 
     private static void CheckMissingWorkPrice(EstimateRow source)

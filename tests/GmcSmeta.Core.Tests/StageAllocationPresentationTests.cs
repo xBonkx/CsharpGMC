@@ -67,4 +67,30 @@ public sealed class StageAllocationPresentationTests
             (Price: 50m, Remaining: -3m), (Price: 25m, Remaining: 0.5m) };
         Assert.Equal(32.5m, StageAllocationPresentation.AmountOfRemaining(rows));
     }
+
+    [Fact]
+    public void CellLabelsPreserveRemainderAndRussianQuantityFormatting()
+    {
+        Assert.Equal(new[] { "", "1,25", "-2", "✓" },
+            StageAllocationPresentation.CellLabels(new decimal[] { 0m, 1.25m, -2m }, 0m));
+        Assert.Equal(new[] { "-0,5" }, StageAllocationPresentation.CellLabels(Array.Empty<decimal>(), -0.5m));
+    }
+
+    [Fact]
+    public void LargeCardMetricsMatchIndependentFormerScans()
+    {
+        var rows = Enumerable.Range(0, 25000).Select(i =>
+            (Price: (decimal)(i % 17), Rest: i % 7 - 3m,
+             PerStage: (IReadOnlyList<decimal>)new decimal[] { i % 3, i % 5 - 2, 0.000001m })).ToArray();
+        var metrics = StageAllocationPresentation.Summarize(3, rows);
+        Assert.Equal(Enumerable.Range(0, 3).Select(i =>
+            rows.Count(r => r.PerStage[i] > StageAllocationPresentation.Epsilon)), metrics.AssignedCounts);
+        Assert.Equal(rows.Count(r => Math.Abs(r.Rest) > StageAllocationPresentation.Epsilon), metrics.UnassignedCount);
+        Assert.Equal(rows.Count(r => r.Rest < -StageAllocationPresentation.Epsilon), metrics.OverrunCount);
+        Assert.Equal(StageAllocationPresentation.AmountOfRemaining(rows.Select(r => (r.Price, r.Rest))),
+            metrics.RemainingAmount);
+        var empty = StageAllocationPresentation.Summarize(0, Array.Empty<(decimal, decimal, IReadOnlyList<decimal>)>());
+        Assert.Empty(empty.AssignedCounts);
+        Assert.Equal(0m, empty.RemainingAmount);
+    }
 }

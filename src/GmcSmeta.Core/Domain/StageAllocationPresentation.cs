@@ -53,6 +53,36 @@ public static class StageAllocationPresentation
             > Epsilon;
     }
 
+    /// <summary>Format one row once; final cell is the automatic remainder.</summary>
+    public static IReadOnlyList<string> CellLabels(IReadOnlyList<decimal> stages, decimal remaining)
+    {
+        var result = new string[stages.Count + 1];
+        for (var i = 0; i < stages.Count; i++) result[i] = Qty(stages[i]);
+        result[^1] = RemainingText(remaining);
+        return Array.AsReadOnly(result);
+    }
+
+    public sealed record Metrics(IReadOnlyList<int> AssignedCounts, int UnassignedCount,
+        int OverrunCount, decimal RemainingAmount);
+
+    /// <summary>All card and remainder statistics in one pass over the snapshot.</summary>
+    public static Metrics Summarize(int stageCount,
+        IEnumerable<(decimal Price, decimal Rest, IReadOnlyList<decimal> PerStage)> rows)
+    {
+        var assigned = new int[stageCount];
+        int unassigned = 0, overrun = 0;
+        decimal amount = 0;
+        foreach (var row in rows)
+        {
+            for (var i = 0; i < stageCount; i++)
+                if (row.PerStage[i] > Epsilon) assigned[i]++;
+            if (Math.Abs(row.Rest) > Epsilon) unassigned++;
+            if (row.Rest < -Epsilon) overrun++;
+            amount += Math.Max(row.Rest, 0m) * row.Price;
+        }
+        return new Metrics(Array.AsReadOnly(assigned), unassigned, overrun, amount);
+    }
+
     public static decimal AmountOfRemaining(
         IEnumerable<(decimal Price, decimal Remaining)> rows) =>
         rows.Sum(row => Math.Max(row.Remaining, 0m) * row.Price);

@@ -32,6 +32,7 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     private bool _isCollapsed;
     private IReadOnlyList<string> _stageDisplay = Array.Empty<string>();
     private bool _stageOverrun;
+    private int? _stagePresentationVersion;
 
     // Source is immutable for the lifetime of this view model. Only edited
     // numeric strings need to be formatted again after an equal SQL readback.
@@ -233,14 +234,31 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     public IReadOnlyList<string> StageDisplay
     {
         get => _stageDisplay;
-        set { _stageDisplay = value ?? Array.Empty<string>(); OnPropertyChanged(); }
+        set
+        {
+            _stagePresentationVersion = null;
+            var next = value ?? Array.Empty<string>();
+            if (ReferenceEquals(_stageDisplay, next) || _stageDisplay.SequenceEqual(next)) return;
+            _stageDisplay = next;
+            OnPropertyChanged();
+        }
     }
+    internal bool HasStagePresentation(int version) => _stagePresentationVersion == version;
+
+    internal void PublishStagePresentation(int version, IReadOnlyList<string> labels, bool overrun)
+    {
+        StageDisplay = labels;
+        StageOverrun = overrun;
+        _stagePresentationVersion = version;
+    }
+
     public bool StageOverrun
     {
         get => _stageOverrun;
         set
         {
             if (_stageOverrun == value) return;
+            _stagePresentationVersion = null;
             _stageOverrun = value;
             OnPropertyChanged();
         }
