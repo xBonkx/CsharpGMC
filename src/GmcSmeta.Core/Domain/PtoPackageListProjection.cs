@@ -10,11 +10,13 @@ public static class PtoPackageListProjection
         string Date,string Status,int Attachments,string Findings,string SearchText);
 
     public static IReadOnlyList<Row> Build(IEnumerable<PtoPackage> packages,
-        long? objectId=null,long? contractId=null)
+        long? objectId=null,long? contractId=null,CancellationToken token=default)
     {
+        token.ThrowIfCancellationRequested();
         var rows=new List<Row>();
         foreach(var p in packages)
         {
+            token.ThrowIfCancellationRequested();
             if(objectId.HasValue && p.ObjectId!=objectId ||
                 contractId.HasValue && p.ContractId!=contractId)continue;
             var findings=PtoRules.Check(p);
@@ -24,6 +26,7 @@ public static class PtoPackageListProjection
                 $"{findings.Errors.Count} ошибок · {findings.Warnings.Count} предупрежд.",
                 JsonSerializer.Serialize(p,PtoRules.Json)));
         }
+        token.ThrowIfCancellationRequested();
         return rows.ToArray();
     }
 

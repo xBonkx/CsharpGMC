@@ -19,6 +19,8 @@ public partial class PtoWindow : Window
     private IReadOnlyList<PtoPackageListProjection.Row> _rows=Array.Empty<PtoPackageListProjection.Row>();
     private bool _initializing=true;
     private bool _initialReadStarted;
+    private bool _initializingArchive=true;
+    private CancellationTokenSource? _readCancellation;
     private bool _loading;
     private bool _closed;
 
@@ -32,8 +34,12 @@ public partial class PtoWindow : Window
         ArchiveLabel.Text="Загрузка исполнительной документации…";
         Loaded+=async (_,_)=>await InitializeAsync();
         // Archive initialization includes the existing Pilot-only schema check/creation.
-        Closing+=(_,e)=>{if(_initializing)e.Cancel=true;};
-        Closed+=(_,_)=>_closed=true;
+        Closing+=(_,e)=>{if(_initializingArchive)e.Cancel=true;};
+        Closed+=(_,_)=>
+        {
+            _closed=true;
+            _readCancellation?.Cancel();
+        };
     }
 
     private void SetLoading(bool value)
@@ -48,6 +54,9 @@ public partial class PtoWindow : Window
         // Loaded normally fires once; detach the initialization state before dispatching.
         if(_initialReadStarted)return;
         _initialReadStarted=true;
+        using var cancellation=new CancellationTokenSource();
+        _readCancellation=cancellation;
+        var token=cancellation.Token;
         try
         {
             var snapshot=await Task.Run(()=>
@@ -60,20 +69,26 @@ public partial class PtoWindow : Window
                     title="АОСР · "+doc;
                 }
                 var archive=new PtoArchive(_connection,PtoUserSettings.Root);
-                return (Archive:archive,Title:title,Rows:ReadRows(archive));
+                return (Archive:archive,Title:title);
             });
-            if(_closed)return;
+            _initializingArchive=false;
+            if(_closed || token.IsCancellationRequested)return;
+            var rows=await Task.Run(()=>ReadRows(snapshot.Archive,token),token);
+            if(_closed || token.IsCancellationRequested)return;
             _archive=snapshot.Archive;
             if(snapshot.Title is not null)Title=snapshot.Title;
-            ApplyRows(snapshot.Rows,null);
+            ApplyRows(rows,null);
         }
         catch(Exception ex)
         {
+            _initializingArchive=false;
             _initializing=false;
-            if(!_closed){ShowError(ex);Close();}
+            if(!_closed && !token.IsCancellationRequested){ShowError(ex);Close();}
         }
         finally
         {
+            _readCancellation=null;
+            _initializingArchive=false;
             _initializing=false;
             if(!_closed)SetLoading(false);
         }
@@ -90,8 +105,9 @@ public partial class PtoWindow : Window
         catch(Exception e){ShowError(e);}
     }
 
-    private IReadOnlyList<PtoPackageListProjection.Row> ReadRows(PtoArchive archive)=>
-        PtoPackageListProjection.Build(archive.Sql.Packages(_scopeObjectId),_scopeObjectId,_scopeContractId);
+    private IReadOnlyList<PtoPackageListProjection.Row> ReadRows(PtoArchive archive,CancellationToken token=default)=>
+        PtoPackageListProjection.Build(archive.Sql.Packages(_scopeObjectId,_scopeContractId,token),
+            _scopeObjectId,_scopeContractId,token);
 
     private Guid? SelectedId()=>(Packages.SelectedItem as PtoPackageListProjection.Row)?.Id;
 
@@ -135,18 +151,22 @@ public partial class PtoWindow : Window
         InvalidateRows();
         SetLoading(true);
         ArchiveLabel.Text="Обновление списка комплектов…";
+        using var cancellation=new CancellationTokenSource();
+        _readCancellation=cancellation;
+        var token=cancellation.Token;
         try
         {
-            var rows=await Task.Run(()=>ReadRows(archive));
-            if(_closed)return;
+            var rows=await Task.Run(()=>ReadRows(archive,token),token);
+            if(_closed || token.IsCancellationRequested)return;
             ApplyRows(rows,selected);
         }
         catch(Exception ex)
         {
-            if(!_closed){InvalidateRows();ShowError(ex);}
+            if(!_closed && !token.IsCancellationRequested){InvalidateRows();ShowError(ex);}
         }
         finally
         {
+            _readCancellation=null;
             if(!_closed)SetLoading(false);
         }
     }

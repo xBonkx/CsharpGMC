@@ -102,6 +102,23 @@ internal static class Program
             Check(clients.Count==10&&clients.Select(x=>x.Fields["number"]).Distinct().Count()==10,
                 "10 concurrent clients allocated duplicate act numbers");
             Check(sql.Packages(1).Count==12,"Concurrent copies missing");
+
+            // A contract-scoped list must not include independent acts, another
+            // contract of the same object or the same contract ID in another object.
+            var scoped=Act(1,"SCOPE-1");scoped.ContractId=101;sql.Save(scoped);
+            var sibling=Act(1,"SCOPE-2");sibling.ContractId=102;sql.Save(sibling);
+            var foreign=Act(2,"SCOPE-1");foreign.ContractId=101;sql.Save(foreign);
+            Check(sql.Packages(1,101).Single().Id==scoped.Id,"Contract filter crossed scope");
+            Check(sql.Packages(1,102).Single().Id==sibling.Id,"Contract filter missed sibling");
+            Check(sql.Packages(1,999).Count==0,"Unknown contract must return empty list");
+            Check(sql.Packages(1).Count==14 && sql.Packages().Any(x=>x.Id==foreign.Id),
+                "Existing object/all scopes must remain unchanged");
+            Expect<ArgumentException>(()=>sql.Packages(null,101));
+            using(var cancelled=new CancellationTokenSource())
+            {
+                cancelled.Cancel();
+                Expect<OperationCanceledException>(()=>sql.Packages(1,101,cancelled.Token));
+            }
             var catalog=new PtoCertificate
             {
                 Kind="Декларация",Product="Сертификат трубы",Manufacturer="Завод",

@@ -21,9 +21,12 @@ public sealed class SqlServerPto
         _connectionString=connectionString;
         EnsureSchema();
     }
-    private SqlConnection Open()
+    private SqlConnection Open(CancellationToken token=default)
     {
-        var conn=SqlServerDatabase.Open(_connectionString);
+        token.ThrowIfCancellationRequested();
+        var conn=token.CanBeCanceled
+            ?SqlServerDatabase.OpenAsync(_connectionString,token).GetAwaiter().GetResult()
+            :SqlServerDatabase.Open(_connectionString);
         if(!conn.Database.StartsWith("GmcSmetaPilot_",StringComparison.OrdinalIgnoreCase))
         {
             conn.Dispose();
@@ -134,24 +137,40 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
             throw new ArgumentException("Объект удалён или отсутствует в SQL Server.");
     }
 
-    public IReadOnlyList<PtoPackage> Packages(long? objectId=null)
+    public IReadOnlyList<PtoPackage> Packages(long? objectId=null)=>
+        Packages(objectId,null);
+
+    public IReadOnlyList<PtoPackage> Packages(long? objectId,long? contractId,
+        CancellationToken token=default)
     {
-        using var conn=Open();
+        if(contractId.HasValue && !objectId.HasValue)
+            throw new ArgumentException("Для договора требуется объект.");
+        token.ThrowIfCancellationRequested();
+        using var conn=Open(token);
+        // Only fetch payloads in the requested scope. The object-only and
+        // unscoped callers keep their original result sets and ordering.
         using var cmd=new SqlCommand(
             "SELECT payload_json,revision FROM dbo.gmc_pto_packages "+
-            "WHERE (@obj IS NULL OR object_id=@obj) ORDER BY updated_utc DESC,id",conn);
-        cmd.Parameters.Add("@obj",SqlDbType.BigInt).Value=objectId.HasValue?objectId.Value:DBNull.Value;
+            (objectId.HasValue?"WHERE object_id=@obj ":"")+
+            (contractId.HasValue?"AND contract_id=@contract ":"")+
+            "ORDER BY updated_utc DESC,id",conn);
+        if(objectId.HasValue)cmd.Parameters.Add("@obj",SqlDbType.BigInt).Value=objectId.Value;
+        if(contractId.HasValue)cmd.Parameters.Add("@contract",SqlDbType.BigInt).Value=contractId.Value;
         var result=new List<PtoPackage>();
-        using var reader=cmd.ExecuteReader();
+        using var registration=SqlReadCancellation.Register(cmd,token);
+        using var reader=SqlReadCancellation.ExecuteReader(cmd,token);
         while(reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var p=JsonSerializer.Deserialize<PtoPackage>(reader.GetString(0),PtoRules.Json)
                 ?? throw new InvalidDataException("Повреждён JSON АОСР.");
             p.Revision=reader.GetInt64(1);
-            if(objectId.HasValue && p.ObjectId!=objectId)
+            if(objectId.HasValue && p.ObjectId!=objectId ||
+                contractId.HasValue && p.ContractId!=contractId)
                 throw new InvalidDataException("Неверная область документа.");
             result.Add(p);
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

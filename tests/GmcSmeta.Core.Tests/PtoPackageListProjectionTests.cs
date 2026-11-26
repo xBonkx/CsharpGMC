@@ -38,6 +38,22 @@ public sealed class PtoPackageListProjectionTests
     }
 
     [Fact]
+    public void CancelledProjectionDoesNotEnumeratePackages()
+    {
+        static IEnumerable<PtoPackage> NeverEnumerate()
+        {
+            throw new InvalidOperationException("Enumeration must not start.");
+#pragma warning disable CS0162
+            yield break;
+#pragma warning restore CS0162
+        }
+        using var cancellation=new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(()=>
+            PtoPackageListProjection.Build(NeverEnumerate(),token:cancellation.Token));
+    }
+
+    [Fact]
     public void WindowFiltersLocallyAndKeepsAuthoritativeReadBeforeActions()
     {
         DirectoryInfo? root=new(AppContext.BaseDirectory);
@@ -49,11 +65,15 @@ public sealed class PtoPackageListProjectionTests
             source.IndexOf("private bool Belongs",StringComparison.Ordinal)];
         Assert.Contains("ApplyFilter(SelectedId());",filter);
         Assert.DoesNotContain("Refresh(",filter);
-        Assert.Contains("await Task.Run(()=>ReadRows(archive))",source);
-        Assert.Contains("if(_closed)return;",source);
+        Assert.Contains("await Task.Run(()=>ReadRows(archive,token),token)",source);
+        Assert.Contains("if(_closed || token.IsCancellationRequested)return;",source);
         Assert.Contains("_archive.Sql.Get(row.Id,_scopeObjectId)",source);
         Assert.Contains("if(!Belongs(current))",source);
         Assert.Contains("if(_closed || _loading || _initializing)return;",source);
-        Assert.Contains("Closing+=(_,e)=>{if(_initializing)e.Cancel=true;};",source);
+        Assert.Contains("Closing+=(_,e)=>{if(_initializingArchive)e.Cancel=true;};",source);
+        Assert.Contains("_readCancellation?.Cancel();",source);
+        Assert.Contains("archive.Sql.Packages(_scopeObjectId,_scopeContractId,token)",source);
+        Assert.True(source.IndexOf("_initializingArchive=false;",StringComparison.Ordinal) <
+            source.IndexOf("await Task.Run(()=>ReadRows(snapshot.Archive,token),token)",StringComparison.Ordinal));
     }
 }
