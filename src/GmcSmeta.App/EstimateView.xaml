@@ -998,7 +998,7 @@
                             <ComboBoxItem Content="По системам" Tag="systems"/>
                             <ComboBoxItem Content="По позициям" Tag="pos"/>
                         </ComboBox>
-                        <TextBlock x:Name="SmrHintText" Style="{StaticResource PythonTileLabel}" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="SmrHintText" Style="{StaticResource PythonTileLabel}" Margin="0,2,0,0" Visibility="Collapsed"/>
                     </StackPanel>
                 </Border>
                 <Border x:Name="ExpensesCard" Style="{StaticResource Card}" MinHeight="70">
@@ -1026,7 +1026,7 @@
                 </Border>
                 <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}">
                     <StackPanel>
-                        <TextBlock Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}"/>
+                        <TextBlock x:Name="TotalCaption" Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"
                                    FontSize="24"/>
                         <TextBlock x:Name="VatText" Foreground="#E6FFFFFF" FontSize="12" TextWrapping="Wrap"

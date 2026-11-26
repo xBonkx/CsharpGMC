@@ -261,8 +261,12 @@ public partial class EstimateView : UserControl
         MaterialsCaption.Text = est.VatTop ? "Строки сметы (без НДС)" : "Материалы";
         SmrCard.Visibility = est.VatTop ? Visibility.Collapsed : Visibility.Visible;
         LayoutTotalsCards();
-        if (!est.VatTop && est.Statistics.WorkRows != 0)
+        if (est.VatTop)
+            MaterialsText.ToolTip = "Работы и материалы — строками одной сметы, как у заказчика";
+        else if (est.Statistics.WorkRows != 0)
             MaterialsText.ToolTip = $"Без строк «Монтаж …» ({N2(est.Statistics.WorkRows)}) — они считаются как СМР";
+        else
+            MaterialsText.ClearValue(ToolTipProperty);
 
         TransportCard.Visibility = Visibility.Visible;
         TransportEdit.Text = est.Totals.Transport == 0m ? "0" : N2(est.Totals.Transport);
@@ -273,8 +277,10 @@ public partial class EstimateView : UserControl
         var sourceCheck=est.SourceCheck;
         SourceCheckChip.Visibility=sourceCheck.Matches==false?Visibility.Visible:Visibility.Collapsed;
         SourceCheckChip.ToolTip=sourceCheck.Details.Length>0?sourceCheck.Details:null;
-        DiscountTotalText.Visibility=est.Totals.DiscountPercent!=0m?Visibility.Visible:Visibility.Collapsed;
-        DiscountTotalText.Text=est.Totals.DiscountPercent!=0m
+        var hasDiscount = est.Totals.DiscountPercent != 0m;
+        TotalCaption.Text = hasDiscount ? "ИТОГО со скидкой" : "ИТОГО с НДС";
+        DiscountTotalText.Visibility = hasDiscount ? Visibility.Visible : Visibility.Collapsed;
+        DiscountTotalText.Text = hasDiscount
             ? $"Скидка {est.Totals.DiscountPercent:0.#########}%: −{N2(est.Totals.DiscountAmount)} ₽" : "";
         TotalText.Text = N2(est.Totals.Total);
         VatText.Text = est.VatTop
@@ -286,6 +292,8 @@ public partial class EstimateView : UserControl
               (est.Statistics.WorkRows != 0 ? $" (в т.ч. монтаж строками {N2(est.Statistics.WorkRows)})" : "") +
               (est.Totals.Pnr != 0 ? $"   ·   ПНР {N2(est.Totals.Pnr)}" : "") +
               $"   ·   ИТОГО с НДС {N2(est.Totals.Total)} ₽";
+        if (hasDiscount)
+            TotalsSummary.Text += $"   ·   {DiscountTotalText.Text}";
 
         // Undo snapshot was captured with the estimate on the background thread
         // and applied by ReloadDocumentAsync, after checking the SQL revision.

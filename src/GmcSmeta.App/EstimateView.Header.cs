@@ -304,6 +304,11 @@ public partial class EstimateView
                     : "";
                 break;
         }
+        if ((pct || bySys || byPos) && est.Statistics.WorkRows != 0)
+            SmrHintText.Text += (SmrHintText.Text.Length == 0 ? "" : " · ") +
+                $"+ монтаж строками {N2(est.Statistics.WorkRows)}";
+        SmrHintText.Visibility = string.IsNullOrEmpty(SmrHintText.Text)
+            ? Visibility.Collapsed : Visibility.Visible;
         TransportEdit.IsReadOnly = est.Locked;
         PnrEdit.IsReadOnly = est.Locked;
     }

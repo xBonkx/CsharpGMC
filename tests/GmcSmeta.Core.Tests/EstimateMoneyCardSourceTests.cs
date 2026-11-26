@@ -39,4 +39,27 @@ public sealed class EstimateMoneyCardSourceTests
         Assert.Same(discount, vat.ElementsAfterSelf().First());
         Assert.Equal("Collapsed", (string?)discount.Attribute("Visibility"));
     }
+
+    [Fact]
+    public void FooterRefreshShowsDiscountAndDoesNotReserveAnEmptySmrHint()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var view = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement Named(string name) => Assert.Single(view.Descendants().Where(e => (string?)e.Attribute(xaml + "Name") == name));
+        Assert.Equal("Collapsed", (string?)Named("SmrHintText").Attribute("Visibility"));
+        Assert.Equal("ИТОГО с НДС", (string?)Named("TotalCaption").Attribute("Text"));
+        var code = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("hasDiscount ? \"ИТОГО со скидкой\" : \"ИТОГО с НДС\"", code);
+        Assert.Contains("if (hasDiscount)\n            TotalsSummary.Text +=", code.Replace("\r\n", "\n"));
+        Assert.Contains("MaterialsText.ClearValue(ToolTipProperty)", code);
+        var header = File.ReadAllText(Path.Combine(app, "EstimateView.Header.cs"));
+        Assert.Contains("est.Statistics.Materials != 0 && est.Statistics.Smr != 0", header);
+        Assert.Contains("(pct || bySys || byPos) && est.Statistics.WorkRows != 0", header);
+        Assert.Contains("SmrHintText.Visibility = string.IsNullOrEmpty(SmrHintText.Text)", header);
+    }
 }
