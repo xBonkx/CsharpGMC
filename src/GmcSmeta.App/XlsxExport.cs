@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using ClosedXML.Excel;
+using GmcSmeta.Core;
 
 namespace GmcSmeta.App;
 
@@ -40,7 +41,7 @@ public static class XlsxExport
                 foreach (var sheet in workbook.Worksheets)
                     sheet.Columns().AdjustToContents(
                         1, Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 1, 200));
-            workbook.SaveAs(dialog.FileName);
+            ExportFilePublication.Write(dialog.FileName, stream => workbook.SaveAs(stream));
         }
         catch (Exception ex)
         {
@@ -76,7 +77,7 @@ public static class XlsxExport
             using var workbook = create();
             if (workbook.Worksheets.Count == 0)
                 throw new InvalidOperationException("В книге нет листов.");
-            workbook.SaveAs(dialog.FileName);
+            ExportFilePublication.Write(dialog.FileName, stream => workbook.SaveAs(stream));
         }
         catch (Exception ex)
         {

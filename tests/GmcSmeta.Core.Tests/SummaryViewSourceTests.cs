@@ -27,6 +27,7 @@ public sealed class SummaryViewSourceTests
         Assert.Contains("else SummaryUpdateMissingCounts(_summaryMissingChecked.Aggregate(", source);
         Assert.Contains("if (_summaryMissingOn == enabled) return;", source);
         Assert.Contains("if (_summaryMode == key) return;", source);
+        Assert.Contains("if (_summarySelectedSystems.SetEquals(selected)) return true;", source);
         Assert.Contains("if (_summarySort == key) return;", source);
         Assert.Contains("ReferenceEquals(_summaryMissingItems, menuItems)", source);
     }

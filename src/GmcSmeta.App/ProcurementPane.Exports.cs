@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using Microsoft.Win32;
 
@@ -36,14 +37,19 @@ public partial class ProcurementPane
         {
             if (dialog.FilterIndex == 2)
             {
-                var data = await Task.Run(() => ProcurementPdfExport.CreateControl(snapshot, withMoney: false));
-                File.WriteAllBytes(path, data);
+                await Task.Run(() =>
+                {
+                    var data = ProcurementPdfExport.CreateControl(snapshot, withMoney: false);
+                    ExportFilePublication.WriteBytes(path, data);
+                });
             }
             else
             {
-                using var workbook = await Task.Run(() =>
-                    ProcurementControlExport.CreateWorkbook(snapshot, withMoney: false));
-                workbook.SaveAs(path);
+                await Task.Run(() =>
+                {
+                    using var workbook = ProcurementControlExport.CreateWorkbook(snapshot, withMoney: false);
+                    ExportFilePublication.Write(path, stream => workbook.SaveAs(stream));
+                });
             }
             SetStatus("Контроль оборудования сохранён: " + path);
             TryOpenExport(path);
@@ -94,9 +100,12 @@ public partial class ProcurementPane
             var lines = preview.Lines;
             var number = preview.Number;
             var due = preview.Due;
-            var bytes = await Task.Run(() =>
-                ProcurementPdfExport.CreateShopOrder(snapshot.info, lines, number, due));
-            File.WriteAllBytes(file.FileName, bytes);
+            var destination = file.FileName;
+            await Task.Run(() =>
+            {
+                var bytes = ProcurementPdfExport.CreateShopOrder(snapshot.info, lines, number, due);
+                ExportFilePublication.WriteBytes(destination, bytes);
+            });
             SetStatus($"Заявка в цех сохранена: {file.FileName}");
             TryOpenExport(file.FileName);
         }

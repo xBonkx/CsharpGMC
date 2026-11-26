@@ -1,5 +1,6 @@
 using System.IO;
 using ClosedXML.Excel;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -118,19 +119,7 @@ internal static class MetalWarehouseReport
                 new object?[] {"Движений всего",movements.Count,"шт."}
             },[2]);
         RequireSameRevision(source, snapshot);
-        var destination = Path.GetFullPath(path);
-        var temporary = Path.Combine(Path.GetDirectoryName(destination)!,
-            ".gmc-metal-" + Guid.NewGuid().ToString("N") + ".xlsx");
-        try
-        {
-            book.SaveAs(temporary);
-            File.Move(temporary, destination, overwrite: true);
-        }
-        finally
-        {
-            try { if (File.Exists(temporary)) File.Delete(temporary); }
-            catch { /* preserve the original error */ }
-        }
+        ExportFilePublication.Write(path, stream => book.SaveAs(stream));
     }
 
     private static void RequireSameRevision(SqlServerMetalWarehouse source, MetalSnapshot snapshot)

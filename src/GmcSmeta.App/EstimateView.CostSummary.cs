@@ -296,6 +296,7 @@ public partial class EstimateView
                 // A refreshed or detached editor must not accept stale popup input.
                 if (_detached || !ReferenceEquals(options, _summarySystemOptions) || _costSummaryData is null)
                     return false;
+                if (_summarySelectedSystems.SetEquals(selected)) return true;
                 _summarySelectedSystems.Clear();
                 _summarySelectedSystems.UnionWith(selected);
                 SummarySyncSystemFilter();
