@@ -180,7 +180,7 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template"><Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="CardBorder" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="18,14">
+                    <Border x:Name="CardBorder" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutCardPadding}">
                         <Border.Effect>
                             <DropShadowEffect Color="#0F172A" Opacity="0.055" BlurRadius="20" ShadowDepth="2" Direction="270"/>
                         </Border.Effect>
@@ -280,7 +280,7 @@
                                 <Rectangle x:Name="DashedOutline" RadiusX="12" RadiusY="12"
                                            Stroke="#D0D7E2" StrokeThickness="1.5"
                                            StrokeDashArray="4 3" SnapsToDevicePixels="True"/>
-                                <ContentPresenter Margin="18,14" HorizontalAlignment="Center"
+                                <ContentPresenter Margin="{StaticResource LayoutCardPadding}" HorizontalAlignment="Center"
                                                   VerticalAlignment="Center" RecognizesAccessKey="True"/>
                             </Grid>
                         </Border>
@@ -576,7 +576,7 @@
                         </Style>
                     </ContentControl.Style>
                     <ContentControl.Content>
-                        <Grid x:Name="ObjectPage" Margin="24,18,24,14">
+                        <Grid x:Name="ObjectPage" Margin="{StaticResource LayoutPageMargin}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -608,28 +608,28 @@
                                 <TextBlock x:Name="ObjectSubtitle" Foreground="#64748B" Margin="0,4,0,0"/>
                             </StackPanel>
                             <Grid x:Name="ObjectTotals" Grid.Row="1" Visibility="Collapsed" Margin="0,0,12,14">
-                                <Border x:Name="ObjectTotalCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" CornerRadius="12" Padding="16,11" Margin="0,0,10,0">
+                                <Border x:Name="ObjectTotalCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0">
                                     <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#2563EB" Offset="0"/><GradientStop Color="#4F46E5" Offset="1"/></LinearGradientBrush></Border.Background>
                                     <StackPanel>
                                     <TextBlock Text="Итого по объекту" Foreground="White" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                                     <TextBlock x:Name="ObjectTotalValue" Foreground="White" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                     <TextBlock x:Name="ObjectTotalSub" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
                                 </StackPanel></Border>
-                                <Border x:Name="ObjectProgressCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="16,11"><StackPanel>
+                                <Border x:Name="ObjectProgressCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}"><StackPanel>
                                     <TextBlock Text="Выполнение по КС" Style="{StaticResource UiCaption}"/>
                                     <TextBlock Text="{Binding Progress.Caption}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,6" TextWrapping="Wrap"/>
                                     <local:ContractProgressBar Height="8" SignedFraction="{Binding Progress.SignedFraction}" PendingFraction="{Binding Progress.PendingFraction}"/>
                                     <TextBlock Text="{Binding Progress.Legend}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 </StackPanel></Border>
-                                <Border x:Name="ObjectMaterialsCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="16,11" Margin="0,0,10,0"><StackPanel>
+                                <Border x:Name="ObjectMaterialsCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0"><StackPanel>
                                     <TextBlock x:Name="ObjectMaterialsCaption" Text="Материалы" Style="{StaticResource UiCaption}"/>
                                     <TextBlock x:Name="ObjectMaterialsValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel></Border>
-                                <Border x:Name="ObjectSmrCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="16,11"><StackPanel>
+                                <Border x:Name="ObjectSmrCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}"><StackPanel>
                                     <TextBlock x:Name="ObjectSmrCaption" Text="СМР" Style="{StaticResource UiCaption}"/>
                                     <TextBlock x:Name="ObjectSmrValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel></Border>
-                                <Border x:Name="ObjectEarnedCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="16,11" ToolTip="{Binding EarnedNotes}"><StackPanel>
+                                <Border x:Name="ObjectEarnedCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" ToolTip="{Binding EarnedNotes}"><StackPanel>
                                     <TextBlock Text="{Binding EarnedCaption}" Style="{StaticResource UiCaption}"/>
                                     <TextBlock Text="{Binding EarnedText}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel></Border>

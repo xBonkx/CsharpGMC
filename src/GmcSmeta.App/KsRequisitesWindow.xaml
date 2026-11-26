@@ -7,7 +7,7 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
         MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="{StaticResource LayoutDialogMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>

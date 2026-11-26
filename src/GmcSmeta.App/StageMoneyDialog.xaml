@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterOwner" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         ResizeMode="CanResize" MinHeight="410" UseLayoutRounding="True" SnapsToDevicePixels="True">
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="{StaticResource LayoutDialogMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>

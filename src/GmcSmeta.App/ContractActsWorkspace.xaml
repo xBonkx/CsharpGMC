@@ -50,7 +50,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="24,6,24,14">
+    <Grid Margin="{StaticResource LayoutEmbeddedPageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>

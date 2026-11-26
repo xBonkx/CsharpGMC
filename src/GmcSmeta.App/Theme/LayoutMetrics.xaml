@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- Logical DIP; page owns outer spacing, child content must not repeat it.
+         Summary keeps Python's inner 12/8/20/16, composed with page 24/6/24/14.
+         Standalone cost window overrides LayoutCostPaneMargin locally. -->
+    <Thickness x:Key="LayoutPageMargin">24,18,24,14</Thickness>
+    <Thickness x:Key="LayoutPageHeaderPadding">24,18,24,0</Thickness>
+    <Thickness x:Key="LayoutDocumentTabsPadding">24,12,24,0</Thickness>
+    <Thickness x:Key="LayoutDocumentToolbarMargin">24,6,24,0</Thickness>
+    <Thickness x:Key="LayoutEmbeddedPageMargin">24,6,24,14</Thickness>
+    <Thickness x:Key="LayoutCostPaneMargin">24,6,24,14</Thickness>
+    <Thickness x:Key="LayoutSummaryPageMargin">36,14,44,30</Thickness>
+    <Thickness x:Key="LayoutDocumentFooterPadding">24,12,24,14</Thickness>
+    <Thickness x:Key="LayoutDialogMargin">22,18,22,16</Thickness>
+    <Thickness x:Key="LayoutCompareDialogMargin">20,16,20,16</Thickness>
+    <Thickness x:Key="LayoutCardPadding">18,14,18,14</Thickness>
+    <Thickness x:Key="LayoutTilePadding">16,11,16,11</Thickness>
+    <Thickness x:Key="LayoutToolbarPadding">10,4,10,4</Thickness>
+    <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>
+    <sys:Double x:Key="LayoutDocumentRowMinHeight">27</sys:Double>
+</ResourceDictionary>

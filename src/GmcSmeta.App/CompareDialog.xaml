@@ -8,7 +8,7 @@
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
         MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
         MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}" Foreground="#0F172A">
-    <Grid Margin="20,16,20,16">
+    <Grid Margin="{StaticResource LayoutCompareDialogMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -52,7 +52,7 @@
                     <TextBlock x:Name="TileSmrValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
-            <Border CornerRadius="12" Padding="16,11">
+            <Border CornerRadius="12" Padding="{StaticResource LayoutTilePadding}">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Color="#2563EB" Offset="0"/>

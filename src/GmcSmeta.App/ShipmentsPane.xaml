@@ -180,7 +180,7 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid Margin="24,6,24,14">
+    <Grid Margin="{StaticResource LayoutEmbeddedPageMargin}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="210"/>
             <ColumnDefinition Width="12"/>

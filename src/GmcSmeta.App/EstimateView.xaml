@@ -384,7 +384,7 @@
              Line 1: object crumb + chips «КП» / организация / замок; line 2: title + pencil.
              Buttons top-right: Отменить · Вернуть · Помощь · Действия · Сохранить в Excel / PDF. -->
         <Border Grid.Row="0" Background="Transparent" BorderThickness="0"
-                Padding="24,18,24,0">
+                Padding="{StaticResource LayoutPageHeaderPadding}">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Top">
@@ -437,7 +437,7 @@
         </Border>
 
         <!-- Python parity: contract navigation differs from KP navigation. -->
-        <Border Grid.Row="1" Background="#F4F6FA" Padding="24,12,24,0">
+        <Border Grid.Row="1" Background="#F4F6FA" Padding="{StaticResource LayoutDocumentTabsPadding}">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
                           PanningMode="HorizontalOnly" CanContentScroll="False">
                 <Grid>
@@ -501,7 +501,7 @@
         <!-- Contract cost navigation is a second row, never the flat KP strip.
              It shares the tools row because the estimate toolbar is hidden on Costs. -->
         <Border x:Name="ContractCostNavigation" Grid.Row="2" Visibility="Collapsed"
-                Background="Transparent" Padding="24,6,24,0">
+                Background="Transparent" Padding="{StaticResource LayoutDocumentToolbarMargin}">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
                           PanningMode="HorizontalOnly" CanContentScroll="False">
                 <StackPanel Orientation="Horizontal">
@@ -519,7 +519,7 @@
         </Border>
 
         <!-- Python kp_editor: left = add + view controls; right = Закуп, Столбцы, search. -->
-        <Grid x:Name="EstimateToolsBar" Grid.Row="2" Margin="24,6,24,0">
+        <Grid x:Name="EstimateToolsBar" Grid.Row="2" Margin="{StaticResource LayoutDocumentToolbarMargin}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -936,12 +936,12 @@
         <!-- Python cost_view mat_page: панель инструментов, подсказка, таблица 13 колонок,
              итоговые плитки. Правки идут теми же сервисами, что и вкладка «Смета»/«Закупки». -->
         <Border x:Name="MaterialsPanel" Grid.Row="4" Visibility="Collapsed" Background="Transparent"
-                BorderThickness="0" Margin="24,6,24,14" Padding="0"/>
+                BorderThickness="0" Margin="{StaticResource LayoutEmbeddedPageMargin}" Padding="0"/>
         <!-- Вкладка «Сводная» КП — перенос cost_summary_view.py: таблица директора
              (материалы/работы/итого), фильтры, плитки, запись через SaveSummaryCell. -->
         <Border x:Name="SummaryPanel" Grid.Row="4" Visibility="Collapsed"
                 Background="Transparent" BorderThickness="0"
-                Margin="36,14,44,30" Padding="0"/>
+                Margin="{StaticResource LayoutSummaryPageMargin}" Padding="0"/>
 
         <!-- Create the KS workspace only when the contract's Acts tab is opened. -->
         <Border x:Name="ContractActsPanel" Grid.Row="4" Visibility="Collapsed"
@@ -967,7 +967,7 @@
 
         <!-- Итоги: Python kp_editor tot_bar + 4 tiles (Материалы / Монтаж · СМР /
              Дополнительные расходы / ИТОГО с НДС) в один ряд. -->
-        <Border x:Name="TotalsFooterPanel" Grid.Row="5" Padding="24,12,24,14" Background="Transparent"
+        <Border x:Name="TotalsFooterPanel" Grid.Row="5" Padding="{StaticResource LayoutDocumentFooterPadding}" Background="Transparent"
                 BorderThickness="0">
             <DockPanel LastChildFill="True">
                 <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,0,0,0"

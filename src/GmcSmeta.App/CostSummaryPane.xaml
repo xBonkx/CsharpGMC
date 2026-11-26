@@ -17,7 +17,7 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="{DynamicResource LayoutCostPaneMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>

@@ -5,6 +5,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Theme/LayoutMetrics.xaml"/>
                 <ResourceDictionary Source="Theme/ToolbarIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         <!-- Python selection palette, also used by default WPF controls and
@@ -802,7 +803,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Foreground" Value="#0F172A"/>
             <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Padding" Value="{StaticResource LayoutToolbarPadding}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="MinHeight" Value="32"/>
@@ -962,7 +963,7 @@
             <Setter Property="BorderBrush" Value="#E8ECF3"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="16,11"/>
+            <Setter Property="Padding" Value="{StaticResource LayoutTilePadding}"/>
             <Setter Property="MinHeight" Value="70"/>
             <Setter Property="Effect">
                 <Setter.Value>
@@ -1088,7 +1089,7 @@
 
         <!-- Compact live-grid chrome: constant thickness, no per-cell converter. -->
         <Style x:Key="PythonGridCell" TargetType="DataGridCell">
-            <Setter Property="Padding" Value="4,3"/>
+            <Setter Property="Padding" Value="{StaticResource LayoutCellPadding}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="BorderBrush" Value="#E4E8EF"/>
@@ -1468,7 +1469,7 @@
             <Setter Property="CellStyle" Value="{StaticResource CompactCostCell}"/>
             <Setter Property="ColumnHeaderStyle" Value="{StaticResource KsQuantityHeader}"/>
             <Setter Property="RowStyle" Value="{StaticResource KsReportRow}"/>
-            <Setter Property="MinRowHeight" Value="24"/>
+            <Setter Property="MinRowHeight" Value="{StaticResource LayoutDocumentRowMinHeight}"/>
             <Setter Property="AlternationCount" Value="2"/>
             <Setter Property="EnableRowVirtualization" Value="True"/>
             <Setter Property="EnableColumnVirtualization" Value="True"/>
