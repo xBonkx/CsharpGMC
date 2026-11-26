@@ -107,7 +107,7 @@
         <!-- Python ui/common.py menu_header: grey caption inside a menu. -->
         <Style x:Key="EstimateMenuHeader" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#64748B"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{StaticResource UiSummaryCaptionSize}"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="14,6,14,2"/>
         </Style>
@@ -171,7 +171,7 @@
         <!-- Python theme.py QLineEdit: rounded money input inside totals tiles. -->
         <Style x:Key="PythonMoneyEdit" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="MinHeight" Value="26"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value="{StaticResource UiMoneyInputSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="6,2"/>
             <Setter Property="TextAlignment" Value="Right"/>
@@ -412,7 +412,7 @@
                         <Button x:Name="EditTitleButton" DockPanel.Dock="Right" Click="EditTitle_Click" Margin="4,0,0,0"
                                 ToolTip="Номер, дата и название документа. Двойной щелчок — изменить"
                                 Style="{StaticResource DocumentTitleEdit}" Content="Изменить" ContentTemplate="{StaticResource IconOnlyEdit}" AutomationProperties.Name="Изменить реквизиты документа"/>
-                        <TextBlock x:Name="TitleText" FontSize="20" VerticalAlignment="Center" FontWeight="Bold"
+                        <TextBlock x:Name="TitleText" FontSize="{StaticResource UiValueSize}" VerticalAlignment="Center" FontWeight="Bold"
                                    Foreground="#0F172A" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </DockPanel>
@@ -1028,10 +1028,10 @@
                     <StackPanel>
                         <TextBlock x:Name="TotalCaption" Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"
-                                   FontSize="24"/>
-                        <TextBlock x:Name="VatText" Foreground="#E6FFFFFF" FontSize="12" TextWrapping="Wrap"
+                                   FontSize="{StaticResource UiGrandTotalSize}"/>
+                        <TextBlock x:Name="VatText" Foreground="#E6FFFFFF" FontSize="{StaticResource UiTotalDetailSize}" TextWrapping="Wrap"
                                    Margin="0,2,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                        <TextBlock x:Name="DiscountTotalText" Foreground="#E6FFFFFF" FontSize="12"
+                        <TextBlock x:Name="DiscountTotalText" Foreground="#E6FFFFFF" FontSize="{StaticResource UiTotalDetailSize}"
                                    TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>

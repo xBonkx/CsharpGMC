@@ -22,7 +22,7 @@ internal sealed class ActDiscountDialog : Window
         Title="Корректировка акта КС-2";Width=560;SizeToContent=SizeToContent.Height;
         ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         var panel=new StackPanel{Margin=new Thickness(22,18,22,18)};
-        panel.Children.Add(new TextBlock{Text="До скидки с НДС: "+Fmt(gross)+" ₽",FontSize=18,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,12)});
+        panel.Children.Add(new TextBlock{Text="До скидки с НДС: "+Fmt(gross)+" ₽",FontSize=(double)FindResource("UiValueSize"),FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,12)});
         foreach(var label in new[]{"Скидка по договору","Индивидуальная скидка, %","Установить итоговую сумму вручную"})_mode.Items.Add(label);
         panel.Children.Add(_mode);
         void Field(string title,TextBox input)

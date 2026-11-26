@@ -88,7 +88,7 @@
                     <Button Content="Закрыть" Style="{StaticResource PythonToolbarButton}" Click="Close_Click" Padding="14,7"/>
                 </StackPanel>
                 <TextBlock x:Name="HintText" TextWrapping="Wrap" VerticalAlignment="Center"
-                           Foreground="#64748B" FontSize="12"
+                           Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"
                            Text="Выберите строку для редактирования; все изменения сохраняются в SQL Server."/>
             </DockPanel>
         </StackPanel>

@@ -15,7 +15,7 @@ internal sealed class EstimateDiscountDialog : Window
     private readonly CheckBox _smr=new(){Content="Скидка и на монтаж (СМР)",IsChecked=true};
     private readonly CheckBox _whole=new(){Content="Округлять расценки до целых рублей"};
     private readonly TextBlock _description=new(){TextWrapping=TextWrapping.Wrap,Foreground=Brushes.DimGray};
-    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,FontSize=15,LineHeight=24};
+    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,LineHeight=24};
     private readonly Button _apply=new(){Content="Применить скидку",MinWidth=150,MinHeight=34,IsDefault=true,IsEnabled=false};
     private bool _busy;
     private bool _onTotal;
@@ -24,10 +24,11 @@ internal sealed class EstimateDiscountDialog : Window
     public EstimateDiscountDialog(EstimateDiscountInput.State state)
     {
         _state=state;
+        _preview.SetResourceReference(TextBlock.FontSizeProperty, "UiMoneyInputSize");
         Title="Скидка на всю смету";Width=590;MinWidth=520;SizeToContent=SizeToContent.Height;
         WindowStartupLocation=WindowStartupLocation.CenterOwner;ResizeMode=ResizeMode.NoResize;
         var root=new StackPanel{Margin=new Thickness(22,18,22,18)};
-        root.Children.Add(new TextBlock{Text=Title,FontSize=20,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,10)});
+        root.Children.Add(new TextBlock{Text=Title,FontSize=(double)FindResource("UiH2Size"),FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,10)});
         if(state.SupportsTotal)_mode.Items.Add("На итог — отдельной строкой");
         _mode.Items.Add("На расценки — изменить цены позиций");
         root.Children.Add(_mode);

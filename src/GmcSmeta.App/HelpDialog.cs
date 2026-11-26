@@ -73,7 +73,7 @@ public sealed class HelpDialog : Window
         var document = new FlowDocument
         {
             PagePadding = new Thickness(16, 10, 16, 10),
-            FontSize = 11.5 * 4.0 / 3.0,
+            FontSize = (double)Application.Current.FindResource("UiHelpBodySize"),
             Foreground = Brushes.Black
         };
         foreach (var element in XElement.Parse("<help>" + html + "</help>").Elements())
@@ -82,7 +82,7 @@ public sealed class HelpDialog : Window
             {
                 case "h2":
                     var heading = CreateParagraph(element);
-                    heading.FontSize = 20;
+                    heading.FontSize = (double)Application.Current.FindResource("UiValueSize");
                     heading.FontWeight = FontWeights.SemiBold;
                     heading.Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175));
                     document.Blocks.Add(heading);

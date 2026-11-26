@@ -191,7 +191,7 @@
             <Button x:Name="NewShipmentButton" Content="Новая ведомость" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewShipment_Click"
                     Style="{StaticResource PythonToolbarPrimary}" HorizontalAlignment="Stretch"
                     ToolTip="Пустая ведомость: потом отметьте галочками, что выдаёте"/>
-            <TextBlock Grid.Row="1" Text="Ведомости объекта" FontWeight="Bold" FontSize="10.666666666666666"
+            <TextBlock Grid.Row="1" Text="Ведомости объекта" FontWeight="Bold" FontSize="{StaticResource UiSectionSize}"
                        Foreground="#94A3B8" Margin="0,6,0,6"/>
             <ListBox x:Name="ShipmentCombo" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0"
                      HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"

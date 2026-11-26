@@ -14,7 +14,7 @@
     </Grid.RowDefinitions>
     <!-- заголовок + кнопки справа (cost_summary_view.__init__: title_row) -->
     <WrapPanel Grid.Row="0" Margin="0,0,0,10" VerticalAlignment="Center">
-        <TextBlock Text="Сводная стоимость" Foreground="#233C61" FontSize="{StaticResource UiH2Size}" FontWeight="Bold"
+        <TextBlock Text="Сводная стоимость" Foreground="#233C61" FontSize="{StaticResource UiSummaryTitleSize}" FontWeight="Bold"
                    VerticalAlignment="Center" Margin="0,0,12,4"/>
             <Button x:Name="SummaryTransferSmrButton" Style="{StaticResource PythonToolbarButton}"
                     Content="СМР в смету по системам…" ContentTemplate="{StaticResource IconLabelList}" Click="SummaryTransferSmr_Click" IsEnabled="False"
@@ -776,11 +776,11 @@
                 <Setter Property="Padding" Value="16,11"/>
             </Style>
             <Style x:Key="SummaryTileCaption" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontSize" Value="{StaticResource UiSummaryCaptionSize}"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
             <Style x:Key="SummaryTileNumber" TargetType="TextBlock" BasedOn="{StaticResource PythonTileValue}">
-                <Setter Property="FontSize" Value="22"/>
+                <Setter Property="FontSize" Value="{StaticResource UiSummaryValueSize}"/>
                 <Setter Property="FontWeight" Value="Bold"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
                 <Setter Property="Margin" Value="0,2,0,0"/>

@@ -6,6 +6,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Theme/LayoutMetrics.xaml"/>
+                <ResourceDictionary Source="Theme/TypographyMetrics.xaml"/>
                 <ResourceDictionary Source="Theme/ToolbarIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         <!-- Python selection palette, also used by default WPF controls and
@@ -30,7 +31,7 @@
         <Style x:Key="UiCaption" TargetType="TextBlock">
             <Setter Property="FontSize" Value="{StaticResource UiCaptionSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
@@ -146,7 +147,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#94A3B8"/></Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/></Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/><Setter Property="Foreground" Value="#94A3B8"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -240,7 +241,7 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="ComboChrome" Property="Background" Value="#F7F9FC"/>
-                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -402,8 +403,8 @@
                                 <Setter Property="Foreground" Value="#1E40AF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="#94A3B8"/>
-                                <Setter TargetName="ShortcutText" Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="ShortcutText" Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                                 <Setter TargetName="ItemChrome" Property="Background" Value="Transparent"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -634,7 +635,7 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="FieldChrome" Property="Background" Value="#F7F9FC"/>
                                 <Setter TargetName="FieldChrome" Property="BorderBrush" Value="#E4E8EF"/>
-                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -655,7 +656,7 @@
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -683,7 +684,7 @@
         <Style x:Key="ObjectTab" TargetType="RadioButton" BasedOn="{StaticResource Segment}">
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
@@ -765,7 +766,7 @@
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -843,7 +844,7 @@
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#1E40AF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                                 <Setter Property="Opacity" Value="0.6"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -1180,7 +1181,7 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSub}" Value="True">
                     <Setter Property="FontStyle" Value="Italic"/>
-                    <Setter Property="Foreground" Value="#64748B"/>
+                    <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -1223,7 +1224,7 @@
             <Setter Property="Foreground" Value="#0F172A"/>
         </Style>
         <Style x:Key="PythonSecondaryTab" TargetType="TabItem">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
@@ -1384,7 +1385,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
         <Style x:Key="ReportGridMuted" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="ReportGridCenter" TargetType="TextBlock">
@@ -1483,7 +1484,7 @@
         </Style>
         <Style x:Key="CompactCostStrongMoney" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}"><Setter Property="FontWeight" Value="SemiBold"/></Style>
         <Style x:Key="CompactCostMuted" TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Style.Triggers><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
         </Style>
         <Style x:Key="CompactCostReview" TargetType="TextBlock" BasedOn="{StaticResource ReportGridReviewText}">
