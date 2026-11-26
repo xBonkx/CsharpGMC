@@ -97,6 +97,7 @@ public partial class EstimateView
         var available = viewport - 2 - _inlineStageColumns
             .Where(c => c.Visibility == Visibility.Visible).Sum(c => c.ActualWidth);
         var widths = _uiSettings.ColumnWidths;
+        var manual = widths.Count > 0;
         var inputs = visible.Select(column =>
         {
             var key = ColumnPreferenceKey(column);
@@ -106,10 +107,11 @@ public partial class EstimateView
                 column == NoteColumn ? EstimateColumnLayout.Role.Note : EstimateColumnLayout.Role.Fixed;
             var minimum = role == EstimateColumnLayout.Role.Name ? 190 :
                 role == EstimateColumnLayout.Role.Note ? 36 : Math.Floor(fallback * 0.75);
-            minimum = Math.Max(Math.Max(36, column.MinWidth), minimum);
+            minimum = manual ? Math.Max(36, column.MinWidth) :
+                Math.Max(Math.Max(36, column.MinWidth), minimum);
             return new EstimateColumnLayout.Column(key, preferred, minimum, role);
         }).ToList();
-        var fitted = EstimateColumnLayout.Fit(inputs, available);
+        var fitted = EstimateColumnLayout.Fit(inputs, available, manual);
         foreach (var column in visible)
         {
             var width = fitted[ColumnPreferenceKey(column)];
@@ -186,15 +188,17 @@ public partial class EstimateView
             {
                 if (before is not null && EstimateGrid.IsLoaded)
                 {
-                    foreach (var (column, previous) in before)
+                    var current = SnapshotEstimateWidths();
+                    if (current.Any(pair => before.TryGetValue(pair.Key, out var previous) &&
+                        double.IsFinite(pair.Value) && Math.Abs(pair.Value - previous) > 0.5))
                     {
-                        var actual = column.ActualWidth;
-                        if (column.Visibility != Visibility.Visible ||
-                            !double.IsFinite(actual) || actual < 36 ||
-                            Math.Abs(actual - previous) <= 0.5) continue;
-                        _uiSettings.ColumnWidths[ColumnPreferenceKey(column)] = Math.Clamp(actual, 36, 1600);
+                        // Freeze the visible layout, not just the dragged column:
+                        // the next fit must not redistribute space to its neighbours.
+                        foreach (var (column, actual) in current)
+                            if (double.IsFinite(actual) && actual >= 36)
+                                _uiSettings.ColumnWidths[ColumnPreferenceKey(column)] = Math.Clamp(actual, 36, 1600);
+                        SaveEstimateUiSettings();
                     }
-                    SaveEstimateUiSettings();
                 }
             }
             finally

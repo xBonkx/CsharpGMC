@@ -69,6 +69,29 @@ public class EstimateColumnLayoutTests
         Assert.Equal(600, cols[1].Preferred);
     }
 
+    [Theory]
+    [InlineData(500)]
+    [InlineData(1200)]
+    [InlineData(2400)]
+    public void ManualLayout_DoesNotRedistributeWidths(double viewport)
+    {
+        var cols = Standard();
+        cols[1] = cols[1] with { Preferred = 600 };
+        var fitted = Fit(cols, viewport, manual: true);
+        foreach (var c in cols) Assert.Equal(c.Preferred, fitted[c.Key]);
+        Assert.Equal(600, fitted["name"]);
+        Assert.Equal(118, fitted["price"]);
+    }
+
+    [Fact]
+    public void ManualLayout_RespectsMinimumAndResetReturnsToAutoFit()
+    {
+        var cols = Standard();
+        cols[1] = cols[1] with { Preferred = 20 };
+        Assert.Equal(190, Fit(cols, 500, manual: true)["name"]);
+        Assert.Equal(1400, Fit(Standard(), 1400).Values.Sum(), 6);
+    }
+
     [Fact]
     public void EmptyAndInvalidViewport()
     {

@@ -36,6 +36,11 @@ internal static class SummaryColumnFitChecks
         Require(wide["m_ucost"] == 140 && manual.Single(c => c.Key == "m_ucost").Preferred == 140,
             "User width preference was not preserved.");
 
+        var manualNarrow = EstimateColumnLayout.Fit(manual, 500, manual: true);
+        var manualWide = EstimateColumnLayout.Fit(manual, 2400, manual: true);
+        Require(manual.All(c => manualNarrow[c.Key] == c.Preferred && manualWide[c.Key] == c.Preferred),
+            "Manual summary widths must survive viewport changes without moving neighbours.");
+
         var grid = new DataGrid { FontSize = 13, AutoGenerateColumns = false };
         var money = new DataGridTextColumn { SortMemberPath = "t_cost", Header = new TextBlock { Text = "Закупка ∑" } };
         grid.Columns.Add(money);

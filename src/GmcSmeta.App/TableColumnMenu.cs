@@ -235,6 +235,7 @@ public static class TableColumnMenu
             }
             _initialized = false;
             _resizeStart = null;
+            if (_summaryFit is not null) _summaryFit.Suspended = false;
             _entries = Array.Empty<Entry>();
             key = newKey;
             Initialize();
@@ -341,7 +342,7 @@ public static class TableColumnMenu
             finally { _applying = false; }
             if (key == "estimate-summary")
             {
-                _summaryFit ??= new SummaryColumnFit(grid, SummaryPreferred);
+                _summaryFit ??= new SummaryColumnFit(grid, SummaryPreferred, () => _prefs.Widths.Count > 0);
                 RequestSummaryFit();
             }
         }
@@ -473,10 +474,9 @@ public static class TableColumnMenu
         internal void ResizeCompleted(object sender, DragCompletedEventArgs e)
         {
             var before = _resizeStart;
+            if (before is null || HeaderFrom(e.OriginalSource as DependencyObject, grid) is null) return;
             _resizeStart = null;
-            if (before is not null && !e.Canceled) SaveWidths(before);
-            if (_summaryFit is not null) _summaryFit.Suspended = false;
-            RequestSummaryFit();
+            CompleteResize(e.Canceled ? null : before);
         }
 
         internal void HeaderDoubleClick(object sender, MouseButtonEventArgs e)
@@ -484,12 +484,20 @@ public static class TableColumnMenu
             if (e.ClickCount != 2 || e.OriginalSource is not Thumb thumb || HeaderFrom(thumb, grid) is null || !Ready()) return;
             var before = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
             if (_summaryFit is not null) _summaryFit.Suspended = true;
-            grid.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            CompleteResize(before);
+        }
+
+        private void CompleteResize(Dictionary<DataGridColumn, DataGridLength>? before)
+        {
+            var entries = _entries;
+            // Width and ActualWidth can differ until WPF finishes layout.
+            grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
-                try { SaveWidths(before); }
+                if (!ReferenceEquals(entries, _entries)) return;
+                try { if (before is not null) SaveWidths(before); }
                 finally
                 {
-                    if (_summaryFit is not null) _summaryFit.Suspended = false;
+                    if (_resizeStart is null && _summaryFit is not null) _summaryFit.Suspended = false;
                     RequestSummaryFit();
                 }
             }));
@@ -508,11 +516,23 @@ public static class TableColumnMenu
                 if (!double.IsFinite(actual) || actual is < 36 or > 2000) continue;
                 changed[entry.Id] = actual;
             }
-            if (changed.Count > 0)
-                Save(prefs =>
+            if (changed.Count == 0) return;
+            if (key == "estimate-summary")
+            {
+                // Capture all visible widths once a manual resize actually changed a column.
+                // Hidden widths stay in the profile and reset clears manual mode.
+                foreach (var entry in _entries.Where(x => !x.Excluded &&
+                    x.Column.Visibility == Visibility.Visible))
                 {
-                    foreach (var (id, width) in changed) prefs.Widths[id] = width;
-                });
+                    var actual = entry.Column.ActualWidth;
+                    if (double.IsFinite(actual) && actual >= 36)
+                        changed[entry.Id] = Math.Clamp(actual, 36, 2000);
+                }
+            }
+            Save(prefs =>
+            {
+                foreach (var (id, width) in changed) prefs.Widths[id] = width;
+            });
         }
     }
 }

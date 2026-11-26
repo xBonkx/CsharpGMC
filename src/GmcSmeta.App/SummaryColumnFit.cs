@@ -8,11 +8,12 @@ using GmcSmeta.Core.Domain;
 namespace GmcSmeta.App;
 
 /// <summary>Fits only the embedded summary to its real scroll viewport. The
-/// persisted widths are preferences, not absolute constraints on small screens.</summary>
+/// default layout fits the viewport; explicit user widths take precedence.</summary>
 internal sealed class SummaryColumnFit
 {
     private readonly DataGrid _grid;
     private readonly Func<DataGridColumn, double> _preferred;
+    private readonly Func<bool> _manual;
     private bool _queued;
     // Cache identity only: a hidden grid may replace its source without another fit.
     // Never keep a superseded collection (and all its rows) alive here.
@@ -22,10 +23,11 @@ internal sealed class SummaryColumnFit
 
     internal bool Suspended { get; set; }
 
-    internal SummaryColumnFit(DataGrid grid, Func<DataGridColumn, double> preferred)
+    internal SummaryColumnFit(DataGrid grid, Func<DataGridColumn, double> preferred, Func<bool>? manual = null)
     {
         _grid = grid;
         _preferred = preferred;
+        _manual = manual ?? (() => false);
         grid.Loaded += (_, _) => Request();
         grid.Unloaded += (_, _) => Suspended = false;
         grid.IsVisibleChanged += (_, _) => Request();
@@ -162,15 +164,19 @@ internal sealed class SummaryColumnFit
         var viewport = Viewer()?.ViewportWidth ?? 0;
         if (!double.IsFinite(viewport) || viewport <= 0) return;
         var dpi = VisualTreeHelper.GetDpi(_grid).DpiScaleX;
-        var minimums = GetMinimums(dpi, VisualTreeHelper.GetDpi(_grid).PixelsPerDip);
+        var manual = _manual();
+        var minimums = manual ? null : GetMinimums(dpi, VisualTreeHelper.GetDpi(_grid).PixelsPerDip);
         var visible = _grid.Columns.Where(c => c.Visibility == Visibility.Visible).ToArray();
         var inputs = visible.Select(c => new EstimateColumnLayout.Column(c.SortMemberPath,
-            _preferred(c), minimums[c], c.SortMemberPath == "name"
+            _preferred(c), minimums is null ? BaseMinimum(c.SortMemberPath) : minimums[c],
+            c.SortMemberPath == "name"
                 ? EstimateColumnLayout.Role.Name : EstimateColumnLayout.Role.Fixed)).ToArray();
-        var fitted = Calculate(inputs, viewport, dpi);
+        var fitted = manual ? EstimateColumnLayout.Fit(inputs, viewport, manual: true) :
+            Calculate(inputs, viewport, dpi);
         foreach (var column in visible)
         {
-            var minimum = Math.Ceiling(minimums[column] * dpi) / dpi;
+            // Content measurements guide automatic sizing, not the mouse gripper.
+            var minimum = BaseMinimum(column.SortMemberPath);
             if (Math.Abs(column.MinWidth - minimum) > .001) column.MinWidth = minimum;
             var width = fitted[column.SortMemberPath];
             if (!column.Width.IsAbsolute || Math.Abs(column.Width.Value - width) > .001)

@@ -14,7 +14,7 @@ public static class EstimateColumnLayout
     /// Preferred widths are inputs only; callers persist manual changes separately.
     /// </summary>
     public static IReadOnlyDictionary<string, double> Fit(
-        IReadOnlyList<Column> columns, double available)
+        IReadOnlyList<Column> columns, double available, bool manual = false)
     {
         if (!double.IsFinite(available)) throw new ArgumentOutOfRangeException(nameof(available));
         if (columns.Any(c => !double.IsFinite(c.Preferred) ||
@@ -22,6 +22,8 @@ public static class EstimateColumnLayout
             throw new ArgumentException("Invalid column dimensions.", nameof(columns));
 
         var sizes = columns.ToDictionary(c => c.Key, c => Math.Max(c.Minimum, c.Preferred));
+        // Explicit widths must not compete with the viewport. The grid scrolls if needed.
+        if (manual) return sizes;
         var excess = sizes.Values.Sum() - Math.Max(0, available);
         if (excess > 0)
         {
