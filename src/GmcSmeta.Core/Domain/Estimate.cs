@@ -259,6 +259,10 @@ public static class EstimateReader
         var bySystem = positions.GroupBy(p => p.SystemId)
                                 .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Order).ThenBy(p => p.Id).ToList());
 
+        // One parent index for the whole snapshot. Lookup groups preserve
+        // source order for monetary sums; display order is sorted explicitly.
+        var systemsByParent = systems.ToLookup(system => system.ParentId);
+
         var rows = new List<EstimateRow>();
         var sort = 0;
         var num = 1;   // сквозная нумерация документа, как в Python: разделы и позиции подряд
@@ -282,21 +286,22 @@ public static class EstimateReader
 
         decimal GroupMaterial(SystemRow system) =>
             sumBySystem.GetValueOrDefault(system.Id) +
-            systems.Where(x => x.ParentId == system.Id).Sum(x => sumBySystem.GetValueOrDefault(x.Id));
+            systemsByParent[system.Id].Sum(x => sumBySystem.GetValueOrDefault(x.Id));
 
         // Примечание системы: её СМР (только когда СМР считается по системам). Как COL_NOTE в Python.
         string SystemNote(SystemRow system)
         {
             if (!string.Equals(head.SmrMode, "systems", StringComparison.Ordinal)) return "";
-            var subs = systems.Where(x => x.ParentId == system.Id).ToList();
+            var subs = systemsByParent[system.Id];
             var group = system.SmrAmount + subs.Sum(x => x.SmrAmount);
-            if (subs.Count > 0 && system.SmrAmount == 0m)
+            if (subs.Any() && system.SmrAmount == 0m)
                 return group != 0m ? $"СМР раздела {Money.Format(group)}" : "СМР раздела —";
             return system.SmrAmount != 0m ? $"СМР {Money.Format(system.SmrAmount)}" : "СМР —";
         }
 
         void AddSystem(SystemRow system, int level)
         {
+            token.ThrowIfCancellationRequested();
             var showHeader = !string.Equals(system.Name, NoSystem, StringComparison.Ordinal);
             var rowNum = numManual
                 ? system.SourceNum
@@ -310,27 +315,30 @@ public static class EstimateReader
         {
             if (!bySystem.TryGetValue(system.Id, out var list)) return;
 
+            // bySystem is already ordered by Order, then Id. ToLookup
+            // retains that order inside each group; no second sort needed.
             var children = list.Where(p => p.ParentId is not null)
-                               .GroupBy(p => p.ParentId!.Value)
-                               .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Order).ThenBy(p => p.Id).ToList());
+                               .ToLookup(p => p.ParentId!.Value);
 
             foreach (var p in list.Where(p => p.ParentId is null))
             {
                 token.ThrowIfCancellationRequested();
                 var rowNum = numManual ? p.Num : p.OutOfKp ? "" : (num++).ToString();
                 rows.Add(MakeRow(p, level, roundRows, sort++, rowNum));
-                if (children.TryGetValue(p.Id, out var subs))
-                    foreach (var s in subs)
-                        rows.Add(MakeRow(s, level + 1, roundRows, sort++, numManual ? s.Num : ""));
+                foreach (var s in children[p.Id])
+                {
+                    token.ThrowIfCancellationRequested();
+                    rows.Add(MakeRow(s, level + 1, roundRows, sort++, numManual ? s.Num : ""));
+                }
             }
         }
 
-        var top = systems.Where(s => s.ParentId is null).OrderBy(s => s.Order).ThenBy(s => s.Id).ToList();
+        var top = systemsByParent[null].OrderBy(s => s.Order).ThenBy(s => s.Id);
         foreach (var system in top)
         {
             AddSystem(system, 0);
             AddPositions(system, 1);
-            foreach (var sub in systems.Where(s => s.ParentId == system.Id).OrderBy(s => s.Order).ThenBy(s => s.Id))
+            foreach (var sub in systemsByParent[system.Id].OrderBy(s => s.Order).ThenBy(s => s.Id))
             {
                 AddSystem(sub, 1);
                 AddPositions(sub, 2);
@@ -346,7 +354,8 @@ public static class EstimateReader
                 p.WorkPrice ?? 0m, p.OutOfKp, p.ParentId is not null)).ToList(),
             positions.Count);
 
-        var inOrder = rows.Where(r => r.Kind == RowKind.Position).OrderBy(r => r.SortKey).ToList();
+        // SortKey is assigned monotonically as rows are appended.
+        var inOrder = rows.Where(r => r.Kind == RowKind.Position).ToList();
 
         return new EstimateDocument(
             contractId, head.Title, head.KindTitle, head.ObjectName, head.Company,

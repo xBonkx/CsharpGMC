@@ -41,6 +41,9 @@ internal static class PilotCases
         p.RunCase("10000-public-sql-services-benchmark",
             () => PilotExtendedCases.RealServicesBenchmark(p, p.LargeContract, 10000));
 
+        p.RunCase("estimate-indexed-hierarchy-and-financial-parity",
+            () => EstimateHierarchy(p));
+
         p.Skip("full-production-v28-schema-and-migrations",
             "Only a synthetic v28 subset is available in this repository; " +
             "schema_reference.sql is SQLite-oriented and is not runnable SQL Server DDL");
@@ -57,6 +60,73 @@ internal static class PilotCases
             "Lost acknowledgement is simulated AFTER real COMMIT; no TCP drop tested");
         p.Skip("actual-wpf-client-relaunch",
             "New .NET process verifies persisted state; WPF window requires Windows acceptance");
+    }
+
+    // A separate owned pilot fixture: no shared business document is modified.
+    private static void EstimateHierarchy(PilotRunner p)
+    {
+        var obj = SqlServerWorkspace.CreateObject(p.PilotConnection,
+            new ObjectProperties("Estimate hierarchy QA", "", "", "", "", ""), p.Revision());
+        var contract = SqlServerWorkspace.CreateEmptyContract(p.PilotConnection, obj,
+            new SqlServerWorkspace.NewContractData("kp", "QA-HIERARCHY", "", "Hierarchy QA",
+                null, null), p.Revision());
+        using var conn = p.Conn();
+        p.RequireOwned(conn);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'systems', form=N'' WHERE id=@id",
+            ("@id", contract));
+
+        long Section(string name, int order, long? parent = null, int smr = 0) =>
+            PilotRunner.Long(conn,
+                "INSERT dbo.systems(contract_id,name,[order],parent_id,smr_amount,heading,source_num) " +
+                "OUTPUT inserted.id VALUES(@doc,@name,@order,@parent,@smr,N'',N'')",
+                ("@doc", contract), ("@name", name), ("@order", order),
+                ("@parent", (object?)parent ?? DBNull.Value), ("@smr", smr));
+        long Position(long system, string name, int order, int price, long? parent = null,
+            bool outside = false) => PilotRunner.Long(conn,
+                "INSERT dbo.positions(system_id,parent_id,name,[order],qty,price,out_of_kp) " +
+                "OUTPUT inserted.id VALUES(@system,@parent,@name,@order,1,@price,@outside)",
+                ("@system", system), ("@parent", (object?)parent ?? DBNull.Value),
+                ("@name", name), ("@order", order), ("@price", price), ("@outside", outside));
+
+        var root = Section("П1", 10);
+        var other = Section("В1", 0);
+        var sub = Section("П1.1", 5, root, 40);
+        var sub2 = Section("П1.2", 5, root, 5);
+        var parent = Position(root, "Установка", 2, 100);
+        var component = Position(root, "Привод", -1, 999, parent);
+        var extra = Position(root, "Вне КП", 0, 777, outside: true);
+        var item = Position(sub, "Клапан", 0, 50);
+        var item2 = Position(sub2, "Датчик", 0, 25);
+        var otherItem = Position(other, "Решётка", 0, 20);
+
+        var estimate = EstimateReader.Load(conn, checked((int)contract));
+        var asyncEstimate = EstimateReader.LoadSqlAsync(conn, checked((int)contract),
+            CancellationToken.None).GetAwaiter().GetResult();
+
+        PilotRunner.Check(estimate.Rows.Select(r => r.Name).SequenceEqual(new[]
+        {
+            "В1", "Решётка", "П1", "Вне КП", "Установка", "Привод", "П1.1",
+            "Клапан", "П1.2", "Датчик"
+        }), "Hierarchy order, tied subsystem order or component placement changed");
+        PilotRunner.Check(estimate.Rows.Select(r => r.Level).SequenceEqual(
+            new[] { 0, 1, 0, 1, 1, 2, 1, 2, 1, 2 }), "Hierarchy depth changed");
+        PilotRunner.Check(estimate.Rows.Select(r => r.Num).SequenceEqual(
+            new[] { "1", "2", "3", "", "4", "", "5", "6", "7", "8" }),
+            "Display numbering changed");
+        PilotRunner.Check(estimate.Rows.Select(r => r.SortKey).SequenceEqual(Enumerable.Range(0, 10)) &&
+            estimate.PositionsInOrder.Select(r => (long)r.Id).SequenceEqual(
+                new[] { otherItem, extra, parent, component, item, item2 }),
+            "Sort keys or ordered position IDs changed");
+        PilotRunner.Check(estimate.Rows.Where(r => r.IsSystem).Select(r => r.Amount)
+            .SequenceEqual(new[] { 20m, 175m, 50m, 25m }) &&
+            estimate.Rows.Single(r => r.IsSystem && r.SystemId == root).Note ==
+                $"СМР раздела {GmcSmeta.Core.Money.Format(45m)}" &&
+            estimate.Totals.Materials == 195m,
+            "Section amounts, SMR note or document material total changed");
+        PilotRunner.Check(estimate.Rows.SequenceEqual(asyncEstimate.Rows) &&
+            estimate.PositionsInOrder.SequenceEqual(asyncEstimate.PositionsInOrder) &&
+            estimate.Totals == asyncEstimate.Totals,
+            "Synchronous and asynchronous estimate projections diverged");
     }
 
     private static void CreateWorkspace(PilotRunner p)
