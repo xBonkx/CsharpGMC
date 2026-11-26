@@ -48,7 +48,7 @@ public partial class MainWindow
         return checked((int)SqlServerWorkspace.CreateObject(_sqlConnectionString, values, revision));
     }
 
-    private void NewSqlServerContractFlow(int objectId, string kind, long? baseId, long? copyFrom)
+    private async void NewSqlServerContractFlow(int objectId, string kind, long? baseId, long? copyFrom)
     {
         if (_serverConn is null || _sqlConnectionString is null) return;
         var obj = _objects.FirstOrDefault(o => o.Id == objectId);
@@ -66,9 +66,16 @@ public partial class MainWindow
             var dialog = new ContractDialog(obj.Name, contracts,
                 SqlServerWorkspace.Companies(_serverConn),
                 SqlServerWorkspace.ObjectTags(_serverConn), kind, baseId, copyFrom,
-                SqlServerWorkspace.LastCompanyId(_serverConn, objectId), allowCopy: true)
+                SqlServerWorkspace.LastCompanyId(_serverConn, objectId), allowCopy: true,
+                allowExcelImport: kind == "kp" && baseId is null && copyFrom is null)
                 { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.Result is not { } value) return;
+            if (dialog.ShowDialog() != true) return;
+            if (dialog.ImportExcelRequested)
+            {
+                await ImportExcelForObjectAsync(objectId, newDocumentsOnly: true);
+                return;
+            }
+            if (dialog.Result is not { } value) return;
 
             var data = new SqlServerWorkspace.NewContractData(value.Kind, value.Number, value.Date,
                 value.Name, value.CompanyId, value.BaseContractId);

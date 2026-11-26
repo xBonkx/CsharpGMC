@@ -40,6 +40,7 @@ public partial class ContractDialog : Window
     private readonly Dictionary<long, decimal> _vatByCompany = new();
 
     public ContractDialogResult? Result { get; private set; }
+    public bool ImportExcelRequested { get; private set; }
 
     /// <summary>Свойства существующего документа (ContractDialog в Python).</summary>
     public ContractDialog(string objectName, ContractInfo info, IReadOnlyList<CompanyInfo> companies,
@@ -70,10 +71,11 @@ public partial class ContractDialog : Window
     public ContractDialog(string objectName, IReadOnlyList<(long Id, string Title, string Kind)> contracts,
                           IReadOnlyList<CompanyInfo> companies, IReadOnlyList<ObjectTag> tags,
                           string kind = "kp", long? baseId = null, long? copyFromId = null,
-                          long? defaultCompany = null, bool allowCopy = true)
+                          long? defaultCompany = null, bool allowCopy = true, bool allowExcelImport = false)
     {
         InitializeComponent();
         _isNew = true;
+        ImportExcelButton.Visibility = allowExcelImport ? Visibility.Visible : Visibility.Collapsed;
         Title = kind == "dop" ? "Новое допсоглашение" : "Новое КП";
         CaptionText.Text = "Новое КП / допсоглашение";
         OkButton.Content = "Создать";
@@ -177,6 +179,14 @@ public partial class ContractDialog : Window
         VatHint.Text = _vatByCompany.TryGetValue(id, out var vat)
             ? $"НДС организации: {vat.ToString("0.###", CultureInfo.CurrentCulture)}%"
             : "";
+    }
+
+    private void ImportExcel_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isNew || ImportExcelButton.Visibility != Visibility.Visible) return;
+        // A separate outcome: no empty document, no date validation, no copy.
+        ImportExcelRequested = true;
+        DialogResult = true;
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)

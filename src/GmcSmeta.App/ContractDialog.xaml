@@ -90,10 +90,16 @@
                        Text="Тег — правила заказчика: НДС сверху, нумерация, форма КС."/>
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
+            <Button x:Name="ImportExcelButton" DockPanel.Dock="Left" Content="Из Excel…"
+                    Style="{StaticResource PythonToolbarButton}" MinWidth="110" Visibility="Collapsed"
+                    Click="ImportExcel_Click"
+                    ToolTip="Открыть импорт нового КП из файла Excel. Реквизиты указываются в окне импорта."/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" MinWidth="90" Margin="0,0,8,0"/>
             <Button x:Name="OkButton" Content="Сохранить" IsDefault="True" MinWidth="110"
                     Click="Ok_Click" Style="{StaticResource PrimaryButton}"/>
-        </StackPanel>
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Window>

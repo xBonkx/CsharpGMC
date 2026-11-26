@@ -13,7 +13,7 @@ public partial class MainWindow
     private async void ImportExcelFromObject_Click(object sender, RoutedEventArgs e) =>
         await ImportExcelForObjectAsync(CommandObject() is { Archived: false } obj ? obj.Id : null);
 
-    private async Task ImportExcelForObjectAsync(int? preferredObjectId)
+    private async Task ImportExcelForObjectAsync(int? preferredObjectId, bool newDocumentsOnly = false)
     {
         if (_sqlConnectionString is null || _serverConn is null || !SqlWritesEnabled) return;
         if (preferredObjectId is int id && !_objects.Any(obj => obj.Id == id && !obj.Archived))
@@ -75,18 +75,22 @@ public partial class MainWindow
             return;
         }
 
-        // Separate opt-in path: the original new-document importer remains untouched.
-        var mode = MessageBox.Show(this,
-            "Обновить существующую смету из Excel?\n\n" +
-            "Да — предпросмотр безопасных изменений существующего КП.\n" +
-            "Нет — прежний импорт новых КП/смет.\nОтмена — ничего не делать.",
-            "Режим импорта Excel", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-        if (mode == MessageBoxResult.Yes)
+        // The New KP dialog explicitly requests a new document, not an update.
+        if (!newDocumentsOnly)
         {
-            await UpdateExistingEstimateFromExcelAsync(fileDialog.FileName, result, parsedFingerprint, preferredObjectId);
-            return;
+            // Separate opt-in path: the original new-document importer remains untouched.
+            var mode = MessageBox.Show(this,
+                "Обновить существующую смету из Excel?\n\n" +
+                "Да — предпросмотр безопасных изменений существующего КП.\n" +
+                "Нет — прежний импорт новых КП/смет.\nОтмена — ничего не делать.",
+                "Режим импорта Excel", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (mode == MessageBoxResult.Yes)
+            {
+                await UpdateExistingEstimateFromExcelAsync(fileDialog.FileName, result, parsedFingerprint, preferredObjectId);
+                return;
+            }
+            if (mode != MessageBoxResult.No) return;
         }
-        if (mode != MessageBoxResult.No) return;
 
         // Read only metadata once, not one network query for each preview block.
         Dictionary<long, IReadOnlySet<string>> existing;
