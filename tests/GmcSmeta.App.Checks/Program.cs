@@ -177,6 +177,7 @@ internal static class Program
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
         LegacySummaryChecks.Run();
+        SummaryRowSequenceChecks.Run();
     }
 
     /// <summary>

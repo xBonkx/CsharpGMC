@@ -67,3 +67,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 - 26.11.2026, PERF-026 / ARCH-SIZE: EstimateView.CostSummary.cs 1359→1364, CostMissingPriceIndex.cs 41→52, CostMissingPriceIndexTests.cs 44→66 строк. Встроенная Сводная переиспользует существующий Core-индекс; рост крупного файла — только интеграция/lookup, отдельная декомпозиция остаётся в архитектурной очереди. Сборка/тесты не запускались.
 
 - 26.11.2026, PERF-026 / ARCH-SIZE: EstimateView.CostSummary.cs 1364→1350, новый CostSummarySearchIndex.cs 44, CostSummarySearchIndexTests.cs 62 строк. Поиск выделен в Core-компонент, подготовка на worker; декомпозиция остальной Сводной остаётся отдельной задачей. Сборка/тесты не запускались.
+
+- 26.11.2026, PERF-026 / ARCH-SIZE: EstimateView.CostSummary.cs 1350→1355, новый SummaryRowSequence.cs 51, Program.cs (App.Checks) 635→636, новый SummaryRowSequenceChecks.cs 60 строк. Вынесено сравнение строк/восстановление ключей в самостоятельный компонент и отдельный тест. Рост крупных файлов — только точки интеграции; общая декомпозиция остаётся отдельной задачей. Сборка/тесты не запускались.

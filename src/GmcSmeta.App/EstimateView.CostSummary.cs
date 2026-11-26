@@ -505,6 +505,13 @@ public partial class EstimateView
     private void SummaryReplaceRows(List<SummaryRow> built)
     {
         var grid = SummaryGrid;
+        // Never skip an authoritative replacement or interfere with an active editor.
+        if (SummarySnapshotReady && _summaryPendingView is null &&
+            grid.ItemsSource is ObservableCollection<SummaryRow> current &&
+            grid.Items is System.ComponentModel.IEditableCollectionView { IsEditingItem: false, IsAddingNew: false } &&
+            SummaryRowSequence.Same(current, built))
+            return;
+
         var state = grid.ItemsSource is not null ? CaptureSummaryView(grid) : _summaryPendingView;
         _summaryPendingView = null;
         var source = new ObservableCollection<SummaryRow>(built);
@@ -513,10 +520,8 @@ public partial class EstimateView
         if (state is null) return;
 
         // Use exact stable keys; duplicate/ambiguous keys must not carry selection.
-        var byKey = built.Select(item => (Item: item, Key: SummarySelectionKey(item)))
-            .Where(x => x.Key is not null).GroupBy(x => x.Key!, StringComparer.Ordinal)
-            .Where(group => group.Count() == 1)
-            .ToDictionary(group => group.Key, group => group.Single().Item, StringComparer.Ordinal);
+        var byKey = SummaryRowSequence.RestoreCandidates(built, state.Selected, state.CurrentKey,
+            state.CurrentAnchor?.Key, state.TopAnchor?.Key);
         foreach (var (key, item) in byKey)
             if (state.Selected.Contains(key)) grid.SelectedItems.Add(item);
         if (state.CurrentKey is { } currentKey && byKey.TryGetValue(currentKey, out var restoredCurrent) &&
