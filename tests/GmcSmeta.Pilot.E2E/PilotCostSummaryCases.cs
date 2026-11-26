@@ -85,6 +85,23 @@ internal static class PilotCostSummaryCases
         }
         catch (OperationCanceledException) { }
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled read changed revision");
+        var legacyMaterials = SqlServerCostSummary.MaterialsData(p.PilotConnection, contractId);
+        using var materialCancellation = new CancellationTokenSource();
+        var materials = SqlServerCostSummary.MaterialsData(conn, contractId, materialCancellation.Token);
+        PilotRunner.Check(materials.Systems.SequenceEqual(legacyMaterials.Systems) &&
+            materials.Positions.SequenceEqual(legacyMaterials.Positions) &&
+            (materials with { Systems = legacyMaterials.Systems, Positions = legacyMaterials.Positions }) == legacyMaterials &&
+            materials.Positions.Select(row => row.Id).Contains(material) &&
+            SqlServerDatabase.Revision(conn) == before,
+            "Same-connection materials read changed projection or revision");
+        materialCancellation.Cancel();
+        try
+        {
+            SqlServerCostSummary.MaterialsData(conn, contractId, materialCancellation.Token);
+            throw new InvalidOperationException("Cancelled materials read did not throw.");
+        }
+        catch (OperationCanceledException) { }
+        PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled materials read changed revision");
         var standaloneTotals = SqlServerCostTotals.Totals(conn, contractId, data);
         var combined = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
         PilotRunner.Check(combined.Summary.Rows.SequenceEqual(data.Rows) &&

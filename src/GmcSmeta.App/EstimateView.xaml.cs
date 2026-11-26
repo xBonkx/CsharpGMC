@@ -155,6 +155,7 @@ public partial class EstimateView : UserControl
                 _reloadGate.NextRequest(); // discard an in-flight read of a detached, clean editor
                 _reloadCancellation?.Cancel(); // preserve mandatory readback on detach
                 CancelSummaryRead();
+                CancelMaterialsRead();
             }
         };
         Loaded += (_, _) =>
@@ -169,6 +170,10 @@ public partial class EstimateView : UserControl
             else if (_visibleEstimateMode == "summary" && _estimate is not null &&
                 string.IsNullOrWhiteSpace(_summaryRevision) && !HasUnsettledCacheWrites)
                 _ = LoadCostSummaryAsync();
+            else if (_visibleEstimateMode == "materials" && _estimate is not null &&
+                !_materialsBusy && !HasUnsettledCacheWrites &&
+                (string.IsNullOrWhiteSpace(_materialsRevision) || _materialsRevision != _serverRevision))
+                _ = LoadMaterialsAsync();
         };
         SetStatus("Загрузка сметы из SQL Server…", false);
         _ = ReloadDocumentAsync();
@@ -179,6 +184,7 @@ public partial class EstimateView : UserControl
         _estimate = est;
         InvalidateCostSummary();
         InvalidateCostTotals();
+        CancelMaterialsRead(); // a new authoritative estimate supersedes a clean in-flight read
         var selectedId = (EstimateGrid.SelectedItem as EditableEstimateRow)?.Id;
         // Full authoritative readback stays mandatory. Reuse only equal
         // source records, never infer a committed value from the editor.

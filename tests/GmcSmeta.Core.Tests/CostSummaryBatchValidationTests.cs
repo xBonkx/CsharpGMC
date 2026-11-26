@@ -17,6 +17,15 @@ public sealed class CostSummaryBatchValidationTests
     }
 
     [Fact]
+    public void CancelledMaterialsReadDoesNotAttemptToUseClosedConnection()
+    {
+        using var connection = new Microsoft.Data.SqlClient.SqlConnection(Pilot);
+        var token = new CancellationToken(canceled: true);
+        Assert.Throws<OperationCanceledException>(() => SqlServerCostSummary.MaterialsData(connection, 1, token));
+        Assert.Equal(System.Data.ConnectionState.Closed, connection.State);
+    }
+
+    [Fact]
     public void BatchRefusesProductionBeforeOpeningConnection()
     {
         Assert.Throws<InvalidOperationException>(() => SqlServerCostSummary.SaveSummaryCells(

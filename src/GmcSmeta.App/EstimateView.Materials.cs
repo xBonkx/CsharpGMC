@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -88,6 +89,7 @@ public partial class EstimateView
     private string _materialsSort = "kp";
     private bool _materialsLoading;
     private int _materialsLoadVersion;
+    private CancellationTokenSource? _materialsLoadCancellation;
     private bool _materialsBusy;
     private string _materialsRevision = "";
     private bool MaterialsSnapshotReady => !_materialsLoading && !_materialsBusy &&
@@ -104,9 +106,20 @@ public partial class EstimateView
     private static string MatMoney(decimal v) => Money.Format(v);
 
     // ------------------------------------------------------------------ load
+    private void CancelMaterialsRead()
+    {
+        // A materials mutation owns its forced readback until it completes.
+        if (_materialsBusy || !_materialsLoading) return;
+        ++_materialsLoadVersion;
+        var cancellation = _materialsLoadCancellation;
+        _materialsLoadCancellation = null;
+        _materialsLoading = false;
+        cancellation?.Cancel();
+    }
+
     private async Task LoadMaterialsAsync(bool force = false)
     {
-        if (_estimate is null || MaterialsPanel is null) return;
+        if (_estimate is null || MaterialsPanel is null || (_detached && !_materialsBusy)) return;
         if (_materialsLoading) return;
         if (MaterialsView is null && _visibleEstimateMode != "materials") return;
         if (!force && _materialsData is not null && !string.IsNullOrWhiteSpace(_materialsRevision) &&
@@ -118,31 +131,46 @@ public partial class EstimateView
         _materialsLoading = true;
         _materialsRevision = "";
         var version = ++_materialsLoadVersion;
+        using var cancellation = new CancellationTokenSource();
+        _materialsLoadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             EnsureMaterialsView();
-            var snapshot = await Task.Run(() =>
+            var snapshot = await Task.Run(async () =>
             {
-                using var conn = SqlServerDatabase.Open(_sqlConnectionString);
-                var revision = SqlServerDatabase.Revision(conn);
-                var data = SqlServerCostSummary.MaterialsData(_sqlConnectionString, _contractId);
-                if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
+                using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
+                var revision = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                var data = SqlServerCostSummary.MaterialsData(conn, _contractId, token);
+                if (string.IsNullOrWhiteSpace(revision) ||
+                    revision != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились во время чтения материалов. Повторите обновление.");
+                token.ThrowIfCancellationRequested();
                 return (data, revision);
-            });
-            if (version != _materialsLoadVersion) return;
+            }, token);
+            if (token.IsCancellationRequested || version != _materialsLoadVersion ||
+                (_detached && !_materialsBusy)) return;
             _materialsData = snapshot.data;
             MaterialsPrepareCache();
             MaterialsRebuild();
             _materialsRevision = snapshot.revision;
         }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            // Navigation superseded this read, not a save failure.
+        }
         catch (Exception ex)
         {
-            SetStatus("Материалы: ошибка загрузки — " + ex.Message, true);
+            if (version == _materialsLoadVersion)
+                SetStatus("Материалы: ошибка загрузки — " + ex.Message, true);
         }
         finally
         {
-            _materialsLoading = false;
+            if (ReferenceEquals(_materialsLoadCancellation, cancellation))
+            {
+                _materialsLoadCancellation = null;
+                _materialsLoading = false;
+            }
         }
     }
 
