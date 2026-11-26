@@ -38,6 +38,8 @@ public sealed class ProcurementReadLifecycleTests
         Assert.Contains("else SuspendBuyReads();", pane);
         Assert.Contains("TryReloadAsync(allowUnchanged: true, requiredReadback: false)", pane);
         Assert.Contains("ReloadAsync(preserveStatus: true)", incremental);
+        Assert.Contains("catch (Exception) when (!requiredReadback &&", loader);
+        Assert.Contains("_ = _owner.TryReloadAsync();", pane);
         Assert.Contains("_allRows = items;", loader);
     }
 }

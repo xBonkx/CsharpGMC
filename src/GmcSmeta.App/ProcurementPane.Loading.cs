@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Data;
 using GmcSmeta.Core.Db;
 
@@ -94,6 +95,8 @@ public partial class ProcurementPane
                         _connectionString, _contractId, "", null, token), token);
                     if (token.IsCancellationRequested || generation != _reloadGeneration || !IsLoaded) return false;
                     if (snapshot is null) throw new InvalidOperationException("Не получен снимок закупок.");
+                    if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
+                        throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
                 }
                 else
                 {
@@ -139,7 +142,8 @@ public partial class ProcurementPane
             if (!preserveStatus) FooterText.Text = "";
             return true;
         }
-        catch (Exception) when (token.IsCancellationRequested || generation != _reloadGeneration)
+        catch (Exception) when (!requiredReadback &&
+            (token.IsCancellationRequested || generation != _reloadGeneration))
         {
             return false;
         }

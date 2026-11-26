@@ -197,7 +197,7 @@ public partial class ProcurementPane : UserControl
             if (!_owner.IsLoaded) return;
             _owner.UpdateHistoryButtons();
             if (_owner._needsReloadAfterAttach && _attachment != _owner._attachmentGeneration)
-                _ = _owner.TryReloadAsync(requiredReadback: false);
+                _ = _owner.TryReloadAsync();
         }
     }
 
