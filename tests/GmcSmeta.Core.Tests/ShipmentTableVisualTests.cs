@@ -53,7 +53,14 @@ public sealed class ShipmentTableVisualTests
         Assert.Equal("SystemGroup_ExpansionChanged", (string?)group.Attribute("Expanded"));
         Assert.Equal("SystemGroup_ExpansionChanged", (string?)group.Attribute("Collapsed"));
         var groupHeader = Assert.Single(group.Descendants(p + "DockPanel"));
-        Assert.Equal("#F1F4F9", (string?)groupHeader.Attribute("Background"));
+        var groupStyle = Assert.Single(groupHeader.Descendants(p + "Style"));
+        Assert.Contains(groupStyle.Elements(p + "Setter"), e =>
+            (string?)e.Attribute("Property") == "Background" && (string?)e.Attribute("Value") == "#F1F4F9");
+        var subTrigger = Assert.Single(groupStyle.Descendants(p + "DataTrigger"));
+        Assert.Equal("{Binding Name.IsSubsystem}", (string?)subTrigger.Attribute("Binding"));
+        Assert.Equal("True", (string?)subTrigger.Attribute("Value"));
+        Assert.Contains(subTrigger.Elements(p + "Setter"), e =>
+            (string?)e.Attribute("Property") == "Background" && (string?)e.Attribute("Value") == "#E8F5FC");
         Assert.Equal("27", (string?)groupHeader.Attribute("MinHeight"));
         Assert.Equal("Bold", (string?)groupHeader.Descendants(p + "TextBlock").Single().Attribute("FontWeight"));
         Assert.Equal("SelectSystem_Click", (string?)groupHeader.Descendants(p + "Button").Single().Attribute("Click"));
@@ -61,6 +68,12 @@ public sealed class ShipmentTableVisualTests
         Assert.NotNull(Named("ShipmentHelpText"));
 
         var code = File.ReadAllText(Path.Combine(app, "ShipmentsPane.xaml.cs"));
+        Assert.Contains("IsSubsystem = row.IsSubsystem", code);
+        Assert.Contains("old.IsSubsystem != candidate.IsSubsystem", code);
+        Assert.Contains("SystemLabel) { IsSubsystem = IsSubsystem }", code);
+        var sql = File.ReadAllText(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerShipments.cs"));
+        Assert.Contains("AS issued, p.parent_id, sy.parent_id", sql);
+        Assert.Contains("outOfKp, !r.IsDBNull(11)) { IsSubsystem = !r.IsDBNull(12) }", sql);
         Assert.Contains("ShipmentCardText.PositionCount(lineCount)", code);
         Assert.Contains("ShipmentCardText.PositionCount(over)", code);
         Assert.Contains("ShipmentCardText.PositionCount(planned - done)", code);

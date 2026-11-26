@@ -15,7 +15,10 @@ using GmcSmeta.Core.Domain;
 namespace GmcSmeta.App;
 
 /// <summary>Идентичность группы не зависит от совпадения названий систем и документов.</summary>
-public sealed record ShipmentSystemGroup(long ContractId, long SystemId, string Label);
+public sealed record ShipmentSystemGroup(long ContractId, long SystemId, string Label)
+{
+    public bool IsSubsystem { get; init; }
+}
 
 /// <summary>Ведомость в окне выдачи — отображение строки и её итогов.</summary>
 public sealed class ShipmentPreviewRow
@@ -23,6 +26,7 @@ public sealed class ShipmentPreviewRow
     public long ContractId { get; init; }
     public long SystemId { get; init; }
     public bool IsSub { get; init; }
+    public bool IsSubsystem { get; init; }
     public long PositionId { get; init; }
     public string Name { get; init; } = "";
     public string Unit { get; init; } = "";
@@ -30,7 +34,7 @@ public sealed class ShipmentPreviewRow
     public string Price { get; init; } = "";
     public string IssuedTotal { get; init; } = "";
     public string SystemLabel { get; init; } = "";
-    public ShipmentSystemGroup SystemGroup => new(ContractId, SystemId, SystemLabel);
+    public ShipmentSystemGroup SystemGroup => new(ContractId, SystemId, SystemLabel) { IsSubsystem = IsSubsystem };
     public string ByEstimate { get; init; } = "";
     public string StockText { get; init; } = "";
     public string LeftText { get; init; } = "";
@@ -306,6 +310,7 @@ public partial class ShipmentsPane : UserControl
             ContractId = row.ContractId,
             SystemId = row.SystemId,
             IsSub = row.IsSub,
+            IsSubsystem = row.IsSubsystem,
             PositionId = row.PositionId,
             Name = row.Name + (row.OutOfKp ? "  [вне КП]" : ""),
             Unit = row.Unit,
@@ -371,7 +376,8 @@ public partial class ShipmentsPane : UserControl
         {
             if (!indexById.TryGetValue(candidate.PositionId, out var index)) return false;
             var old = _rows[index];
-            if (old.SystemId != candidate.SystemId || old.ContractId != candidate.ContractId) return false;
+            if (old.SystemId != candidate.SystemId || old.ContractId != candidate.ContractId ||
+                old.IsSubsystem != candidate.IsSubsystem) return false;
             byId.TryGetValue(candidate.PositionId, out var line);
             var replacement = BuildPreviewRow(candidate, line, changes.Shipment, IsEditable, old.SystemLabel);
             expectedLines += (replacement.InShipment ? 1 : 0) - (old.InShipment ? 1 : 0);

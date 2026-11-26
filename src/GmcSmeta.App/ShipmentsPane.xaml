@@ -398,7 +398,17 @@
                                           Loaded="SystemGroup_Loaded" DataContextChanged="SystemGroup_DataContextChanged"
                                           Expanded="SystemGroup_ExpansionChanged" Collapsed="SystemGroup_ExpansionChanged">
                                     <Expander.Header>
-                                        <DockPanel LastChildFill="True" MinHeight="27" Background="#F1F4F9">
+                                        <DockPanel LastChildFill="True" MinHeight="27">
+                                            <DockPanel.Style>
+                                                <Style TargetType="DockPanel">
+                                                    <Setter Property="Background" Value="#F1F4F9"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Name.IsSubsystem}" Value="True">
+                                                            <Setter Property="Background" Value="#E8F5FC"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DockPanel.Style>
                                             <Button DockPanel.Dock="Right" Content="Выбрать систему" Click="SelectSystem_Click"
                                                     Style="{StaticResource PythonToolbarButton}" Padding="6,2" MinHeight="24"
                                                     ToolTip="Выбрать все видимые позиции этой системы для массового действия"/>

@@ -24,7 +24,11 @@ public static class SqlServerShipments
 
     public sealed record IssuableRow(long ContractId, long PositionId, long SystemId,
         string SystemName, string Name, string Unit, decimal Qty, decimal Price,
-        decimal Received, decimal Issued, bool OutOfKp, bool IsSub = false);
+        decimal Received, decimal Issued, bool OutOfKp, bool IsSub = false)
+    {
+        // System hierarchy is independent of the position/kit hierarchy.
+        public bool IsSubsystem { get; init; }
+    }
 
     public sealed record ShipmentDocument(long Id, string Title);
 
@@ -186,7 +190,7 @@ public static class SqlServerShipments
             "ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'in'),0)" +
             " - ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back_supplier'),0) AS received, " +
             "ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'out'),0)" +
-            " - ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back'),0) AS issued, p.parent_id " +
+            " - ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back'),0) AS issued, p.parent_id, sy.parent_id " +
             "FROM dbo.positions p " +
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
             "JOIN dbo.contracts c ON c.id=sy.contract_id " +
@@ -215,7 +219,7 @@ public static class SqlServerShipments
                 r.IsDBNull(7) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture)),
                 r.IsDBNull(9) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(9), CultureInfo.InvariantCulture)),
                 r.IsDBNull(10) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(10), CultureInfo.InvariantCulture)),
-                outOfKp, !r.IsDBNull(11)));
+                outOfKp, !r.IsDBNull(11)) { IsSubsystem = !r.IsDBNull(12) });
         }
         token.ThrowIfCancellationRequested();
         return list;
