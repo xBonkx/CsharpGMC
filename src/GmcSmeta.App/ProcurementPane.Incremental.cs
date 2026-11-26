@@ -16,24 +16,52 @@ public partial class ProcurementPane
     private int _buyViewportGeneration;
     private ObservableCollection<ProcurementPreviewRow>? _buyDisplay;
     private bool _buyDisplayGrouped;
-    private (long Id, string Label, string Identity)[] _buyDisplayKeys = Array.Empty<(long, string, string)>();
+    private BuyDisplayKey[] _buyDisplayKeys = Array.Empty<BuyDisplayKey>();
+    private Dictionary<long, int>? _buyRowIndex;
+
+    internal readonly record struct BuyDisplayKey(long Id, string Label, string Identity,
+        string Title, string Number)
+    {
+        public static BuyDisplayKey Of(ProcurementPreviewRow row) =>
+            new(row.PositionId, row.GroupLabel, row.GroupIdentity,
+                row.GroupTitle, row.GroupDisplayNumber);
+    }
+
+    internal static bool SameBuyRowReferences(IList<ProcurementPreviewRow> current,
+        IReadOnlyList<ProcurementPreviewRow> next)
+    {
+        if (current.Count != next.Count) return false;
+        for (var i = 0; i < next.Count; i++)
+            if (!ReferenceEquals(current[i], next[i])) return false;
+        return true;
+    }
 
     /// <summary>Update the current view in place only when its membership, order and groups agree.
     /// Otherwise rebuild from the in-memory projection, not from SQL.</summary>
     private void ApplyBuyDisplay(List<ProcurementPreviewRow> display, bool grouped)
     {
+        // The planner mutates group captions on reused row objects. Compare
+        // detached keys (including header title/number), not the mutated rows.
+        var keys = display.Select(BuyDisplayKey.Of).ToArray();
+        var canReplace = _buyDisplay is not null &&
+            BuyGrid.ItemsSource is ListCollectionView currentView &&
+            ReferenceEquals(currentView.SourceCollection, _buyDisplay) &&
+            _buyDisplayGrouped == grouped && _buyDisplay.Count == display.Count &&
+            _buyDisplayKeys.SequenceEqual(keys);
+
+        // A no-op filter or a committed update outside the visible subset
+        // must not clear selection, queue scrolling or start another history
+        // request. Snapshot callers still explicitly reload history at the
+        // newly accepted revision after this method returns.
+        if (canReplace && SameBuyRowReferences(_buyDisplay!, display))
+            return;
+
         var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().Select(r => r.PositionId).ToHashSet();
         var currentId = (BuyGrid.CurrentCell.Item as ProcurementPreviewRow)?.PositionId;
         var column = BuyGrid.CurrentCell.Column;
         var scroll = FindVisualChild<ScrollViewer>(BuyGrid);
         var vertical = scroll?.VerticalOffset ?? 0;
         var horizontal = scroll?.HorizontalOffset ?? 0;
-        // The planner mutates group captions on reused row objects. Compare against
-        // detached keys of the last applied view, not the now-mutated row references.
-        var keys = display.Select(row => (row.PositionId, row.GroupLabel, row.GroupIdentity)).ToArray();
-        var canReplace = _buyDisplay is not null && BuyGrid.ItemsSource is ListCollectionView &&
-            _buyDisplayGrouped == grouped && _buyDisplay.Count == display.Count &&
-            _buyDisplayKeys.SequenceEqual(keys);
         _restoringBuySelection = true;
         try
         {
@@ -79,10 +107,15 @@ public partial class ProcurementPane
             _snapshotDay != DateTime.Today ||
             BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: false }) return false;
         var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
         var rows = await Task.Run(() =>
             SqlServerProcurement.ReadChangedBuyRows(_connectionString, _contractId, ids, revision));
-        if (!IsLoaded || attachment != _attachmentGeneration || rows is null || _snapshotDay != DateTime.Today) return false;
-        var index = _allRows.Select((row, i) => (row.PositionId, Index: i))
+        if (!IsLoaded || attachment != _attachmentGeneration || generation != _reloadGeneration ||
+            rows is null || _snapshotDay != DateTime.Today ||
+            BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: false }) return false;
+        // The full readback replaces the list and invalidates this index.
+        // Incremental readback only replaces items at existing indices.
+        var index = _buyRowIndex ??= _allRows.Select((row, i) => (row.PositionId, Index: i))
             .ToDictionary(x => x.PositionId, x => x.Index);
         var replacements = new List<(int Index, ProcurementPreviewRow Row)>();
         foreach (var row in rows)

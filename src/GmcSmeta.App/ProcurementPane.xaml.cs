@@ -251,6 +251,7 @@ public partial class ProcurementPane : UserControl
         try
         {
             _allRows = items.ToList();
+            _buyRowIndex = null;
             _allSystems = systems.ToList();
             RebuildScopeFilters();
             UpdateCategoryCounts();

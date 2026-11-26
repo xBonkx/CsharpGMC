@@ -167,6 +167,7 @@ internal static class Program
         CheckEstimateCalculatedColumns();
         CheckEstimateRowViewIndex();
         CheckEstimateVisibleRowPresentation();
+        CheckProcurementUnchangedDisplay();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -392,6 +393,39 @@ internal static class Program
         if (changes != 0)
             throw new Exception("An unchanged visible row must not raise redundant notifications.");
         Console.WriteLine("Estimate visible-row presentation and grouping transitions OK.");
+    }
+
+    private static void CheckProcurementUnchangedDisplay()
+    {
+        static ProcurementPreviewRow Row(int id) => new()
+        {
+            PositionId = id, GroupLabel = "П1 · 2500 поз.", GroupIdentity = "system:1",
+            GroupTitle = "П1", GroupDisplayNumber = "1"
+        };
+        var current = Enumerable.Range(1, 2500).Select(Row).ToList();
+        var visible = current.ToList();
+        if (!ProcurementPane.SameBuyRowReferences(current, visible))
+            throw new Exception("Unchanged procurement rows must retain their current view.");
+
+        visible[1234] = Row(1235);
+        if (ProcurementPane.SameBuyRowReferences(current, visible))
+            throw new Exception("Authoritative readback must replace a visible row even if its ID matches.");
+        visible[1234] = current[1234];
+        visible.Reverse();
+        if (ProcurementPane.SameBuyRowReferences(current, visible) ||
+            ProcurementPane.SameBuyRowReferences(current, visible.Take(10).ToArray()))
+            throw new Exception("Changed order or membership must not be a no-op.");
+
+        var first = current[0];
+        var key = ProcurementPane.BuyDisplayKey.Of(first);
+        first.GroupTitle = "Новое название";
+        if (key == ProcurementPane.BuyDisplayKey.Of(first))
+            throw new Exception("Group title changes must invalidate detached view keys.");
+        first.GroupTitle = "П1";
+        first.GroupDisplayNumber = "2";
+        if (key == ProcurementPane.BuyDisplayKey.Of(first))
+            throw new Exception("Group number changes must invalidate detached view keys.");
+        Console.WriteLine("Procurement no-op projection and authoritative replacements OK.");
     }
 
     private static void CheckEstimateCalculatedColumns()
