@@ -6,7 +6,9 @@
 
 Восстановлена документация из CsharpGMC-archive @ fb8024cc7ca4d42b4e0d34c6000ad821d2c69abf. Архивный MASTER_TODO содержит 400 ID; 35 открытых Issues сохранены с описаниями. Архивные статусы не переподтверждены. Активная очередь остаётся Python 0.66.4–0.67.9 / SQL 28→31 / выпуск релиза; предыдущий кодовый коммит 34355f3b65668e28d53a3c2ec0099ee4e9df16c3 — пересчёт СМР по системам этапов. Следующий шаг: интеграция безопасной репетиции/проверки фактической схемы с ReleaseBuilder, потом полноценная миграция только после приёмки. Рабочая БД не тронута. Windows/SQL тесты не выполнены. История: docs/CURRENT_TASK_ARCHIVE_20261125.md.
 
-## 26.11.2026 — Паритет палитры формул КС 0.67.9 + публикация релиза v1.0.3
+## 26.11.2026 — Релиз v1.0.4 (локальная сборка, GitHub Actions минуты исчерпаны)
+
+`RELEASE_VERSION` поднят до `v1.0.4`. Коммит отправлен в `main`; GitHub-релиз, если минуты появятся, опубликуется workflow автоматически. Локальная сборка выполнена по шагам csharp-release.yml: schema guard 28, build 0 ошибок, unit-тесты 1401/1401, publish self-contained/fx/launcher, архивы и SHA256SUMS в `artifacts/release/`. Рабочая БД не затрагивалась.
 
 Кодовый блок: константы палитры формул КС (Python 0.67.9 `ks_view.REFERENCE_COLORS`) вынесены из App в Core `KsFormulaReferenceColors`; App берёт палитру оттуда вместо дублированных hex. Добавлены `KsFormulaReferenceColorsTests` (7) и `CheckKsFormulaReferenceHighlight` в App.Checks. Парное сравнение палитры выполнено: 8 цветов и порядок совпадают, alpha 30 и толщина 2. Визуальная заливка 30-alpha в WPF по-прежнему только рамкой — полный визуальный паритет остаётся открытым для Windows/DPI.
 Файлы: `src/GmcSmeta.Core/Domain/KsFormulaReferenceColors.cs`, `tests/.../KsFormulaReferenceColorsTests.cs`, `src/GmcSmeta.App/ActsEditorView.xaml.cs`, `tests/GmcSmeta.App.Checks/Program.cs`, доки.
