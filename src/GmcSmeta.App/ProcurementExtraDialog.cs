@@ -47,15 +47,20 @@ public sealed class ProcurementExtraDialog : Window
             return box;
         }
         _name = Field(pane, "Наименование", item?.BuyName ?? "Новая позиция (докупили)");
+        _name.TextWrapping = TextWrapping.Wrap;
+        _name.MinHeight = 54;
+        _name.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         var unitWrap = new StackPanel { Width = 140, Margin = new Thickness(0, 0, 16, 0) };
         var qtyWrap = new StackPanel { Width = 160 };
         _unit = Field(unitWrap, "Ед.", item?.Unit ?? "шт");
         _quantity = Field(qtyWrap, "Количество", item?.Qty ?? "1");
+        _quantity.TextAlignment = TextAlignment.Right;
         row.Children.Add(unitWrap);
         row.Children.Add(qtyWrap);
         pane.Children.Add(row);
         _cost = Field(pane, "Фактическая цена закупки (можно пусто)", item?.CostPrice ?? "");
+        _cost.TextAlignment = TextAlignment.Right;
         if (item is not null)
         {
             _cost.IsEnabled = false;

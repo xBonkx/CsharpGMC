@@ -4,28 +4,60 @@
         xmlns:local="clr-namespace:GmcSmeta.App"
         Title="Люди и автомобили" Width="1200" Height="760" MinWidth="840" MinHeight="550"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" WindowStartupLocation="CenterOwner"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         Background="#F4F6FA" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <DockPanel Margin="22,16,22,14" LastChildFill="True">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <DockPanel Margin="0,0,0,8">
-                <Button DockPanel.Dock="Right" Content="Загрузить из Excel…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Import_Click"
+                <Button DockPanel.Dock="Right" Content="Загрузить из Excel…" Style="{StaticResource PythonToolbarButton}" ContentTemplate="{StaticResource IconLabelUpload}" Click="Import_Click"
                         Padding="16,8" Margin="12,0,0,0" VerticalAlignment="Top"/>
                 <StackPanel>
                     <TextBlock x:Name="TitleText" Text="Люди и автомобили"
-                               FontSize="24" FontWeight="SemiBold" Foreground="#1F2937"/>
+                               FontSize="{StaticResource UiH1Size}" FontWeight="SemiBold" Foreground="#1F2937" TextWrapping="Wrap"/>
                     <TextBlock x:Name="SubtitleText" Text="Общая база сотрудников и автомобилей"
                                Foreground="#64748B" TextWrapping="Wrap" Margin="0,3,0,0"/>
                 </StackPanel>
             </DockPanel>
-            <StackPanel x:Name="HistoryPanel" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,7">
+            <WrapPanel x:Name="HistoryPanel" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,7">
                 <TextBlock Text="Галочки как в списке:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#64748B"/>
                 <ComboBox x:Name="HistoryBox" MinWidth="420" Width="475" DisplayMemberPath="Label"
                           SelectionChanged="History_Changed"/>
-                <Button Content="Открыть файл" Click="OpenHistory_Click" Padding="10,6" Margin="8,0,0,0"/>
-            </StackPanel>
+                <Button Content="Открыть файл" ContentTemplate="{StaticResource IconLabelOpen}" Style="{StaticResource PythonToolbarButton}" Click="OpenHistory_Click" Padding="10,6" Margin="8,0,0,0"/>
+            </WrapPanel>
             <WrapPanel Margin="0,4,0,0">
-                <TextBox x:Name="SearchBox" Width="390" Padding="9,7" TextChanged="Search_Changed"
-                         ToolTip="Поиск по ФИО, должности, номеру машины"/>
+                <Grid Width="390">
+                    <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" Padding="32,5,32,5" TextChanged="Search_Changed"
+                             AutomationProperties.Name="Поиск по фамилии, должности, госномеру" ToolTip="Поиск по фамилии, должности, госномеру…"/>
+                    <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False">
+                        <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Поиск по фамилии, должности, госномеру…" Foreground="#94A3B8" Margin="32,0,32,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" Click="ClearPeopleSearch_Click"
+                            ToolTip="Очистить поиск" AutomationProperties.Name="Очистить поиск"
+                            Width="26" Height="26" MinWidth="0" MinHeight="0" Padding="0" Margin="0,0,3,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger></Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
                 <CheckBox x:Name="ShowInactive" Content="Показать тех, кто уже не работает"
                           Margin="20,0,0,0" VerticalAlignment="Center"
                           Checked="Filter_Changed" Unchecked="Filter_Changed"/>
@@ -44,17 +76,16 @@
                 <ComboBox Grid.Column="1" x:Name="CompanyBox" DisplayMemberPath="Name"
                           Margin="0,0,18,0" Height="32"/>
                 <TextBlock Grid.Column="2" Text="Текст письма:" VerticalAlignment="Top" Margin="0,8,8,0"/>
-                <TextBox Grid.Column="3" x:Name="IntroBox" Height="56" Padding="6" AcceptsReturn="True"
+                <TextBox Grid.Column="3" x:Name="IntroBox" Height="54" Padding="6" AcceptsReturn="True"
                          TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
             </Grid>
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button x:Name="OrdersButton" Visibility="Collapsed" Content="Приказы…"
+                    <Button x:Name="OrdersButton" Visibility="Collapsed" Content="Приказы…" ContentTemplate="{StaticResource IconLabelFile}" Style="{StaticResource PythonToolbarButton}"
                             Click="Orders_Click" Padding="12,7" Margin="0,0,8,0"/>
-                    <Button x:Name="ExportButton" Visibility="Collapsed" Content="Сформировать список (Excel)" ContentTemplate="{StaticResource IconLabelDownload}"
-                            Click="Export_Click" Background="#F97316" Foreground="White"
-                            BorderBrush="#F97316" FontWeight="SemiBold" Padding="14,7" Margin="0,0,8,0"/>
-                    <Button Content="Закрыть" Click="Close_Click" Padding="14,7"/>
+                    <Button x:Name="ExportButton" Visibility="Collapsed" Content="Сформировать список (Excel)" ContentTemplate="{StaticResource IconLabelExcel}"
+                            Click="Export_Click" Style="{StaticResource ProcurementRequestPrimary}" Margin="0,0,8,0"/>
+                    <Button Content="Закрыть" Style="{StaticResource PythonToolbarButton}" Click="Close_Click" Padding="14,7"/>
                 </StackPanel>
                 <TextBlock x:Name="HintText" TextWrapping="Wrap" VerticalAlignment="Center"
                            Foreground="#64748B" FontSize="12"
@@ -64,22 +95,22 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="3*"/>
+                <RowDefinition Height="3*" MinHeight="105"/>
                 <RowDefinition Height="8"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="*" MinHeight="105"/>
             </Grid.RowDefinitions>
             <DockPanel Grid.Row="0">
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6" VerticalAlignment="Center">
                     <TextBlock Text="ЛЮДИ" FontWeight="SemiBold" VerticalAlignment="Center"
                                Foreground="#475569" Margin="0,0,10,0"/>
                     <TextBlock x:Name="PeopleCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <Button x:Name="PeopleAll" Visibility="Collapsed" Content="Отметить всех"
+                    <Button x:Name="PeopleAll" Visibility="Collapsed" Content="Отметить всех" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarButton}"
                             Click="PeopleAll_Click" Padding="8,4" Margin="0,0,5,0"/>
-                    <Button x:Name="PeopleNone" Visibility="Collapsed" Content="Снять все"
+                    <Button x:Name="PeopleNone" Visibility="Collapsed" Content="Снять все" ContentTemplate="{StaticResource IconLabelX}" Style="{StaticResource PythonToolbarButton}"
                             Click="PeopleNone_Click" Padding="8,4" Margin="0,0,8,0"/>
-                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" ToolTip="Выше" Click="PersonUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
-                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" ToolTip="Ниже" Click="PersonDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
-                    <Button Content="Добавить человека" ContentTemplate="{StaticResource IconLabelPlus}" Click="PersonAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" Style="{StaticResource PythonToolbarButton}" ToolTip="Выше" Click="PersonUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" Style="{StaticResource PythonToolbarButton}" ToolTip="Ниже" Click="PersonDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Добавить человека" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PythonToolbarButton}" Click="PersonAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button Content="Редактировать" Click="PersonEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button x:Name="PersonActiveButton" Content="Не работает / Снова работает"
                             Click="PersonActive_Click" Padding="8,4" Margin="0,0,5,0"/>
@@ -88,7 +119,7 @@
                 </WrapPanel>
                 <DataGrid local:TableColumnMenu.Key="people" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="ФИО" x:Name="PeopleGrid" AutoGenerateColumns="False" CanUserAddRows="False"
                           HeadersVisibility="Column" GridLinesVisibility="All"
-                          SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False" MinRowHeight="24"
+                          SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False" MinRowHeight="27" AlternationCount="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                           Background="White" CanUserReorderColumns="True"
                           SelectionChanged="Selection_Changed"
                           MouseDoubleClick="People_DoubleClick" ContextMenuOpening="People_ContextMenuOpening"
@@ -117,13 +148,13 @@
                     <TextBlock Text="АВТОМОБИЛИ" FontWeight="SemiBold" Foreground="#475569"
                                VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <TextBlock x:Name="CarsCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <Button x:Name="CarsAll" Visibility="Collapsed" Content="Отметить все"
+                    <Button x:Name="CarsAll" Visibility="Collapsed" Content="Отметить все" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarButton}"
                             Click="CarsAll_Click" Padding="8,4" Margin="0,0,5,0"/>
-                    <Button x:Name="CarsNone" Visibility="Collapsed" Content="Снять все"
+                    <Button x:Name="CarsNone" Visibility="Collapsed" Content="Снять все" ContentTemplate="{StaticResource IconLabelX}" Style="{StaticResource PythonToolbarButton}"
                             Click="CarsNone_Click" Padding="8,4" Margin="0,0,8,0"/>
-                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" ToolTip="Выше" Click="CarUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
-                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" ToolTip="Ниже" Click="CarDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
-                    <Button Content="Добавить автомобиль" ContentTemplate="{StaticResource IconLabelPlus}" Click="CarAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
+                    <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" Style="{StaticResource PythonToolbarButton}" ToolTip="Выше" Click="CarUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" Style="{StaticResource PythonToolbarButton}" ToolTip="Ниже" Click="CarDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
+                    <Button Content="Добавить автомобиль" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PythonToolbarButton}" Click="CarAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button Content="Редактировать" Click="CarEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button Content="Не работает / Снова работает" Click="CarActive_Click"
                             Padding="8,4" Margin="0,0,5,0"/>
@@ -131,7 +162,7 @@
                 </WrapPanel>
                 <DataGrid local:TableColumnMenu.Key="cars" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="Марка|Госномер" x:Name="CarsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
                           HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
-                          GridLinesVisibility="All" MinRowHeight="24" Background="White"
+                          GridLinesVisibility="All" MinRowHeight="27" AlternationCount="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" Background="White"
                           MouseDoubleClick="Cars_DoubleClick" ContextMenuOpening="Cars_ContextMenuOpening"
                           PreviewKeyDown="Cars_PreviewKeyDown"
                           CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">

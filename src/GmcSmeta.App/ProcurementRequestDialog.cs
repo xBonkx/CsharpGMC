@@ -97,25 +97,29 @@ public sealed class ProcurementRequestDialog : Window
         {
             ItemsSource = all.Select(x => new SupplierChoice(
                 x.Supplier, fresh.GetValueOrDefault(x.Supplier), x.Count)).ToArray(),
-            DisplayMemberPath = nameof(SupplierChoice.Label)
+            DisplayMemberPath = nameof(SupplierChoice.Label),
+            MaxDropDownHeight = 420, IsTextSearchEnabled = true
         };
+        TextSearch.SetTextPath(_supplier, nameof(SupplierChoice.Label));
         _supplier.SelectionChanged += (_, _) => Rebuild();
-        form.Children.Add(Field("Поставщик", _supplier, 355));
+        form.Children.Add(Field("Поставщик", _supplier, 380));
         _number = new TextBox { Text = nextNumber };
         form.Children.Add(Field("Номер заявки", _number, 120));
-        _due = new TextBox();
+        _due = new TextBox { ToolTip = "например: до 15.11.2026 или «как можно скорее»" };
         form.Children.Add(Field("Срок поставки", _due, 195));
-        _note = new TextBox();
+        _note = new TextBox { ToolTip = "Доставка на объект / самовывоз, контакт для связи…" };
         form.Children.Add(Field("Примечание", _note, 225));
         Grid.SetRow(form, 1);
         root.Children.Add(form);
 
         var options = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
         _onlyNew = new CheckBox { Content = "Только ещё не заказанное",
+            ToolTip = "Строки со статусом «Заказано», «Оплачено», «На складе»… в заявку не попадут",
             IsChecked = true, Margin = new Thickness(0, 0, 14, 8) };
-        _merge = new CheckBox { Content = "Одинаковые — одной строкой",
+        _merge = new CheckBox { Content = "Одинаковые из разных систем — одной строкой",
             IsChecked = true, Margin = new Thickness(0, 0, 14, 8) };
         _withPrices = new CheckBox { Content = "С ценами (наш закуп)",
+            ToolTip = "Обычно заявку шлют без цен — поставщик сам выставит счёт",
             Margin = new Thickness(0, 0, 14, 8) };
         _mark = new CheckBox { Content = "Отметить строки «Заказано» с номером заявки",
             IsChecked = true, Margin = new Thickness(0, 0, 14, 8) };
@@ -134,7 +138,7 @@ public sealed class ProcurementRequestDialog : Window
         {
             ItemsSource = _display, AutoGenerateColumns = false,
             CanUserAddRows = false, CanUserDeleteRows = false,
-            MinRowHeight = 24, GridLinesVisibility = DataGridGridLinesVisibility.All,
+            MinRowHeight = 27, GridLinesVisibility = DataGridGridLinesVisibility.All,
             HeadersVisibility = DataGridHeadersVisibility.Column
         };
         void Col(string title, string property, int width, bool readOnly)
@@ -142,6 +146,7 @@ public sealed class ProcurementRequestDialog : Window
             _grid.Columns.Add(new DataGridTextColumn
             {
                 Header = title,
+                MinWidth = width == 0 ? 180 : 0,
                 Width = width == 0 ? new DataGridLength(1, DataGridLengthUnitType.Star)
                                   : new DataGridLength(width),
                 IsReadOnly = readOnly,
@@ -192,7 +197,7 @@ public sealed class ProcurementRequestDialog : Window
         };
         cancel.Click += (_, _) => DialogResult = false;
         ProcurementDialogChrome.Buttons(_make, cancel, "ProcurementRequestPrimary");
-        _make.SetResourceReference(ContentControl.ContentTemplateProperty, "IconLabelDownload");
+        _make.SetResourceReference(ContentControl.ContentTemplateProperty, "IconLabelExcel");
         buttons.Children.Add(cancel);
         DockPanel.SetDock(buttons, Dock.Right);
         footer.Children.Add(buttons);

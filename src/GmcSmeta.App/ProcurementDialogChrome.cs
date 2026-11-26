@@ -19,6 +19,8 @@ internal static class ProcurementDialogChrome
         window.SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(window, TextFormattingMode.Display);
         window.ShowInTaskbar = false;
+        window.MaxWidth = SystemParameters.WorkArea.Width;
+        window.MaxHeight = SystemParameters.WorkArea.Height;
         window.Background = Brushes.White;
     }
     public static TextBlock Heading(string text)
@@ -36,6 +38,13 @@ internal static class ProcurementDialogChrome
     public static void Table(DataGrid grid)
     {
         grid.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
+        grid.MinRowHeight = 27;
+        grid.AlternationCount = 0;
+        grid.EnableRowVirtualization = true;
+        grid.EnableColumnVirtualization = true;
+        VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
+        ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
     }
     public static void Column(DataGridTextColumn column, TextAlignment alignment)
     {

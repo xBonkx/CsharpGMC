@@ -102,13 +102,14 @@ public sealed class ProcurementMovementDialog : Window
         _document = new TextBox
         {
             Text = edit?.Document ?? defaultDocument,
-            MinHeight = 30,
+            ToolTip = kind == "in" ? "УПД № / накладная №" : "накладная (необязательно)",
+            MinHeight = 32,
             Margin = new Thickness(0, 0, 0, 7)
         };
         _note = new TextBox
         {
             Text = edit?.Note ?? "",
-            MinHeight = 30,
+            MinHeight = 32,
             Margin = new Thickness(0, 0, 0, 7)
         };
         At(form, new TextBlock { Text = "Дата", VerticalAlignment = VerticalAlignment.Center }, 0, 0);
@@ -145,12 +146,12 @@ public sealed class ProcurementMovementDialog : Window
             ItemsSource = _lines,
             HeadersVisibility = DataGridHeadersVisibility.Column,
             SelectionUnit = DataGridSelectionUnit.FullRow,
-            MinRowHeight = 24,
+            MinRowHeight = 27,
             GridLinesVisibility = DataGridGridLinesVisibility.All
         };
         _grid.Columns.Add(new DataGridTextColumn
         {
-            Header = "Наименование", Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+            Header = "Наименование", Width = new DataGridLength(1, DataGridLengthUnitType.Star), MinWidth = 180,
             IsReadOnly = true, Binding = new Binding(nameof(Line.Name))
         });
         foreach (var col in new[]

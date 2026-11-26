@@ -36,7 +36,7 @@ public sealed class ProcurementOrderDialog : Window
         _single = rows.Count == 1;
         var current = _single ? rows[0] : null;
         Title = "Заказ / оплата";
-        Width = 640;
+        Width = 620;
         Height = 485;
         MinWidth = 560;
         MinHeight = 360;
@@ -67,7 +67,7 @@ public sealed class ProcurementOrderDialog : Window
             var label = new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetRow(label, index);
             panel.Children.Add(label);
-            editor.MinHeight = 30;
+            editor.MinHeight = 32;
             editor.Margin = new Thickness(0, 4, 0, 4);
             editor.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetRow(editor, index);
@@ -126,9 +126,9 @@ public sealed class ProcurementOrderDialog : Window
                 _supplier.Text = "Цех";
         };
         FillStage();
-        _order = new TextBox { Text = current?.OrderRef ?? "" };
+        _order = new TextBox { Text = current?.OrderRef ?? "", ToolTip = "заявка 146 / заказ № 191 / ЗВК 219" };
         Place(form, "Заявка / заказ", _order, 3);
-        _invoice = new TextBox { Text = current?.InvoiceRef ?? "" };
+        _invoice = new TextBox { Text = current?.InvoiceRef ?? "", ToolTip = "№ счёта" };
         Place(form, "Счёт", _invoice, 4);
         var paymentRow = new WrapPanel { Orientation = Orientation.Horizontal };
         _setPayment = new CheckBox
