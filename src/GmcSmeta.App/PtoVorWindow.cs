@@ -14,7 +14,7 @@ public sealed class PtoVorWindow : Window
     private readonly TextBox _qty=new(){Text="4",Width=65,Margin=new Thickness(0,2,8,0)};
     private readonly TextBox _unit=new(){Text="3",Width=65,Margin=new Thickness(0,2,8,0)};
     private readonly TextBox _system=new(){Text="",Width=65,Margin=new Thickness(0,2,8,0)};
-    private readonly DataGrid _preview=new(){AutoGenerateColumns=true,IsReadOnly=true,MinRowHeight=24,CanUserAddRows=false,CanUserDeleteRows=false};
+    private readonly DataGrid _preview=new(){AutoGenerateColumns=true,IsReadOnly=true,MinRowHeight=27,AlternationCount=0,SelectionUnit=DataGridSelectionUnit.FullRow,SelectionMode=DataGridSelectionMode.Single,CanUserAddRows=false,CanUserDeleteRows=false};
     private readonly CheckBox _confirmed=new(){Content="Я проверил соответствие колонок и строки начала",
         Margin=new Thickness(0,9,0,5)};
     private readonly TextBlock _warnings=new(){TextWrapping=TextWrapping.Wrap,Foreground=
@@ -24,11 +24,13 @@ public sealed class PtoVorWindow : Window
     {
         _path=path;
         Title="Импорт ВОР из Excel · явное сопоставление";
-        Width=930;Height=690;MinWidth=670;MinHeight=460;
-        FontFamily=new System.Windows.Media.FontFamily("Segoe UI");
+        Width=1000;Height=720;MinWidth=670;MinHeight=460;
+        SetResourceReference(FontFamilyProperty,"UiFontFamily");
+        SetResourceReference(FontSizeProperty,"UiBodySize");
         WindowStartupLocation=WindowStartupLocation.CenterOwner;
         WorkspaceWindowUi.ApplyChrome(this);
         _preview.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
+        _preview.SetResourceReference(DataGrid.RowStyleProperty,"PythonTableRow");
         _preview.AutoGeneratingColumn += (_, e) =>
         {
             if (e.Column is not DataGridTextColumn column) return;
@@ -52,7 +54,8 @@ public sealed class PtoVorWindow : Window
         void Add(string title,Control field)
         {
             var s=new StackPanel{Margin=new Thickness(0,0,14,3)};
-            s.Children.Add(new TextBlock{Text=title});
+            s.Children.Add(new TextBlock{Text=title,Foreground=System.Windows.Media.Brushes.SlateGray,Margin=new Thickness(0,0,0,3)});
+            field.MinHeight=32;
             s.Children.Add(field);grid.Children.Add(s);
         }
         Add("Лист",_sheets);Add("Первая строка",_first);Add("Имя (номер)",_name);
@@ -62,15 +65,16 @@ public sealed class PtoVorWindow : Window
         var parse=new Button{Content="Просмотр строк",Padding=new Thickness(12,7,12,7),
             Margin=new Thickness(0,0,8,0)};
         parse.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
-        parse.SetResourceReference(ContentControl.ContentTemplateProperty, "IconLabelSearch");
         parse.Click+=(_,_)=>Parse();actions.Children.Add(parse);
-        controls.Children.Add(_warnings);
+        var warningScroll=new ScrollViewer{MaxHeight=95,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=_warnings};
+        controls.Children.Add(warningScroll);
         var bottom=new StackPanel();DockPanel.SetDock(bottom,Dock.Bottom);dock.Children.Add(bottom);
         bottom.Children.Add(_confirmed);
         var accept=new Button{Content="Перенести проверенные строки",HorizontalAlignment=HorizontalAlignment.Right,
             Padding=new Thickness(12,8,12,8)};
         accept.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarPrimary");
-        accept.SetResourceReference(ContentControl.ContentTemplateProperty, "IconLabelCheck");
+        // Python uses text-only verification and dialog actions.
         accept.Click+=(_,_)=>
         {
             if(Parsed is null||_confirmed.IsChecked!=true)
@@ -80,7 +84,11 @@ public sealed class PtoVorWindow : Window
             }
             DialogResult=true;
         };
-        bottom.Children.Add(accept);
+        var footer=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
+        accept.Margin=new Thickness(0,0,8,0);
+        var cancel=new Button{Content="Отмена",IsCancel=true,Padding=new Thickness(14,6,14,6)};
+        cancel.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
+        footer.Children.Add(accept);footer.Children.Add(cancel);bottom.Children.Add(footer);
         dock.Children.Add(_preview);
         Content=dock;
         _sheets.ItemsSource=PtoVor.Sheets(path);

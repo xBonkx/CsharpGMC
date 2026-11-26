@@ -16,7 +16,7 @@ public sealed class PtoCertificatesWindow : Window
     private readonly TextBox _search=new(){Margin=new Thickness(0,0,0,8),Padding=new Thickness(8,5,8,5)};
     private readonly DataGrid _grid=new()
     {
-        AutoGenerateColumns=false,IsReadOnly=true,MinRowHeight=24,Background=System.Windows.Media.Brushes.White,
+        AutoGenerateColumns=false,IsReadOnly=true,MinRowHeight=27,AlternationCount=0,SelectionMode=DataGridSelectionMode.Single,Background=System.Windows.Media.Brushes.White,
         CanUserAddRows=false,CanUserDeleteRows=false,SelectionUnit=DataGridSelectionUnit.FullRow
     };
     private List<PtoCertificate> _visible=new();
@@ -26,39 +26,51 @@ public sealed class PtoCertificatesWindow : Window
     {
         _archive=archive;_pick=pick;
         Title=pick?"Выберите подтверждающий документ":"ПТО · Библиотека сертификатов";
-        Width=1040;Height=640;MinWidth=680;MinHeight=420;
+        Width=1050;Height=650;MinWidth=680;MinHeight=420;
         WindowStartupLocation=WindowStartupLocation.CenterOwner;
         WorkspaceWindowUi.ApplyChrome(this);
-        FontFamily=new System.Windows.Media.FontFamily("Segoe UI");
+        SetResourceReference(FontFamilyProperty,"UiFontFamily");
+        SetResourceReference(FontSizeProperty,"UiBodySize");
         _grid.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
+        _grid.SetResourceReference(DataGrid.RowStyleProperty,"PythonTableRow");
         var panel=new DockPanel{Margin=new Thickness(12)};
         var header=new StackPanel();DockPanel.SetDock(header,Dock.Top);panel.Children.Add(header);
         var bar=new WrapPanel{Margin=new Thickness(0,0,0,8)};
         header.Children.Add(bar);
-        void Button(string caption,Action run,string icon)
+        void Button(string caption,Action run,string? icon=null)
         {
             var b=new Button{Content=caption,Padding=new Thickness(10,4,10,4),Margin=new Thickness(0,0,6,4)};
             b.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
-            b.SetResourceReference(ContentControl.ContentTemplateProperty, icon);
+            if(icon is not null)b.SetResourceReference(ContentControl.ContentTemplateProperty, icon);
             b.Click+=(_,_)=>Run(run);bar.Children.Add(b);
         }
-        Button("Импорт PDF",New,"IconLabelUpload");
-        Button("Реквизиты / проверить",Edit,"IconLabelEdit");
-        Button("Открыть PDF",Open,"IconLabelFile");
-        if(pick)Button("Добавить в акт",Choose,"IconLabelPlus");
+        Button("Добавить PDF…",New);
+        Button("Изменить карточку",Edit);
+        Button("Открыть PDF",Open);
+        if(pick)Button("Добавить выбранный в акт",Choose);
         Button("Обновить",Refresh,"IconLabelRefresh");
+        _search.Margin=new Thickness(0);
+        _search.Height=32;
+        _search.SetResourceReference(FrameworkElement.StyleProperty,"PythonSearch");
+        _search.Background=System.Windows.Media.Brushes.White;
+        _search.BorderBrush=new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD0,0xD7,0xE2));
         _search.ToolTip="Поиск по производителю, номеру, материалу, виду документа";
         _search.TextChanged+=(_,_)=>Refresh();
-        header.Children.Add(_search);
+        header.Children.Add(PtoFormUi.WithPlaceholder(_search,"Продукция, материал, производитель, номер"));
         foreach(var(title,path,width) in new[]{
-            ("Тип","Kind",150d),("Продукция","Product",260d),("Производитель","Manufacturer",180d),
+            ("Продукция","Product",260d),("Тип","Kind",150d),("Производитель","Manufacturer",180d),
             ("Номер","Number",110d),("Выдан","Issued",85d),("До","Expires",85d),
             ("Проверено","Verified",80d)})
         {
             bool center = path is "Issued" or "Expires" or "Verified" or "Number";
             _grid.Columns.Add(new DataGridTextColumn
             {
-                Header=title, Binding=new System.Windows.Data.Binding(path),
+                Header=title, SortMemberPath=path, Binding=path switch
+                {
+                    "Verified"=>new System.Windows.Data.Binding(path){Converter=PtoFormUi.VerifiedText},
+                    "Expires"=>PtoFormUi.ExpiryBinding(),
+                    _=>new System.Windows.Data.Binding(path)
+                },
                 Width=path == "Product" ? new DataGridLength(1, DataGridLengthUnitType.Star) : new DataGridLength(width),
                 MinWidth=path == "Product" ? 190 : 36,
                 ElementStyle=(Style)Application.Current.FindResource(center ? "CompactCostCenter" : "CompactCostText"),
@@ -105,19 +117,23 @@ public sealed class PtoCertificatesWindow : Window
     }
     private bool EditDialog(PtoCertificate c)
     {
-        var dlg=new Window {Owner=this,Title="Реквизиты документа о качестве",Width=720,Height=640,
+        var dlg=new Window {Owner=this,Title="Реквизиты документа о качестве",Width=720,Height=540,MinWidth=550,MinHeight=430,
             WindowStartupLocation=WindowStartupLocation.CenterOwner};
         WorkspaceWindowUi.ApplyChrome(dlg);
         var panel=new DockPanel{Margin=new Thickness(14)};
-        var save=new Button{Content="Сохранить реквизиты",Padding=new Thickness(14,7,14,7),
-            HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,10,0,0)};
-        DockPanel.SetDock(save,Dock.Bottom);panel.Children.Add(save);
+        var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,
+            Margin=new Thickness(0,10,0,0)};
+        var save=new Button{Content="Сохранить реквизиты",Padding=new Thickness(14,6,14,6),Margin=new Thickness(0,0,8,0)};
+        save.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
+        var cancel=new Button{Content="Отмена",IsCancel=true,Padding=new Thickness(14,6,14,6)};
+        cancel.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
+        actions.Children.Add(save);actions.Children.Add(cancel);
+        DockPanel.SetDock(actions,Dock.Bottom);panel.Children.Add(actions);
         var scroll=new ScrollViewer{VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         var stack=new StackPanel();
         scroll.Content=stack;panel.Children.Add(scroll);
-        var types=new ComboBox{ItemsSource=PtoRules.QualityKinds,SelectedItem=c.Kind};
-        stack.Children.Add(new TextBlock{Text="Тип документа",Margin=new Thickness(0,7,0,2)});
-        stack.Children.Add(types);
+        var types=new ComboBox{ItemsSource=PtoRules.QualityKinds,SelectedItem=c.Kind,MinHeight=32};
+        PtoFormUi.AddRow(stack,"Тип документа",types,230);
         var fields=new Dictionary<string,TextBox>();
         foreach(var (key,label,value) in new[]{
             ("product","Продукция / оборудование",c.Product),
@@ -126,10 +142,9 @@ public sealed class PtoCertificatesWindow : Window
             ("expires","Окончание действия ДД.ММ.ГГГГ",c.Expires),
             ("materials","Материалы / примечания для поиска",c.Materials)})
         {
-            stack.Children.Add(new TextBlock{Text=label,Margin=new Thickness(0,9,0,2)});
-            var edit=new TextBox{Text=value,Padding=new Thickness(5),
-                TextWrapping=TextWrapping.Wrap,MinHeight=30};
-            stack.Children.Add(edit);fields[key]=edit;
+            var edit=new TextBox{Text=value,Padding=new Thickness(8,5,8,5),
+                TextWrapping=TextWrapping.Wrap,MinHeight=32};
+            PtoFormUi.AddRow(stack,label,edit,230);fields[key]=edit;
         }
         var noExpiry=new CheckBox{Content="Срок действия отсутствует (проверено вручную)",
             IsChecked=c.NoExpiry,Margin=new Thickness(0,12,0,4)};

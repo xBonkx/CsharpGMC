@@ -42,20 +42,19 @@ public partial class PtoEditorWindow : Window
                 :key is "object" or "address" or "customer" or "contractor" or
                  "designer" or "executor" or "project" or "standards"?
                  ObjectPanel:ActPanel;
-            host.Children.Add(new TextBlock{Text=label,Margin=new Thickness(0,8,0,3)});
             var shortField=key is "number" or "date" or "section" or "start" or "finish" or "copies";
             var box=new TextBox
             {
                 Text=PtoRules.Text(data,key),
                 AcceptsReturn=!shortField,
                 TextWrapping=shortField?TextWrapping.NoWrap:TextWrapping.Wrap,
-                MinHeight=shortField?29:45,
-                MaxHeight=shortField?30:95,
+                MinHeight=shortField?32:48,
+                MaxHeight=shortField?32:80,
                 VerticalScrollBarVisibility=shortField?ScrollBarVisibility.Disabled:ScrollBarVisibility.Auto,
                 Padding=new Thickness(7,5,7,5)
             };
             box.TextChanged+=(_,_)=>InvalidateReview();
-            host.Children.Add(box);_inputs[key]=box;
+            PtoFormUi.AddRow(host,label,box,250);_inputs[key]=box;
         }
         StatusCombo.SelectedItem=data.Status;
         ReviewCheck.IsChecked=data.ManualReview;
