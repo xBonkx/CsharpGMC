@@ -355,7 +355,8 @@ public partial class EstimateView
         await SaveTotalsFieldAsync(field, value, caption);
     }
 
-    private async Task<bool> SaveTotalsFieldAsync(string field, decimal? value, string caption)
+    private async Task<bool> SaveTotalsFieldAsync(string field, decimal? value, string caption,
+        string? displayedRevision = null)
     {
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
@@ -369,8 +370,15 @@ public partial class EstimateView
                 _saveError ??= "Смета изменилась на сервере. Сначала обнови её.";
                 return false;
             }
+            if (displayedRevision is not null && displayedRevision != _serverRevision)
+            {
+                _saveError = "Итоги изменились до записи. Обнови смету.";
+                _serverConflict = true;
+                return false;
+            }
+            var expectedRevision = displayedRevision ?? _serverRevision;
             var saved = await Task.Run(() => SqlServerCostTotals.SaveTotalsField(
-                _sqlConnectionString, _contractId, field, value, _serverRevision));
+                _sqlConnectionString, _contractId, field, value, expectedRevision));
             if (!saved.Saved)
             {
                 _saveError = saved.Error ?? $"{caption} не сохранено";

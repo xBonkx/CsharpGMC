@@ -45,7 +45,11 @@ public static partial class SqlServerCostSummary
         SummarySystemsSql + ";" + SummaryPositionsSql + ";" +
         SummaryComponentsSql + ";" + SummaryExpensesSql + ";" + SummaryTransportSql + ";";
 
-    public static CostSummaryData Summary(SqlConnection conn, int contractId)
+    public static CostSummaryData Summary(SqlConnection conn, int contractId) =>
+        Summary(conn, contractId, out _, out _);
+
+    internal static CostSummaryData Summary(SqlConnection conn, int contractId,
+        out ContractTotals? documentTotals, out TagRules rules)
     {
         using var command = new SqlCommand(CostSummaryReadBatchSql, conn);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
@@ -158,7 +162,11 @@ public static partial class SqlServerCostSummary
         // СМР документа — из проверенного Totals (Contract.stats()["smr"] эталона).
         // Release the reader before the existing contract totals query. No MARS required.
         r.Close();
-        var smr = Totals.ReadOne(conn, contractId)?.Smr ?? 0m;
-        return new CostSummaryData(systems, finalized, extra, notes, smr) { SystemParents = systemParents };
+        rules = new TagRules();
+        documentTotals = contractId > 0
+            ? Totals.ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out rules).SingleOrDefault()
+            : null;
+        return new CostSummaryData(systems, finalized, extra, notes, documentTotals?.Smr ?? 0m)
+            { SystemParents = systemParents };
     }
 }

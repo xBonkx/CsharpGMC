@@ -185,6 +185,8 @@ public partial class EstimateView
             SummaryRebuild();
             return;
         }
+        var cachedSummary = !force && TotalsSnapshotReady ? _totalsSourceSummary : null;
+        var cachedRevision = cachedSummary is null ? "" : _totalsRevision;
         _summaryLoading = true;
         _summaryRevision = "";
         var version = ++_summaryLoadVersion;
@@ -194,7 +196,8 @@ public partial class EstimateView
             {
                 using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                 var before = SqlServerDatabase.Revision(conn);
-                var data = SqlServerCostSummary.Summary(conn, _contractId);
+                var data = CostFinancialSnapshot.CanReuse(cachedSummary, cachedRevision, before)
+                    ? cachedSummary! : SqlServerCostSummary.Summary(conn, _contractId);
                 if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new InvalidOperationException("Данные изменились во время чтения сводной. Повтори обновление.");
                 var labels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);

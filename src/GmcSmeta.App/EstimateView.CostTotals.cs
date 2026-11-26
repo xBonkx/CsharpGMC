@@ -46,6 +46,11 @@ public partial class EstimateView
 
     // ------------------------------------------------------------------ state
     private CostTotalsData? _costTotalsData;
+    private CostSummaryData? _totalsSourceSummary;
+    private string _totalsRevision = "";
+    private bool TotalsSnapshotReady => !_detached && !_totalsLoading && !_totalsBusy &&
+        !_serverConflict && !HasUnsettledCacheWrites &&
+        !string.IsNullOrWhiteSpace(_totalsRevision) && _totalsRevision == _serverRevision;
     private bool _totalsLoading;
     private bool _totalsBusy;
     private int _totalsLoadVersion;
@@ -55,6 +60,8 @@ public partial class EstimateView
     {
         _totalsLoadVersion++;
         _costTotalsData = null;
+        _totalsSourceSummary = null;
+        _totalsRevision = "";
         _totalsLoading = false;
         if (TotalsGrid is not null) TotalsGrid.ItemsSource = null;
     }
@@ -63,15 +70,22 @@ public partial class EstimateView
     {
         if (_estimate is null || TotalsGrid is null) return;
         if (_totalsLoading) return;
-        if (!force && _costTotalsData is not null) return;
+        if (!force && _costTotalsData is not null && TotalsSnapshotReady) return;
+        var cachedSummary = !force && SummarySnapshotReady && !HasUnsettledCacheWrites
+            ? _costSummaryData : null;
+        var cachedRevision = cachedSummary is null ? "" : _summaryRevision;
         _totalsLoading = true;
+        _totalsRevision = "";
         var version = ++_totalsLoadVersion;
         try
         {
-            var data = await Task.Run(() => SqlServerCostTotals.Totals(_sqlConnectionString, _contractId));
-            if (version != _totalsLoadVersion) return;
-            _costTotalsData = data;
+            var snapshot = await Task.Run(() => CostFinancialSnapshot.ReadTotals(
+                _sqlConnectionString, _contractId, cachedSummary, cachedRevision));
+            if (version != _totalsLoadVersion || _detached) return;
+            _costTotalsData = snapshot.Totals;
+            _totalsSourceSummary = snapshot.Summary;
             TotalsShow();
+            _totalsRevision = snapshot.Revision;
         }
         catch (Exception ex)
         {
@@ -180,9 +194,10 @@ public partial class EstimateView
     // ------------------------------------------------------------------ editing
     private void TotalsGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
     {
-        if (e.Row.Item is not TotalsRow row)
+        if (!TotalsSnapshotReady || e.Row.Item is not TotalsRow row)
         {
             e.Cancel = true;
+            if (!TotalsSnapshotReady) SetStatus("Обнови итоги перед редактированием.", true);
             return;
         }
         var column = e.Column.SortMemberPath ?? "";
@@ -220,8 +235,8 @@ public partial class EstimateView
 
     private void TotalsGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
     {
-        if (_totalsBusy) return;
         if (e.EditAction != DataGridEditAction.Commit) return;
+        if (!TotalsSnapshotReady) { e.Cancel = true; return; }
         if (e.Row.Item is not TotalsRow row) return;
         var editor = MaterialsEditorTextBox(e.EditingElement);
         if (editor is null) return;
@@ -259,10 +274,10 @@ public partial class EstimateView
         if (value is null && field is "pnr_amount" or "transport_amount")
             value = 0m;
         _totalsBusy = true;
-        _ = TotalsCommitAsync(field, value, row);
+        _ = TotalsCommitAsync(field, value, _totalsRevision);
     }
 
-    private async Task TotalsCommitAsync(string field, decimal? value, TotalsRow row)
+    private async Task TotalsCommitAsync(string field, decimal? value, string revision)
     {
         try
         {
@@ -271,7 +286,7 @@ public partial class EstimateView
                 SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
                 return;
             }
-            if (!await SaveTotalsFieldAsync(field, value, "Итог"))
+            if (!await SaveTotalsFieldAsync(field, value, "Итог", revision))
             {
                 await LoadCostTotalsAsync(force: true);
                 return;

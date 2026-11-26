@@ -267,8 +267,7 @@ public partial class CostSummaryPane : UserControl
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var before = SqlServerDatabase.Revision(conn);
-            var summary = SqlServerCostSummary.Summary(conn, contractId);
-            var totals = SqlServerCostTotals.Totals(conn, contractId, summary);
+            var (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
             var expenses = SqlServerSmrExpenses.List(conn, contractId).Select(x => new SmrExpensePreviewRow
             {
                 Id = x.Id,
@@ -281,7 +280,7 @@ public partial class CostSummaryPane : UserControl
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             var mode = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "sum";
             var after = SqlServerDatabase.Revision(conn);
-            if (before == after)
+            if (!string.IsNullOrWhiteSpace(before) && before == after)
                 return new CostLoadSnapshot(summary, totals, BuildSummaryPreview(summary), expenses, mode, after,
                     new CostMissingPriceIndex(summary.Rows));
         }

@@ -69,6 +69,23 @@ internal static class PilotCostSummaryCases
             data.SmrContract == (Totals.ReadOne(conn, checked((int)contract))?.Smr ?? 0m) &&
             data.TotalCost == 175m && data.TotalSell == 305m,
             "Extra order, null transport, SMR or monetary totals changed");
+        var contractId = checked((int)contract);
+        var standaloneTotals = SqlServerCostTotals.Totals(conn, contractId, data);
+        var combined = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
+        PilotRunner.Check(combined.Summary.Rows.SequenceEqual(data.Rows) &&
+            combined.Summary.Extra.SequenceEqual(data.Extra) &&
+            combined.Totals.Lines.SequenceEqual(standaloneTotals.Lines) &&
+            (combined.Totals with { Lines = standaloneTotals.Lines }) == standaloneTotals,
+            "Shared document totals/rules changed cost projection");
+        var hit = CostFinancialSnapshot.ReadTotals(conn, contractId, data, before);
+        var miss = CostFinancialSnapshot.ReadTotals(conn, contractId, data, "stale");
+        var emptyRevision = CostFinancialSnapshot.ReadTotals(conn, contractId, data, "");
+        PilotRunner.Check(ReferenceEquals(hit.Summary, data) && hit.Revision == before &&
+            !ReferenceEquals(miss.Summary, data) && !ReferenceEquals(emptyRevision.Summary, data) &&
+            hit.Totals.Lines.SequenceEqual(miss.Totals.Lines) &&
+            (hit.Totals with { Lines = miss.Totals.Lines }) == miss.Totals &&
+            miss.Summary.Rows.SequenceEqual(data.Rows) && emptyRevision.Summary.Rows.SequenceEqual(data.Rows),
+            "Revision-fenced summary reuse accepted stale cache or changed money");
         var missingDoc = SqlServerCostSummary.Summary(conn, int.MaxValue);
         PilotRunner.Check(missingDoc.Rows.Count == 0 && missingDoc.Systems.Count == 0 &&
             missingDoc.Extra.SequenceEqual(new[] { ("Транспорт", 0m, 0m, "trans") }) &&

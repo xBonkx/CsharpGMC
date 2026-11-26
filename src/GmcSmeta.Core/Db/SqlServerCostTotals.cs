@@ -24,11 +24,29 @@ public static class SqlServerCostTotals
     public static CostTotalsData Totals(string connectionString, int contractId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
-        return Totals(conn, contractId, SqlServerCostSummary.Summary(conn, contractId));
+        return SummaryAndTotals(conn, contractId).Totals;
+    }
+
+    // Both projections use one calculation of the contract totals and its tag rules.
+    // The caller must fence the entire operation with the SQL revision.
+    public static (CostSummaryData Summary, CostTotalsData Totals) SummaryAndTotals(
+        SqlConnection conn, int contractId)
+    {
+        var summary = SqlServerCostSummary.Summary(conn, contractId, out var documentTotals, out var rules);
+        return (summary, BuildTotals(conn, contractId, summary, documentTotals, rules));
     }
 
     // Caller supplies the summary from the same revision-checked read.
     public static CostTotalsData Totals(SqlConnection conn, int contractId, CostSummaryData summary)
+    {
+        if (contractId <= 0) throw new ArgumentException("Документ не найден.");
+        var documentTotals = GmcSmeta.Core.Domain.Totals.ReadSqlBatch(
+            conn, new ContractReadScope(new[] { contractId }), out var rules).SingleOrDefault();
+        return BuildTotals(conn, contractId, summary, documentTotals, rules);
+    }
+
+    private static CostTotalsData BuildTotals(SqlConnection conn, int contractId,
+        CostSummaryData summary, ContractTotals? totals, TagRules rules)
     {
         decimal matCost = 0m, smrCost = 0m;
         foreach (var row in summary.Rows)
@@ -77,9 +95,7 @@ public static class SqlServerCostTotals
             }
             var smrEditable = !locked && smrMode == "sum" && (stageOf is not null || !fromStages);
 
-            var rules = TagRules.Load(conn);
             var vatTop = rules.Has(form, "vat_top");
-            var totals = GmcSmeta.Core.Domain.Totals.ReadOne(conn, contractId);
             var vatRate = totals?.VatRate ?? 0m;
             var vat = vatTop ? Math.Round(totals?.Vat ?? 0m, 2) : 0m;
             var total = totals?.Total ?? 0m;
