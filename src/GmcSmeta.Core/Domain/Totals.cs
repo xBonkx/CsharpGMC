@@ -34,7 +34,7 @@ public readonly record struct TotalsPosition(int SystemId, decimal Qty, decimal 
 /// Расчёт итогов документа — порт Contract.material_sum / smr / net / total / vat.
 /// Читает базу напрямую (одним проходом), считает в decimal.
 /// </summary>
-public static class Totals
+public static partial class Totals
 {
     private sealed class ContractRow
     {
@@ -71,8 +71,9 @@ public static class Totals
             (schema31 ? ", discount_percent " : " ") +
             "FROM contracts" + Where("id") + " ORDER BY id;" +
             "SELECT id, contract_id, smr_amount FROM systems" + Where("contract_id") + " ORDER BY id;" +
-            "SELECT p.system_id,p.qty,p.price,p.work_price,p.out_of_kp FROM positions p " +
-            "JOIN systems sy ON sy.id=p.system_id WHERE p.parent_id IS NULL" +
+            "SELECT p.system_id,p.qty,p.price,p.work_price FROM positions p " +
+            "JOIN systems sy ON sy.id=p.system_id WHERE p.parent_id IS NULL " +
+            "AND (p.out_of_kp=0 OR p.out_of_kp IS NULL)" +
             And("sy.contract_id") + " ORDER BY p.system_id,p.[order],p.id;" +
             "SELECT sy.contract_id,COUNT(*) FROM systems sy JOIN positions p ON p.system_id=sy.id" +
             Where("sy.contract_id") + " GROUP BY sy.contract_id;";
@@ -88,10 +89,10 @@ public static class Totals
         Next();
         var systems = ReadSystemRows(r);
         Next();
-        var positions = ReadPositionRows(r);
+        var sums = ReadSqlSums(r, rules, contracts, systems);
         Next();
         var counts = ReadCountRows(r);
-        return Calculate(rules, contracts, systems, positions, counts);
+        return FinishSqlSums(rules, contracts, systems, sums, counts);
     }
 
     /// <summary>
@@ -158,8 +159,6 @@ public static class Totals
         foreach (var c in contracts)
         {
             var roundRows = tags.Has(c.Form, "round_rows");
-            var vatTop = tags.Has(c.Form, "vat_top");
-
             decimal materials = 0m;
             decimal workSum = 0m;
             decimal systemsSmr = 0m;
@@ -180,27 +179,34 @@ public static class Totals
                 materials += systemSum;
             }
 
-            materials = Money.Round2(materials);
-            var smr = c.SmrMode switch
-            {
-                "percent" => Money.Round2(materials * c.SmrPercent / 100m),
-                "systems" => Money.Round2(systemsSmr),
-                "pos" => Money.Round2(workSum),
-                _ => c.SmrAmount,
-            };
-
-            var net = materials + smr + c.Transport + c.Pnr;
-            var beforeDiscount = vatTop ? Money.Round2(net + Money.Round2(net * c.VatRate / 100m)) : net;
-            var total = DiscountPolicy.Payable(beforeDiscount, c.DiscountPercent);
-            var vat = vatTop
-                ? Money.Round2(net * c.VatRate / 100m)
-                : Money.VatIncluded(total, c.VatRate);   // как в Python: без округления, его делает показ
-
-            result.Add(new ContractTotals(c.Id, c.Kind, c.Form, c.VatRate,
-                materials, smr, net, total, vat, positionCount, c.Transport, c.Pnr,
-                c.DiscountPercent, DiscountPolicy.Amount(beforeDiscount, c.DiscountPercent)));
+            result.Add(FinishContract(c, tags.Has(c.Form, "vat_top"),
+                materials, workSum, systemsSmr, positionCount));
         }
         return result;
+    }
+
+    private static ContractTotals FinishContract(ContractRow c, bool vatTop,
+        decimal materials, decimal workSum, decimal systemsSmr, int positionCount)
+    {
+        materials = Money.Round2(materials);
+        var smr = c.SmrMode switch
+        {
+            "percent" => Money.Round2(materials * c.SmrPercent / 100m),
+            "systems" => Money.Round2(systemsSmr),
+            "pos" => Money.Round2(workSum),
+            _ => c.SmrAmount,
+        };
+
+        var net = materials + smr + c.Transport + c.Pnr;
+        var beforeDiscount = vatTop ? Money.Round2(net + Money.Round2(net * c.VatRate / 100m)) : net;
+        var total = DiscountPolicy.Payable(beforeDiscount, c.DiscountPercent);
+        var vat = vatTop
+            ? Money.Round2(net * c.VatRate / 100m)
+            : Money.VatIncluded(total, c.VatRate);   // как в Python: без округления, его делает показ
+
+        return new ContractTotals(c.Id, c.Kind, c.Form, c.VatRate,
+            materials, smr, net, total, vat, positionCount, c.Transport, c.Pnr,
+            c.DiscountPercent, DiscountPolicy.Amount(beforeDiscount, c.DiscountPercent));
     }
 
     private readonly record struct SystemRow(int Id, decimal SmrAmount);
