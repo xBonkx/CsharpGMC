@@ -170,8 +170,10 @@
         </Style>
         <!-- Python theme.py QLineEdit: rounded money input inside totals tiles. -->
         <Style x:Key="PythonMoneyEdit" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-            <Setter Property="MinHeight" Value="30"/>
-            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="6,2"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
@@ -985,10 +987,10 @@
                 <Border x:Name="SmrCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
                         <TextBlock x:Name="SmrCaption" Text="Монтаж · СМР" Style="{StaticResource CardCaption}"/>
-                        <TextBox x:Name="SmrEdit" Style="{StaticResource PythonMoneyEdit}"
+                        <TextBox x:Name="SmrEdit" Style="{StaticResource PythonMoneyEdit}" Margin="0,2,0,0"
                                  KeyDown="TotalsEdit_KeyDown" LostFocus="SmrEdit_Commit"
                                  ToolTip="СМР: общая сумма (Enter — сохранить)"/>
-                        <ComboBox x:Name="SmrModeCombo" Margin="0,6,0,0" MinHeight="30"
+                        <ComboBox x:Name="SmrModeCombo" Margin="0,2,0,0" MinHeight="30" Padding="10,6"
                                   SelectionChanged="SmrModeCombo_SelectionChanged"
                                   ToolTip="Как рассчитывать СМР: общей суммой, процентом от материалов, по системам или по позициям">
                             <ComboBoxItem Content="Суммой, ₽" Tag="sum"/>
@@ -996,13 +998,12 @@
                             <ComboBoxItem Content="По системам" Tag="systems"/>
                             <ComboBoxItem Content="По позициям" Tag="pos"/>
                         </ComboBox>
-                        <TextBlock x:Name="SmrHintText" Foreground="#64748B" FontSize="11" TextWrapping="Wrap"
-                                   Margin="0,5,0,0"/>
+                        <TextBlock x:Name="SmrHintText" Style="{StaticResource PythonTileLabel}" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
                 <Border x:Name="ExpensesCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
-                        <TextBlock Text="Дополнительные расходы" Style="{StaticResource CardCaption}" Margin="0,0,0,4"/>
+                        <TextBlock Text="Дополнительные расходы" Style="{StaticResource CardCaption}"/>
                         <Border x:Name="TransportCard" Margin="0,2,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1012,7 +1013,7 @@
                                          ToolTip="Транспорт: сумма (Enter — сохранить)"/>
                             </Grid>
                         </Border>
-                        <Border x:Name="PnrCard" Margin="0,6,0,0">
+                        <Border x:Name="PnrCard" Margin="0,2,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="Пусконаладка, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -1028,10 +1029,11 @@
                         <TextBlock Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"
                                    FontSize="24"/>
-                        <TextBlock x:Name="DiscountTotalText" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}"
-                                   TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"/>
-                        <TextBlock x:Name="VatText" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"
-                                   Margin="0,2,0,0"/>
+                        <TextBlock x:Name="VatText" Foreground="#E6FFFFFF" FontSize="12" TextWrapping="Wrap"
+                                   Margin="0,2,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <TextBlock x:Name="DiscountTotalText" Foreground="#E6FFFFFF" FontSize="12"
+                                   TextWrapping="Wrap" Visibility="Collapsed" Margin="0,2,0,0"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
                     </local:EstimateTotalsCardsPanel>
