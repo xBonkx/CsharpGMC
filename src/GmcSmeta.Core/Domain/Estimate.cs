@@ -98,15 +98,31 @@ public static class EstimateFilter
         if (words.Length == 0) return rows;
         var visible = new bool[rows.Count];
         var ancestors = new List<int>();
+        int? matchedLevel = null;
         for (var i = 0; i < rows.Count; i++)
         {
-            while (ancestors.Count > 0 && rows[ancestors[^1]].Level >= rows[i].Level)
+            var row = rows[i];
+            while (ancestors.Count > 0 && rows[ancestors[^1]].Level >= row.Level)
                 ancestors.RemoveAt(ancestors.Count - 1);
-            if (words.All(word => rows[i].Name.Contains(word, StringComparison.OrdinalIgnoreCase)))
+
+            // A matching parent reveals its entire subtree. Do not search or
+            // walk that subtree again for every matching descendant.
+            if (matchedLevel is int level && row.Level <= level)
+                matchedLevel = null;
+            if (matchedLevel.HasValue)
+                visible[i] = true;
+            else if (words.All(word => row.Name.Contains(word, StringComparison.OrdinalIgnoreCase)))
             {
                 visible[i] = true;
-                foreach (var parent in ancestors) visible[parent] = true;
-                for (var j = i + 1; j < rows.Count && rows[j].Level > rows[i].Level; j++) visible[j] = true;
+                matchedLevel = row.Level;
+                // Once an ancestor is visible, all of its ancestors are
+                // already visible as well. Each hidden ancestor is marked once.
+                for (var j = ancestors.Count - 1; j >= 0; j--)
+                {
+                    var parent = ancestors[j];
+                    if (visible[parent]) break;
+                    visible[parent] = true;
+                }
             }
             ancestors.Add(i);
         }

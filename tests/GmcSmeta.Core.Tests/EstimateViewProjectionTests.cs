@@ -135,6 +135,74 @@ public sealed class EstimateViewProjectionTests
     }
 
     [Fact]
+    public void DocumentSearch_RetainsAncestorsAndMatchingSubtreesWithoutUnrelatedSiblings()
+    {
+        var rows = new[]
+        {
+            Section(0, 10, "П1"),
+            Section(1, 11, "Приточная система", 1),
+            Pos(2, 100, 11, "Клапан", 10) with { Level = 2 },
+            Pos(3, 101, 11, "Датчик", 0, parent: 100) with { Level = 3 },
+            Pos(4, 102, 11, "Решётка", 20) with { Level = 2 },
+            Section(5, 20, "Приточная система"),
+            Pos(6, 200, 20, "Фильтр", 20),
+            Section(7, 30, "Вытяжная система"),
+            Pos(8, 300, 30, "Фильтр", 20)
+        };
+        Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 6 },
+            EstimateViewProjection.Apply(rows, "СИСТЕМА приточная").Select(row => row.SortKey));
+        Assert.Equal(new[] { 0, 1, 2, 3 },
+            EstimateViewProjection.Apply(rows, "датчик").Select(row => row.SortKey));
+        Assert.Equal(new[] { 5, 6, 7, 8 },
+            EstimateViewProjection.Apply(rows, "фильтр").Select(row => row.SortKey));
+        Assert.Empty(EstimateViewProjection.Apply(rows, "несуществующее"));
+    }
+
+    [Fact]
+    public void Search_IdenticalToPreviousAlgorithm_OnMixedHierarchiesAndLargeDocument()
+    {
+        // Keep the former implementation here as an independent regression
+        // oracle, including overlapping ancestor/descendant matches.
+        static int[] Previous(IReadOnlyList<EstimateRow> rows, string query)
+        {
+            var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0) return rows.Select(row => row.SortKey).ToArray();
+            var visible = new bool[rows.Count];
+            var ancestors = new List<int>();
+            for (var i = 0; i < rows.Count; i++)
+            {
+                while (ancestors.Count > 0 && rows[ancestors[^1]].Level >= rows[i].Level)
+                    ancestors.RemoveAt(ancestors.Count - 1);
+                if (words.All(word => rows[i].Name.Contains(word, StringComparison.OrdinalIgnoreCase)))
+                {
+                    visible[i] = true;
+                    foreach (var parent in ancestors) visible[parent] = true;
+                    for (var j = i + 1; j < rows.Count && rows[j].Level > rows[i].Level; j++)
+                        visible[j] = true;
+                }
+                ancestors.Add(i);
+            }
+            return rows.Where((_, i) => visible[i]).Select(row => row.SortKey).ToArray();
+        }
+
+        var random = new Random(400);
+        string[] names = ["Клапан П1", "Датчик", "п1 датчик", "Решётка"];
+        var rows = new List<EstimateRow>();
+        var level = 0;
+        for (var i = 0; i < 25000; i++)
+        {
+            level = random.Next(0, Math.Min(level + 2, 5));
+            rows.Add(Pos(i, i + 1, 10, names[random.Next(names.Length)], 1) with { Level = level });
+        }
+        foreach (var query in new[] { "П1", "датчик п1", "РЕШЁТКА", "  ", "нет совпадений" })
+        {
+            var expected = Previous(rows, query);
+            Assert.Equal(expected, EstimateFilter.Apply(rows, query).Select(row => row.SortKey));
+            Assert.Equal(expected, EstimateViewProjection.Apply(rows, query).Select(row => row.SortKey));
+        }
+    }
+
+    [Fact]
     public void UnknownSortIsRejectedWithoutDataMutation() =>
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             EstimateViewProjection.Apply(Example(), sort: "sql-order-by"));

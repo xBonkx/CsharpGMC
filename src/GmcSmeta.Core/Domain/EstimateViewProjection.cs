@@ -31,8 +31,14 @@ public static class EstimateViewProjection
             sort == DocumentOrder && !flat)
             return rows;
 
-        var allowed = EstimateFilter.Apply(rows, query ?? "")
-            .Select(row => row.SortKey).ToHashSet();
+        var searchResult = EstimateFilter.Apply(rows, query ?? "");
+        // In ordinary document order the filter already returns the original
+        // ordered rows, including ancestors and components. Avoid hashing and
+        // scanning the full document a second time.
+        if (!noPriceOnly && sort == DocumentOrder && !flat)
+            return searchResult;
+
+        var allowed = searchResult.Select(row => row.SortKey).ToHashSet();
 
         if (noPriceOnly)
         {
