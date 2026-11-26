@@ -204,14 +204,14 @@
             <Setter Property="Foreground" Value="#475569"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="{StaticResource UiHeaderSize}"/>
-            <Setter Property="Padding" Value="8,7"/>
+            <Setter Property="Padding" Value="6,8"/>
             <Setter Property="MinHeight" Value="31"/>
             <Setter Property="BorderBrush" Value="#D0D7E2"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
         </Style>
 
         <Style x:Key="EstimateCell" TargetType="DataGridCell" BasedOn="{StaticResource PythonGridCell}">
-            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Padding" Value="4,4"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -284,7 +284,7 @@
         </Style>
 
         <Style x:Key="EstimateRow" TargetType="DataGridRow">
-            <Setter Property="MinHeight" Value="23"/>
+            <Setter Property="MinHeight" Value="27"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
@@ -292,7 +292,7 @@
                     <Setter Property="Background" Value="#F1F4F9"/>
                     <Setter Property="FontWeight" Value="Bold"/>
                     <!-- Do not fix system-row height: long titles must wrap like Python. -->
-                    <Setter Property="Foreground" Value="#1A365D"/>
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
                 </DataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
@@ -740,7 +740,7 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
-                <DataGrid x:Name="EstimateGrid" MinRowHeight="23" MinColumnWidth="36" BorderThickness="0" Background="White"
+                <DataGrid x:Name="EstimateGrid" MinRowHeight="27" MinColumnWidth="36" BorderThickness="0" Background="White"
                           ContextMenuOpening="EstimateGrid_ContextMenuOpening"
                        AllowDrop="True"
                        PreviewMouseLeftButtonDown="EstimateGrid_DragMouseDown"
