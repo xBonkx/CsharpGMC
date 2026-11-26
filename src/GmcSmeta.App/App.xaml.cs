@@ -94,6 +94,13 @@ public partial class App : Application
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION")))
         {
             StartupTrace.Mark("app_sql_connection_missing");
+            // A legacy taskbar pin may start a versioned office EXE directly.
+            // Recover only the known installed office launcher, never guess SQL credentials.
+            if (OfficeTaskbarLaunch.TryRedirect())
+            {
+                Shutdown(0);
+                return;
+            }
             MessageBox.Show("Откройте ГМЦ-Смету с рабочего ярлыка.", "ГМЦ-Смета",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown(1);
@@ -106,6 +113,7 @@ public partial class App : Application
         window.InitializeWorkspaceNavigation();
         StartupTrace.Mark("app_workspace_navigation_attached");
         MainWindow = window;
+        OfficeTaskbarLaunch.Attach(window);
         EventHandler? rendered = null;
         rendered = async (_, _) =>
         {
