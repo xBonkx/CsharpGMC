@@ -166,6 +166,7 @@ internal static class Program
         CheckCatalogPageSelection();
         CheckEstimateCalculatedColumns();
         CheckEstimateRowViewIndex();
+        CheckEstimateVisibleRowPresentation();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -345,6 +346,52 @@ internal static class Program
             !ReferenceEquals(next.BySortKey[2], replacement))
             throw new Exception("Reloaded estimates must not retain old structural lookups.");
         Console.WriteLine("Estimate row snapshot index and live section labels OK.");
+    }
+
+    private static void CheckEstimateVisibleRowPresentation()
+    {
+        var section = new EditableEstimateRow(new GmcSmeta.Core.Domain.EstimateRow(
+            GmcSmeta.Core.Domain.RowKind.System, 1, 0, 0, false, "4",
+            "Подсистема П1", "", 0, 0, 0, null, false, "") { SystemId = 5 });
+        var parent = new EditableEstimateRow(new GmcSmeta.Core.Domain.EstimateRow(
+            GmcSmeta.Core.Domain.RowKind.Position, 2, 1, 10, false, "5",
+            "Клапан", "шт", 1, 1, 1, null, false, "") { SystemId = 5 });
+        var child = new EditableEstimateRow(new GmcSmeta.Core.Domain.EstimateRow(
+            GmcSmeta.Core.Domain.RowKind.Position, 3, 2, 11, true, "",
+            "Привод", "шт", 1, 0, 0, null, false, "")
+            { SystemId = 5, ParentPositionId = 10 });
+        var index = new EstimateRowViewIndex(new[] { section, parent, child });
+
+        // Simulate rows reused from grouped mode, including a hidden child.
+        parent.DisplayNum = "Старая группа";
+        parent.DisplayIndentLevel = 1;
+        child.DisplayNum = "Старая группа";
+        child.DisplayIndentLevel = 2;
+        index.PrepareDocumentRow(parent, flat: true);
+        if (parent.DisplayNum != section.Name || parent.DisplayIndentLevel != 0 ||
+            child.DisplayNum != "Старая группа" || child.DisplayIndentLevel != 2)
+            throw new Exception("Preparing one visible row must not rewrite a hidden child.");
+
+        section.Name = "Подсистема переименована";
+        index.PrepareDocumentRow(parent, flat: true);
+        index.PrepareDocumentRow(child, flat: true);
+        if (parent.DisplayNum != section.Name || child.DisplayNum != section.Name ||
+            parent.DisplayIndentLevel != 0 || child.DisplayIndentLevel != 1)
+            throw new Exception("Flat view must refresh live system labels and component depth.");
+
+        foreach (var row in index.Rows)
+        {
+            index.PrepareDocumentRow(row, flat: false);
+            if (row.DisplayNum != row.Num || row.DisplayIndentLevel != row.Level)
+                throw new Exception("Returning to document order must restore numbers and structural depth.");
+        }
+
+        var changes = 0;
+        parent.PropertyChanged += (_, _) => changes++;
+        index.PrepareDocumentRow(parent, flat: false);
+        if (changes != 0)
+            throw new Exception("An unchanged visible row must not raise redundant notifications.");
+        Console.WriteLine("Estimate visible-row presentation and grouping transitions OK.");
     }
 
     private static void CheckEstimateCalculatedColumns()

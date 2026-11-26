@@ -661,16 +661,6 @@ public partial class EstimateView : UserControl
         var index = RowViewIndex;
         var byKey = index.BySortKey;
 
-        foreach (var row in _rows)
-        {
-            var displayNum = _flatTemporaryView && !row.IsSystem
-                ? index.SectionName(row.Source.SystemId, row.Num)
-                : row.Num;
-            var indent = _flatTemporaryView ? (row.IsSub ? 1 : 0) : row.Level;
-            if (row.DisplayNum != displayNum) row.DisplayNum = displayNum;
-            if (row.DisplayIndentLevel != indent) row.DisplayIndentLevel = indent;
-        }
-
         // A stage filter must still reveal rows hidden inside collapsed
         // systems, or the user could see a blank result with no expandable
         // header to reach the undistributed positions.
@@ -698,6 +688,9 @@ public partial class EstimateView : UserControl
                 row.Source.ParentPositionId is int areaId &&
                 areaSummaryIds.Contains(areaId) && !_expandedAreaSummaries.Contains(areaId))
                 continue;
+            // Prepare only rows surviving search and folds. Stage filtering
+            // below needs their current presentation depth to find ancestors.
+            index.PrepareDocumentRow(row, _flatTemporaryView);
             visible.Add(row);
         }
 
