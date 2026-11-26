@@ -17,6 +17,7 @@ public partial class TrashWindow : Window
     private readonly string _connectionString;
     private string _revision = "";
     private bool _commitUncertain;
+    private CancellationTokenSource? _loadCancellation;
 
     /// <summary>("object" | "contract", новый id) для главного окна, как TrashDialog.restored.</summary>
     public SqlServerTrash.RestoredItem? Restored { get; private set; }
@@ -25,31 +26,70 @@ public partial class TrashWindow : Window
     {
         _connectionString = connectionString;
         InitializeComponent();
-        SafeReload();
+        RestoreButton.IsEnabled = ForgetButton.IsEnabled = false;
+        EmptyText.Text = "Загрузка корзины…";
+        EmptyText.Visibility = Visibility.Visible;
+        Loaded += async (_, _) => await SafeReloadAsync();
+        Closed += (_, _) => _loadCancellation?.Cancel();
     }
 
-    private void Reload()
+    private async Task SafeReloadAsync()
     {
+        if (_loadCancellation is not null) return;
         _revision = "";
-        RestoreButton.IsEnabled = false;
-        ForgetButton.IsEnabled = false;
-        var (entries, revision) = SqlServerTrash.ReadSnapshot(_connectionString);
-        _revision = revision;
-        TrashGrid.ItemsSource = entries.Select(e => new Row(e)).ToList();
-        var hasData = entries.Count > 0;
-        EmptyText.Visibility = hasData ? Visibility.Collapsed : Visibility.Visible;
-        RestoreButton.IsEnabled = hasData && !_commitUncertain;
-        ForgetButton.IsEnabled = hasData && !_commitUncertain;
-        if (TrashGrid.Items.Count > 0) TrashGrid.SelectedIndex = 0;
+        RestoreButton.IsEnabled = ForgetButton.IsEnabled = false;
+        TrashGrid.ItemsSource = null;
+        EmptyText.Text = "Загрузка корзины…";
+        EmptyText.Visibility = Visibility.Visible;
+        using var cancellation = new CancellationTokenSource();
+        _loadCancellation = cancellation;
+        var token = cancellation.Token;
+        try
+        {
+            var snapshot = await Task.Run(() =>
+            {
+                var (entries, revision) = SqlServerTrash.ReadSnapshot(_connectionString, token);
+                var rows = new List<Row>(entries.Count);
+                foreach (var entry in entries)
+                {
+                    token.ThrowIfCancellationRequested();
+                    rows.Add(new Row(entry));
+                }
+                return (Rows: rows, Revision: revision);
+            }, token);
+            if (token.IsCancellationRequested || !IsLoaded) return;
+            TrashGrid.ItemsSource = snapshot.Rows;
+            var hasData = snapshot.Rows.Count > 0;
+            EmptyText.Text = "Корзина пуста — ничего не удаляли.";
+            EmptyText.Visibility = hasData ? Visibility.Collapsed : Visibility.Visible;
+            if (hasData) TrashGrid.SelectedIndex = 0;
+            if (!_commitUncertain)
+            {
+                _revision = snapshot.Revision;
+                RestoreButton.IsEnabled = ForgetButton.IsEnabled = hasData;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (token.IsCancellationRequested || !IsLoaded) return;
+            var ticket = new ErrorLog().Record(ErrorCategory.SqlFailure, ex);
+            EmptyText.Text = "Невозможно перечитать корзину. " + ticket.Notification;
+            EmptyText.Visibility = Visibility.Visible;
+            MessageBox.Show(this, EmptyText.Text, "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _loadCancellation = null;
+        }
     }
 
     private long? CurrentId() => TrashGrid.SelectedItem is Row row ? row.Id : null;
 
-    private void Restore_Click(object sender, RoutedEventArgs e) => Restore();
+    private async void Restore_Click(object sender, RoutedEventArgs e) => await RestoreAsync();
 
-    private void Forget_Click(object sender, RoutedEventArgs e) => Forget();
+    private async void Forget_Click(object sender, RoutedEventArgs e) => await ForgetAsync();
 
-    private void Restore()
+    private async Task RestoreAsync()
     {
         if (_commitUncertain || string.IsNullOrWhiteSpace(_revision) || CurrentId() is not long id) return;
         var revision = _revision;
@@ -67,11 +107,11 @@ public partial class TrashWindow : Window
             MessageBox.Show(this, ticket.Notification + (_commitUncertain ?
                 "\nНе повторяйте восстановление до проверки объекта на сервере." : ""),
                 "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
-            SafeReload();
+            await SafeReloadAsync();
         }
     }
 
-    private void Forget()
+    private async Task ForgetAsync()
     {
         if (_commitUncertain || string.IsNullOrWhiteSpace(_revision) ||
             TrashGrid.SelectedItem is not Row row) return;
@@ -94,18 +134,7 @@ public partial class TrashWindow : Window
                 "\nНе повторяйте удаление до проверки состояния сервера." : ""),
                 "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        SafeReload();
-    }
-
-    private void SafeReload()
-    {
-        try { Reload(); }
-        catch (Exception ex)
-        {
-            var ticket = new ErrorLog().Record(ErrorCategory.SqlFailure, ex);
-            MessageBox.Show(this, "Невозможно перечитать корзину. " + ticket.Notification,
-                "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+        await SafeReloadAsync();
     }
 
     private void BlockUncertainCommit()
@@ -116,13 +145,13 @@ public partial class TrashWindow : Window
         ForgetButton.IsEnabled = false;
     }
 
-    private void TrashGrid_DoubleClick(object sender, MouseButtonEventArgs e)
+    private async void TrashGrid_DoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is DependencyObject source &&
             System.Windows.Controls.ItemsControl.ContainerFromElement(TrashGrid, source)
                 is System.Windows.Controls.DataGridRow row &&
             row.Item is Row entry && entry.Id == CurrentId())
-            Restore();
+            await RestoreAsync();
     }
 
     /// <summary>Строка таблицы с отображением как в Python (дата · пользователь, «N дн.»).</summary>

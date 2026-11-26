@@ -57,28 +57,40 @@ public static partial class SqlServerTrash
         return List(conn);
     }
 
-    public static (IReadOnlyList<TrashEntry> Entries, string Revision) ReadSnapshot(string connectionString)
+    public static (IReadOnlyList<TrashEntry> Entries, string Revision) ReadSnapshot(string connectionString,
+        CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        token.ThrowIfCancellationRequested();
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var before = SqlServerDatabase.Revision(conn);
-            var entries = List(conn);
-            if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            token.ThrowIfCancellationRequested();
+            var before = Revision();
+            var entries = List(conn, token);
+            var after = Revision();
+            token.ThrowIfCancellationRequested();
+            if (!string.IsNullOrWhiteSpace(before) && before == after)
                 return (entries, before);
         }
         throw new InvalidOperationException("Корзина изменилась при чтении. Откройте её повторно.");
     }
 
-    private static IReadOnlyList<TrashEntry> List(SqlConnection conn)
+    private static IReadOnlyList<TrashEntry> List(SqlConnection conn, CancellationToken token = default)
     {
         var entries = new List<TrashEntry>();
         using var cmd = new SqlCommand(
             "SELECT id,kind,title,object_name,[rows],deleted_at,deleted_by FROM dbo.trash " +
             "ORDER BY deleted_at DESC, id DESC", conn);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             string Text(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             entries.Add(new TrashEntry(
                 Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), Text(1), Text(2), Text(3),
@@ -86,6 +98,7 @@ public static partial class SqlServerTrash
                 r.IsDBNull(5) ? null : Convert.ToDateTime(r.GetValue(5), CultureInfo.InvariantCulture),
                 Text(6)));
         }
+        token.ThrowIfCancellationRequested();
         return entries;
     }
 
