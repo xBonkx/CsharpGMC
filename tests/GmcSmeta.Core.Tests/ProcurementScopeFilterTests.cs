@@ -62,6 +62,30 @@ public sealed class ProcurementScopeFilterTests
             search: "пв-1 ф315"));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ф315\tЗАЯВКА  ")]
+    [InlineData("ПВ-1 магазин")]
+    [InlineData("счет замена")]
+    [InlineData("нет")]
+    public void PreparedSearchMatchesLegacyPredicateAcrossLargeInput(string search)
+    {
+        var words = ProcurementScopeFilter.PrepareSearch(search);
+        var selected = new HashSet<long> { 5, 21 };
+        for (var i = 0; i < 25000; i++)
+        {
+            var supplier = i % 3 == 0 ? null : "Магазин";
+            var id = i % 5 == 0 ? 21 : 100;
+            long? parent = i % 2 == 0 ? 5 : null;
+            var name = i % 7 == 0 ? "Воздуховод ф315" : "Решетка";
+            var fields = new[] { name, "ПВ-1", supplier ?? "", "Заявка 7", "Счет 3", "Замена" };
+            var expected = (selected.Contains(id) || (parent.HasValue && selected.Contains(parent.Value))) &&
+                words.All(word => fields.Any(field => field.Contains(word, StringComparison.OrdinalIgnoreCase)));
+            Assert.Equal(expected, ProcurementScopeFilter.MatchesPrepared(id, parent, "ПВ-1", supplier,
+                selected, null, words, name, "Заявка 7", "Счет 3", "Замена"));
+        }
+    }
+
     [Fact]
     public void NullSelectedSystems_FailsFast()
     {

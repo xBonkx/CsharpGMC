@@ -83,6 +83,8 @@ public partial class EstimateView
     private List<CostMaterialsPosition> _materialsTop = new();
     private Dictionary<long, CostMaterialsPosition> _materialsById = new();
     private List<MaterialsRow> _materialsBuilt = new();
+    private MaterialsVisibleRows _materialsVisibleRows = new(Array.Empty<MaterialsRow>());
+    private bool _materialsUpdatingSystemFilter;
     private Dictionary<long, MatSortKey> _materialsFrozenKeys = new();
     private (int ContractId, string Mode, string Sort)? _materialsFrozenDoc;
     private string _materialsMode = "kp";
@@ -199,6 +201,7 @@ public partial class EstimateView
         _materialsBuilt = _materialsMode == "kp" && _materialsSort == "kp"
             ? MaterialsBuildKp(data)
             : MaterialsBuildView(data);
+        _materialsVisibleRows = new MaterialsVisibleRows(_materialsBuilt);
         MaterialsFillTiles(counts);
         MaterialsSyncFilters(counts);
         MaterialsFillSystemFilter();
@@ -328,12 +331,14 @@ public partial class EstimateView
         var labels = _materialsLabels;
         var children = data.Positions.Where(p => p.ParentId is not null)
             .GroupBy(p => p.ParentId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+        var bySystem = data.Positions.ToLookup(p => p.SystemId);
+        var topBySystem = _materialsTop.ToLookup(p => p.SystemId);
         var num = 1;
         foreach (var (id, name, isSub, _) in data.Systems)
         {
-            var members = _materialsTop.Where(p => p.SystemId == id).ToList();
+            var members = topBySystem[id];
             decimal sRev = 0m, sCost = 0m, sCov = 0m;
-            foreach (var p in data.Positions.Where(p => p.SystemId == id))
+            foreach (var p in bySystem[id])
             {
                 var cu = p.UnitCost;
                 if (p.ParentId is null && !p.Work)
@@ -558,69 +563,19 @@ public partial class EstimateView
     // ------------------------------------------------------------------ filtering
     private void MaterialsApplyViewFilter()
     {
-        if (MaterialsGrid is null) return;
-        var words = (MaterialsSearch?.Text ?? "")
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(w => w.ToLowerInvariant()).ToArray();
-        var onlyMissing = MaterialsNoCostToggle?.IsChecked == true;
-        var onlyNoPrice = MaterialsNoPriceToggle?.IsChecked == true;
-        var allowedId = (MaterialsSystemFilter?.SelectedItem as MatSystemOption)?.Id;
-        var anyFilter = words.Length > 0 || onlyMissing || onlyNoPrice || allowedId is not null;
-
-        static bool Matches(string[] words, string text)
-        {
-            if (words.Length == 0) return true;
-            var folded = text.ToLowerInvariant();
-            return words.All(w => folded.Contains(w));
-        }
-
-        bool PositionOk(MaterialsRow r) =>
-            (Matches(words, r.Name) || Matches(words, r.SystemLabel)) &&
-            (!onlyMissing || r.NoCostFlag) && (!onlyNoPrice || r.NoPriceFlag) &&
-            (allowedId is null || r.SystemId == allowedId);
-
-        // Число видимых строк под каждой шапкой (системы/группы).
-        var visibleChildren = new Dictionary<MaterialsRow, int>();
-        MaterialsRow? currentHeader = null;
-        foreach (var r in _materialsBuilt)
-        {
-            if (r.IsSystemHeader && !r.IsGroup || r.IsGroup)
-            {
-                currentHeader = r;
-                visibleChildren[r] = 0;
-                continue;
-            }
-            if (PositionOk(r))
-            {
-                if (currentHeader is not null)
-                    visibleChildren[currentHeader]++;
-            }
-        }
-
-        var result = new ObservableCollection<MaterialsRow>();
-        foreach (var r in _materialsBuilt)
-        {
-            if (r.IsSystemHeader && !r.IsGroup)
-            {
-                // Система: скрыта, если строки не попадают в фильтр систем или в ней
-                // не осталось ни одной видимой строки (пустые системы скрыты, как в Python).
-                if (allowedId is not null && allowedId != r.SystemId) continue;
-                if (visibleChildren.GetValueOrDefault(r) == 0) continue;
-                result.Add(r);
-            }
-            else if (r.IsGroup)
-            {
-                var shown = visibleChildren.GetValueOrDefault(r) > 0 ||
-                    (!onlyMissing && !onlyNoPrice && allowedId is null &&
-                     Matches(words, r.Name));
-                if (shown) result.Add(r);
-            }
-            else if (PositionOk(r))
-            {
-                result.Add(r);
-            }
-        }
-        MaterialsGrid.ItemsSource = result;
+        if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;
+        var grid = MaterialsGrid;
+        var result = _materialsVisibleRows.Filter(MaterialsSearch?.Text,
+            MaterialsNoCostToggle?.IsChecked == true,
+            MaterialsNoPriceToggle?.IsChecked == true,
+            (MaterialsSystemFilter?.SelectedItem as MatSystemOption)?.Id);
+        // Keep selection, viewport and edit controls for an unchanged view.
+        // New authoritative rows always have different references.
+        if (grid.ItemsSource is ObservableCollection<MaterialsRow> existing &&
+            grid.Items is System.ComponentModel.IEditableCollectionView { IsEditingItem: false, IsAddingNew: false } &&
+            MaterialsVisibleRows.SameReferences(existing, result))
+            return;
+        grid.ItemsSource = new ObservableCollection<MaterialsRow>(result);
     }
 
     private void MaterialsSyncFilters((decimal Rev, decimal Cost, decimal Cov, int Missing, int NoPrice) counts)
@@ -709,12 +664,18 @@ public partial class EstimateView
         if (MaterialsSystemFilter is null) return;
         var selected = MaterialsSystemFilter.SelectedItem as MatSystemOption;
         var options = new List<MatSystemOption> { new(null, "Все системы") };
-        MaterialsComputeSystemLabels();
         foreach (var (id, name, _, _) in _materialsData!.Systems)
             options.Add(new MatSystemOption(id, _materialsLabels.GetValueOrDefault(id, name)));
-        MaterialsSystemFilter.ItemsSource = options;
-        MaterialsSystemFilter.SelectedItem =
-            options.FirstOrDefault(o => o.Id == selected?.Id) ?? options[0];
+        if (MaterialsSystemFilter.ItemsSource is IEnumerable<MatSystemOption> existing &&
+            existing.SequenceEqual(options) && selected is not null) return;
+        _materialsUpdatingSystemFilter = true;
+        try
+        {
+            MaterialsSystemFilter.ItemsSource = options;
+            MaterialsSystemFilter.SelectedItem =
+                options.FirstOrDefault(o => o.Id == selected?.Id) ?? options[0];
+        }
+        finally { _materialsUpdatingSystemFilter = false; }
     }
 
     private void MaterialsSyncViewButtons()

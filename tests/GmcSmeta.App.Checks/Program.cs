@@ -221,6 +221,7 @@ internal static class Program
         SummaryRowSequenceChecks.Run();
         SummaryExcelChecks.Run();
         LiveWorkbookSnapshotChecks.Run();
+        MaterialsVisibleRowsChecks.Run();
     }
 
     /// <summary>

@@ -19,6 +19,10 @@ public sealed class MaterialsViewMenuSourceTests
         Assert.Contains("_materialsFrozenDoc = null;", method);
         Assert.Contains("MaterialsRebuild();", method);
         Assert.Contains("_materialsFrozenKeys.TryGetValue(p.Id, out var frozen)", code);
+        Assert.Contains("data.Positions.ToLookup(p => p.SystemId)", code);
+        Assert.Contains("_materialsTop.ToLookup(p => p.SystemId)", code);
+        Assert.Contains("MaterialsVisibleRows.SameReferences(existing, result)", code);
+        Assert.Contains("if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;", code);
         Assert.Contains("ContextMenuIcons.Create(\"Вернуть как в КП\", \"X\")", code);
         var icons = File.ReadAllText(Path.Combine(app, "Theme", "ToolbarIcons.xaml"));
         Assert.Contains("x:Key=\"GlyphX\" Figures=\"M6 6l12 12M18 6 6 18\"", icons);

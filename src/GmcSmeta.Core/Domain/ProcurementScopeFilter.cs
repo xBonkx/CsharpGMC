@@ -14,6 +14,21 @@ public static class ProcurementScopeFilter
         string? search, string name, string orderRef, string invoiceRef, string replacement)
     {
         ArgumentNullException.ThrowIfNull(selectedSystems);
+        return MatchesPrepared(systemId, parentSystemId, systemName, supplier, selectedSystems,
+            selectedSupplier, PrepareSearch(search), name, orderRef, invoiceRef, replacement);
+    }
+
+    public static string[] PrepareSearch(string? search) =>
+        (search ?? "").Split((char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Use the same prepared words for every row of a single filter pass.</summary>
+    public static bool MatchesPrepared(long systemId, long? parentSystemId, string systemName,
+        string? supplier, IReadOnlyCollection<long> selectedSystems, string? selectedSupplier,
+        IReadOnlyList<string> words, string name, string orderRef, string invoiceRef, string replacement)
+    {
+        ArgumentNullException.ThrowIfNull(selectedSystems);
+        ArgumentNullException.ThrowIfNull(words);
 
         if (selectedSystems.Count > 0 && !selectedSystems.Contains(systemId)
             && !(parentSystemId is long parent && selectedSystems.Contains(parent)))
@@ -23,13 +38,16 @@ public static class ProcurementScopeFilter
             !string.Equals(supplier ?? "", selectedSupplier, StringComparison.Ordinal))
             return false;
 
-        var words = (search ?? "").Split((char[]?)null,
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (words.Length == 0) return true;
-
-        var sources = new[] { name, systemName, supplier ?? "",
-            orderRef, invoiceRef, replacement };
-        return words.All(word => sources.Any(value =>
-            value.Contains(word, StringComparison.OrdinalIgnoreCase)));
+        foreach (var word in words)
+        {
+            if (name.Contains(word, StringComparison.OrdinalIgnoreCase) ||
+                systemName.Contains(word, StringComparison.OrdinalIgnoreCase) ||
+                (supplier ?? "").Contains(word, StringComparison.OrdinalIgnoreCase) ||
+                orderRef.Contains(word, StringComparison.OrdinalIgnoreCase) ||
+                invoiceRef.Contains(word, StringComparison.OrdinalIgnoreCase) ||
+                replacement.Contains(word, StringComparison.OrdinalIgnoreCase)) continue;
+            return false;
+        }
+        return true;
     }
 }

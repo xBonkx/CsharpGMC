@@ -375,16 +375,16 @@ public partial class ProcurementPane : UserControl
     {
         if (_rebuildingScopeFilters || sender is not CheckBox { Tag: long id } box)
             return;
-        if (box.IsChecked == true)
-            _selectedSystemIds.Add(id);
-        else
-            _selectedSystemIds.Remove(id);
+        var changed = box.IsChecked == true
+            ? _selectedSystemIds.Add(id) : _selectedSystemIds.Remove(id);
+        if (!changed) return;
         UpdateSystemFilterTitle();
         ApplyProcurementFilters();
     }
 
     private void ProcurementSystemsClear_Click(object sender, RoutedEventArgs e)
     {
+        if (_selectedSystemIds.Count == 0) return;
         _selectedSystemIds.Clear();
         _rebuildingScopeFilters = true;
         try { RebuildVisibleSystemChoices(); }
@@ -432,15 +432,15 @@ public partial class ProcurementPane : UserControl
         if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true }) return;
         if (_rebuildingScopeFilters) return;
 
-        var q = ProcurementSearchBox.Text.Trim();
+        var words = ProcurementScopeFilter.PrepareSearch(ProcurementSearchBox.Text);
         var supplierChoice =
             (ProcurementSupplierFilter.SelectedItem as ProcurementSupplierFilterChoice)?.Key;
         IEnumerable<ProcurementPreviewRow> rows = _allRows.Where(row =>
             ProcurementViewFilter.Matches(_activeCategory, row.StatusCode,
                 row.Stage, row.Work, row.FlagItems, row.Source) &&
-            ProcurementScopeFilter.Matches(row.SystemId, row.ParentSystemId,
+            ProcurementScopeFilter.MatchesPrepared(row.SystemId, row.ParentSystemId,
                 row.SystemName, row.Supplier, _selectedSystemIds, supplierChoice,
-                q, row.Name, row.OrderRef, row.InvoiceRef, row.Replacement));
+                words, row.Name, row.OrderRef, row.InvoiceRef, row.Replacement));
         if (_openOnly)
             rows = rows.Where(r => r.StatusCode is not ("zero" or "skip" or "issued"));
         if (_missingCost)
