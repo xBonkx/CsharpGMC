@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,96 +13,6 @@ using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
 
 namespace GmcSmeta.App;
-
-/// <summary>Строка окна КС-2 (ks_view ActPositionItem): раздел сметы или позиция
-/// со строкой акта. Правится только «В этом акте»; строки акта зелёные,
-/// колонка ввода подсвечена #DCE8FF, «сдаём больше, чем выдано» — оранжевым.</summary>
-public sealed class KsRowVm : INotifyPropertyChanged
-{
-    private string _num = "";
-    private string _name = "";
-    private string _unit = "";
-    private string _qtyByKp = "";
-    private string _before = "";
-    private string _now = "";
-    private string _left = "";
-    private string _issued = "";
-    private string _price = "";
-    private string _amount = "";
-    private Brush? _referenceBrush;
-    private bool _inAct;
-    private bool _warn;
-    private bool _overLeft;
-    private decimal _nowValue;
-    private string _nowRaw = "";
-    private string _nowToolTip = "";
-    private decimal _restRaw;
-    private decimal _leftRaw;
-
-    public bool IsSection { get; init; }
-    public bool IsSub { get; init; }
-    public long SystemId { get; init; }
-    public long PositionId { get; init; }
-    public bool OutOfKp { get; init; }
-
-    public string Num { get => _num; set { _num = value; Raise(); } }
-    public string Name { get => _name; set { _name = value; Raise(); } }
-    public string Unit { get => _unit; set { _unit = value; Raise(); } }
-    public string QtyByKp { get => _qtyByKp; set { _qtyByKp = value; Raise(); } }
-    public string Before { get => _before; set { _before = value; Raise(); } }
-    public string Now { get => _now; set { _now = value; Raise(); } }
-    public string Left { get => _left; set { _left = value; Raise(); } }
-    public string Issued { get => _issued; set { _issued = value; Raise(); } }
-    public string Price { get => _price; set { _price = value; Raise(); } }
-    public string Amount { get => _amount; set { _amount = value; Raise(); } }
-    public bool InAct { get => _inAct; set { _inAct = value; Raise(nameof(InAct), nameof(NowCellWeight)); } }
-    public bool Warn { get => _warn; set { _warn = value; Raise(nameof(Warn), nameof(NowCellFore)); } }
-    public bool OverLeft { get => _overLeft; set { _overLeft = value; Raise(nameof(OverLeft), nameof(LeftCellFore)); } }
-    /// <summary>Объём в акте числом — для «Объём в акте» у выделенных строк.</summary>
-    public decimal NowValue { get => _nowValue; set { _nowValue = value; Raise(); } }
-    /// <summary>Формула в показе «К12+К15» (или пусто) — подставляется в редактор ячейки.</summary>
-    public string NowRaw { get => _nowRaw; set { _nowRaw = value; Raise(nameof(NowRaw), nameof(NowToolTip)); } }
-    public string NowToolTip { get => _nowToolTip; set { _nowToolTip = value; Raise(); } }
-    /// <summary>Остаток по смете до этого акта (для фильтра «Остатки»).</summary>
-    public decimal RestRaw { get => _restRaw; set { _restRaw = value; Raise(); } }
-    /// <summary>Остаток после акта — «Больше, чем по смете!» при минусе.</summary>
-    public decimal LeftRaw { get => _leftRaw; set { _leftRaw = value; Raise(nameof(LeftRaw), nameof(LeftCellFore)); } }
-
-    public Brush? ReferenceBrush
-    {
-        get => _referenceBrush;
-        set
-        {
-            if (ReferenceEquals(_referenceBrush,value)) return;
-            _referenceBrush=value;
-            Raise(nameof(ReferenceBrush),nameof(HasReference));
-        }
-    }
-    public bool HasReference => ReferenceBrush is not null;
-
-    public string RowBack { get; init; } = "#FFFFFF";
-    public string NowCellBack { get; init; } = "#DCE8FF";
-    public Brush NowCellFore => Warn ? WarnBrush : TextBrush;
-    public FontWeight NowCellWeight => InAct && !IsSection ? FontWeights.Bold : FontWeights.Normal;
-    public Brush LeftCellFore => OverLeft ? DangerBrush : TextBrush;
-    public string LeftToolTip => OverLeft ? "Больше, чем по смете!" : "";
-    public string NameToolTip { get; init; } = "";
-
-    internal static readonly Brush TextBrush = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-    internal static readonly Brush WarnBrush = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
-    internal static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xDC, 0x26, 0x26));
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private void Raise([CallerMemberName] string name = "") =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-    private void Raise(params string[] names)
-    {
-        foreach (var n in names)
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
-    }
-}
 
 /// <summary>
 /// Редактор акта КС-2 (ks_view.py): шапка в одну строку, панель действий, грид

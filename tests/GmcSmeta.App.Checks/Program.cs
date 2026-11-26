@@ -171,6 +171,7 @@ internal static class Program
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();
         CheckKsReferenceHighlights();
+        KsRowNotificationChecks.Run();
         CheckSummaryTableFrame();
         SummaryColumnFitChecks.Run();
         CheckNumericPastePlanning();
