@@ -21,7 +21,7 @@ public static class SqlServerCompare
             ? EstimateReader.LoadSqlAsync(conn, idB, token).GetAwaiter().GetResult()
             : EstimateReader.Load(conn, idB);
         token.ThrowIfCancellationRequested();
-        var result = DocumentCompare.CompareDocuments(a, b);
+        var result = DocumentCompare.CompareDocuments(a, b, token);
         token.ThrowIfCancellationRequested();
         return result;
     }

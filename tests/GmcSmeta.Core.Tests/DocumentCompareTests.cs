@@ -161,4 +161,60 @@ public sealed class DocumentCompareTests
         Assert.Throws<OperationCanceledException>(() => CompareDisplayProjection.Build(result, cancellation.Token));
     }
 
+    [Fact]
+    public void NormalizedSystemNamesKeepOriginalGroupingAndMoveSemantics()
+    {
+        var a = Doc("A", Sys(1, "  ВЕНТИЛЯЦИЯ   П1 "), Sys(2, "Старая"),
+            Pos(10, 1, "Сохранена", "шт.", 1m, 10m),
+            Pos(11, 1, "Убрана", "шт", 1m, 10m),
+            Pos(12, 2, "Перенесена", "шт", 2m, 5m),
+            Pos(13, 2, "Только старая", "шт", 1m, 1m));
+        var b = Doc("B", Sys(3, "Новая"), Sys(4, "вентиляция п1"),
+            Pos(20, 3, "Перенесена", "шт", 2m, 5m),
+            Pos(21, 4, "Сохранена", "шт", 1m, 10m),
+            Pos(22, 4, "Добавлена", "шт", 3m, 7m));
+        var result = DocumentCompare.CompareDocuments(a, b);
+        Assert.Equal(new[] { "Перенесена", "Сохранена", "Добавлена", "Убрана", "Только старая" },
+            result.Rows.Select(r => r.Name).ToArray());
+        Assert.Equal(new[] { "sys" }, result.Rows[0].Changed);
+        Assert.Equal("same", result.Rows[1].Kind);
+        Assert.Equal("  ВЕНТИЛЯЦИЯ   П1 ", result.Rows[3].Sys);
+        Assert.Equal(1, result.Same);
+        Assert.Equal(1, result.ChangedCount);
+        Assert.Equal(1, result.Added);
+        Assert.Equal(2, result.Removed);
+    }
+
+    [Theory]
+    [InlineData(2500)]
+    [InlineData(10000)]
+    public void LargeComparisonPreservesDuplicatePairingAndCounts(int count)
+    {
+        var a = new[] { Sys(1, "П1") }.Concat(Enumerable.Range(0, count)
+            .Select(i => Pos(i + 10, 1, "Решётка", "шт.", i + 1m, 2m))).ToArray();
+        var b = new[] { Sys(2, "  п1 ") }.Concat(Enumerable.Range(0, count)
+            .Select(i => Pos(i + 10, 2, "решётка", "шт", i + 2m, 2m))).ToArray();
+        var result = DocumentCompare.CompareDocuments(Doc("A", a), Doc("B", b));
+        Assert.Equal(count, result.ChangedCount);
+        Assert.Equal(count, result.Rows.Count);
+        Assert.Equal(0, result.Added + result.Removed + result.Same);
+        for (var i = 0; i < count; i++)
+        {
+            Assert.Equal(i + 1m, result.Rows[i].QtyA);
+            Assert.Equal(i + 2m, result.Rows[i].QtyB);
+            Assert.Equal(2m, result.Rows[i].Diff);
+            Assert.Equal(new[] { "qty" }, result.Rows[i].Changed);
+        }
+    }
+
+    [Fact]
+    public void CancelledComparisonDoesNotBuildRows()
+    {
+        var doc = Doc("КП", Sys(1, "П1"), Pos(10, 1, "Решётка", "шт", 1m, 1m));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            DocumentCompare.CompareDocuments(doc, doc, cancellation.Token));
+    }
+
 }
