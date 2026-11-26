@@ -172,6 +172,20 @@ public static class Workspace
         return ReadNavigationMetadata(conn, null, totals);
     }
 
+    // Manual refresh uses an independent read connection. Do not mix list
+    // metadata and monetary totals from two different server revisions.
+    public static (List<ObjectRow> Objects, List<DocRow> Documents) ReadConsistentNavigation(
+        Microsoft.Data.SqlClient.SqlConnection conn)
+    {
+        var before = Db.SqlServerDatabase.Revision(conn);
+        if (string.IsNullOrWhiteSpace(before))
+            throw new InvalidOperationException("Не удалось прочитать ревизию SQL Server.");
+        var data = ReadNavigation(conn);
+        if (!string.Equals(before, Db.SqlServerDatabase.Revision(conn), StringComparison.Ordinal))
+            throw new InvalidOperationException("Данные изменились во время обновления списка.");
+        return data;
+    }
+
     private static (List<ObjectRow> Objects, List<DocRow> Documents) ReadNavigationMetadata(
         Microsoft.Data.SqlClient.SqlConnection conn, int? objectId,
         IReadOnlyDictionary<int, ContractTotals>? totals)

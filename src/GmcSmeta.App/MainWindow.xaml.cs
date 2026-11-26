@@ -682,54 +682,6 @@ public partial class MainWindow : Window
     internal void CompareCurrentDocument(DocRow doc) => OpenCompare(doc);
 
     /// <summary>Перечитать объекты и документы, перестроить дерево и выбрать объект — как refresh(("obj", id)) в Python.</summary>
-    private void ReloadAndSelect(int objectId)
-    {
-        ReloadNavigationData();
-        if (_objects.FirstOrDefault(o => o.Id == objectId) is not { } obj)
-        {
-            RefreshNavigation();
-            ShowEmptyPage();
-            StatusText.Text = "Объект больше недоступен";
-            return;
-        }
-        SelectObjectFromNavigation(obj);
-    }
-
-    private void ReloadNavigationData()
-    {
-        var reader = _serverConn
-            ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
-        var (objects, documents) = Workspace.ReadNavigation(reader);
-        _objects.Clear(); _objects.AddRange(objects);
-        _docs.Clear(); _docs.AddRange(documents);
-    }
-
-    private void SelectObjectFromNavigation(ObjectRow obj)
-    {
-        var docsHere = _docs.Where(d => d.ObjectId == obj.Id).ToList();
-        var hasKp = docsHere.Any(d => d.Kind == "kp");
-        var hasContract = docsHere.Any(d => d.Kind is "main" or "dop");
-        var mode = obj.Archived ? NavigationMode.Archive
-            : CurrentMode == NavigationMode.Kp && hasKp ? NavigationMode.Kp
-            : CurrentMode == NavigationMode.Contracts && hasContract ? NavigationMode.Contracts
-            : hasKp || docsHere.Count == 0 ? NavigationMode.Kp : NavigationMode.Contracts;
-        _ready = false;
-        (mode == NavigationMode.Archive ? ArchiveMode : mode == NavigationMode.Kp ? KpMode : ContractsMode).IsChecked = true;
-        ObjectSearch.Clear();
-        _ready = true;
-        RememberNavigationMode();
-        RefreshNavigation();
-        if (_objectNodes.TryGetValue(obj.Id, out var node))
-        {
-            if (ItemsControl.ItemsControlFromItemContainer(node) is TreeViewItem year) year.IsExpanded = true;
-            _syncingNavigation = true;
-            try { node.IsSelected = true; }
-            finally { _syncingNavigation = false; }
-            node.BringIntoView();
-        }
-        ShowObject(obj);
-    }
-
     internal int SaveObjectProperties(ObjectProperties properties, int? id = null)
     {
         var result = SaveSqlServerObjectProperties(properties, id);

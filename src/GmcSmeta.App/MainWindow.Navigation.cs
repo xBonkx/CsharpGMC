@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -10,6 +11,8 @@ namespace GmcSmeta.App;
 public partial class MainWindow
 {
     private bool _workspaceNavigationAttached;
+    private bool _navigationRefreshInProgress;
+    private long _navigationDataGeneration;
 
     internal void InitializeWorkspaceNavigation()
     {
@@ -175,31 +178,151 @@ public partial class MainWindow
             ? (int)hit.PositionId : null);
     }
 
-    private void RefreshWorkspaceNavigation()
+    // Manual F5 reads on its own guarded SQL connection. Keep the existing
+    // synchronous post-write reload path, and never publish an obsolete result.
+    private async void RefreshWorkspaceNavigation()
     {
-        if (_serverConn is null) return;
+        if (!_ready || _startupClosed || _navigationRefreshInProgress ||
+            _serverConn is null || _sqlConnectionString is not { } connection) return;
+        if (ObjectRenameBox.Visibility == Visibility.Visible)
+        {
+            StatusText.Text = "Завершите переименование объекта перед обновлением.";
+            return;
+        }
+
+        _navigationRefreshInProgress = true;
+        var navigationGeneration = _estimateOpenGeneration;
+        var dataGeneration = _navigationDataGeneration;
         var selected = CommandObject()?.Id;
+        bool IsCurrent() => !_startupClosed && _ready &&
+            navigationGeneration == _estimateOpenGeneration &&
+            dataGeneration == _navigationDataGeneration &&
+            connection == _sqlConnectionString;
+
+        const string loading = "Обновление списка объектов и документов…";
+        StatusText.Text = loading;
+        try
+        {
+            var loaded = await Task.Run(() =>
+            {
+                StartupTrace.Mark("main_navigation_refresh_begin");
+                using var read = SqlServerDatabase.Open(connection);
+                var result = Workspace.ReadConsistentNavigation(read);
+                StartupTrace.Mark("main_navigation_refresh_end");
+                return result;
+            });
+
+            if (!IsCurrent())
+            {
+                if (!_startupClosed && StatusText.Text == loading)
+                    StatusText.Text = "Обновление списка отменено: нажмите F5 повторно.";
+                return;
+            }
+            if (!IsEnabled || !RootLayout.IsEnabled ||
+                System.Windows.Interop.ComponentDispatcher.IsThreadModal ||
+                ObjectRenameBox.Visibility == Visibility.Visible)
+            {
+                StatusText.Text = "Завершите текущую операцию и повторите F5.";
+                return;
+            }
+
+            // Do not detach a dirty editor if its document disappeared while
+            // this independent read was running. Existing save/readback owns it.
+            if (PageHost.Content is EstimateView editing && !editing.CanTransferDocument &&
+                !loaded.Documents.Any(d => d.Id == _openDocumentId &&
+                    loaded.Objects.Any(o => o.Id == d.ObjectId)))
+            {
+                StatusText.Text = "Документ изменён или удалён. Завершите редактирование и повторите F5.";
+                return;
+            }
+
+            var changed = ApplyNavigationData(loaded.Objects, loaded.Documents);
+            if (PageHost.Content is EstimateView estimate &&
+                _docs.FirstOrDefault(d => d.Id == _openDocumentId) is { } doc &&
+                _objects.Any(o => o.Id == doc.ObjectId))
+            {
+                if (changed) SynchronizeNavigation(doc, rebuildTree: true);
+                estimate.RequestRefresh();
+                StatusText.Text = $"{doc.Title}  ·  список объектов и документов обновлён";
+                return;
+            }
+            if (selected is int id && _objects.FirstOrDefault(x => x.Id == id) is { } obj)
+            {
+                SelectObjectFromNavigation(obj, preserveSearch: true, rebuildTree: changed);
+                return;
+            }
+            if (changed) RefreshNavigation();
+            if (ReferenceEquals(PageHost.Content, _directorView) && _directorView is not null)
+                _directorView.RequestRefresh();
+            else
+                ShowEmptyPage();
+            StatusText.Text = "Данные объектов и документов обновлены из SQL Server";
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            if (IsCurrent())
+                StatusText.Text = "Не удалось обновить список: " + ex.Message + " · Повторите F5.";
+        }
+        finally { _navigationRefreshInProgress = false; }
+    }
+
+    private void ReloadAndSelect(int objectId)
+    {
         ReloadNavigationData();
-        if (PageHost.Content is EstimateView estimate &&
-            _docs.FirstOrDefault(d => d.Id == _openDocumentId) is { } doc &&
-            _objects.Any(o => o.Id == doc.ObjectId))
+        if (_objects.FirstOrDefault(o => o.Id == objectId) is not { } obj)
         {
-            SynchronizeNavigation(doc, rebuildTree: true);
-            estimate.RequestRefresh();
-            StatusText.Text = $"{doc.Title}  ·  список объектов и документов обновлён";
-            return;
-        }
-        if (selected is int id && _objects.FirstOrDefault(x => x.Id == id) is { } obj)
-        {
-            SelectObjectFromNavigation(obj);
-            return;
-        }
-        RefreshNavigation();
-        if (ReferenceEquals(PageHost.Content, _directorView) && _directorView is not null)
-            ShowHome();
-        else
+            RefreshNavigation();
             ShowEmptyPage();
-        StatusText.Text = "Данные объектов и документов обновлены из SQL Server";
+            StatusText.Text = "Объект больше недоступен";
+            return;
+        }
+        SelectObjectFromNavigation(obj);
+    }
+
+    private void ReloadNavigationData()
+    {
+        // Invalidate any manual F5 snapshot before a synchronous post-write refresh.
+        ++_navigationDataGeneration;
+        var reader = _serverConn
+            ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
+        var (objects, documents) = Workspace.ReadNavigation(reader);
+        ApplyNavigationData(objects, documents);
+    }
+
+    private bool ApplyNavigationData(List<ObjectRow> objects, List<DocRow> documents)
+    {
+        if (_objects.SequenceEqual(objects) && _docs.SequenceEqual(documents)) return false;
+        _objects.Clear(); _objects.AddRange(objects);
+        _docs.Clear(); _docs.AddRange(documents);
+        return true;
+    }
+
+    private void SelectObjectFromNavigation(ObjectRow obj, bool preserveSearch = false, bool rebuildTree = true)
+    {
+        var docsHere = _docs.Where(d => d.ObjectId == obj.Id).ToList();
+        var hasKp = docsHere.Any(d => d.Kind == "kp");
+        var hasContract = docsHere.Any(d => d.Kind is "main" or "dop");
+        var mode = obj.Archived ? NavigationMode.Archive
+            : CurrentMode == NavigationMode.Kp && hasKp ? NavigationMode.Kp
+            : CurrentMode == NavigationMode.Contracts && hasContract ? NavigationMode.Contracts
+            : hasKp || docsHere.Count == 0 ? NavigationMode.Kp : NavigationMode.Contracts;
+        _ready = false;
+        (mode == NavigationMode.Archive ? ArchiveMode : mode == NavigationMode.Kp ? KpMode : ContractsMode).IsChecked = true;
+        if (!preserveSearch) ObjectSearch.Clear();
+        _ready = true;
+        RememberNavigationMode();
+        rebuildTree |= _shownMode != mode;
+        if (rebuildTree) RefreshNavigation();
+        if (_objectNodes.TryGetValue(obj.Id, out var node) && (rebuildTree || !node.IsSelected))
+        {
+            if (ItemsControl.ItemsControlFromItemContainer(node) is TreeViewItem year) year.IsExpanded = true;
+            _syncingNavigation = true;
+            try { node.IsSelected = true; }
+            finally { _syncingNavigation = false; }
+            if (node.Visibility == Visibility.Visible) node.BringIntoView();
+        }
+        ShowObject(obj);
     }
 
     private void OpenWorkspaceErrorLog()

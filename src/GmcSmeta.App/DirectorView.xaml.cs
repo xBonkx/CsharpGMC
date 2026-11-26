@@ -72,6 +72,8 @@ public partial class DirectorView : UserControl
         Unloaded += (_, _) => { ++_loadGeneration; _snapshotReady = false; };
     }
 
+    internal void RequestRefresh() => _ = ReloadAsync();
+
     private async Task ReloadAsync()
     {
         var generation = ++_loadGeneration;

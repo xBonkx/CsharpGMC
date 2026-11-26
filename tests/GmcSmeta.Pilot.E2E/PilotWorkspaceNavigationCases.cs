@@ -15,6 +15,10 @@ internal static class PilotWorkspaceNavigationCases
         var expectedObjects = Workspace.Objects(conn);
         var expectedDocuments = Workspace.Documents(conn);
         var actual = Workspace.ReadNavigation(conn);
+        var consistent = Workspace.ReadConsistentNavigation(conn);
+        PilotRunner.Check(consistent.Objects.SequenceEqual(actual.Objects) &&
+            consistent.Documents.SequenceEqual(actual.Documents),
+            "Revision-fenced refresh changed navigation data");
         PilotRunner.Check(expectedObjects.SequenceEqual(actual.Objects) &&
             expectedDocuments.SequenceEqual(actual.Documents),
             "Navigation batch changed order, metadata, counts or monetary totals");
