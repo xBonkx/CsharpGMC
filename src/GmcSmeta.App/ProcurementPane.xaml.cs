@@ -29,6 +29,9 @@ public sealed class ProcurementPreviewRow
     public string Received { get; init; } = "";
     public string Issued { get; init; } = "";
     public string Supplier { get; set; } = "";
+    public string SupplierTooltip => Source == "shop"
+        ? (string.IsNullOrWhiteSpace(Supplier) ? "Изготовление в нашем цеху" : Supplier + "\nИзготовление в нашем цеху")
+        : Supplier;
     public string Stage { get; set; } = "";
     public string StageLabel
     {
@@ -482,7 +485,7 @@ public partial class ProcurementPane : UserControl
         if (_restoringBuySelection || ProcurementSelectionText is null) return;
         var count = BuyGrid.SelectedItems.Count;
         ProcurementSelectionText.Text = count > 0 ? $"Выделено: {count} →" : "Выделите строки →";
-        ProcurementSelectionText.Foreground = (Brush)new BrushConverter().ConvertFromString(count > 0 ? "#1D4ED8" : "#64748B")!;
+        ProcurementSelectionText.Tag = count > 0 ? "selected" : null;
         if (ProcurementSupplierButton is not null) ProcurementSupplierButton.IsEnabled = count > 0;
         if (ProcurementStatusButton is not null) ProcurementStatusButton.IsEnabled = count > 0;
         // Loading is lazy: merely selecting cells does not query the network

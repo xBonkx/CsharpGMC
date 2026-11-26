@@ -295,8 +295,22 @@
                         Margin="0,0,0,4" Click="ProcurementMore_Click"/>
             </StackPanel>
             <WrapPanel VerticalAlignment="Center">
-                <TextBlock x:Name="ProcurementSelectionText" Text="Выделите строки →" Foreground="#64748B"
-                           VerticalAlignment="Center" Margin="0,0,14,4"/>
+                <TextBlock x:Name="ProcurementSelectionText" Text="Выделите строки →"
+                           VerticalAlignment="Center" Margin="0,0,14,4"
+                           ToolTip="Выделите строки мышкой (Ctrl, Shift или целую систему), потом нажмите «Поставщик…» или «Статус…»">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#64748B"/>
+                            <Setter Property="FontWeight" Value="Normal"/>
+                            <Style.Triggers>
+                                <Trigger Property="Tag" Value="selected">
+                                    <Setter Property="Foreground" Value="#1E40AF"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 <Button x:Name="ProcurementSupplierButton" Content="Поставщик…" ContentTemplate="{StaticResource IconLabelBuilding}" Style="{StaticResource PythonToolbarButton}"
                         Margin="0,0,2,4" Click="ProcurementBulkSupplier_Click" IsEnabled="False"/>
                 <Button x:Name="ProcurementStatusButton" Content="Статус…" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}"
@@ -402,7 +416,37 @@
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
                 <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
-                <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier, Mode=TwoWay}" Width="120" HeaderStyle="{StaticResource ProcurementTextHeader}" ElementStyle="{StaticResource CompactCostText}" EditingElementStyle="{StaticResource CompactCostEditor}"/>
+                <DataGridTemplateColumn Header="Поставщик" Width="120" HeaderStyle="{StaticResource ProcurementTextHeader}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <DockPanel LastChildFill="True" ToolTip="{Binding SupplierTooltip}">
+                                <Viewbox DockPanel.Dock="Left" Width="14" Height="14" Margin="0,0,4,0"
+                                         VerticalAlignment="Center" IsHitTestVisible="False">
+                                    <Viewbox.Style>
+                                        <Style TargetType="Viewbox">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Source}" Value="shop">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Viewbox.Style>
+                                    <Canvas Width="24" Height="24">
+                                        <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSettings}" Stroke="#A21CAF"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <TextBlock Text="{Binding Supplier}" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Supplier, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -562,7 +606,7 @@
             </Grid>
         </Expander>
         <TextBlock x:Name="FooterText" Grid.Row="4" Foreground="#64748B" Margin="2,4,0,0" TextWrapping="Wrap">
-            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/>
+            <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource UiCaption}"><Setter Property="Visibility" Value="Visible"/>
                 <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
             </Style></TextBlock.Style>
         </TextBlock>
