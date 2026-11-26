@@ -155,6 +155,8 @@
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               RowHeaderWidth="0" ColumnHeaderStyle="{StaticResource KsQuantityHeader}"
                               MinRowHeight="27" MinHeight="90" MaxHeight="240"
+                              EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                               VerticalGridLinesBrush="#E4E8EF"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
