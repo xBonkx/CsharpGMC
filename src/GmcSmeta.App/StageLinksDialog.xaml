@@ -5,7 +5,7 @@
         Title="Связи этапов, ДС и КС" Width="910" Height="560"
         MinWidth="680" MinHeight="420" WindowStartupLocation="CenterOwner"
         Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}"
-        FontSize="{StaticResource UiBodySize}">
+        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Grid Margin="20,16,20,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,7 +18,7 @@
                   AutoGenerateColumns="False" CanUserAddRows="False"
                   CanUserDeleteRows="False" IsReadOnly="True"
                   GridLinesVisibility="Horizontal" HeadersVisibility="Column"
-                  EnableRowVirtualization="True" BorderBrush="#E4E8EF"
+                  MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True" BorderBrush="#E4E8EF"
                   Background="White" RowHeaderWidth="0" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="95" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
@@ -28,12 +28,13 @@
                 <DataGridTextColumn Header="Статус" Binding="{Binding State}" Width="125" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
             </DataGrid.Columns>
         </DataGrid>
-        <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
-            <TextBlock x:Name="StatusText" DockPanel.Dock="Left" VerticalAlignment="Center"
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center"
                        Foreground="#64748B" TextWrapping="Wrap"
                        Text="Удаление этапа с КС, ДС или движениями материалов запрещено."/>
-            <Button DockPanel.Dock="Right" Content="Закрыть" IsCancel="True"
+            <Button Grid.Column="1" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" IsCancel="True"
                     MinWidth="95" Padding="12,5" Margin="12,0,0,0"/>
-        </DockPanel>
+        </Grid>
     </Grid>
 </Window>

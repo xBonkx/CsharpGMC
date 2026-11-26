@@ -28,8 +28,35 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="Из" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <ComboBox x:Name="SourceCombo" Grid.Column="1" SelectionChanged="Source_Changed"/>
-            <TextBox x:Name="SourceSearch" Style="{StaticResource PythonSearch}" Grid.Column="2" Width="220" Margin="10,0,0,0"
-                     TextChanged="Search_Changed" ToolTip="Поиск КП"/>
+            <Grid Grid.Column="2" Width="220" Margin="10,0,0,0">
+                <TextBox x:Name="SourceSearch" Style="{StaticResource PythonSearch}" TextChanged="Search_Changed"
+                         Padding="8,5,32,5" AutomationProperties.Name="Поиск КП" ToolTip="Поиск КП"/>
+                
+                <TextBlock Text="Поиск КП" Foreground="#94A3B8" Margin="8,0,32,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SourceSearch}" Value="">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger></Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" ToolTip="Очистить поиск"
+                        AutomationProperties.Name="Очистить поиск" Width="26" Height="26" MinWidth="0" MinHeight="0"
+                        Padding="0" Margin="0,0,3,0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ClearRateSearch_Click">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SourceSearch}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger></Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
             <CheckBox x:Name="AllObjects" Style="{StaticResource PythonFilterChip}" Grid.Column="3" Content="Все объекты" Margin="10,0,0,0"
                       Checked="Source_Changed" Unchecked="Source_Changed"/>
         </Grid>
@@ -37,9 +64,9 @@
             <CheckBox x:Name="SmrCheck" Style="{StaticResource PythonFilterChip}" Content="СМР" IsChecked="True" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,12,0" VerticalAlignment="Center"/>
             <CheckBox x:Name="MaterialsCheck" Style="{StaticResource PythonFilterChip}" Content="Материалы" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,12,0" VerticalAlignment="Center"/>
             <CheckBox x:Name="OverwriteCheck" Content="Заменять заполненные цены" Checked="Invalidate_Changed" Unchecked="Invalidate_Changed" Margin="0,0,20,0" VerticalAlignment="Center"/>
-            <Button x:Name="CheckButton" Content="Проверить совпадения" Click="Check_Click" FontWeight="SemiBold" Padding="12,4" Style="{StaticResource PrimaryButton}"/>
+            <Button x:Name="CheckButton" Content="Проверить совпадения" ContentTemplate="{StaticResource IconLabelSearch}" Click="Check_Click" Padding="12,4" Style="{StaticResource PythonToolbarButton}"/>
         </WrapPanel>
-        <DataGrid local:TableColumnMenu.Key="rate-transfer" local:TableColumnMenu.Protect="Позиция из источника|Позиция в смете|Результат" MinRowHeight="30"
+        <DataGrid local:TableColumnMenu.Key="rate-transfer" local:TableColumnMenu.Protect="Позиция из источника|Позиция в смете|Результат" MinRowHeight="27"
                  
                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalGridLinesBrush="#E4E8EF"
@@ -49,8 +76,8 @@
                   SelectionMode="Single" SelectionUnit="FullRow" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="✓" Binding="{Binding Included, Mode=TwoWay}" Width="34"/>
-                <DataGridTextColumn Header="Позиция из источника" Binding="{Binding SourceLabel}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Позиция в смете" Binding="{Binding TargetLabel}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                <DataGridTextColumn Header="Позиция из источника" Binding="{Binding SourceLabel}" Width="*" MinWidth="140" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                <DataGridTextColumn Header="Позиция в смете" Binding="{Binding TargetLabel}" Width="*" MinWidth="140" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Цена сейчас" Binding="{Binding CurrentPrice}" Width="138" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridBeforeHeader}"/>
                 <DataGridTextColumn Header="Цена из источника" Binding="{Binding SourcePrice}" Width="138" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridAfterHeader}"/>
                 <DataGridTextColumn Header="Результат" Binding="{Binding ResultText}" Width="170" IsReadOnly="True" ElementStyle="{StaticResource CompactCostReview}" HeaderStyle="{StaticResource KsTextHeader}"/>

@@ -58,7 +58,8 @@ public sealed class AttachmentWindow : Window
     {
         AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
         CanUserDeleteRows = false, SelectionMode = DataGridSelectionMode.Extended,
-        SelectionUnit = DataGridSelectionUnit.FullRow, RowHeight = 28,
+        SelectionUnit = DataGridSelectionUnit.FullRow, MinRowHeight = 27, AlternationCount = 0,
+        HeadersVisibility = DataGridHeadersVisibility.Column,
     };
 
     public AttachmentWindow(string connectionString, long contractId, string contractTitle, bool signedOnly = false)
@@ -70,30 +71,34 @@ public sealed class AttachmentWindow : Window
         MinWidth = 560; MinHeight = 360; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = System.Windows.Media.Brushes.White;
 
+        WorkspaceWindowUi.ApplyChrome(this);
+        WorkspaceWindowUi.StyleTable(_grid);
         _grid.Columns.Add(new DataGridTextColumn { Header = "Файл", Binding = new System.Windows.Data.Binding(nameof(AttachmentRow.Name)), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
         _grid.Columns.Add(new DataGridTextColumn { Header = "Размер", Binding = new System.Windows.Data.Binding(nameof(AttachmentRow.SizeText)), Width = 90 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "Кто добавил", Binding = new System.Windows.Data.Binding(nameof(AttachmentRow.AddedBy)), Width = 120 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "Когда", Binding = new System.Windows.Data.Binding(nameof(AttachmentRow.AddedAtText)), Width = 130 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "Отметка", Binding = new System.Windows.Data.Binding(nameof(AttachmentRow.SignedText)), Width = 145 });
+        foreach (var column in _grid.Columns.OfType<DataGridTextColumn>())
+            WorkspaceWindowUi.StyleColumn(column, Equals(column.Header, "Размер") ? TextAlignment.Right : TextAlignment.Left);
         TableColumnMenu.SetKey(_grid, "attachments");
         _grid.ItemsSource = _rows;
         _grid.ContextMenu = new ContextMenu();
         _grid.ContextMenuOpening += AttachmentMenu_Opening;
         _grid.MouseDoubleClick += async (_, _) => await OpenSelectedAsync();
 
-        var root = new DockPanel { Margin = new Thickness(16) };
+        var root = new DockPanel { Margin = new Thickness(22,18,22,18) };
         Content = root;
-        var heading = new TextBlock { Text = Title, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        var heading = WorkspaceWindowUi.Heading(Title);
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var hint = new TextBlock { Text = "Новые файлы — в общей UNC-папке объекта (отдельный каталог тестовой базы). Отметка PDF не проверяет электронную подпись. Старые относительные пути требуют переноса. Удаление из списка не удаляет файл.", Foreground = System.Windows.Media.Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
         DockPanel.SetDock(hint, Dock.Top); root.Children.Add(hint);
 
         var footer = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
-        var add = new Button { Content = "Добавить…", Width = 110, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
+        var add = new Button { Content = "Добавить файл…", Width = 110, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
         add.Click += (_, _) => AddFiles();
         var open = new Button { Content = "Открыть", Width = 100, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
         open.Click += async (_, _) => await OpenSelectedAsync();
-        var del = new Button { Content = "Удалить", Width = 100, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
+        var del = new Button { Content = "Убрать из списка", Width = 100, Height = 30, Margin = new Thickness(0, 0, 6, 0) };
         del.Click += (_, _) => DeleteSelected();
         var close = new Button { Content = "Закрыть", Width = 100, Height = 30, IsCancel = true };
         close.Click += (_, _) => DialogResult = true;
@@ -123,6 +128,7 @@ public sealed class AttachmentWindow : Window
         StyleButton(add, "Plus", primary: true);
         StyleButton(open, "File");
         StyleButton(del, "Trash");
+        WorkspaceWindowUi.StyleButton(close);
         _commands.Add((add, () => CanWrite));
         _commands.Add((open, () => !_loading && _grid.SelectedItems.Count == 1));
         _commands.Add((del, () => CanWrite && !_signedOnly && _grid.SelectedItems.Count > 0));

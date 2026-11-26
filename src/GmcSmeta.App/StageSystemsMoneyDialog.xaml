@@ -5,7 +5,7 @@
         Title="СМР по системам" Width="690" Height="535"
         MinWidth="580" MinHeight="420" WindowStartupLocation="CenterOwner"
         Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}"
-        FontSize="{StaticResource UiBodySize}">
+        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Grid Margin="20,18,20,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -13,12 +13,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock x:Name="CaptionText" FontSize="16" FontWeight="SemiBold"
+        <TextBlock x:Name="CaptionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
                    Margin="0,0,0,12" TextWrapping="Wrap"/>
         <DataGrid local:TableColumnMenu.Key="stage-systems-money" local:TableColumnMenu.Protect="Система" x:Name="SystemsGrid" Grid.Row="1" CanUserAddRows="False"
                   CanUserDeleteRows="False" AutoGenerateColumns="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  RowHeaderWidth="0" EnableRowVirtualization="True"
+                  RowHeaderWidth="0" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   BorderBrush="#E4E8EF" Background="White" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Система" Binding="{Binding Name}"
@@ -32,7 +32,7 @@
                    Foreground="#64748B" TextWrapping="Wrap"/>
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                     Margin="0,14,0,0">
-            <Button Content="Отмена" IsCancel="True" MinWidth="105"
+            <Button Content="Отмена" Style="{StaticResource PythonToolbarButton}" IsCancel="True" MinWidth="105"
                     Padding="12,6" Margin="0,0,8,0"/>
             <Button Content="Сохранить" Click="Save_Click" IsDefault="True"
                     Style="{StaticResource PrimaryButton}" MinWidth="120" Padding="12,6"/>

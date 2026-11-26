@@ -1,7 +1,7 @@
 <Window x:Class="GmcSmeta.App.StagesDialog" UseLayoutRounding="True" SnapsToDevicePixels="True"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Этапы" Width="1180" Height="690" MinWidth="900" MinHeight="480"
+        Title="Этапы" Width="1250" Height="720" MinWidth="900" MinHeight="480"
         WindowStartupLocation="CenterOwner" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
@@ -22,14 +22,42 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" TextChanged="Search_Changed" ToolTip="Поиск по названию или разделу"/>
-            <Button x:Name="AddStageButton" Grid.Column="1" Content="Этап" ContentTemplate="{StaticResource IconLabelPlus}" Click="AddStage_Click"
+            <Grid MaxWidth="220" HorizontalAlignment="Left" MinWidth="180">
+                <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" TextChanged="Search_Changed"
+                         Padding="32,5,32,5" AutomationProperties.Name="Найти строку…" ToolTip="Найти строку…"/>
+                <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Найти строку…" Foreground="#94A3B8" Margin="32,0,32,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger></Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" ToolTip="Очистить поиск"
+                        AutomationProperties.Name="Очистить поиск" Width="26" Height="26" MinWidth="0" MinHeight="0"
+                        Padding="0" Margin="0,0,3,0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ClearStageSearch_Click">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger></Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+            <Button x:Name="AddStageButton" Grid.Column="1" Content="Новый этап" ContentTemplate="{StaticResource IconLabelPlus}" Click="AddStage_Click"
                     Margin="10,0,0,0" FontWeight="SemiBold" Padding="12,4" Style="{StaticResource PrimaryButton}"/>
-            <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Остаток" Click="CreateRest_Click" Margin="8,0,0,0"
+            <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Документ «Остаток»" ContentTemplate="{StaticResource IconLabelFile}" Click="CreateRest_Click" Margin="8,0,0,0"
                     ToolTip="Создать или обновить документ «Остаток»: полное КП − этапы"/>
             <Button Grid.Column="3" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" IsCancel="True" Margin="8,0,0,0" Padding="12,4"/>
         </Grid>
-        <DataGrid MinRowHeight="30"
+        <DataGrid MinRowHeight="27"
                  
                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalGridLinesBrush="#E4E8EF"

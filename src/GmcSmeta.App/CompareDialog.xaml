@@ -28,7 +28,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="Было:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="ComboA" Grid.Column="1" MinWidth="260" SelectionChanged="Combo_Changed"/>
-            <Button x:Name="SwapButton" Style="{StaticResource PythonToolbarButton}" Grid.Column="2" Content="⇄" Click="Swap_Click" Margin="8,0"
+            <Button x:Name="SwapButton" Style="{StaticResource PythonToolbarButton}" Grid.Column="2" Content="" ContentTemplate="{StaticResource IconLabelRefresh}" AutomationProperties.Name="Поменять местами" Click="Swap_Click" Margin="8,0"
                     ToolTip="Поменять местами" Padding="8,2"/>
             <TextBlock Text="Стало:" Foreground="#64748B" Grid.Column="3" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="ComboB" Grid.Column="4" MinWidth="260" SelectionChanged="Combo_Changed"/>
@@ -37,19 +37,19 @@
             <Border x:Name="TileCount" Margin="0,0,10,0" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock Text="Строки" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TileCountValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"/>
+                    <TextBlock x:Name="TileCountValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border x:Name="TileMat" Margin="0,0,10,0" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock Text="Материалы" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TileMatValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"/>
+                    <TextBlock x:Name="TileMatValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border x:Name="TileSmr" Margin="0,0,10,0" Style="{StaticResource PythonTile}">
                 <StackPanel>
                     <TextBlock Text="СМР" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TileSmrValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"/>
+                    <TextBlock x:Name="TileSmrValue" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
             <Border CornerRadius="12" Padding="16,11">
@@ -61,7 +61,7 @@
                 </Border.Background>
                 <StackPanel>
                     <TextBlock Text="ИТОГО с НДС" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TileTotalValue" Foreground="White" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"/>
+                    <TextBlock x:Name="TileTotalValue" Foreground="White" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -71,7 +71,7 @@
             <TextBlock Text="■ убрано" Foreground="#B91C1C" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
             <TextBlock Text="■ изменено" Foreground="#B45309" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </WrapPanel>
-        <DataGrid local:TableColumnMenu.Key="compare" local:TableColumnMenu.Protect="Наименование" MinRowHeight="24"
+        <DataGrid local:TableColumnMenu.Key="compare" local:TableColumnMenu.Protect="Наименование" MinRowHeight="27"
                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalGridLinesBrush="#E4E8EF"
                   Background="#FFFFFF" BorderBrush="#E4E8EF" x:Name="CompareGrid" Grid.Row="4" Margin="0,10,0,0"
@@ -80,7 +80,7 @@
                   SelectionMode="Extended" SelectionUnit="FullRow" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Система" Binding="{Binding Sys}" Width="120" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="160" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="60" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                 <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty}" Width="70" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                 <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="150" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
@@ -101,8 +101,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="InfoText" Foreground="#64748B" TextWrapping="Wrap" VerticalAlignment="Center"/>
-            <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"/>
-            <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" IsCancel="True" Padding="18,6" FontWeight="SemiBold"/>
+            <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click" Style="{StaticResource PythonToolbarButton}" Margin="0,0,8,0"/>
+            <Button Grid.Column="2" Style="{StaticResource PythonToolbarPrimary}" Content="Закрыть" IsCancel="True" Padding="18,6" FontWeight="SemiBold"/>
         </Grid>
     </Grid>
 </Window>
