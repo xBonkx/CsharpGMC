@@ -22,10 +22,15 @@ public partial class ShipmentsPane
     private void UpdateShipmentSteps(SqlServerShipments.ShipmentInfo? current)
     {
         ShipmentStepsBar.Visibility = current is null ? Visibility.Collapsed : Visibility.Visible;
-        if (current is null) return;
+        if (current is null)
+        {
+            ExportExcelButton.Tag = ExportPdfButton.Tag = "";
+            return;
+        }
 
         var step = ShipmentStepPolicy.Current(current.Fixed, current.Lines,
             current.Recipient, _exportedShipments.Contains(current.Id));
+        ExportExcelButton.Tag = ExportPdfButton.Tag = step == 2 ? "now" : "";
         SetShipmentStep(ShipmentStepPositions, 0, step, "Отметьте, что выдаёте");
         SetShipmentStep(ShipmentStepRecipient, 1, step, "Укажите, кому");
         SetShipmentStep(ShipmentStepExport, 2, step, "Распечатайте");

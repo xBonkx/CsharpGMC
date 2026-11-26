@@ -17,6 +17,8 @@
 
 ## Ход выполнения
 
+- 26.11.2026 ChatGPT / main (база 003b4ae) — SHIP-VIS-02, WIN-07 PARTIAL: Python `aa6b34dcf0314df93086a297f01d549ff58cf705`, ship_view.py `_style_print` / `_state`, theme.py file: существующий IconLabelFile/GlyphFile повторяет три SVG path, stroke следует Foreground; мягкий оранжевый #FFF4EB/#C2410C и граница #F97316, на шаге 2 (Распечатайте) заливка #F97316/white, hover #FFE2C7 или #C2410C, disabled transparent/#94A3B8/#E4E8EF. WPF radius8, padding16,6, bold, дополнительная рамка keyboard focus. Excel/PDF сохранены раздельно как осознанная адаптация C#, общий Tag из существующего ShipmentStepPolicy, сброс при отсутствии ведомости; guards успешного экспорта/смены ID и IsEnabled не изменены. Дополнена source regression. Статически проверены якоря, ресурсы и XAML-структура; Windows build/xUnit/GUI не запускались. Приёмка: пустая/черновая/проведённая, сохранение/отмена/ошибка Excel/PDF, повторный экспорт, смена ведомости во время экспорта, hover/focus/disabled и DPI. SQL, БД, релиз не менялись.
+
 - 26.11.2026 ChatGPT / main — SHIP-VIS-05 PARTIAL: таблица выдачи сверена с Python ship_view.py (HEADERS, NowDelegate, _set_row, _summary). Количества выровнены вправо, ширины 74/48/80/110/112/130/130, header tooltips; светло-синяя ячейка только у неотмеченных, зелёная у выбранных, предупреждение об избыточном количестве, подсказка edit, жирный текущий объём, убрана zebra. Итоги используют русские формы числа позиций через ShipmentCardText, отдельное предупреждение и tooltip закрытых позиций. SQL, проверка количества и запись/выбор строк не менялись; source regression добавлена. Windows build/xUnit/SQL Pilot/GUI не запускались: WIN-07/SHIP-VIS-05 остаются PARTIAL до приёмки DPI, больших ведомостей, edit/selection/scroll.
 
 - 26.11.2026 ChatGPT / main (база b3a65a1) — SHIP-VIS-04, WIN-07 PARTIAL. Python ship_view.py:263–270, common.py segmented: track min330, radius11, padding3, gap2, weights3:4:4, exclusive, checked white/border_strong, original captions/tooltips. ShipmentsPane reuses existing Segment style, local radio siblings (no global GroupName), Click only, requested filter preserved across fixed readback, forced fixed filter2 displayed disabled, clear disabled, EditFixed resets requested0. Existing RowVisible conditions, document/search filters, RefreshRowFilter with grid-state restore retained; no SQL changes. Separate ShipmentsPane.Filters.cs, previous source regression updated and new test added. Existing draft default all retained (Python empty draft may default stock), Python hides locked toolbar while C# keeps disabled controls; not changed. Static review only; Windows build/xUnit/GUI not run. Acceptance: independent panes, keyboard, fixed/unfixed/edit, switch drafts, active cell edit/busy, document+search+segments, selection/scroll, 2500+ rows, narrow/DPI. Table/totals remain.
@@ -774,11 +776,13 @@ KsRequisitesWindow: 22+16+10=48 до текста поля; LetterEditorWindow �
 
 - [ ] **SHIP-VIS-01 · P1** — Поиск и оформление панели действий: 190/32, лупа и очистка, placeholder, точные edit/check/x glyphs, подписи stock/rest, сохранение операций и фильтров. Windows/DPI, узкое окно, режим черновика/выданной ведомости; segmented отдельно.
 
-- [ ] **SHIP-VIS-02 · P1** — Динамическая панель четырёх шагов: current blue, done green/✓, pending muted, state по подтверждённой ведомости и успешному экспорту (не отмене/ошибке), переходы/пустой экран/DPI; стиль печати отдельно.
+- [ ] **SHIP-VIS-02 · P1** — Динамическая панель четырёх шагов: current blue, done green/✓, pending muted, state по подтверждённой ведомости и успешному экспорту (не отмене/ошибке), переходы/пустой экран/DPI; стиль печати реализован, Windows-приёмка открыта.
 
 - [ ] **SHIP-VIS-03 · P1** — Карточки ведомостей: номер/дата, получатель/предупреждение, исходные Ok/Warn цвета, склонение количества, tooltip, selection/readback и DPI.
 
 - [ ] **SHIP-VIS-04 · P1** — Сегменты фильтров выдачи: оригинальная подложка/Segment, 3:4:4, независимые группы, корректный forced fixed filter, сохранение search/document и scroll/selection, Windows/DPI/2500+ строк.
+
+- [ ] **SHIP-VIS-05 · P1** — Таблица и итоги выдачи: выравнивание и ширины, подсказки, зелёная/голубая палитра, предупреждение, склонение количества. Реализация 003b4ae; проверить Windows/DPI, редактирование, выделение и прокрутку 2500+ строк.
 
 ## Матрица охвата всех модулей
 Каждый модуль проверить на ICON/SPACE/FONT/GRID/QA по применимости; отмечать отдельно после проверки, указать commit и снимок.

@@ -77,6 +77,53 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- Python ship_view._style_print: orange filled on the print step, soft otherwise. -->
+        <Style x:Key="ShipmentExportButton" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Background" Value="#FFF4EB"/>
+            <Setter Property="Foreground" Value="#C2410C"/>
+            <Setter Property="BorderBrush" Value="#F97316"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ExportChrome" CornerRadius="8" BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ExportChrome" Property="BorderBrush" Value="#9A3412"/>
+                                <Setter TargetName="ExportChrome" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE2C7"/>
+                </Trigger>
+                <Trigger Property="Tag" Value="now">
+                    <Setter Property="Background" Value="#F97316"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="Tag" Value="now"/>
+                        <Condition Property="IsMouseOver" Value="True"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="#C2410C"/>
+                </MultiTrigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#94A3B8"/>
+                    <Setter Property="BorderBrush" Value="#E4E8EF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid Margin="24,6,24,14">
         <Grid.ColumnDefinitions>
@@ -183,9 +230,9 @@
                     Click="EditFixed_Click" Margin="0,0,8,6" Visibility="Collapsed"/>
             <Button x:Name="FinishFixedButton" Content="Готово" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarPrimary}"
                     Click="FinishFixed_Click" Margin="0,0,8,6" Visibility="Collapsed"/>
-            <Button x:Name="ExportExcelButton" Style="{StaticResource PythonToolbarButton}" Content="Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click"
+            <Button x:Name="ExportExcelButton" Style="{StaticResource ShipmentExportButton}" Content="Excel" ContentTemplate="{StaticResource IconLabelFile}" Click="Export_Click"
                     Margin="0,0,8,6" ToolTip="Ведомость выдачи в Excel"/>
-            <Button x:Name="ExportPdfButton" Style="{StaticResource PythonToolbarButton}" Content="PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportPdf_Click"
+            <Button x:Name="ExportPdfButton" Style="{StaticResource ShipmentExportButton}" Content="PDF" ContentTemplate="{StaticResource IconLabelFile}" Click="ExportPdf_Click"
                     Margin="0,0,8,6" ToolTip="Ведомость выдачи в PDF"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Click="Refresh_Click"
                     Margin="0,0,0,6" ToolTip="Перечитать ведомость из SQL Server"/>
