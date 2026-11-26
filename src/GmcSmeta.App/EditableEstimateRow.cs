@@ -22,6 +22,24 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     private string _work;
     private string _note;
     private string _basis;
+    // Cache the exact displayed/edited text, not the unrounded SQL decimal.
+    // NumberText.Parse is invariant-culture and pure, including invalid input.
+    private ParsedNumber _parsedQty, _parsedPrice, _parsedWork;
+
+    private struct ParsedNumber
+    {
+        private string? _text;
+        private decimal? _value;
+        internal decimal? Get(string text)
+        {
+            if (!ReferenceEquals(_text, text))
+            {
+                _value = NumberText.Parse(text);
+                _text = text;
+            }
+            return _value;
+        }
+    }
     private string _areaUnitEdit = "";
     private string _areaUnitDisplay = "";
     private string _areaTotalDisplay = "";
@@ -270,8 +288,8 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         {
             if (IsGroup || IsSystem || IsSub) return Source.DisplayAmount;
             // Optimistic total: use typed values when they are valid, otherwise retain the last committed amount.
-            var qty = NumberText.Parse(_qty);
-            var price = NumberText.Parse(_price);
+            var qty = _parsedQty.Get(_qty);
+            var price = _parsedPrice.Get(_price);
             var amount = qty is not null && price is not null ? qty.Value * price.Value : Source.DisplayAmount;
             return amount == 0m ? null : amount;
         }
@@ -286,15 +304,15 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
 
     // Python: money(p.work_price) if p.work_price else "—" (СМР «по поз.»); subs stay empty.
     public bool HasNoWorkPrice => !IsSystem && !IsSub && !IsVirtual && !OutOfKp &&
-        (string.IsNullOrWhiteSpace(_work) || NumberText.Parse(_work) == 0m);
+        (string.IsNullOrWhiteSpace(_work) || _parsedWork.Get(_work) == 0m);
 
     public string WorkDisplayText => IsSystem || IsSub || IsTypeHeader ? "" :
-        string.IsNullOrWhiteSpace(_work) || NumberText.Parse(_work) == 0m ? "—" : _work;
+        string.IsNullOrWhiteSpace(_work) || _parsedWork.Get(_work) == 0m ? "—" : _work;
 
     private decimal OptimisticAmount()
     {
-        var qty = NumberText.Parse(_qty);
-        var price = NumberText.Parse(_price);
+        var qty = _parsedQty.Get(_qty);
+        var price = _parsedPrice.Get(_price);
         return qty is not null && price is not null ? qty.Value * price.Value : Source.Amount;
     }
 
@@ -302,7 +320,7 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
 
     public bool HasNoPrice => IsGroup ? GroupHasNoPrice :
         !IsSystem && !IsSub &&
-        (string.IsNullOrWhiteSpace(_price) || NumberText.Parse(_price) == 0m);
+        (string.IsNullOrWhiteSpace(_price) || _parsedPrice.Get(_price) == 0m);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

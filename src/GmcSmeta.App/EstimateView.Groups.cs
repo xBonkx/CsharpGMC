@@ -18,7 +18,7 @@ public partial class EstimateView
     private readonly HashSet<string> _collapsedTypeKeys = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _frozenGroupedOrder = new(StringComparer.Ordinal);
 
-    private bool ApplyGroupedFilter()
+    private bool ApplyGroupedFilter(bool expandAllGroups)
     {
         if (_temporaryGroupMode is not (EstimateGroups.Same or EstimateGroups.Type) ||
             _estimate is null) return false;
@@ -27,6 +27,11 @@ public partial class EstimateView
         var sections = EstimateGroups.Build(_estimate.Rows, _temporaryGroupMode,
             _temporarySort, EstimateSearch.Text, _noPriceTemporaryView,
             _frozenGroupedOrder);
+        // Expand all uses this very projection; do not build groups twice.
+        if (expandAllGroups)
+            foreach (var group in sections.SelectMany(section => section.Groups))
+                if (group.Members.Count > 1)
+                    _expandedGroupKeys.Add(group.Key);
 
         var index = RowViewIndex;
         var byId = index.ByPositionId;

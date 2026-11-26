@@ -35,6 +35,7 @@ internal static class EstimateRowIndexReadbackChecks
                 !index.TryAdvance(next) || !ReferenceEquals(index.Rows, next) ||
                 !ReferenceEquals(keys, index.BySortKey) || !ReferenceEquals(ids, index.ByPositionId) ||
                 !ReferenceEquals(areas, index.AreaSummaryIds) || index.SectionName(7, "?") != "П2" ||
+                !ReferenceEquals(index.FindSection(7), next[0]) || index.FindSection(99) is not null ||
                 !ReferenceEquals(keys[0], next[0]))
                 throw new Exception("Small readback did not advance existing indexes.");
             if (count != 0 && (!ReferenceEquals(ids[count], next[^1]) ||

@@ -33,6 +33,14 @@ public sealed class MaterialsViewMenuSourceTests
         Assert.Contains("if (!keep[i]) continue;", stages);
         Assert.Contains("FillInlineStageCells(rows[i]);", stages);
         Assert.Contains("StageAllocationPresentation.Summarize(data.Stages.Count,", stages);
+        var temporary = File.ReadAllText(Path.Combine(app, "EstimateView.TemporaryView.cs"));
+        Assert.Contains("ApplyFilter(expandAllGroups: true);", temporary);
+        Assert.DoesNotContain("EstimateGroups.Build(", temporary);
+        Assert.Contains("if (expandAllGroups)", grouped);
+        var main = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("ApplyGroupedFilter(expandAllGroups)", main);
+        Assert.Contains("RowViewIndex.FindSection(systemId)", main);
+        Assert.Contains("!ReferenceEquals(EstimateGrid.SelectedItem, selected)", main);
         Assert.Contains("if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;", code);
         Assert.Contains("ContextMenuIcons.Create(\"Вернуть как в КП\", \"X\")", code);
         var icons = File.ReadAllText(Path.Combine(app, "Theme", "ToolbarIcons.xaml"));

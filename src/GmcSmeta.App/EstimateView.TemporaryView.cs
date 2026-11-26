@@ -263,17 +263,7 @@ public partial class EstimateView
                 row.IsCollapsed = false;
             }
         }
-        if (_estimate is { } estimate &&
-            _temporaryGroupMode is (EstimateGroups.Same or EstimateGroups.Type))
-        {
-            var grouped = EstimateGroups.Build(estimate.Rows, _temporaryGroupMode,
-                _temporarySort, EstimateSearch.Text, _noPriceTemporaryView,
-                _frozenGroupedOrder);
-            foreach (var group in grouped.SelectMany(section => section.Groups))
-                if (group.Members.Count > 1)
-                    _expandedGroupKeys.Add(group.Key);
-        }
-        ApplyFilter();
+        ApplyFilter(expandAllGroups: true);
     }
 
     private void SortMenu_Click(object sender, RoutedEventArgs e)

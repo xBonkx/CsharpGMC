@@ -103,10 +103,13 @@ internal sealed class EstimateRowViewIndex(IReadOnlyList<EditableEstimateRow> ro
         if (row.DisplayIndentLevel != depth) row.DisplayIndentLevel = depth;
     }
 
-    public string SectionName(int systemId, string fallback)
+    public EditableEstimateRow? FindSection(int systemId)
     {
         _sections ??= Rows.Where(row => row.IsSystem)
             .ToDictionary(row => row.Source.SystemId);
-        return _sections.TryGetValue(systemId, out var section) ? section.Name : fallback;
+        return _sections.GetValueOrDefault(systemId);
     }
+
+    public string SectionName(int systemId, string fallback) =>
+        FindSection(systemId)?.Name ?? fallback;
 }

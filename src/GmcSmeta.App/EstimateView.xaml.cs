@@ -215,8 +215,8 @@ public partial class EstimateView : UserControl
         _focusAfterReload = null;
         _focusSystemAfterReload = null;
         EditableEstimateRow? selected = focusSystem is int systemId
-            ? _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == systemId)
-            : focusId is int id ? _rows.FirstOrDefault(r => r.Id == id && !r.IsSystem) : null;
+            ? RowViewIndex.FindSection(systemId)
+            : focusId is int id ? RowViewIndex.ByPositionId.GetValueOrDefault(id) : null;
         if (selected is not null)
         {
             if (!ReferenceEquals(EstimateGrid.SelectedItem, selected) &&
@@ -225,6 +225,11 @@ public partial class EstimateView : UserControl
             if (focusSystem is not null || selectedId != focusId)
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    // A queued focus request must not steal focus or edit a row
+                    // after navigation, another reload or a change of selection.
+                    if (_detached || !EstimateGrid.IsVisible ||
+                        !ReferenceEquals(EstimateGrid.SelectedItem, selected) ||
+                        !EstimateGrid.Items.Contains(selected)) return;
                     EstimateGrid.ScrollIntoView(selected);
                     if (!selected.IsSystem && editAfterReload)
                     {
@@ -627,7 +632,7 @@ public partial class EstimateView : UserControl
     {
         if (_estimate is null || _positionFromSearch is not int id) return;
         _positionFromSearch = null;
-        var row = _rows.FirstOrDefault(r => r.Id == id && !r.IsSystem && !r.IsVirtual);
+        var row = RowViewIndex.ByPositionId.GetValueOrDefault(id);
         if (row is null)
         {
             SetStatus("Позиция больше недоступна в этой смете", true);
@@ -641,15 +646,18 @@ public partial class EstimateView : UserControl
         if (!EstimateGrid.Items.Contains(row))
         {
             ResetTemporaryView();
-            var system = _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == row.Source.SystemId);
-            foreach (var section in _rows.Where(r => r.IsSystem &&
-                         (r.Source.SystemId == row.Source.SystemId || r.Source.SystemId == system?.ParentSystemId)))
+            var system = RowViewIndex.FindSection(row.Source.SystemId);
+            void ExpandSection(EditableEstimateRow? section)
             {
+                if (section is null) return;
                 _collapsedSectionIds.Remove(section.Source.SystemId);
                 section.IsCollapsed = false;
             }
+            ExpandSection(system);
+            if (system?.ParentSystemId is int parentSystem)
+                ExpandSection(RowViewIndex.FindSection(parentSystem));
             if (row.Source.ParentPositionId is int parent &&
-                _rows.FirstOrDefault(r => r.Id == parent && r.IsAreaSummary) is { } summary)
+                RowViewIndex.ByPositionId.GetValueOrDefault(parent) is { IsAreaSummary: true } summary)
             {
                 _expandedAreaSummaries.Add(parent);
                 summary.IsCollapsed = false;
@@ -673,12 +681,12 @@ public partial class EstimateView : UserControl
         }, DispatcherPriority.Loaded);
     }
 
-    private void ApplyFilter()
+    private void ApplyFilter(bool expandAllGroups = false)
     {
         _estimateSearchTimer?.Stop();
         _searchPending = false;
         if (_estimate is null) return;
-        if (ApplyGroupedFilter()) return;
+        if (ApplyGroupedFilter(expandAllGroups)) return;
 
         // The temporary view is a read-only projection of authoritative
         // SQL-loaded rows. SortKey and position IDs remain unchanged.

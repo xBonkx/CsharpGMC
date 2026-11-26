@@ -76,7 +76,39 @@ internal static class EstimateRowReadbackChecks
         if (changed.Count != 0) throw new Exception("Repeated clean readback emitted notifications.");
         CheckMissingWorkPrice(first.Source);
         CheckStagePresentation(rows);
+        CheckParsedNumericText(first.Source);
         Console.WriteLine("Estimate formatted readback and area notifications OK (25000 rows).");
+    }
+
+    private static void CheckParsedNumericText(EstimateRow source)
+    {
+        var row = new EditableEstimateRow(source);
+        foreach (var qty in new[] { "2", "1,25", "=2*3", "ошибка", "0", "2" })
+        foreach (var price in new[] { "1 234,50", "=4+5", "0", "", "2/0", "1 234,50" })
+        {
+            row.QtyText = qty;
+            row.PriceText = price;
+            var q = GmcSmeta.Core.NumberText.Parse(qty);
+            var p = GmcSmeta.Core.NumberText.Parse(price);
+            var amount = q.HasValue && p.HasValue ? q.Value * p.Value : source.DisplayAmount;
+            var missing = string.IsNullOrWhiteSpace(price) || p == 0m;
+            for (int repeat = 0; repeat < 3; repeat++)
+                if (row.DisplayAmount != (amount == 0m ? null : amount) || row.HasNoPrice != missing)
+                    throw new Exception("Cached estimate number differs from current text.");
+        }
+        foreach (var text in new[] { "", "0", "=2*3", "не число", "0" })
+        {
+            row.WorkText = text;
+            var missing = string.IsNullOrWhiteSpace(text) || GmcSmeta.Core.NumberText.Parse(text) == 0m;
+            if (row.HasNoWorkPrice != missing || row.WorkDisplayText != (missing ? "—" : text))
+                throw new Exception("Work price cache retained an old value.");
+        }
+        if (!row.TryReuseAuthoritative(source))
+            throw new Exception("Numeric readback failed.");
+        var fresh = new EditableEstimateRow(source);
+        if (row.DisplayAmount != fresh.DisplayAmount || row.DisplayAmountText != fresh.DisplayAmountText ||
+            row.HasNoPrice != fresh.HasNoPrice || row.HasNoWorkPrice != fresh.HasNoWorkPrice)
+            throw new Exception("Numeric cache did not follow authoritative readback.");
     }
 
     private static void CheckStagePresentation(EditableEstimateRow[] rows)
