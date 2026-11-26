@@ -557,6 +557,7 @@ public partial class ActsEditorView : UserControl
         _totals = null;
         DetachQuantityEditor();
         _rows = null;
+        _referenceHighlights = null;
         _moveAfter = 0;
         ActGrid.ItemsSource = null;
         EditorRoot.Visibility = Visibility.Collapsed;
@@ -631,6 +632,7 @@ public partial class ActsEditorView : UserControl
             }
         }
         _rows = items;
+        _referenceHighlights = null;
         ActGrid.ItemsSource = items;
         FilterRows();
     }
@@ -843,35 +845,6 @@ public partial class ActsEditorView : UserControl
         editor.ToolTip = "Начните с = и щёлкайте по ячейкам «В этом акте». Enter — сохранить, Esc — отменить.";
         editor.KeyDown -= QtyEditor_KeyDown;
         editor.KeyDown += QtyEditor_KeyDown;
-    }
-
-    private static readonly Brush[] ReferenceColors = new[]{"#2563EB","#DC2626","#16803C","#9333EA","#C2410C","#087F8C","#A21CAF","#946200"}
-        .Select(hex=>{ var brush=new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); brush.Freeze(); return (Brush)brush; }).ToArray();
-
-    private void QuantityEditor_TextChanged(object sender, TextChangedEventArgs e) => UpdateQuantityReferences();
-    private void QuantityEditor_Unloaded(object sender, RoutedEventArgs e)
-    {
-        if (ReferenceEquals(sender,_qtyEditor)) DetachQuantityEditor();
-    }
-    private void UpdateQuantityReferences()
-    {
-        if (_rows is null) return;
-        var refs=QuantityReferenceIndex().EditingReferences(_qtyEditor?.Text)
-            .Select((id,index)=>(id,brush:ReferenceColors[index%ReferenceColors.Length]))
-            .ToDictionary(x=>x.id,x=>x.brush);
-        foreach(var row in _rows)
-            row.ReferenceBrush=!row.IsSection&&refs.TryGetValue(row.PositionId,out var brush)?brush:null;
-    }
-    private void DetachQuantityEditor()
-    {
-        if(_qtyEditor is { } editor)
-        {
-            editor.KeyDown-=QtyEditor_KeyDown;
-            editor.TextChanged-=QuantityEditor_TextChanged;
-            editor.Unloaded-=QuantityEditor_Unloaded;
-            _qtyEditor=null;
-        }
-        if(_rows is not null) foreach(var row in _rows) row.ReferenceBrush=null;
     }
 
     private void QtyEditor_KeyDown(object sender, KeyEventArgs e)

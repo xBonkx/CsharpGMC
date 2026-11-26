@@ -59,3 +59,5 @@ SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить 
 Регистрация 26.11.2026: 8 NOT STARTED; правила внесены в AGENTS.md. Код, БД и сборка не изменялись; реализация и приёмка впереди.
 
 - 26.11.2026, PERF-019 / ARCH-SIZE-02: ActsEditorView.xaml.cs 2466→2463, новый ActsEditorView.QuantityReferences.cs 28, ActQuantityFormulas.cs 252→228, новый ActQuantityReferenceIndex.cs 54 строк. Выделен самостоятельный тестируемый индекс ссылок; WPF-адаптер вынесен без расширения большого файла. Полная декомпозиция редактора остаётся NOT STARTED; сборка/тесты не запускались.
+
+- 26.11.2026, PERF-019 / ARCH-SIZE-02: ActsEditorView.xaml.cs 2463→2436, ActsEditorView.QuantityReferences.cs 28→62, новый KsReferenceHighlights.cs 50, Program.cs (App.Checks) 581→633 строк. Выделен компонент KsReferenceHighlights и перенесены обработчики ссылок; крупный редактор уменьшен, рост тестового runner — один проверочный сценарий. Общая декомпозиция остаётся отдельной задачей; сборка/тесты не запускались.

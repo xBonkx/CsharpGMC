@@ -170,6 +170,7 @@ internal static class Program
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();
         CheckSignedActTabReuse();
+        CheckKsReferenceHighlights();
         CheckSummaryTableFrame();
         CheckNumericPastePlanning();
         ColumnMenuChecks.Run();
@@ -395,6 +396,57 @@ internal static class Program
         if (changes != 0)
             throw new Exception("An unchanged visible row must not raise redundant notifications.");
         Console.WriteLine("Estimate visible-row presentation and grouping transitions OK.");
+    }
+
+    private static void CheckKsReferenceHighlights()
+    {
+        var rows = Enumerable.Range(1, 25000)
+            .Select(id => new KsRowVm { PositionId = id }).ToArray();
+        var section = new KsRowVm { IsSection = true, PositionId = 1 };
+        var duplicate = new KsRowVm { PositionId = 1 };
+        var enumerated = 0;
+        IEnumerable<KsRowVm> Source()
+        {
+            foreach (var row in rows.Append(section).Append(duplicate))
+            {
+                enumerated++;
+                yield return row;
+            }
+        }
+
+        var highlights = new KsReferenceHighlights(Source());
+        highlights.Update(new long[] { 1, 25000, 99999, 2 });
+        var first = rows[0].ReferenceBrush;
+        var second = rows[^1].ReferenceBrush;
+        if (first?.ToString() != "#FF2563EB" || second?.ToString() != "#FFDC2626" ||
+            rows[1].ReferenceBrush?.ToString() != "#FF9333EA" ||
+            !ReferenceEquals(duplicate.ReferenceBrush, first) || section.HasReference)
+            throw new Exception("KS reference palette, duplicate ID or section handling changed.");
+
+        var notifications = 0;
+        rows[0].PropertyChanged += (_, _) => notifications++;
+        highlights.Update(new long[] { 1, 25000, 99999, 2 });
+        if (notifications != 0)
+            throw new Exception("Unchanged reference color must not notify WPF.");
+        highlights.Update(new long[] { 25000, 1 });
+        if (!ReferenceEquals(rows[^1].ReferenceBrush, first) ||
+            !ReferenceEquals(rows[0].ReferenceBrush, second) ||
+            rows[1].HasReference || !ReferenceEquals(duplicate.ReferenceBrush, second))
+            throw new Exception("KS reference removal or reordering failed.");
+
+        highlights.Clear();
+        highlights.Clear();
+        if (rows.Any(row => row.HasReference) || duplicate.HasReference || section.HasReference ||
+            enumerated != rows.Length + 2)
+            throw new Exception("Reference cleanup or single source enumeration failed.");
+
+        var replacement = new KsRowVm { PositionId = 1 };
+        var replacementHighlights = new KsReferenceHighlights(new[] { replacement });
+        replacementHighlights.Update(new long[] { 1 });
+        if (!replacement.HasReference || rows[0].HasReference)
+            throw new Exception("A replacement grid must not highlight old rows.");
+        replacementHighlights.Clear();
+        Console.WriteLine("KS sparse reference highlighting, colors and snapshot replacement OK.");
     }
 
     private static void CheckSignedActTabReuse()
