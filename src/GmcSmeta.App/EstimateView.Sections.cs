@@ -768,57 +768,57 @@ public partial class EstimateView
         var window = CreateExcelPasteWindow("Импорт из Excel", out var body);
         var heading = new TextBlock
         {
-            Text = $"Вставить строки из Excel?",
+            Text = "Вставить строки из Excel?",
             FontSize = 20, FontWeight = FontWeights.SemiBold,
-            Foreground = Brush("#0F172A")
+            Foreground = ExcelPasteBrush("#0F172A")
         };
         body.Children.Add(heading);
         body.Children.Add(new TextBlock
         {
             Text = source is null ? "Из буфера обмена" : source,
-            Foreground = Brush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Foreground = ExcelPasteBrush("#64748B"), TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 4, 0, 16)
         });
         var preview = new StackPanel();
         preview.Children.Add(new TextBlock
         {
             Text = $"Раздел: {sectionName}", FontWeight = FontWeights.SemiBold,
-            TextWrapping = TextWrapping.Wrap, Foreground = Brush("#1E40AF")
+            TextWrapping = TextWrapping.Wrap, Foreground = ExcelPasteBrush("#1E40AF")
         });
         preview.Children.Add(new TextBlock
         {
             Text = $"Новых позиций: {rows.Count}", Margin = new Thickness(0, 6, 0, 9),
-            Foreground = Brush("#334155")
+            Foreground = ExcelPasteBrush("#334155")
         });
         foreach (var row in rows.Take(5))
             preview.Children.Add(new TextBlock
             {
                 Text = "•  " + row.Name.Replace('\r', ' ').Replace('\n', ' '),
                 TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = row.Name,
-                Margin = new Thickness(0, 2, 0, 2), Foreground = Brush("#334155")
+                Margin = new Thickness(0, 2, 0, 2), Foreground = ExcelPasteBrush("#334155")
             });
         if (rows.Count > 5)
             preview.Children.Add(new TextBlock
             {
                 Text = $"…и ещё {rows.Count - 5}", Margin = new Thickness(0, 6, 0, 0),
-                Foreground = Brush("#64748B")
+                Foreground = ExcelPasteBrush("#64748B")
             });
         body.Children.Add(new Border
         {
-            Background = Brush("#F8FAFC"), BorderBrush = Brush("#E2E8F0"),
+            Background = ExcelPasteBrush("#F8FAFC"), BorderBrush = ExcelPasteBrush("#E2E8F0"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
             Padding = new Thickness(14), Child = preview
         });
         body.Children.Add(new TextBlock
         {
             Text = "Колонки: название · ед. · количество · цена · закупка · примечание",
-            Foreground = Brush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Foreground = ExcelPasteBrush("#64748B"), TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 13, 0, 8)
         });
         body.Children.Add(new TextBlock
         {
             Text = "Будут добавлены новые строки. Существующие позиции и объёмы этапов не заменяются.",
-            Foreground = Brush("#334155"), TextWrapping = TextWrapping.Wrap
+            Foreground = ExcelPasteBrush("#334155"), TextWrapping = TextWrapping.Wrap
         });
         AddExcelPasteButtons(window, body, $"Вставить ({rows.Count})", true);
         return window.ShowDialog() == true;
@@ -831,7 +831,7 @@ public partial class EstimateView
         body.Children.Add(new TextBlock
         {
             Text = "Не удалось подтвердить вставку", FontSize = 19,
-            FontWeight = FontWeights.SemiBold, Foreground = Brush("#991B1B")
+            FontWeight = FontWeights.SemiBold, Foreground = ExcelPasteBrush("#991B1B")
         });
         body.Children.Add(new ScrollViewer
         {
@@ -855,13 +855,13 @@ public partial class EstimateView
             WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
             FontFamily = (FontFamily)FindResource("UiFontFamily"),
             FontSize = (double)FindResource("UiBodySize"),
-            Foreground = Brush("#0F172A"), UseLayoutRounding = true
+            Foreground = ExcelPasteBrush("#0F172A"), UseLayoutRounding = true
         };
         body = new StackPanel();
         var chrome = new Border
         {
             Margin = new Thickness(15), Padding = new Thickness(24),
-            Background = Brushes.White, BorderBrush = Brush("#E2E8F0"),
+            Background = Brushes.White, BorderBrush = ExcelPasteBrush("#E2E8F0"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
@@ -904,6 +904,6 @@ public partial class EstimateView
         body.Children.Add(footer);
     }
 
-    private static SolidColorBrush Brush(string hex) =>
+    private static SolidColorBrush ExcelPasteBrush(string hex) =>
         (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
 }
