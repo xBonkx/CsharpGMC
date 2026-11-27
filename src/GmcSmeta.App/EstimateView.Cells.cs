@@ -22,6 +22,11 @@ public partial class EstimateView
     private void EstimateGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
     {
         if (e.Row.Item is not EditableEstimateRow row) { e.Cancel = true; return; }
+        if (row.IsPendingInsert)
+        {
+            e.Cancel = !CanEditPendingInsert(row, Field(e.Column));
+            return;
+        }
         if (_inlineStageColumns.Contains(e.Column))
         {
             e.Cancel = !CanEditInlineStage(row, e.Column, out _);
@@ -102,6 +107,11 @@ public partial class EstimateView
         // CellEditEnding fires BEFORE WPF writes its binding. Capture the editor's exact text,
         // including an unfinished formula, rather than reading the previous model value.
         var input = editor.Text;
+        if (row.IsPendingInsert)
+        {
+            if (!CommitPendingInsertCell(row, field, input)) e.Cancel = true;
+            return;
+        }
         if (field == "area_manual" &&
             !AreaCellPresentation.TryParseManual(input, out _))
         {

@@ -172,19 +172,21 @@ public partial class EstimateView
     /// </summary>
     private async Task AddPositionAsync(bool component)
     {
-        if (_estimate?.Locked == true)
-            return;
-        if (_serverConflict)
+        if (_estimate?.Locked != false) return;
+        if (_serverConflict || _cellSaveQueue.Blocked || _saveError is not null)
         {
-            SetStatus("Сначала обнови смету: серверная ревизия изменилась.", true);
+            SetStatus("Сначала обнови смету: есть неподтверждённые правки.", true);
+            return;
+        }
+        if (_pendingEstimateInsert is not null)
+        {
+            SetStatus("Предыдущая новая позиция ещё сверяется с сервером.", false);
             return;
         }
 
-        // Commit an active editor before queuing insertion; it will be written first.
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        // When nothing is selected, use the first system; never silently choose another document.
         selected ??= _rows.FirstOrDefault(r => r.IsSystem);
         if (selected?.IsVirtual == true)
         {
@@ -208,35 +210,60 @@ public partial class EstimateView
             ? selected.Source.ParentPositionId ?? selected.Id
             : null;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Добавление строки… ({count})", false);
-        await _writeLock.WaitAsync();
+        PendingEstimateInsert? preview = null;
+        var acquired = false;
+        var saved = false;
         try
         {
-            if (_serverConflict)
+            // Publish a local draft before any SQL/undo wait; it is NOT in the
+            // authoritative document or in the SQL row index.
+            preview = TryShowPendingInsert(selected, component);
+            await _writeLock.WaitAsync();
+            acquired = true;
+            if (_serverConflict || _cellSaveQueue.Blocked)
                 throw new InvalidOperationException("Серверная смета устарела, обнови её.");
             var result = await Task.Run(() => SqlServerDatabase.AddPosition(
                 _sqlConnectionString, _contractId, systemId, afterId, parentId, _serverRevision));
             if (!result.Saved)
-            {
-                _serverConflict = true;
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил вставку.");
-            }
             _serverRevision = result.Revision;
-            _focusAfterReload = checked((int)result.PositionId!.Value);
-            _editAfterReload = true;
-            if (!string.IsNullOrEmpty(EstimateSearch.Text)) EstimateSearch.Clear();
+            var id = checked((int)result.PositionId!.Value);
+            _saveAwaitingReadback = true;
+            saved = true;
+            if (preview is not null)
+                preview.ServerId = id;
+            else
+            {
+                _focusAfterReload = id;
+                _editAfterReload = true;
+                if (!string.IsNullOrEmpty(EstimateSearch.Text)) EstimateSearch.Clear();
+            }
         }
         catch (Exception ex)
         {
-            _saveError = ex.Message;
+            // A lost COMMIT acknowledgement must not cause another insertion.
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
+            _saveError = "Добавление не подтверждено: " + ex.Message;
+            if (preview is not null) preview.Failed = true;
         }
         finally
         {
-            _writeLock.Release();
+            if (acquired) _writeLock.Release();
+            // The insert is now committed and its real ID is known. Queue all
+            // edits entered while it was pending, without sending the local ID.
+            if (saved && preview is { ServerId: int realId })
+            {
+                foreach (var edit in preview.BufferedEdits)
+                    QueueSave(realId, edit.Key, edit.Value);
+                preview.BufferedEdits.Clear();
+            }
             if (Interlocked.Decrement(ref _pendingWrites) == 0)
             {
-                SetStatus(_saveError is null ? "Строка добавлена ✓" : "Ошибка записи: " + _saveError,
+                SetStatus(_saveError is null ? "Строка добавлена; сверка с SQL Server…" : "Ошибка записи: " + _saveError,
                     _saveError is not null);
                 _reloadTimer.Stop();
                 _reloadTimer.Start();

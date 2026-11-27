@@ -198,6 +198,7 @@ public partial class EstimateView : UserControl
         InvalidateCostTotals();
         CancelMaterialsRead(); // a new authoritative estimate supersedes a clean in-flight read
         var selectedId = (EstimateGrid.SelectedItem as EditableEstimateRow)?.Id;
+        ReconcilePendingInsert(est);
         // Full authoritative readback stays mandatory. Reuse only equal
         // source records, never infer a committed value from the editor.
         var nextRows = EstimateRowViewIndex.Reconcile(_rows, est.Rows, !_inlineStagesOn);
@@ -741,6 +742,7 @@ public partial class EstimateView : UserControl
 
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
         visible = ApplyInlineStagesFilter(visible);
+        IncludePendingInsert(visible);
         // No collection reset if the filtered projection is identical. WPF
         // then keeps the current cell, selection and scroll position intact.
         if (EstimateGrid.ItemsSource is not IEnumerable<EditableEstimateRow> existing ||

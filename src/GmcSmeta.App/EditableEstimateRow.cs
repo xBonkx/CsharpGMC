@@ -111,7 +111,8 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
     public bool IsTypeHeader { get; init; }
     public bool GroupHasNoPrice { get; init; }
     public bool IsGroup => GroupMemberIds.Count > 1;
-    public bool IsVirtual => IsGroup || IsTypeHeader;
+    internal bool IsPendingInsert { get; init; }
+    public bool IsVirtual => IsGroup || IsTypeHeader || IsPendingInsert;
     public bool IsExpandable => Source.IsSystem || IsGroup || IsAreaSummary || IsTypeHeader;
     public bool IsSystem => Source.IsSystem;
     public bool IsSub => Source.IsSub;

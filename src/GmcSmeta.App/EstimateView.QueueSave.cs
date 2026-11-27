@@ -52,6 +52,12 @@ public partial class EstimateView
     /// <summary>Returns the SQL receipt so multi-cell paste cannot claim success early.</summary>
     private async Task<bool> QueueSaveAsync(int rowId, string field, string input)
     {
+        // Temporary UI rows must never reach SQL, even via a bulk/paste shortcut.
+        if (rowId <= 0)
+        {
+            SetStatus("Дождитесь подтверждения новой позиции сервером.", true);
+            return false;
+        }
         var saved = false;
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
