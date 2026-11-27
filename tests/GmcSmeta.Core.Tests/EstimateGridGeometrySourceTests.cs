@@ -27,8 +27,8 @@ public sealed class EstimateGridGeometrySourceTests
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
         Assert.Equal("Recycling", (string?)grid.Attribute("VirtualizingPanel.VirtualizationMode"));
         Assert.Equal("White", (string?)grid.Attribute("Background"));
-        Assert.Equal("#E4E8EF", (string?)grid.Attribute("HorizontalGridLinesBrush"));
-        Assert.Equal("#E4E8EF", (string?)grid.Attribute("VerticalGridLinesBrush"));
+        Assert.Null(grid.Attribute("HorizontalGridLinesBrush"));
+        Assert.Null(grid.Attribute("VerticalGridLinesBrush"));
         Assert.Equal("4,4", Value(Style("EstimateCell"), "Padding"));
         var header = Assert.Single(view.Descendants(p + "Style")
             .Where(e => (string?)e.Attribute("TargetType") == "DataGridColumnHeader"));
