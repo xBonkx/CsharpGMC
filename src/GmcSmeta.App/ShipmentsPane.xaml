@@ -419,7 +419,7 @@
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
                   SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="0" CanUserSortColumns="False" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
-                  BeginningEdit="LinesGrid_BeginningEdit" CellEditEnding="LinesGrid_CellEditEnding" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+                  BeginningEdit="LinesGrid_BeginningEdit" CellEditEnding="LinesGrid_CellEditEnding" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="True">
             <DataGrid.Resources>
                 <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
                 <Style x:Key="ShipmentNameText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">

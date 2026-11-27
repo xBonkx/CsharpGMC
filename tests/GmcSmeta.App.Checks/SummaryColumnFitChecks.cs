@@ -62,6 +62,17 @@ internal static class SummaryColumnFitChecks
         var beforeFont = cache.GetMinimums(1.25, 1.25);
         grid.FontSize = 16;
         Require(!ReferenceEquals(beforeFont, cache.GetMinimums(1.25, 1.25)), "Font change must invalidate measurements.");
+        // A bounded text cache must not lose the maximum even after saturation,
+        // nor change the result when identical displayed strings repeat.
+        var values = Enumerable.Range(0, 25000).Select(i =>
+            new EstimateView.SummaryRow { TotalCostText = i < 5000
+                ? i.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("ru-RU"))
+                : i == 24999 ? "-123 456 789 012 345,67" : "1,00" }).ToArray();
+        grid.ItemsSource = values;
+        var all = SummaryColumnFit.ReadMinimums(grid, 1)[money];
+        grid.ItemsSource = new[] { values[^1] };
+        var maximumOnly = SummaryColumnFit.ReadMinimums(grid, 1)[money];
+        Require(all == maximumOnly, "Bounded measurement cache lost a late large value.");
         Console.WriteLine("Summary fit arithmetic and formatted-value checks passed (no SQL).");
     }
 

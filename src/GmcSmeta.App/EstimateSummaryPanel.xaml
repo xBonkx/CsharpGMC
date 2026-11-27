@@ -195,7 +195,7 @@
               CellEditEnding="SummaryGrid_CellEditEnding" ContextMenuOpening="SummaryGrid_ContextMenuOpening"
               ScrollViewer.CanContentScroll="True"
               ScrollViewer.HorizontalScrollBarVisibility="Auto"
-              ScrollViewer.VerticalScrollBarVisibility="Auto">
+              ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.IsDeferredScrollingEnabled="True">
         <DataGrid.Resources>
             <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
             <!-- шапки блоков: ПОЗИЦИЯ / МАТЕРИАЛЫ (голубой) / СМР (оранжевый) /

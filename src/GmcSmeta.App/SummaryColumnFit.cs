@@ -91,8 +91,15 @@ internal sealed class SummaryColumnFit
     {
         var typeface = new Typeface(grid.FontFamily, grid.FontStyle, FontWeights.Bold, grid.FontStretch);
         var glyphs = new Dictionary<char, double>();
+        // Repeated formatted amounts, units and blanks dominate many summaries.
+        // Bound the text cache so a document with unique values cannot retain
+        // every cell. This cache lives only for the current measurement pass.
+        const int maxCachedTexts = 4096;
+        var measuredTexts = new Dictionary<string, double>(StringComparer.Ordinal);
         double Measure(string value)
         {
+            if (value.Length == 0) return 0;
+            if (measuredTexts.TryGetValue(value, out var cached)) return cached;
             double width = 0;
             foreach (var ch in value)
             {
@@ -105,6 +112,8 @@ internal sealed class SummaryColumnFit
                 }
                 width += glyph;
             }
+            if (measuredTexts.Count < maxCachedTexts)
+                measuredTexts.Add(value, width);
             return width;
         }
 
@@ -117,11 +126,20 @@ internal sealed class SummaryColumnFit
                     result[column] = Math.Max(result[column], Math.Ceiling(Measure(word) + 10));
         }
         if (grid.ItemsSource is IEnumerable<EstimateView.SummaryRow> rows)
+        {
+            var measuredColumns = columns.Where(c => c.SortMemberPath != "name")
+                .Select(c => (Column: c, Key: c.SortMemberPath, Minimum: result[c])).ToArray();
+            var maximums = measuredColumns.Select(c => c.Minimum).ToArray();
             foreach (var row in rows)
-                foreach (var column in columns)
-                    if (column.SortMemberPath != "name")
-                        result[column] = Math.Max(result[column],
-                            Math.Ceiling(Measure(Value(row, column.SortMemberPath)) + 14));
+                for (int i = 0; i < measuredColumns.Length; i++)
+                {
+                    var value = Value(row, measuredColumns[i].Key);
+                    if (value.Length != 0)
+                        maximums[i] = Math.Max(maximums[i], Math.Ceiling(Measure(value) + 14));
+                }
+            for (int i = 0; i < measuredColumns.Length; i++)
+                result[measuredColumns[i].Column] = maximums[i];
+        }
         return result;
     }
 
