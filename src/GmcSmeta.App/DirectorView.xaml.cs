@@ -1,6 +1,6 @@
-using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Text;
+using System.Threading;
+using ClosedXML.Excel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -62,6 +62,9 @@ public partial class DirectorView : UserControl
     private readonly System.Threading.SemaphoreSlim _readGate = new(1, 1);
     private long _loadGeneration;
     private bool _snapshotReady;
+    private readonly Dictionary<string, DirectorSnapshot> _snapshots = new();
+    private CancellationTokenSource? _readCancellation;
+    private CancellationTokenSource? _exportCancellation;
     public event Action<int>? ObjectOpenRequested;
 
     public DirectorView(string connectionString)
@@ -69,10 +72,20 @@ public partial class DirectorView : UserControl
         _connectionString = connectionString;
         InitializeComponent();
         Loaded += (_, _) => _ = ReloadAsync();
-        Unloaded += (_, _) => { ++_loadGeneration; _snapshotReady = false; };
+        Unloaded += (_, _) =>
+        {
+            ++_loadGeneration;
+            _snapshotReady = false;
+            _readCancellation?.Cancel();
+            _exportCancellation?.Cancel();
+        };
     }
 
-    internal void RequestRefresh() => _ = ReloadAsync();
+    internal void RequestRefresh()
+    {
+        _snapshots.Clear();
+        if (IsLoaded) _ = ReloadAsync();
+    }
 
     private void DirectorTiles_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -94,6 +107,11 @@ public partial class DirectorView : UserControl
     private async Task ReloadAsync()
     {
         var generation = ++_loadGeneration;
+        _readCancellation?.Cancel();
+        _exportCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _readCancellation = cancellation;
+        var token = cancellation.Token;
         _snapshotReady = false;
         DirectorGrid.ItemsSource = null;
         ExportButton.IsEnabled = false;
@@ -118,46 +136,63 @@ public partial class DirectorView : UserControl
         TotalColumn.Header = kp ? "КП, ₽" : "Итого,\n₽";
         EarnedColumn.Header = kp ? "Расчётная\nприбыль" : "Заработано";
 
-        await _readGate.WaitAsync();
+        var entered = false;
         try
         {
-            if (generation != _loadGeneration || !IsLoaded) return;
+            await _readGate.WaitAsync(token);
+            entered = true;
+            if (token.IsCancellationRequested || generation != _loadGeneration || !IsLoaded) return;
             StartupTrace.Mark("director_load_begin");
-            var data = await Task.Run(() => BuildSnapshot(_connectionString, mode));
-            if (generation != _loadGeneration || !IsLoaded) return;
-            DirectorGrid.ItemsSource = new ObservableCollection<DirectorPreviewRow>(data.Rows);
+            var cached = _snapshots.GetValueOrDefault(mode);
+            var data = await Task.Run(() => BuildSnapshot(_connectionString, mode, cached, token), token);
+            if (token.IsCancellationRequested || generation != _loadGeneration || !IsLoaded) return;
+            if (data.Day != DateTime.Today)
+                throw new InvalidOperationException("Дата изменилась во время загрузки. Обновите сводку.");
+            _snapshots[mode] = data;
+            DirectorGrid.ItemsSource = data.Rows;
             TileTotalValue.Text = Money.Format(data.Total);
             TileClosedValue.Text = $"{Money.Format(data.Closed)}  ·  {Pct(data.Total != 0m ? data.Closed / data.Total * 100m : null)}";
             TileExtraValue.Text = data.Out != 0m ? Money.Format(data.Out) : "нет";
             TileEarnedValue.Text = Money.Format(data.Earned);
             _snapshotReady = true;
-            ExportButton.IsEnabled = true;
+            ExportButton.IsEnabled = _exportCancellation is null;
             LoadStatus.Text = "";
             LoadStatusPanel.Visibility = Visibility.Collapsed;
             StartupTrace.Mark("director_load_end");
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (generation != _loadGeneration || !IsLoaded) return;
+            if (token.IsCancellationRequested || generation != _loadGeneration || !IsLoaded) return;
+            _snapshots.Remove(mode);
             LoadStatus.Text = "Не удалось загрузить сводку: " + ex.Message;
             LoadStatusPanel.Visibility = Visibility.Visible;
             RetryButton.Visibility = Visibility.Visible;
             StartupTrace.Mark("director_load_failed");
         }
-        finally { _readGate.Release(); }
+        finally
+        {
+            if (entered) _readGate.Release();
+            if (ReferenceEquals(_readCancellation, cancellation)) _readCancellation = null;
+        }
     }
 
     private static string Pct(decimal? v) => v is null ? "—" : $"{v.Value:0}%";
     private sealed record DirectorSnapshot(List<DirectorPreviewRow> Rows,
-        decimal Total, decimal Closed, decimal Out, decimal Earned);
+        decimal Total, decimal Closed, decimal Out, decimal Earned, string Revision, DateTime Day);
 
-    private static DirectorSnapshot BuildSnapshot(string connectionString, string mode)
+    private static DirectorSnapshot BuildSnapshot(string connectionString, string mode,
+        DirectorSnapshot? cached, CancellationToken token)
     {
-        var rows = SqlServerDirector.DirectorRows(connectionString, mode);
-        var items = new List<DirectorPreviewRow>();
+        var snapshot = SqlServerDirector.ReadIfChanged(connectionString, mode,
+            cached?.Revision ?? "", cached?.Day, token);
+        if (snapshot is null) return cached ?? throw new InvalidOperationException("Нет снимка сводки.");
+        var rows = snapshot.Rows;
+        var items = new List<DirectorPreviewRow>(rows.Count);
         decimal sumTotal = 0m, sumClosed = 0m, sumOut = 0m, sumEarned = 0m;
         foreach (var d in rows)
         {
+            token.ThrowIfCancellationRequested();
             var incompleteCoverage = d.Coverage is { } cov && cov < 95m;
             var missingSmr = d.Smr != 0m && (d.SmrCost ?? 0m) == 0m;
             var incomplete = incompleteCoverage || missingSmr;
@@ -202,7 +237,7 @@ public partial class DirectorView : UserControl
             sumOut += d.OutCost;
             sumEarned += d.Earned;
         }
-        return new DirectorSnapshot(items, sumTotal, sumClosed, sumOut, sumEarned);
+        return new DirectorSnapshot(items, sumTotal, sumClosed, sumOut, sumEarned, snapshot.Revision, snapshot.Day);
     }
 
     private void Mode_Changed(object sender, SelectionChangedEventArgs e)
@@ -213,7 +248,7 @@ public partial class DirectorView : UserControl
         _ = ReloadAsync();
     }
 
-    private void Retry_Click(object sender, RoutedEventArgs e) => _ = ReloadAsync();
+    private void Retry_Click(object sender, RoutedEventArgs e) => RequestRefresh();
 
     private void Grid_DoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -227,19 +262,41 @@ public partial class DirectorView : UserControl
         ObjectOpenRequested?.Invoke((int)row.ObjectId);
     }
 
-    /// <summary>Экспорт сводки — xlsx.</summary>
-    private void Export_Click(object sender, RoutedEventArgs e)
+    /// <summary>Экспорт сводки — xlsx, из зафиксированного порядка строк.</summary>
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (!_snapshotReady) return;
-        var mode = (ModeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "contracts";
-        XlsxExport.Save(Window.GetWindow(this), HeadingText.Text, sheet =>
+        if (!_snapshotReady || _exportCancellation is not null) return;
+        var rows = DirectorGrid.Items.OfType<DirectorPreviewRow>().ToArray();
+        var title = HeadingText.Text;
+        using var cancellation = new CancellationTokenSource();
+        _exportCancellation = cancellation;
+        var token = cancellation.Token;
+        ExportButton.IsEnabled = false;
+        try
         {
+            await ContractDocumentSave.XlsxAsync(Window.GetWindow(this), title,
+                () => CreateWorkbook(rows, token), token);
+        }
+        finally
+        {
+            _exportCancellation = null;
+            if (IsLoaded) ExportButton.IsEnabled = _snapshotReady;
+        }
+    }
+
+    private static XLWorkbook CreateWorkbook(IReadOnlyList<DirectorPreviewRow> rows, CancellationToken token)
+    {
+        var book = new XLWorkbook();
+        try
+        {
+            var sheet = book.Worksheets.Add("Лист1");
             XlsxExport.Header(sheet, 1, new[] { "Объект", "Договор, ₽", "Сдано по КС", "Маржа: материалы",
                 "Закуп известен", "Маржа: монтаж", "Докуплено вне сметы", "Заработано",
                 "Выдано на объект", "Просрочено поставок" });
             var row = 2;
-            foreach (var rowItem in DirectorGrid.Items.OfType<DirectorPreviewRow>())
+            foreach (var rowItem in rows)
             {
+                token.ThrowIfCancellationRequested();
                 sheet.Cell(row, 1).Value = rowItem.Object;
                 sheet.Cell(row, 2).Value = rowItem.Total;
                 sheet.Cell(row, 3).Value = rowItem.Closed;
@@ -253,6 +310,14 @@ public partial class DirectorView : UserControl
                 row++;
             }
             sheet.SheetView.FreezeRows(1);
-        });
+            token.ThrowIfCancellationRequested();
+            sheet.Columns().AdjustToContents(1, Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 1, 200));
+            return book;
+        }
+        catch
+        {
+            book.Dispose();
+            throw;
+        }
     }
 }

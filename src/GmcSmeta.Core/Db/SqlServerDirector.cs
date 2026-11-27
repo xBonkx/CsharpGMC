@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Threading;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
 
@@ -23,20 +24,42 @@ public static class SqlServerDirector
     private static readonly HashSet<string> Waiting = new()
     { "none", "ordered", "invoice", "paid", "shop_queued", "shop_work", "part_stock" };
 
-    public static IReadOnlyList<DirectorRow> DirectorRows(string connectionString, string mode)
+    public sealed record ReadSnapshot(IReadOnlyList<DirectorRow> Rows, string Revision, DateTime Day);
+
+    public static IReadOnlyList<DirectorRow> DirectorRows(string connectionString, string mode) =>
+        ReadIfChanged(connectionString, mode, "", null)!.Rows;
+
+    public static bool CanReuseSnapshot(string cachedRevision, string currentRevision,
+        DateTime? cachedDay, DateTime day) =>
+        !string.IsNullOrWhiteSpace(cachedRevision) && cachedRevision == currentRevision &&
+        cachedDay?.Date == day.Date;
+
+    // Null means the caller's same-mode snapshot is current. The day matters
+    // because procurement due-state can change without a database revision.
+    public static ReadSnapshot? ReadIfChanged(string connectionString, string mode,
+        string cachedRevision, DateTime? cachedDay, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var conn = SqlServerDatabase.Open(connectionString);
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            token.ThrowIfCancellationRequested();
             var revision = SqlServerDatabase.Revision(conn);
-            var rows = ReadRows(conn, mode);
-            if (!string.IsNullOrEmpty(revision) && SqlServerDatabase.Revision(conn) == revision)
-                return rows;
+            var day = DateTime.Today;
+            token.ThrowIfCancellationRequested();
+            if (attempt == 0 && CanReuseSnapshot(cachedRevision, revision, cachedDay, day) &&
+                day == DateTime.Today) return null;
+            var rows = ReadRows(conn, mode, day, token);
+            token.ThrowIfCancellationRequested();
+            if (!string.IsNullOrWhiteSpace(revision) && SqlServerDatabase.Revision(conn) == revision &&
+                day == DateTime.Today)
+                return new ReadSnapshot(rows, revision, day);
         }
         throw new InvalidOperationException("Данные сводки изменились при чтении. Обновите страницу.");
     }
 
-    private static IReadOnlyList<DirectorRow> ReadRows(SqlConnection conn, string mode)
+    private static IReadOnlyList<DirectorRow> ReadRows(SqlConnection conn, string mode,
+        DateTime day, CancellationToken token)
     {
         var objects = new List<(long Id, string Name)>();
         var contracts = new Dictionary<long, List<(long Id, int Order, string Kind, int? StageOf)>>();
@@ -62,6 +85,7 @@ public static class SqlServerDirector
             }
         }
 
+        token.ThrowIfCancellationRequested();
         var kpOnly = mode == "kp";
         var scopes = objects.Select(o =>
         {
@@ -75,11 +99,13 @@ public static class SqlServerDirector
         if (scopes.Count == 0) return Array.Empty<DirectorRow>();
         var selected = scopes.SelectMany(o => o.Docs).Select(d => d.Id).Distinct().ToArray();
         var finance = FinanceReader.ReadSelected(conn, selected.Select(id => checked((int)id)), out var totals);
+        token.ThrowIfCancellationRequested();
         var totalsById = totals.ToDictionary(t => t.Id);
-        var metrics = ReadContractMetrics(conn, selected, !kpOnly, DateTime.Today);
-        var rows = new List<DirectorRow>();
+        var metrics = ReadContractMetrics(conn, selected, !kpOnly, day, token);
+        var rows = new List<DirectorRow>(scopes.Count);
         foreach (var (objectId, objectName, docs) in scopes)
         {
+            token.ThrowIfCancellationRequested();
             decimal total = 0m, closed = 0m, revenue = 0m, cost = 0m, covered = 0m, outCost = 0m,
                 smr = 0m, smrCost = 0m, matTotal = 0m, issuedValue = 0m;
             var missing = 0;
@@ -133,11 +159,12 @@ public static class SqlServerDirector
     internal const int ContractBatchSize = 512;
 
     private static Dictionary<long, ContractMetrics> ReadContractMetrics(SqlConnection conn,
-        IReadOnlyList<long> contractIds, bool countLate, DateTime today)
+        IReadOnlyList<long> contractIds, bool countLate, DateTime today, CancellationToken token)
     {
         var result = contractIds.ToDictionary(id => id, _ => new ContractMetrics());
         foreach (var batch in contractIds.Chunk(ContractBatchSize))
         {
+            token.ThrowIfCancellationRequested();
             using var read = new SqlCommand("", conn);
             var names = new List<string>(batch.Length);
             for (var i = 0; i < batch.Length; i++)
@@ -160,6 +187,7 @@ public static class SqlServerDirector
             if (!r.NextResult()) throw new InvalidOperationException("Нет остатков в ответе SQL.");
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var m = result[Id(0)];
                 var name = r.IsDBNull(1) ? "" : r.GetString(1);
                 var qty = Number(2);

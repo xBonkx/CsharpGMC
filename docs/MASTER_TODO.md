@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 1bb903c) — PERF-034/035/037 PARTIAL: director same-mode revision/day cache, cancellable queued and between-phase reads, asynchronous captured XLSX export. Tests added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 3f542b4) — PERF-024/027/028/032 PARTIAL: background procurement row projection, shipment historical-line tracking bounded by line count, cost-summary queued/between-phase read cancellation. Source guards added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 38f2bea) — PERF-022/023 PARTIAL, BUG-F15 follow-up: requisites form disabled until coherent snapshot and during save; close guarded pending acknowledgement; conflict requires reopen. KS financial overview keeps period, report windows cancel queued reads and group export checks lifetime before publication; source regressions added, not run. See performance/functional TODO.
