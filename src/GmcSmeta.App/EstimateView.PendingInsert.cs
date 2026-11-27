@@ -19,6 +19,12 @@ public partial class EstimateView
         public bool Failed { get; set; }
         public Dictionary<string, string> BufferedEdits { get; } = new();
         public Dictionary<string, string> EnteredEdits { get; } = new();
+        public Dictionary<string, string> LastCommitted { get; } = new()
+        {
+            ["name"] = row.Name, ["unit"] = row.Unit, ["qty"] = row.QtyText,
+            ["price"] = row.PriceText, ["purchase_price"] = row.PurchaseText,
+            ["work_price"] = row.WorkText, ["note"] = row.Note
+        };
     }
 
     private readonly List<PendingEstimateInsert> _pendingEstimateInserts = new();
@@ -56,7 +62,7 @@ public partial class EstimateView
             SystemId = anchor.Source.SystemId,
             ParentSystemId = section.Source.ParentSystemId,
             ParentPositionId = component ? rootId : null
-        }) { IsPendingInsert = true };
+        }) { IsPendingInsert = true, DisplayNum = "…" };
 
         var pending = new PendingEstimateInsert(draft, rootId);
         var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
@@ -131,6 +137,11 @@ public partial class EstimateView
             SetStatus("Формулы доступны после сверки новой позиции с сервером.", true);
             return false;
         }
+        // A fast Add click commits the previous editor, often with no changes.
+        // Do not generate a redundant cell write (and another SQL readback).
+        if (pending.LastCommitted.TryGetValue(field, out var previous) && previous == input)
+            return true;
+        pending.LastCommitted[field] = input;
         pending.EnteredEdits[field] = input;
         if (pending.Failed || pending.ServerId is null)
             pending.BufferedEdits[field] = input;
