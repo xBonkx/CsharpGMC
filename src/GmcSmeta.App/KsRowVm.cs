@@ -12,6 +12,7 @@ public sealed class KsRowVm : INotifyPropertyChanged
 {
     private string _num = "";
     private string _name = "";
+    private string? _searchName;
     private string _unit = "";
     private string _qtyByKp = "";
     private string _before = "";
@@ -39,7 +40,25 @@ public sealed class KsRowVm : INotifyPropertyChanged
     public bool OutOfKp { get; init; }
 
     public string Num { get => _num; set => SetField(ref _num, value); }
-    public string Name { get => _name; set => SetField(ref _name, value); }
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            if (_name == value) return;
+            _searchName = null;
+            SetField(ref _name, value);
+        }
+    }
+
+    internal bool MatchesSearch(IReadOnlyList<string> words)
+    {
+        if (words.Count == 0) return true;
+        var name = _searchName ??= _name.ToLowerInvariant();
+        foreach (var word in words)
+            if (!name.Contains(word, StringComparison.Ordinal)) return false;
+        return true;
+    }
     public string Unit { get => _unit; set => SetField(ref _unit, value); }
     public string QtyByKp { get => _qtyByKp; set => SetField(ref _qtyByKp, value); }
     public string Before { get => _before; set => SetField(ref _before, value); }

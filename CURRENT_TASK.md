@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+27.11.2026 ChatGPT/main (base 3364692) — PERF-019/020 PARTIAL: KS search cache, shared section totals on quantity readback, structural fallback and row-step optimization; tests added, not run. See performance TODO.
+
 27.11.2026 ChatGPT/main (base aa8a308) — PERF-025/026 PARTIAL: direct summary merge, single-pass cell formatting and extracted row factory; regression tests added, not executed. Details: [performance TODO](docs/PERFORMANCE_TODO_20261124.md).
 
 27.11.2026 ChatGPT/main (base 12ff5c7) — PERF-025/026 PARTIAL: cost material system grouping indexes sorted rows once instead of scanning per system (empty headers/order retained). Embedded summary uses one-pass group accumulator for four amounts, four uniform unit prices, and missing flags; avoids duplicate sums and temporary price hash sets, retains null/zero/mixed/rounding and collapsed-group totals. Same-mode totals also one pass. Dedicated core accumulator and adapter; oversized summary file localized net reduction. Added 11 core cases (including 25000 positions/202 systems and 25000 group members), not executed; no SQL, financial formulas, layout/icons, schema or release changes. Windows/.NET/Pilot parity and allocation/latency measurements remain.

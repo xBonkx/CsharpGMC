@@ -89,4 +89,65 @@ public static class KsActSheetProjection
         token.ThrowIfCancellationRequested();
         return (rows, refNumbers, refDisplay);
     }
+
+    public sealed record SectionDisplay(long SystemId, string Label, bool IsSub,
+        decimal Material, decimal Work, decimal Transport, bool Unallocated = false)
+    {
+        public decimal Amount => Material + Work + Transport;
+        public bool InAct => Work != 0m || Transport != 0m;
+        public string Name => Unallocated
+            ? $"Без привязки к разделу · СМР {Money.Format(Work)} · тр. {Money.Format(Transport)}"
+            : Label + (InAct ? $"   ·   СМР {Money.Format(Work)}   ·   тр. {Money.Format(Transport)}" : "");
+    }
+
+    /// <summary>Same section presentation for opening and quantity readback.
+    /// Include manual allocations and negative material amounts, never alter SQL totals.</summary>
+    public static IReadOnlyList<SectionDisplay> Sections(SqlServerActs.ActSheetData sheet,
+        KsActAllocation.SectionAmounts? manual, bool perPosition, bool roundRows)
+    {
+        var material = new Dictionary<long, decimal>();
+        foreach (var row in sheet.Positions)
+        {
+            material.TryAdd(row.SystemId, 0m);
+            if (row.LineId is not null)
+                material[row.SystemId] += decimal.Round(row.LineQty * row.LinePrice, 2,
+                    roundRows ? MidpointRounding.AwayFromZero : MidpointRounding.ToEven);
+        }
+        var result = new List<SectionDisplay>(sheet.Systems.Count);
+        foreach (var system in sheet.Systems)
+        {
+            var work = perPosition ? 0m : manual?.Smr.GetValueOrDefault(system.SystemId) ?? 0m;
+            var transport = manual?.Transport.GetValueOrDefault(system.SystemId) ?? 0m;
+            if (!material.ContainsKey(system.SystemId) && work == 0m && transport == 0m) continue;
+            result.Add(new SectionDisplay(system.SystemId, system.Label, system.IsSub,
+                material.GetValueOrDefault(system.SystemId), work, transport));
+        }
+        if (manual is not null)
+        {
+            var work = perPosition ? 0m : manual.Smr.GetValueOrDefault(0);
+            var transport = manual.Transport.GetValueOrDefault(0);
+            if (work != 0m || transport != 0m)
+                result.Add(new SectionDisplay(0, "", false, 0m, work, transport, true));
+        }
+        return result;
+    }
+
+    /// <summary>Mutable quantity fields can be patched in place only while
+    /// row membership, numbering and the other original presentation fields agree.</summary>
+    public static bool SameRowLayout(SqlServerActs.ActSheetData previous, SqlServerActs.ActSheetData next)
+    {
+        if (previous.Form != next.Form || previous.NumManual != next.NumManual ||
+            previous.Positions.Count != next.Positions.Count || !previous.Systems.SequenceEqual(next.Systems))
+            return false;
+        for (var i = 0; i < next.Positions.Count; i++)
+        {
+            var a = previous.Positions[i];
+            var b = next.Positions[i];
+            if (a.PositionId != b.PositionId || a.SystemId != b.SystemId || a.NumText != b.NumText ||
+                a.Name != b.Name || a.Unit != b.Unit || a.QtyByKp != b.QtyByKp ||
+                a.OutOfKp != b.OutOfKp || a.WorkCode != b.WorkCode) return false;
+        }
+        return true;
+    }
+
 }

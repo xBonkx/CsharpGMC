@@ -96,4 +96,61 @@ public sealed class KsActSheetProjectionTests
         Assert.Empty(result.RefNumbers);
         Assert.Empty(result.RefDisplay);
     }
+
+    private static SqlServerActs.ActSheetData Sheet(params SqlServerActs.ActSheetRow[] rows) =>
+        new(new[] { new SqlServerActs.ActSheetSystem(1, "П1", false, 0),
+            new SqlServerActs.ActSheetSystem(2, "В1", true, 1),
+            new SqlServerActs.ActSheetSystem(3, "Пустая", false, 0) },
+            rows, new Dictionary<long, string>(), new Dictionary<long, string>(), false, "r4");
+
+    [Theory]
+    [InlineData(false, 0.02)]
+    [InlineData(true, 0.03)]
+    public void SectionsIncludeManualAmountsAndNegativeLines(bool roundRows, double expected)
+    {
+        var sheet = Sheet(Row(1, 1, "1") with { LineQty = 1m, LinePrice = 0.025m },
+            Row(2, 2, "2") with { LineQty = -2m, LinePrice = 10m },
+            Row(3, 1, "3", inAct: false));
+        var manual = new KsActAllocation.SectionAmounts(
+            new Dictionary<long, decimal> { [1] = 5, [3] = 7, [0] = 2 },
+            new Dictionary<long, decimal> { [1] = 10, [2] = 1, [0] = 3 });
+        var sections = KsActSheetProjection.Sections(sheet, manual, false, roundRows);
+        Assert.Equal(new long[] { 1, 2, 3, 0 }, sections.Select(s => s.SystemId));
+        Assert.Equal((decimal)expected + 15m, sections[0].Amount);
+        Assert.Equal(-19m, sections[1].Amount);
+        Assert.Equal(7m, sections[2].Amount);
+        Assert.Equal(5m, sections[3].Amount);
+        Assert.True(sections[3].Unallocated);
+        Assert.True(sections[0].InAct);
+        var perPosition = KsActSheetProjection.Sections(sheet, manual, true, roundRows);
+        Assert.Equal(new long[] { 1, 2, 0 }, perPosition.Select(s => s.SystemId));
+        Assert.Equal((decimal)expected + 10m, perPosition[0].Amount);
+    }
+
+    [Fact]
+    public void SectionProjectionSupports25000PositionsWithoutDroppingEmptyOrUnclosedRules()
+    {
+        var sheet = Sheet(Enumerable.Range(1, 25000).Select(i =>
+            Row(i, i % 2 + 1, i.ToString(), inAct: i % 3 != 0)).ToArray());
+        var sections = KsActSheetProjection.Sections(sheet, null, false, false);
+        Assert.Equal(2, sections.Count);
+        foreach (var section in sections)
+            Assert.Equal(sheet.Positions.Where(r => r.SystemId == section.SystemId && r.LineId is not null)
+                .Sum(r => decimal.Round(r.LineQty * r.LinePrice, 2)), section.Amount);
+    }
+
+    [Fact]
+    public void ReadbackLayoutAllowsQuantityChangesButRejectsRenumberingOrMembershipChanges()
+    {
+        var original = Sheet(Row(1, 1, "1"), Row(2, 2, "2"));
+        Assert.True(KsActSheetProjection.SameRowLayout(original,
+            original with { Positions = original.Positions.Select(r => r with { LineQty = 7m }).ToArray() }));
+        Assert.False(KsActSheetProjection.SameRowLayout(original,
+            original with { Positions = original.Positions.Take(1).ToArray() }));
+        Assert.False(KsActSheetProjection.SameRowLayout(original,
+            original with { Positions = original.Positions.Reverse().ToArray() }));
+        Assert.False(KsActSheetProjection.SameRowLayout(original,
+            original with { Positions = original.Positions.Select(r => r with { NumText = "9" }).ToArray() }));
+    }
+
 }

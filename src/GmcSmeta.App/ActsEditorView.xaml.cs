@@ -381,8 +381,6 @@ public partial class ActsEditorView : UserControl
 
             BuildGrid();
             FillTiles();
-            FilterRows();
-            UpdateSelectionQty();
             // The complete header, rows and totals are prepared before reveal.
             EmptyPanel.Visibility = Visibility.Collapsed;
             EditorRoot.Visibility = Visibility.Visible;
@@ -434,51 +432,20 @@ public partial class ActsEditorView : UserControl
         var sheet = _sheet;
         if (sheet is not null)
         {
-            var manual = _details is not null && !string.IsNullOrEmpty(_details.SectionAmountsJson)
-                ? KsActAllocation.Resolve(
-                    sheet.Positions.Where(p => p.LineId is not null)
-                        .Select(p => new KsActAllocation.Line(p.SystemId,p.LineQty,p.LinePrice,p.LineWorkPrice)).ToList(),
-                    sheet.Systems.Select(s => s.SystemId).ToHashSet(),
-                    _details.Smr, _details.Transport, _isPosSmr, _details.SmrBySystem,
-                    _details.SectionAmountsJson, _roundRows)
-                : null;
+            var sections = ProjectActSections(sheet);
             var positionsBySystem = sheet.Positions.ToLookup(p => p.SystemId);
-            foreach (var system in sheet.Systems)
+            foreach (var section in sections)
             {
-                var positions = positionsBySystem[system.SystemId];
-                var works = !_isPosSmr ? manual?.Smr.GetValueOrDefault(system.SystemId) ?? 0m : 0m;
-                var transport = manual?.Transport.GetValueOrDefault(system.SystemId) ?? 0m;
-                if (!positions.Any() && works == 0m && transport == 0m)
-                    continue;
-                var sectionRow = new KsRowVm
+                var back = section.IsSub ? "#E8F5FC" : "#F1F4F9";
+                items.Add(new KsRowVm
                 {
-                    IsSection = true,
-                    IsSub = system.IsSub,
-                    SystemId = system.SystemId,
-                    Name = system.Label + (works != 0m || transport != 0m
-                        ? $"   ·   СМР {Money.Format(works)}   ·   тр. {Money.Format(transport)}" : ""),
-                    InAct = works != 0m || transport != 0m,
-                    RowBack = system.IsSub ? "#E8F5FC" : "#F1F4F9",
-                    NowCellBack = system.IsSub ? "#E8F5FC" : "#F1F4F9",
-                };
-                items.Add(sectionRow);
-                decimal materialSum = 0m;
-                foreach (var p in positions)
-                {
-                    items.Add(PositionRow(p));
-                    if (p.LineId is not null) materialSum += LineAmount(p.LineQty, p.LinePrice);
-                }
-                var sum = materialSum + works + transport;
-                if (sum != 0m) sectionRow.Amount = Money.Format(sum);
-            }
-            if (manual is not null)
-            {
-                var works = !_isPosSmr ? manual.Smr.GetValueOrDefault(0) : 0m;
-                var transport = manual.Transport.GetValueOrDefault(0);
-                if (works != 0m || transport != 0m)
-                    items.Add(new KsRowVm { IsSection = true, InAct = true,
-                        Name = $"Без привязки к разделу · СМР {Money.Format(works)} · тр. {Money.Format(transport)}",
-                        Amount = Money.Format(works + transport), RowBack = "#F1F4F9", NowCellBack = "#F1F4F9" });
+                    IsSection = true, IsSub = section.IsSub, SystemId = section.SystemId,
+                    Name = section.Name, InAct = section.InAct,
+                    Amount = SectionAmountText(section), RowBack = back, NowCellBack = back,
+                });
+                if (section.Unallocated) continue;
+                foreach (var position in positionsBySystem[section.SystemId])
+                    items.Add(PositionRow(position));
             }
         }
         _rows = items;
@@ -544,7 +511,7 @@ public partial class ActsEditorView : UserControl
         var onlyAct = OnlyActToggle.IsChecked == true;
         var rest = OnlyRestToggle.IsChecked == true;
         view.Filter = o => o is KsRowVm r &&
-            words.All(w => r.Name.ToLowerInvariant().Contains(w)) &&
+            r.MatchesSearch(words) &&
             (!onlyAct || r.InAct) &&
             (!rest || r.InAct || r.RestRaw > 0.000001m);
         UpdateSelectionQty();
@@ -815,15 +782,26 @@ public partial class ActsEditorView : UserControl
         if (_actId != actId || _contractId != contractId || _connectionString != connectionString ||
             _revision != revision) return false;
         var sheet = loaded.Sheet!;
+        var sameLayout = _sheet is not null && KsActSheetProjection.SameRowLayout(_sheet, sheet);
         _sheet = sheet;
         _acts = loaded.Acts;
         _actsRevision = loaded.Revision;
         _details = loaded.Details;
         _totals = loaded.Totals;
         _sharedExtraIds = loaded.SharedExtraIds;
-        if (_rows is not null)
+        var sections = ProjectActSections(sheet);
+        var existingSections = _rows?.Where(r => r.IsSection).ToArray();
+        if (!sameLayout || _rows is null || existingSections is null ||
+            !existingSections.Select(r => r.SystemId).SequenceEqual(sections.Select(r => r.SystemId)))
+        {
+            // A quantity change can add/remove an extra row or allocation header.
+            // Never retain an obsolete row under a newly confirmed revision.
+            BuildGrid();
+        }
+        else
         {
             var byPosition = sheet.Positions.ToDictionary(p => p.PositionId);
+            var filterChanged = false;
             foreach (var vm in _rows)
             {
                 if (vm.IsSection)
@@ -836,6 +814,8 @@ public partial class ActsEditorView : UserControl
                 var inAct = p.LineId is not null;
                 var amount = inAct ? LineAmount(p.LineQty, p.LinePrice) : 0m;
                 var nowText = p.LineQty != 0m || displayed.Length > 0 ? Qty(p.LineQty) : "";
+                filterChanged |= vm.InAct != inAct ||
+                    (vm.RestRaw > 0.000001m) != (!p.OutOfKp && p.QtyByKp - p.ClosedByOthers > 0.000001m);
                 vm.Before = p.ClosedByOthers == 0m ? "" : Qty(p.ClosedByOthers);
                 vm.Now = nowText;
                 vm.NowValue = p.LineQty;
@@ -851,17 +831,18 @@ public partial class ActsEditorView : UserControl
                 vm.Warn = p.TrackIssues && p.ClosedByOthers + p.LineQty - p.Issued > 0.000001m;
                 vm.OverLeft = left < -0.000000001m;
             }
-            var sums = new Dictionary<long, decimal>();
-            foreach (var p in sheet.Positions)
+            for (var i = 0; i < sections.Count; i++)
             {
-                if (p.LineId is null) continue;
-                sums[p.SystemId] = sums.GetValueOrDefault(p.SystemId) + LineAmount(p.LineQty, p.LinePrice);
+                var vm = existingSections[i];
+                var section = sections[i];
+                filterChanged |= vm.Name != section.Name || vm.InAct != section.InAct;
+                vm.Name = section.Name;
+                vm.InAct = section.InAct;
+                vm.Amount = SectionAmountText(section);
             }
-            foreach (var section in _rows.Where(r => r.IsSection))
-            {
-                var sum = sums.GetValueOrDefault(section.SystemId);
-                section.Amount = sum > 0m ? Money.Format(sum) : "";
-            }
+            if (filterChanged && (OnlyActToggle.IsChecked == true || OnlyRestToggle.IsChecked == true ||
+                !string.IsNullOrWhiteSpace(SearchBox.Text)))
+                FilterRows();
         }
         FillTiles();
         UpdateSelectionQty();
@@ -875,12 +856,21 @@ public partial class ActsEditorView : UserControl
         if (_rows is null) return;
         var view = CollectionViewSource.GetDefaultView(ActGrid.ItemsSource);
         Predicate<object>? filter = view?.Filter;
-        var visible = _rows.Where(r => !r.IsSection)
-            .Where(r => filter is null || filter(r)).ToList();
-        var index = visible.FindIndex(r => r.PositionId == positionId);
-        var next = index + step;
-        if (index < 0 || next < 0 || next >= visible.Count) return;
-        var target = visible[next];
+        KsRowVm? target = null;
+        KsRowVm? previous = null;
+        var found = false;
+        foreach (var row in _rows)
+        {
+            if (row.IsSection || (filter is not null && !filter(row))) continue;
+            if (found) { target = row; break; }
+            if (row.PositionId == positionId)
+            {
+                if (step < 0) { target = previous; break; }
+                found = true;
+            }
+            previous = row;
+        }
+        if (target is null) return;
         var column = ActGrid.Columns.FirstOrDefault(c => c.Header?.ToString() == "В этом акте");
         if (column is null) return;
         ActGrid.SelectedItem = target;

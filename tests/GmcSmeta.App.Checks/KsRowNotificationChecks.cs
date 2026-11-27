@@ -65,6 +65,13 @@ internal static class KsRowNotificationChecks
         changed.OverLeft = false;
         if (notifications.Count != 0)
             throw new Exception("Repeated KS changes must not notify WPF.");
+        var search = new KsRowVm { Name = "Клапан П1" };
+        if (!search.MatchesSearch(new[] { "п1", "клапан" }) ||
+            search.MatchesSearch(new[] { "датчик" }) || !search.MatchesSearch(Array.Empty<string>()))
+            throw new Exception("KS search must retain word-by-word case-insensitive matching.");
+        search.Name = "Датчик В2";
+        if (!search.MatchesSearch(new[] { "датчик", "в2" }) || search.MatchesSearch(new[] { "клапан" }))
+            throw new Exception("KS search cache must invalidate after a name change.");
         Console.WriteLine("KS row notifications: 25000 unchanged rows, changed fields and dependent bindings OK.");
     }
 }
