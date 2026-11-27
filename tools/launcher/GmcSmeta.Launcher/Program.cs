@@ -145,7 +145,7 @@ try
         }
 
         StartupTrace.Mark("launcher_self_update_begin");
-        LauncherSelfUpdate.TryUpdate(releases, release, paths, ui);
+        LauncherSelfUpdate.TryUpdate(releases, release, ui);
         StartupTrace.Mark("launcher_self_update_end");
         if (options.BackgroundUpdate && appUpdated)
             ui.FinishUpdate($"Версия {release.Version} готова", "Программа с поддержкой автоперезапуска откроет новую версию автоматически после завершения операций.");

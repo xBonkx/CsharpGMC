@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -187,13 +186,14 @@ internal sealed class GitHubReleases
         if (asset is null) return null;
         try
         {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             using var request = CreateRequest(HttpMethod.Get, asset.ApiUrl, "application/octet-stream");
-            using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
-            using var reader = new StreamReader(response.Content.ReadAsStream(), Encoding.UTF8);
-            return reader.ReadToEnd();
+            using var reader = new StreamReader(response.Content.ReadAsStream(timeout.Token), Encoding.UTF8);
+            return reader.ReadToEndAsync(timeout.Token).GetAwaiter().GetResult();
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
         {
             _ui.Warn("Не удалось получить контрольные суммы: " + ex.Message);
             return null;
@@ -211,7 +211,7 @@ internal sealed class GitHubReleases
             if (space <= 0) continue;
             var hash = line[..space].Trim();
             var name = line[(space + 1)..].Trim().TrimStart('*');
-            if (string.Equals(name, assetName, StringComparison.OrdinalIgnoreCase) && hash.Length == 64)
+            if (string.Equals(name, assetName, StringComparison.OrdinalIgnoreCase) && hash.Length == 64 && hash.All(Uri.IsHexDigit))
                 return hash;
         }
         return null;
@@ -230,38 +230,34 @@ internal sealed class GitHubReleases
         response.EnsureSuccessStatusCode();
 
         var total = response.Content.Headers.ContentLength ?? asset.Size;
+        if (asset.Size > 0 && total != asset.Size)
+            throw new InvalidOperationException("Размер вложения не совпадает с опубликованным.");
         using var source = response.Content.ReadAsStream(timeout.Token);
-        using var target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        var buffer = new byte[81920];
-        long done = 0;
         var lastReport = 0L;
         var started = Stopwatch.StartNew();
-        while (true)
+        string actual;
+        try
         {
-            var read = source.Read(buffer, 0, buffer.Length);
-            if (read <= 0) break;
-            target.Write(buffer, 0, read);
-            hash.AppendData(buffer, 0, read);
-            done += read;
-            if (started.ElapsedMilliseconds - lastReport > 250 || done == total)
-            {
-                lastReport = started.ElapsedMilliseconds;
-                Report(done, total);
-            }
+            using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            actual = ReleaseDownloadTransfer.CopyVerified(source, target, total, expectedSha256,
+                timeout.Token, TimeSpan.FromSeconds(60), done =>
+                {
+                    if (started.ElapsedMilliseconds - lastReport > 250 || done == total)
+                    {
+                        lastReport = started.ElapsedMilliseconds;
+                        Report(done, total);
+                    }
+                });
+            target.Flush(flushToDisk: true);
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new IOException("Истекло время скачивания вложения. Повторите запуск.", ex);
         }
         Console.WriteLine();
 
-        var actual = Convert.ToHexString(hash.GetHashAndReset());
-        if (!string.IsNullOrWhiteSpace(expectedSha256) &&
-            !string.Equals(actual, expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            try { File.Delete(destination); } catch { }
-            throw new InvalidOperationException(
-                "контрольная сумма не совпала: скачанный файл повреждён. Повторите запуск.");
-        }
         if (string.IsNullOrWhiteSpace(expectedSha256))
-            _ui.Warn("Контрольная сумма для «" + asset.Name + "» не найдена — проверена только целостность архива.");
+            _ui.Warn("Контрольная сумма для «" + asset.Name + "» не найдена — SHA-256 не сверена с опубликованным значением.");
         return actual;
     }
 

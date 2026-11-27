@@ -223,10 +223,10 @@ internal sealed class AppInstaller
     }
 }
 
-/// <summary>Обновление самого запускающего EXE: переименовать работающий файл и положить новый.</summary>
+/// <summary>Обновление самого запускающего EXE проверенным файлом.</summary>
 internal static class LauncherSelfUpdate
 {
-    public static void TryUpdate(GitHubReleases releases, ReleaseInfo release, AppPaths paths, ConsoleUi ui)
+    public static void TryUpdate(GitHubReleases releases, ReleaseInfo release, ConsoleUi ui)
     {
         if (Environment.GetEnvironmentVariable("GMC_SMETA_NO_SELF_UPDATE") == "1") return;
 
@@ -246,29 +246,26 @@ internal static class LauncherSelfUpdate
             ui.Step($"Обновляю запускающий EXE до {release.Version}…");
             var checksums = releases.TryGetChecksums(release);
             var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
-            if (OfficeLauncher.IsOfficeExecutable && expected is null)
+            // Executables must always have a published checksum, including
+            // the non-office launcher.
+            if (expected is null)
                 throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
-            var download = Path.Combine(paths.Downloads, "GmcSmeta.Launcher.new.exe");
-            if (File.Exists(download)) File.Delete(download);
-            releases.Download(asset, download, expected);
-
-            var backup = self + ".old";
-            try { if (File.Exists(backup)) File.Delete(backup); } catch (IOException) { }
-            File.Move(self, backup);
+            var download = self + "." + Guid.NewGuid().ToString("N") + ".new";
             try
             {
-                File.Copy(download, self, overwrite: true);
+                releases.Download(asset, download, expected);
+                LauncherBinaryPublisher.Replace(download, self);
             }
-            catch
+            finally
             {
-                File.Move(backup, self);
-                throw;
+                try { File.Delete(download); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
             }
-            try { File.Delete(download); } catch (IOException) { }
             ui.Info("Запускающий EXE обновлён — новый файл вступит в силу сразу, повторно скачивать не нужно.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
-                                       or System.Net.Http.HttpRequestException)
+                                       or System.Net.Http.HttpRequestException or OperationCanceledException)
         {
             ui.Warn("Не удалось обновить запускающий EXE: " + ex.Message);
             ui.Warn("Программа всё равно запустится; EXE можно обновить позже вручную.");
