@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
+using System.ComponentModel;
 using GmcSmeta.Core.Domain;
 using Microsoft.Win32;
 
@@ -14,7 +16,10 @@ public partial class LettersWindow : Window
     private readonly ObjectRow? _objectContext;
     private readonly DocRow? _contractContext;
     private readonly IReadOnlySet<long>? _objectContractIds;
-    private LettersArchive _archive;
+    private LettersArchive? _archive;
+    private readonly DispatcherTimer _searchTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private bool _closed, _busy, _reading, _refreshRequested, _ready;
+    private long _generation;
     private static readonly string SettingsFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "GMC-Smeta-Next", "letters.settings.json");
@@ -52,24 +57,128 @@ public partial class LettersWindow : Window
         if (objectContext is not null)
             Title = "Письма · " + objectContext.Name + (contractContext is null ? "" : " — " + contractContext.Title);
         AttachExistingButton.Visibility = objectContext is null ? Visibility.Collapsed : Visibility.Visible;
-        _archive = new LettersArchive(connectionString, SavedRoot());
         StatusFilter.SelectedIndex = 0;
-        Refresh();
+        SetControls();
+        ArchivePath.Text = "Подключение к архиву писем…";
+        _searchTimer.Tick += SearchTimer_Tick;
+        Loaded += InitializeAsync;
     }
 
-    private void Refresh()
+    private async void InitializeAsync(object sender, RoutedEventArgs e)
     {
-        ArchivePath.Text = "Отдельный архив файлов: " + _archive.Root +
-            " · метаданные и номера писем: SQL Server";
-        var status = (StatusFilter.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Все";
-        var letters = _archive.Sql.List(SearchBox.Text.Trim(), status);
-        LetterList.ItemsSource = letters.Where(Belongs).ToList();
+        Loaded -= InitializeAsync;
+        _busy = true;
+        SetControls();
+        try
+        {
+            _archive = await Task.Run(() => new LettersArchive(_connectionString, SavedRoot()));
+        }
+        catch (Exception error)
+        {
+            ArchivePath.Text = "Архив не открыт: " + error.Message;
+        }
+        finally
+        {
+            _busy = false;
+            SetControls();
+        }
+        if (_archive is not null) RequestRefresh(immediate: true);
+    }
+
+    private void SetControls()
+    {
+        ActionPanel.IsEnabled = LetterList.IsEnabled = _ready && !_busy;
+        SearchBox.IsEnabled = StatusFilter.IsEnabled = RefreshButton.IsEnabled = !_busy && _archive is not null;
+    }
+
+    private void RequestRefresh(bool immediate = false)
+    {
+        if (_closed || _busy || _archive is null) return;
+        ++_generation;
+        _ready = false;
+        SetControls();
+        ArchivePath.Text = "Чтение списка писем…";
+        _searchTimer.Stop();
+        if (immediate)
+        {
+            _refreshRequested = true;
+            _ = RefreshAsync();
+        }
+        else _searchTimer.Start();
+    }
+
+    private void Refresh_Click(object sender, RoutedEventArgs e) => RequestRefresh(immediate: true);
+
+    private void SearchTimer_Tick(object? sender, EventArgs e)
+    {
+        _searchTimer.Stop();
+        _refreshRequested = true;
+        _ = RefreshAsync();
+    }
+
+    // At most one list read is in flight. New input invalidates its result
+    // immediately; a timer coalesces rapid changes before the next request.
+    private async Task RefreshAsync()
+    {
+        if (_closed || _busy || _reading || _archive is null) return;
+        _reading = true;
+        try
+        {
+            while (_refreshRequested && !_closed && !_busy)
+            {
+                _refreshRequested = false;
+                var generation = _generation;
+                var archive = _archive;
+                var selectedId = Selected()?.Id;
+                var query = SearchBox.Text.Trim();
+                var status = (StatusFilter.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Все";
+                try
+                {
+                    var letters = await Task.Run(() => archive.Sql.List(query, status).Where(Belongs).ToList());
+                    if (_closed || generation != _generation || !ReferenceEquals(archive, _archive)) continue;
+                    LetterList.ItemsSource = letters;
+                    LetterList.SelectedItem = letters.FirstOrDefault(x => x.Id == selectedId);
+                    ArchivePath.Text = "Отдельный архив файлов: " + archive.Root +
+                        " · метаданные и номера писем: SQL Server";
+                    _ready = true;
+                }
+                catch (Exception error)
+                {
+                    if (_closed || generation != _generation) continue;
+                    LetterList.ItemsSource = null;
+                    ArchivePath.Text = "Не удалось прочитать письма: " + error.Message;
+                    // Search/filter remains available for a fresh read.
+                    _ready = false;
+                }
+                finally
+                {
+                    if (!_closed) SetControls();
+                }
+            }
+        }
+        finally { _reading = false; }
     }
 
     private void Search_Changed(object sender, RoutedEventArgs e)
     {
         if (_archive is not null && StatusFilter is not null && SearchBox is not null)
-            Refresh();
+            RequestRefresh();
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // A write/restore must finish and report its outcome before closing.
+        if (_busy) e.Cancel = true;
+        base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        ++_generation;
+        _searchTimer.Stop();
+        _searchTimer.Tick -= SearchTimer_Tick;
+        base.OnClosed(e);
     }
 
     private bool Belongs(LetterDocument letter) => LetterContext.Belongs(letter,
@@ -77,22 +186,28 @@ public partial class LettersWindow : Window
 
     private LetterDocument? Selected() => LetterList.SelectedItem as LetterDocument;
 
-    private void Try(Action action)
+    private async Task RunActionAsync(Func<LettersArchive, Task> action)
     {
-        try { action(); }
+        if (_closed || _busy || !_ready || _archive is not { } archive) return;
+        _busy = true;
+        _ready = false;
+        SetControls();
+        try { await action(archive); }
         catch (Exception e)
         {
             MessageBox.Show(this, e.Message, "Письма", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally
+        {
+            _busy = false;
+            RequestRefresh(immediate: true);
+        }
     }
 
-    private void Edit(LetterDocument letter)
-    {
-        new LetterEditorWindow(_archive, letter, _connectionString) { Owner = this }.ShowDialog();
-        Refresh();
-    }
+    private void Edit(LettersArchive archive, LetterDocument letter) =>
+        new LetterEditorWindow(archive, letter, _connectionString) { Owner = this }.ShowDialog();
 
-    private void New_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void New_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         var doc = new LetterDocument();
         if (_objectContext is not null)
@@ -101,37 +216,38 @@ public partial class LettersWindow : Window
                 _contractContext?.Id, _contractContext?.Title ?? "");
             doc.Recipient = _objectContext.Customer;
         }
-        _archive.Sql.Save(doc, validateContext: _objectContext is not null);
-        Edit(doc);
+        await Task.Run(() => archive.Sql.Save(doc, validateContext: _objectContext is not null));
+        Edit(archive, doc);
     });
 
-    private void Open_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void Open_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         if (Selected() is { } selected)
         {
-            var current = _archive.Sql.Get(selected.Id);
-            if (!Belongs(current)) { Refresh(); return; }
-            Edit(current);
+            var current = await Task.Run(() => archive.Sql.Get(selected.Id));
+            if (!Belongs(current)) return;
+            Edit(archive, current);
         }
     });
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void Copy_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         if (Selected() is { } source)
         {
-            var current = _archive.Sql.Get(source.Id);
-            if (!Belongs(current)) { Refresh(); return; }
-            Edit(_archive.Sql.Create(current));
+            var current = await Task.Run(() => archive.Sql.Get(source.Id));
+            if (!Belongs(current)) return;
+            var copy = await Task.Run(() => archive.Sql.Create(current));
+            Edit(archive, copy);
         }
     });
 
     private void List_DoubleClick(object sender, MouseButtonEventArgs e) =>
         Open_Click(sender, e);
 
-    private void AttachExisting_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void AttachExisting_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         if (_objectContext is not { } obj) return;
-        var choices = _archive.Sql.List().Where(LetterContext.CanAttach).ToArray();
+        var choices = await Task.Run(() => archive.Sql.List().Where(LetterContext.CanAttach).ToArray());
         if (choices.Length == 0)
         {
             MessageBox.Show(this, "Нет черновиков без привязки и опубликованных выпусков.", "Письма");
@@ -158,33 +274,34 @@ public partial class LettersWindow : Window
         picker.Content = panel;
         if (picker.ShowDialog() != true || list.SelectedIndex < 0) return;
         var chosen = choices[list.SelectedIndex];
-        var current = _archive.Sql.Get(chosen.Id);
-        if (current.Revision != chosen.Revision || !LetterContext.CanAttach(current))
-            throw new InvalidOperationException("Письмо изменилось. Повторите выбор.");
-        LetterContext.AttachDraft(current, obj.Id, obj.Name, _contractContext?.Id, _contractContext?.Title ?? "");
-        _archive.Sql.Save(current, validateContext: true);
-        Refresh();
+        await Task.Run(() =>
+        {
+            var current = archive.Sql.Get(chosen.Id);
+            if (current.Revision != chosen.Revision || !LetterContext.CanAttach(current))
+                throw new InvalidOperationException("Письмо изменилось. Повторите выбор.");
+            LetterContext.AttachDraft(current, obj.Id, obj.Name, _contractContext?.Id, _contractContext?.Title ?? "");
+            archive.Sql.Save(current, validateContext: true);
+        });
     });
 
-    private void Root_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void Root_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         var browse = new OpenFolderDialog { Title = "Файловый архив писем" };
         if (browse.ShowDialog(this) != true) return;
         var target = Path.GetFullPath(browse.FolderName).TrimEnd(Path.DirectorySeparatorChar);
-        if (!string.Equals(target, _archive.Root.TrimEnd(Path.DirectorySeparatorChar),
+        if (!string.Equals(target, archive.Root.TrimEnd(Path.DirectorySeparatorChar),
                 StringComparison.OrdinalIgnoreCase) &&
-            _archive.Sql.List().Any(letter => letter.Files.Count > 0 || letter.Releases.Count > 0))
+            await Task.Run(() => archive.Sql.List().Any(letter => letter.Files.Count > 0 || letter.Releases.Count > 0)))
             throw new InvalidOperationException(
                 "В архиве уже есть вложения или выпуски. Переключение папки без их переноса " +
                 "сделает файлы недоступными. Выберите сетевой архив до добавления писем " +
                 "или выполните согласованную миграцию всех файлов.");
-        var replacement = new LettersArchive(_connectionString, target);
+        var replacement = await Task.Run(() => new LettersArchive(_connectionString, target));
         _archive = replacement;
-        PersistRoot(replacement.Root);
-        Refresh();
+        await Task.Run(() => PersistRoot(replacement.Root));
     });
 
-    private void Backup_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void Backup_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         var dialog = new SaveFileDialog
         {
@@ -192,22 +309,24 @@ public partial class LettersWindow : Window
             Filter = "ZIP (*.zip)|*.zip", FileName = "Письма.zip"
         };
         if (dialog.ShowDialog(this) != true) return;
-        _archive.Backup(dialog.FileName);
+        var path = dialog.FileName;
+        await Task.Run(() => archive.Backup(path));
         MessageBox.Show(this, "Резервная копия сохранена.", "Письма");
     });
 
-    private void Restore_Click(object sender, RoutedEventArgs e) => Try(() =>
+    private async void Restore_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {
         var backup = new OpenFileDialog { Title = "ZIP-копия архива писем", Filter = "ZIP (*.zip)|*.zip" };
         if (backup.ShowDialog(this) != true) return;
-        LettersArchive.ValidateRestoreZip(backup.FileName);
+        var backupPath = backup.FileName;
+        await Task.Run(() => LettersArchive.ValidateRestoreZip(backupPath));
         var folder = new OpenFolderDialog { Title = "Новый пустой каталог восстановления" };
         if (folder.ShowDialog(this) != true) return;
         // Never replace data already present in SQL Server or an existing file archive.
-        var restored = LettersArchive.RestoreBackup(_connectionString, backup.FileName, folder.FolderName);
+        var destination = folder.FolderName;
+        var restored = await Task.Run(() => LettersArchive.RestoreBackup(_connectionString, backupPath, destination));
         _archive = restored;
-        PersistRoot(restored.Root);
-        Refresh();
+        await Task.Run(() => PersistRoot(restored.Root));
         MessageBox.Show(this, "Архив восстановлен в новом каталоге.", "Письма");
     });
 }

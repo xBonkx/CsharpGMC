@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using GmcSmeta.Core.Db;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Domain;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
@@ -272,7 +273,12 @@ public sealed class LettersArchive
         if (zipPath.StartsWith(Root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
             StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Копия должна находиться вне действующего архива.");
-        using var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create);
+        ExportFilePublication.Write(zipPath, stream => WriteBackup(stream));
+    }
+
+    private void WriteBackup(Stream stream)
+    {
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
         var letters = Sql.List();
         static void AddJson(ZipArchive archive, string name, object value)
         {

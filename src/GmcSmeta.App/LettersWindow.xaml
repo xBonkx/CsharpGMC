@@ -8,7 +8,7 @@
     <DockPanel Margin="14">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <TextBlock x:Name="ArchivePath" Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,10"/>
-            <WrapPanel Margin="0,0,0,10">
+            <WrapPanel x:Name="ActionPanel" Margin="0,0,0,10" IsEnabled="False">
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Новое письмо" Click="New_Click" Padding="14,6" Margin="0,0,6,6"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="Open_Click" Padding="14,6" Margin="0,0,6,6"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать" Click="Copy_Click" Padding="14,6" Margin="0,0,6,6"/>
@@ -18,7 +18,7 @@
                 <Button Style="{StaticResource PythonToolbarButton}" x:Name="AttachExistingButton" Content="Добавить ранее созданное письмо…" Click="AttachExisting_Click" Visibility="Collapsed" Padding="14,6" Margin="0,0,6,6"/>
             </WrapPanel>
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="175"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="175"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <Grid Grid.Column="0" Margin="0,0,10,0">
                     <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" Height="32"
                              Background="#FFFFFF" BorderBrush="#D0D7E2" Padding="10,5"
@@ -43,6 +43,9 @@
                     <ComboBoxItem Content="Черновик"/>
                     <ComboBoxItem Content="Отправлено"/>
                 </ComboBox>
+                <Button x:Name="RefreshButton" Grid.Column="2" Content="Обновить"
+                        Style="{StaticResource PythonToolbarButton}" Margin="6,0,0,0"
+                        Click="Refresh_Click" IsEnabled="False"/>
             </Grid>
         </StackPanel>
         <DataGrid local:TableColumnMenu.Key="letters" x:Name="LetterList" AutoGenerateColumns="False" IsReadOnly="True"
