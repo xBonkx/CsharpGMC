@@ -9,7 +9,18 @@ public static partial class SqlServerWorkspace
 {
     public sealed record AgreementCardSnapshot(ObjectProperties Properties,
         SqlServerKsRequisites.Values Print, AgreementPresentation.Requisites? Agreement,
-        string Contractor, IReadOnlyList<ObjectTag> Tags, string Revision);
+        string Contractor, IReadOnlyList<ObjectTag> Tags, string Revision)
+    {
+        public IReadOnlyList<AgreementCardDocument> Documents { get; init; } = Array.Empty<AgreementCardDocument>();
+    }
+
+    public sealed record AgreementCardDocument(DocRow Document, string Contractor)
+    {
+        public string Name => Document.Kind == "main" ? AgreementPresentation.AnnexTitle(Document) : Document.NavigationName;
+        public string Number => Document.Number;
+        public string Date => Document.Date;
+        public bool CanEdit => !Document.Locked && !Document.IsStage;
+    }
 
     public static AgreementCardSnapshot ReadAgreementCard(string connectionString, int objectId)
     {
@@ -19,11 +30,16 @@ public static partial class SqlServerWorkspace
             var revision = SqlServerDatabase.Revision(conn);
             var properties = ReadObject(conn, objectId);
             var print = SqlServerKsRequisites.ReadShared(conn, objectId);
-            var agreement = AgreementPresentation.Resolve(Workspace.ReadObjectDocumentMetadata(conn, objectId));
-            var company = agreement is null ? "" : Companies(conn).FirstOrDefault(c => c.Id == agreement.CompanyId)?.Name ?? "";
+            var metadata = Workspace.ReadObjectDocumentMetadata(conn, objectId);
+            var agreement = AgreementPresentation.Resolve(metadata);
+            var companies = Companies(conn).ToDictionary(c => c.Id, c => c.Name);
+            string CompanyName(long? id) => id is long key && companies.TryGetValue(key, out var name) ? name : "";
+            var company = CompanyName(agreement?.CompanyId);
+            var documents = metadata.Where(d => d.Kind is "main" or "dop")
+                .Select(d => new AgreementCardDocument(d, CompanyName(d.CompanyId))).ToArray();
             var tags = ObjectTags(conn, properties.Form);
             if (!string.IsNullOrWhiteSpace(revision) && revision == SqlServerDatabase.Revision(conn))
-                return new(properties, print, agreement, company, tags, revision);
+                return new(properties, print, agreement, company, tags, revision) { Documents = documents };
         }
         throw new InvalidOperationException("Реквизиты изменились во время чтения. Откройте страницу заново.");
     }

@@ -20,6 +20,11 @@ public partial class MainWindow
         {
             if (ReferenceEquals(PageHost.Content, page)) ReloadAndSelect(target.Id);
         };
+        page.EditDocumentRequested += doc =>
+        {
+            if (ReferenceEquals(PageHost.Content, page) && doc.ObjectId == target.Id)
+                EditSqlServerContractProperties(doc, makeContract: false);
+        };
         ShowPage(page);
         StatusText.Text = target.Name + " · реквизиты договора";
     }

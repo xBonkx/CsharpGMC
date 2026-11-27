@@ -15,21 +15,43 @@
    <StackPanel x:Name="Fields" IsEnabled="False" MaxWidth="1100" HorizontalAlignment="Stretch">
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
-      <TextBlock Text="Договор" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
-      <TextBlock x:Name="AgreementText" TextWrapping="Wrap" Margin="0,8,0,4"/>
-      <TextBlock x:Name="CompanyText" TextWrapping="Wrap"/>
-      <TextBlock Text="Номер, дата и подрядчик пока берутся из приложений. При расхождениях исправьте реквизиты конкретных приложений; автоматического объединения нет." Foreground="#64748B" TextWrapping="Wrap" Margin="0,8,0,0"/>
+      <TextBlock Text="Данные договора" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
+      <Grid Margin="0,12,0,8">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+       <StackPanel Margin="0,0,8,0"><TextBlock Text="№ договора"/><TextBox x:Name="AgreementNumberBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Дата договора"/><TextBox x:Name="AgreementDateBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Подрядчик"/><TextBox x:Name="CompanyBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+      </Grid>
+      <TextBlock x:Name="AgreementText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,8"/>
+      <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
+       <StackPanel Margin="0,8,0,0">
+        <TextBlock Text="У ДС собственные номер и дата. Изменить можно только неподписанные документы, не являющиеся этапами." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <DataGrid x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column">
+         <DataGrid.Columns>
+          <DataGridTextColumn Header="Документ" Binding="{Binding Name}" Width="2*"/>
+          <DataGridTextColumn Header="№" Binding="{Binding Number}" Width="*"/>
+          <DataGridTextColumn Header="Дата" Binding="{Binding Date}" Width="*"/>
+          <DataGridTextColumn Header="Подрядчик" Binding="{Binding Contractor}" Width="2*"/>
+          <DataGridTemplateColumn Header="" Width="Auto">
+           <DataGridTemplateColumn.CellTemplate><DataTemplate>
+            <Button Content="Изменить…" Style="{StaticResource PythonToolbarButton}" IsEnabled="{Binding CanEdit}" Click="EditDocument_Click" Padding="6,2"/>
+           </DataTemplate></DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+         </DataGrid.Columns>
+        </DataGrid>
+       </StackPanel>
+      </Expander>
      </StackPanel>
     </Border>
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
-      <TextBlock Text="Основные сведения" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold" Margin="0,0,0,12"/>
-      <TextBlock Text="Название карточки"/>
+      <TextBlock Text="Объект и основные сведения" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold" Margin="0,0,0,12"/>
+      <TextBlock Text="Название объекта (в дереве)"/>
       <TextBox x:Name="NameBox" MinHeight="32" Margin="0,4,0,10"/>
       <Grid Margin="0,0,0,10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
        <StackPanel Margin="0,0,8,0"><TextBlock Text="Заказчик (кратко)"/><TextBox x:Name="CustomerBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Адрес"/><TextBox x:Name="AddressBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Адрес объекта"/><TextBox x:Name="AddressBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
       </Grid>
       <TextBlock Text="Папка документов"/>
       <DockPanel Margin="0,4,0,10">

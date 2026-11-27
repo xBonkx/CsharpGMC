@@ -46,6 +46,13 @@ public sealed class AgreementCardTests
         var view = File.ReadAllText(Path.Combine(app, "MainWindow.AgreementCard.cs"));
         Assert.Contains("ShowPage(page);", view);
         Assert.DoesNotContain("ShowDialog", view);
+        Assert.Contains("EditSqlServerContractProperties(doc, makeContract: false);", view);
+        var markup = File.ReadAllText(Path.Combine(app, "AgreementCardView.xaml"));
+        Assert.Contains("Название объекта (в дереве)", markup);
+        Assert.Contains("x:Name=\"AgreementNumberBox\" IsReadOnly=\"True\"", markup);
+        Assert.Contains("x:Name=\"AgreementDateBox\" IsReadOnly=\"True\"", markup);
+        Assert.Contains("x:Name=\"CompanyBox\" IsReadOnly=\"True\"", markup);
+        Assert.Contains("x:Name=\"SourceGrid\"", markup);
         var write = File.ReadAllText(Path.Combine(db, "SqlServerWorkspace.AgreementCard.cs"));
         Assert.Contains("CheckRevision(conn, tx, expectedRevision);", write);
         Assert.Contains("UPDATE dbo.objects SET", write);

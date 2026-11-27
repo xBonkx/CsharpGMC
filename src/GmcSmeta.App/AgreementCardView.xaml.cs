@@ -14,6 +14,7 @@ public partial class AgreementCardView : UserControl
     private bool _saving;
     public event Action? BackRequested;
     public event Action? Saved;
+    public event Action<DocRow>? EditDocumentRequested;
 
     public AgreementCardView(string connection, int objectId)
     {
@@ -35,8 +36,18 @@ public partial class AgreementCardView : UserControl
             var p = snapshot.Properties;
             var v = snapshot.Print;
             TitleText.Text = p.Name;
-            AgreementText.Text = snapshot.Agreement?.Heading ?? "Реквизиты договора не определены однозначно";
-            CompanyText.Text = "Подрядчик: " + (snapshot.Contractor.Length == 0 ? "не определён" : snapshot.Contractor);
+            var agreement = snapshot.Agreement;
+            AgreementNumberBox.Text = agreement?.Number ?? "Не определён";
+            AgreementDateBox.Text = agreement?.Date ?? "Не определена";
+            CompanyBox.Text = snapshot.Contractor.Length == 0 ? "Не определён" : snapshot.Contractor;
+            AgreementText.Text = agreement is null
+                ? "Единые реквизиты не подтверждены. Проверьте номера, даты, подрядчиков и основания ДС в списке ниже."
+                : "Общие номер, дата и подрядчик подтверждены реквизитами приложений.";
+            SourceGrid.ItemsSource = snapshot.Documents;
+            SourceExpander.IsExpanded = agreement is null;
+            SourceExpander.Visibility = snapshot.Documents.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+            if (snapshot.Documents.Count == 0)
+                AgreementText.Text = "Приложений пока нет. Самостоятельные юридические реквизиты карточки ещё не поддерживаются.";
             NameBox.Text = p.Name;
             CustomerBox.Text = p.Customer;
             AddressBox.Text = p.Address;
@@ -100,11 +111,25 @@ public partial class AgreementCardView : UserControl
         if (IsLoaded) Saved?.Invoke();
     }
 
+    private bool HasUnsavedChanges() => _snapshot is { } snapshot &&
+        (ReadProperties() != snapshot.Properties || ReadPrint(snapshot.Print) != snapshot.Print);
+
+    private void EditDocument_Click(object sender, RoutedEventArgs e)
+    {
+        if (_saving || sender is not Button { DataContext: SqlServerWorkspace.AgreementCardDocument { CanEdit: true } source }) return;
+        if (HasUnsavedChanges())
+        {
+            StatusText.Text = "Сначала сохраните общие реквизиты или вернитесь к карточке без сохранения.";
+            return;
+        }
+        EditDocumentRequested?.Invoke(source.Document);
+    }
+
     private void Back_Click(object sender, RoutedEventArgs e)
     {
         if (_saving) return;
-        if (_snapshot is { } snapshot && (ReadProperties() != snapshot.Properties || ReadPrint(snapshot.Print) != snapshot.Print)
-            && MessageBox.Show(Window.GetWindow(this), "Вернуться без сохранения изменений?", "Реквизиты",
+        if (HasUnsavedChanges() &&
+            MessageBox.Show(Window.GetWindow(this), "Вернуться без сохранения изменений?", "Реквизиты",
                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         BackRequested?.Invoke();
     }
