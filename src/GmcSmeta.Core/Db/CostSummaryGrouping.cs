@@ -60,10 +60,13 @@ public static class CostSummaryGrouping
         var result = new List<Group>();
         if (mode == "kp")
         {
+            // Index once after sorting, preserving member order and empty
+            // systems. Avoid scanning every position for every system.
+            var bySystem = rows.ToLookup(r => r.SystemId);
             foreach (var sy in data.Systems)
             {
-                var members = rows.Where(r => r.SystemId == sy.Id).ToList();
-                result.Add(new Group("sys:" + sy.Id, sy.Label, members, true, members.Count == 0));
+                var members = bySystem[sy.Id].ToArray();
+                result.Add(new Group("sys:" + sy.Id, sy.Label, members, true, members.Length == 0));
             }
             return result;
         }

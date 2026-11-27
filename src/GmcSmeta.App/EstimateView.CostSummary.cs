@@ -360,8 +360,11 @@ public partial class EstimateView
             var list = SortRecs(merged);
             foreach (var m in list)
                 AddStripe(SummaryRowFromRec(m, kinds: markKinds));
-            totMCost = list.Sum(x => x.MCost); totMSell = list.Sum(x => x.MSell);
-            totWCost = list.Sum(x => x.WCost); totWSell = list.Sum(x => x.WSell);
+            foreach (var item in list)
+            {
+                totMCost += item.MCost; totMSell += item.MSell;
+                totWCost += item.WCost; totWSell += item.WSell;
+            }
         }
         else
         {
@@ -387,10 +390,11 @@ public partial class EstimateView
             foreach (var (title, sysId, supplierKey, items) in groups)
             {
                 var sorted = SortRecs(items);
-                built.Add(SummaryRowFromGroup(sysId, supplierKey, title, sorted, chosen));
+                var amounts = AccumulateSummaryGroup(sorted);
+                built.Add(SummaryRowFromGroup(sysId, supplierKey, title, sorted, amounts));
                 // Сворачивание скрывает только детали, не исключает систему из итогов.
-                totMCost += sorted.Sum(x => x.MCost); totMSell += sorted.Sum(x => x.MSell);
-                totWCost += sorted.Sum(x => x.WCost); totWSell += sorted.Sum(x => x.WSell);
+                totMCost += amounts.MaterialCost; totMSell += amounts.MaterialSell;
+                totWCost += amounts.WorkCost; totWSell += amounts.WorkSell;
                 if (SummaryGroupCollapsed(sysId, supplierKey))
                     continue;
                 foreach (var r in sorted)
@@ -718,26 +722,25 @@ public partial class EstimateView
     }
 
     /// <summary>Шапка системы / поставщика: суммы группы и цены, вписываемые во все строки.</summary>
-    private SummaryRow SummaryRowFromGroup(long systemId, string? supplierKey, string title, List<SummaryRec> items, HashSet<string> chosen)
+    private SummaryRow SummaryRowFromGroup(long systemId, string? supplierKey, string title,
+        List<SummaryRec> items, SummaryGroupAccumulator amounts)
     {
-        decimal mCost = items.Sum(x => x.MCost), mSell = items.Sum(x => x.MSell);
-        decimal wCost = items.Sum(x => x.WCost), wSell = items.Sum(x => x.WSell);
+        var mCost = amounts.MaterialCost;
+        var mSell = amounts.MaterialSell;
+        var wCost = amounts.WorkCost;
+        var wSell = amounts.WorkSell;
 
-        static (string Text, string Raw, bool Uniform) Price(
-            Func<SummaryRec, decimal?> get, Func<SummaryRec, bool> differs, List<SummaryRec> list)
+        static (string Text, string Raw, bool Uniform) Price(SummaryGroupAccumulator.UniformPrice price)
         {
-            if (list.Any(differs)) return ("", "", false);
-            var values = list.Select(get).ToHashSet();
-            if (values.Count == 1 && values.First() is decimal v)
+            if (price.Value is decimal v)
                 return (v != 0m ? Money.Format(v) : "", NumberText.QtyText(v), true);
-            // All missing is uniform too; only differing prices get the mixed-price tip.
-            return ("", "", values.Count == 1);
+            return ("", "", price.IsUniform);
         }
 
-        var cost = Price(x => x.UCost, x => x.UCostDiff, items);
-        var price = Price(x => x.UPrice, x => x.UPriceDiff, items);
-        var wcost = Price(x => x.UWcost, x => x.UWcostDiff, items);
-        var wsell = Price(x => x.UWsell, x => x.UWsellDiff, items);
+        var cost = Price(amounts.MaterialUnitCost);
+        var price = Price(amounts.MaterialUnitSell);
+        var wcost = Price(amounts.WorkUnitCost);
+        var wsell = Price(amounts.WorkUnitSell);
         static string Tip(string what, bool uniform, int n) =>
             $"Впишите {what} — получат все {n} строк этой группы" + (uniform ? "" : " (сейчас цены у них разные)");
 
@@ -766,10 +769,10 @@ public partial class EstimateView
             WorkMarginText = MarginText(wCost, wSell),
             MatMarginNeg = MarginNeg(mCost, mSell),
             WorkMarginNeg = MarginNeg(wCost, wSell),
-            NoCost = items.Any(x => x.NoCost),
-            NoPrice = items.Any(x => x.NoPrice),
-            NowCost = items.Any(x => x.NowCost),
-            NowSell = items.Any(x => x.NowSell),
+            NoCost = amounts.NoCost,
+            NoPrice = amounts.NoPrice,
+            NowCost = amounts.NowCost,
+            NowSell = amounts.NowSell,
         };
     }
 

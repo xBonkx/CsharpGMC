@@ -208,4 +208,27 @@ public sealed class SqlServerCostSummaryProjectionTests
         Assert.Equal(2, CostSummaryGrouping.Build(data, "kp", "kp").Count(x => x.IsEmpty));
     }
 
+
+    [Fact]
+    public void ManySystemsKeepSortedMembershipAndEmptyHeaders()
+    {
+        var rows = Enumerable.Range(1, 25000).Select(i => new CostSummaryRow(
+            i, i % 200 + 1, "Позиция " + i % 29, "шт", 1, "",
+            i, i + 1, 0, 0, false, false, false, false, i % 23, i,
+            null, null, false, null, false, false)).ToArray();
+        var data = new CostSummaryData(
+            Enumerable.Range(1, 202).Select(i => ((long)i, "Система " + i, false)).ToArray(),
+            rows, Array.Empty<(string, decimal, decimal, string)>(), Array.Empty<string>(), 0);
+        var groups = CostSummaryGrouping.Build(data, "kp", "cost_down");
+        Assert.Equal(202, groups.Count);
+        Assert.Equal(25000, groups.Sum(g => g.Rows.Count));
+        Assert.Equal(2, groups.Count(g => g.IsEmpty));
+        var ordered = rows.OrderBy(r => r.UCost is null ? 1 : 0)
+            .ThenByDescending(r => r.UCost ?? 0m)
+            .ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        for (var i = 0; i < groups.Count; i++)
+            Assert.Equal(ordered.Where(r => r.SystemId == i + 1).Select(r => r.Id),
+                groups[i].Rows.Select(r => r.Id));
+    }
+
 }
