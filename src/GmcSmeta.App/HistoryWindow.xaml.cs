@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 
@@ -19,7 +20,8 @@ public partial class HistoryWindow : Window
     private static readonly Brush UndoTint = Frozen(0xFF, 0xF7, 0xE6);
     private static readonly Brush CreateTint = Frozen(0xEC, 0xFD, 0xF3);
 
-    private readonly List<Row> _all = [];
+    private IReadOnlyList<Row> _all = Array.Empty<Row>();
+    private readonly DispatcherTimer _searchTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private string _summaryText = "";
     private bool _historyLoaded;
     private CancellationTokenSource? _loadCancellation;
@@ -31,7 +33,8 @@ public partial class HistoryWindow : Window
         TitleText.Text = Title;
         SubtitleText.Text = "Загрузка истории…";
         Loaded += async (_, _) => await LoadHistoryAsync(connectionString, contractId);
-        Closed += (_, _) => _loadCancellation?.Cancel();
+        _searchTimer.Tick += (_, _) => { _searchTimer.Stop(); ApplyFilter(); };
+        Closed += (_, _) => { _loadCancellation?.Cancel(); _searchTimer.Stop(); };
     }
 
     private async Task LoadHistoryAsync(string connectionString, long? contractId)
@@ -77,7 +80,7 @@ public partial class HistoryWindow : Window
             }
             if (scope is not null) Title = $"История: {scope.Title}";
             TitleText.Text = Title;
-            _all.AddRange(snapshot.Rows);
+            _all = snapshot.Rows;
             _summaryText = scope is null
                 ? $"Все действия в базе — последние {SqlServerHistory.Limit}"
                 : $"{scope.ObjectName} · всё, что меняли в этом документе (и ведомости объекта), свежее сверху";
@@ -98,7 +101,13 @@ public partial class HistoryWindow : Window
         }
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_historyLoaded) return;
+        _searchTimer.Stop();
+        if (string.IsNullOrWhiteSpace(SearchBox.Text)) ApplyFilter();
+        else _searchTimer.Start();
+    }
 
     private void ClearSearch_Click(object sender, RoutedEventArgs e)
     {
@@ -111,8 +120,10 @@ public partial class HistoryWindow : Window
         // Если договор не найден, не затираем сообщение о причине пустой истории.
         if (!_historyLoaded) return;
 
-        var shown = _all
-            .Where(row => HistoryPresentation.MatchesWords(SearchBox.Text, row.SearchLine))
+        _searchTimer.Stop();
+        var words = HistoryPresentation.SearchWords(SearchBox.Text);
+        IReadOnlyList<Row> shown = words.Length == 0 ? _all : _all
+            .Where(row => HistoryPresentation.MatchesSearchWords(words, row.SearchLine))
             .ToList();
         HistoryGrid.ItemsSource = shown;
         SubtitleText.Text = $"{_summaryText}. Показано: {shown.Count} из {_all.Count}";

@@ -72,12 +72,20 @@ internal sealed class ExcelImportPreviewWindow : Window
 
     public long? ObjectId => (_objects.SelectedItem as Target)?.Id;
     public string NewObjectName => _newName.Text.Trim();
-    public IReadOnlyList<ExcelImportChoice> Choices => _rows.Where(r => r.Selected)
-        .Select(r => new ExcelImportChoice(r.Block, r.Kind, r.Number.Trim(),
-            r.Date.Trim(), r.Name.Trim(), r.Kind == "dop" ? (_baseDocs.SelectedItem as BaseDocument)?.Id : null,
-            r.Kind == "main" ? (_annexCompany.SelectedItem as CompanyInfo)?.Id :
-            r.Kind == "dop" ? SelectedBaseCompany() : null))
-        .ToList();
+    public IReadOnlyList<ExcelImportChoice> Choices
+    {
+        get
+        {
+            var baseId = (_baseDocs.SelectedItem as BaseDocument)?.Id;
+            var annexCompany = (_annexCompany.SelectedItem as CompanyInfo)?.Id;
+            var baseCompany = SelectedBaseCompany();
+            return _rows.Where(r => r.Selected)
+                .Select(r => new ExcelImportChoice(r.Block, r.Kind, r.Number.Trim(),
+                    r.Date.Trim(), r.Name.Trim(), r.Kind == "dop" ? baseId : null,
+                    r.Kind == "main" ? annexCompany : r.Kind == "dop" ? baseCompany : null))
+                .ToList();
+        }
+    }
 
     public ExcelImportPreviewWindow(Window parent, ExcelImportResult result,
         IEnumerable<ObjectRow> objects, IEnumerable<DocRow> docs,
@@ -262,9 +270,31 @@ internal sealed class ExcelImportPreviewWindow : Window
         _table.Items.Refresh();
     }
 
+    private PreviewRow? _reportRow;
+    private string _reportBody = "";
+
     private void ShowReport()
     {
         if (_table.SelectedItem is not PreviewRow row) return;
+        var b = row.Block;
+        // Changing only the target changes the duplicate warning, not the
+        // immutable parsed workbook's reconciliation and section totals.
+        if (!ReferenceEquals(_reportRow, row))
+        {
+            _reportBody = BuildReport(row);
+            _reportRow = row;
+        }
+        var duplicate = ObjectId is long id && _alreadyLoaded.TryGetValue(id, out var sheets) &&
+            sheets.Contains(Path.GetFileName(_result.FileName) + "|" + b.Sheet);
+        var text = duplicate
+            ? "⚠ Этот файл и лист уже загружены в выбранную карточку. Повторный импорт заблокирован.\n" +
+                Environment.NewLine + _reportBody
+            : _reportBody;
+        if (_report.Text != text) _report.Text = text;
+    }
+
+    private string BuildReport(PreviewRow row)
+    {
         var b = row.Block;
         var info = new List<string>
         {
@@ -283,15 +313,12 @@ internal sealed class ExcelImportPreviewWindow : Window
         info.Add(""); info.Add("Проверки:");
         foreach (var check in b.Checks) info.Add($"  {(check.Passed ? "✓" : "✗")} {check.Description}");
         foreach (var warning in b.Warnings) info.Add("  ⚠ " + warning);
-        if (ObjectId is long id && _alreadyLoaded.TryGetValue(id, out var sheets) &&
-            sheets.Contains(Path.GetFileName(_result.FileName) + "|" + b.Sheet))
-            info.Insert(0, "⚠ Этот файл и лист уже загружены в выбранную карточку. Повторный импорт заблокирован.\n");
         if (_result.Notes.Count > 0)
         {
             info.Add(""); info.Add("По файлу:");
             info.AddRange(_result.Notes);
         }
-        _report.Text = string.Join(Environment.NewLine, info);
+        return string.Join(Environment.NewLine, info);
     }
 
     private void Confirm()

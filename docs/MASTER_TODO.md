@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 129e66a) — PERF-047 PARTIAL: asynchronous guarded trash mutations, debounced/pre-tokenized history filter, cached immutable Excel import report and no-op safe-choice refresh. Tests added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 7a1fb49) — PERF-016/041/044 PARTIAL: linear clipboard copy projection, indexed large replacement guard, allocation-light formula references and frozen adorner palette. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 1ff3723) — PERF-040/041 PARTIAL: range-based estimate position-block sorting, direct unsorted flat projection, no full search membership set on blank missing-price filter, precomputed sort direction/field in estimate/group projection, lazy area lookup and empty selection fast path. Tests added, not run; see performance TODO.

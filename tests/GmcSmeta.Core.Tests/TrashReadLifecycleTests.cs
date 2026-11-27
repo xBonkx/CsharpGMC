@@ -28,7 +28,12 @@ public sealed class TrashReadLifecycleTests
         Assert.Contains("if (token.IsCancellationRequested || !IsLoaded) return;", source);
         Assert.Contains("if (!_commitUncertain)", source);
         Assert.Contains("_revision = snapshot.Revision;", source);
-        Assert.Contains("_commitUncertain || string.IsNullOrWhiteSpace(_revision)", source);
+        Assert.Contains("_mutationBusy || _commitUncertain || string.IsNullOrWhiteSpace(_revision)", source);
+        Assert.Contains("if (_mutationBusy) e.Cancel = true;", source);
+        Assert.Contains("await Task.Run(() => SqlServerTrash.Restore(_connectionString, id, revision))", source);
+        Assert.Contains("await Task.Run(() => SqlServerTrash.Forget(_connectionString, id, revision))", source);
+        Assert.Contains("finally { EndMutation(); }", source);
+        Assert.Contains("if (Restored is not null) DialogResult = true;", source);
         Assert.Contains("SqlServerTrash.Restore(_connectionString, id, revision)", source);
         Assert.Contains("SqlServerTrash.Forget(_connectionString, id, revision)", source);
         Assert.Contains("BlockUncertainCommit()", source);

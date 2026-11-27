@@ -100,12 +100,19 @@ public static class HistoryPresentation
     /// Поиск history_dialog.apply: все слова запроса должны встречаться в одной
     /// строке без учёта регистра. Пустой запрос не скрывает ни одной строки.
     /// </summary>
-    public static bool MatchesWords(string? query, string? line)
+    public static string[] SearchWords(string? query) =>
+        string.IsNullOrWhiteSpace(query) ? Array.Empty<string>() :
+            query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+    public static bool MatchesWords(string? query, string? line) =>
+        MatchesSearchWords(SearchWords(query), line);
+
+    public static bool MatchesSearchWords(IReadOnlyList<string> words, string? line)
     {
-        if (string.IsNullOrWhiteSpace(query)) return true;
-        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var text = line ?? "";
-        return words.All(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
+        foreach (var word in words)
+            if (!text.Contains(word, StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
     }
 
     /// <summary>Дата как в Python: dd.MM.yyyy HH:mm, пустая дата — пустая строка.</summary>

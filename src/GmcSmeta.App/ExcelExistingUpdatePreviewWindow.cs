@@ -442,9 +442,15 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     private void ChooseSafe(bool selected)
     {
         if (_closed || _busy || Plan is not { } plan || !CommitGrid()) return;
+        var changed = false;
         foreach (var row in plan.Differences)
-            row.Apply = selected && row.SafeForBulk;
-        _grid.Items.Refresh();
+        {
+            var apply = selected && row.SafeForBulk;
+            if (row.Apply == apply) continue;
+            row.Apply = apply;
+            changed = true;
+        }
+        if (changed) _grid.Items.Refresh();
     }
 
     private bool CommitGrid() =>

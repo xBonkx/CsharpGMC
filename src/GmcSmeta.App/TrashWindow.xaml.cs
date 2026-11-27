@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
@@ -17,6 +18,7 @@ public partial class TrashWindow : Window
     private readonly string _connectionString;
     private string _revision = "";
     private bool _commitUncertain;
+    private bool _mutationBusy;
     private CancellationTokenSource? _loadCancellation;
 
     /// <summary>("object" | "contract", новый id) для главного окна, как TrashDialog.restored.</summary>
@@ -85,18 +87,42 @@ public partial class TrashWindow : Window
 
     private long? CurrentId() => TrashGrid.SelectedItem is Row row ? row.Id : null;
 
+    // Do not let a close/cancel or a second action abandon an outstanding
+    // mutation acknowledgement. Read-only initial loading remains cancellable.
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (_mutationBusy) e.Cancel = true;
+    }
+
+    private void BeginMutation()
+    {
+        _mutationBusy = true;
+        _revision = "";
+        TrashGrid.IsEnabled = false;
+        RestoreButton.IsEnabled = ForgetButton.IsEnabled = false;
+        EmptyText.Text = "Операция в SQL Server…";
+        EmptyText.Visibility = Visibility.Visible;
+    }
+
+    private void EndMutation()
+    {
+        _mutationBusy = false;
+        TrashGrid.IsEnabled = true;
+    }
+
     private async void Restore_Click(object sender, RoutedEventArgs e) => await RestoreAsync();
 
     private async void Forget_Click(object sender, RoutedEventArgs e) => await ForgetAsync();
 
     private async Task RestoreAsync()
     {
-        if (_commitUncertain || string.IsNullOrWhiteSpace(_revision) || CurrentId() is not long id) return;
+        if (_mutationBusy || _commitUncertain || string.IsNullOrWhiteSpace(_revision) || CurrentId() is not long id) return;
         var revision = _revision;
+        BeginMutation();
         try
         {
-            Restored = SqlServerTrash.Restore(_connectionString, id, revision);
-            DialogResult = true;                     // главное окно показывает восстановленное
+            Restored = await Task.Run(() => SqlServerTrash.Restore(_connectionString, id, revision));
         }
         catch (Exception ex)
         {
@@ -109,20 +135,23 @@ public partial class TrashWindow : Window
                 "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
             await SafeReloadAsync();
         }
+        finally { EndMutation(); }
+        if (Restored is not null) DialogResult = true; // main window opens the restored item
     }
 
     private async Task ForgetAsync()
     {
-        if (_commitUncertain || string.IsNullOrWhiteSpace(_revision) ||
+        if (_mutationBusy || _commitUncertain || string.IsNullOrWhiteSpace(_revision) ||
             TrashGrid.SelectedItem is not Row row) return;
         var id = row.Id;
         var revision = _revision;
         if (MessageBox.Show(this, $"Удалить навсегда «{row.Title}»? Вернуть будет уже нельзя.",
                 "Удалить навсегда", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (_mutationBusy || _revision != revision || CurrentId() != id || _commitUncertain) return;
+        BeginMutation();
         try
         {
-            if (_revision != revision || CurrentId() != id || _commitUncertain) return;
-            if (!SqlServerTrash.Forget(_connectionString, id, revision))
+            if (!await Task.Run(() => SqlServerTrash.Forget(_connectionString, id, revision)))
                 throw new InvalidOperationException("Запись корзины уже отсутствует. Обновите список.");
         }
         catch (Exception ex)
@@ -134,7 +163,11 @@ public partial class TrashWindow : Window
                 "\nНе повторяйте удаление до проверки состояния сервера." : ""),
                 "Корзина", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        await SafeReloadAsync();
+        finally
+        {
+            try { await SafeReloadAsync(); }
+            finally { EndMutation(); }
+        }
     }
 
     private void BlockUncertainCommit()
