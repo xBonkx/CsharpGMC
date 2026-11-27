@@ -15,7 +15,7 @@ internal sealed class ExcelImportPreviewWindow : Window
 {
     private sealed record DocumentKind(string Key, string Label);
     private static readonly DocumentKind[] DocumentKinds =
-        { new("kp", "КП"), new("main", "Договор"), new("dop", "Допсоглашение") };
+        { new("kp", "КП"), new("main", "Приложение"), new("dop", "Допсоглашение") };
 
     private sealed record Target(long? Id, string Title)
     {
@@ -82,7 +82,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         _result = result;
         _docs = docs.ToList();
         _alreadyLoaded = alreadyLoaded;
-        Title = "Импорт КП — " + Path.GetFileName(result.FileName);
+        Title = "Импорт документов — " + Path.GetFileName(result.FileName);
         Width = 1250; Height = 720; MinWidth = 880; MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = System.Windows.Media.Brushes.White;
@@ -102,15 +102,15 @@ internal sealed class ExcelImportPreviewWindow : Window
         target.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         target.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         target.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        target.Children.Add(Label("Объект:"));
-        _objects.Items.Add(new Target(null, "➕ Новый объект…"));
+        target.Children.Add(Label("Договор / группа КП:"));
+        _objects.Items.Add(new Target(null, "➕ Новая карточка…"));
         foreach (var obj in objects.Where(x => !x.Archived))
             _objects.Items.Add(new Target(obj.Id, obj.Name));
         _objects.SelectedItem = _objects.Items.OfType<Target>().FirstOrDefault(x => x.Id == defaultObjectId) ??
                                 _objects.Items[0];
         Grid.SetColumn(_objects, 1);
         target.Children.Add(_objects);
-        var nameLabel = Label("Название нового объекта:");
+        var nameLabel = Label("Название новой карточки:");
         Grid.SetRow(nameLabel, 1);
         nameLabel.Margin = new Thickness(0, 6, 8, 0);
         target.Children.Add(nameLabel);
@@ -122,8 +122,9 @@ internal sealed class ExcelImportPreviewWindow : Window
         Grid.SetRow(target, 0); layout.Children.Add(target);
 
         var meta = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-        meta.Children.Add(Label("Найденные в файле КП (отметьте, что загружать):"));
-        meta.Children.Add(new TextBlock { Text = "Основание ДС:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
+        meta.Children.Add(Label("Найденные документы (отметьте, что загружать):"));
+        meta.Children.Add(new TextBlock { Text = "Общее основание выбранных ДС:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
+        _baseDocs.ToolTip = "Выберите основание явно. Все отмеченные ДС будут связаны с одним выбранным документом. Для разных оснований импортируйте отдельно.";
         meta.Children.Add(_baseDocs);
         Grid.SetRow(meta, 1); layout.Children.Add(meta);
 
@@ -189,7 +190,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         _objects.SelectionChanged += (_, _) => { UpdateTarget(); ShowReport(); };
         UpdateTarget();
         if (_rows.Count > 0) _table.SelectedIndex = 0;
-        else _report.Text = "В файле не найдены таблицы КП.\n" + string.Join("\n", result.Notes);
+        else _report.Text = "В файле не найдены таблицы смет.\n" + string.Join("\n", result.Notes);
         _confirm.IsEnabled = _rows.Count > 0;
     }
 
@@ -215,8 +216,10 @@ internal sealed class ExcelImportPreviewWindow : Window
         _newName.IsEnabled = ObjectId is null;
         _baseDocs.Items.Clear();
         foreach (var d in _docs.Where(d => d.ObjectId == ObjectId && d.Kind is "main" or "kp" && !d.IsStage))
-            _baseDocs.Items.Add(new BaseDocument(d.Id, d.Title));
-        if (_baseDocs.Items.Count > 0) _baseDocs.SelectedIndex = 0;
+            _baseDocs.Items.Add(new BaseDocument(d.Id, d.Kind == "main"
+                ? AgreementPresentation.FullAnnexTitle(d) : d.Title));
+        // Never attach an imported DS to the first document by list order.
+        _baseDocs.SelectedIndex = -1;
     }
 
     private void ShowReport()
@@ -242,7 +245,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         foreach (var warning in b.Warnings) info.Add("  ⚠ " + warning);
         if (ObjectId is long id && _alreadyLoaded.TryGetValue(id, out var sheets) &&
             sheets.Contains(Path.GetFileName(_result.FileName) + "|" + b.Sheet))
-            info.Insert(0, "⚠ Этот файл и лист уже загружены в объект. Повторный импорт заблокирован.\n");
+            info.Insert(0, "⚠ Этот файл и лист уже загружены в выбранную карточку. Повторный импорт заблокирован.\n");
         if (_result.Notes.Count > 0)
         {
             info.Add(""); info.Add("По файлу:");
@@ -258,31 +261,36 @@ internal sealed class ExcelImportPreviewWindow : Window
         var selections = Choices;
         if (selections.Count == 0)
         {
-            MessageBox.Show(this, "Отметь хотя бы один КП.", "Импорт", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "Отметь хотя бы один документ.", "Импорт", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (ObjectId is null && NewObjectName.Length == 0)
         {
-            MessageBox.Show(this, "Укажи название нового объекта.", "Импорт", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "Укажи название новой карточки.", "Импорт", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (selections.Any(c => c.Kind == "dop" && c.BaseContractId is null))
         {
-            MessageBox.Show(this, "Для допсоглашения выбери существующий договор-основание.", "Импорт",
+            MessageBox.Show(this, "Для допсоглашений явно выбери документ-основание. Все выбранные ДС получат это основание.", "Импорт",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (ObjectId is long id && _alreadyLoaded.TryGetValue(id, out var sheets) &&
             selections.Any(c => sheets.Contains(Path.GetFileName(_result.FileName) + "|" + c.Block.Sheet)))
         {
-            MessageBox.Show(this, "Один из отмеченных листов уже был импортирован в объект.", "Повторный импорт",
+            MessageBox.Show(this, "Один из отмеченных листов уже был импортирован в выбранную карточку.", "Повторный импорт",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (selections.Any(c => !c.Block.Ok) &&
-            MessageBox.Show(this, "Для некоторых КП суммы не сходятся с файлом или нет итоговых строк.\n" +
+            MessageBox.Show(this, "Для некоторых документов суммы не сходятся с файлом или нет итоговых строк.\n" +
                 "Импортировать выбранные блоки?", "Проверка сумм", MessageBoxButton.YesNo,
                 MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (selections.Any(c => c.Kind is "main" or "dop") &&
+            MessageBox.Show(this, "Импорт использует организацию по умолчанию из справочника, а не реквизиты выбранного договора.\n" +
+                "После импорта проверь организацию, номер и дату в свойствах каждого приложения и ДС. Продолжить?",
+                "Проверка реквизитов", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes) return;
         DialogResult = true;
     }
 }

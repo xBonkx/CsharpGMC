@@ -38,5 +38,8 @@ public sealed class AgreementPresentationTests
         Assert.Null(AgreementPresentation.Resolve(new[] { one with { Date = "31.02.2025" } }));
         Assert.Equal("23.01.2025", AgreementPresentation.Resolve(new[] { one, Main(2, date: "2025-01-23") })!.Date);
         Assert.Equal("Смета 1", AgreementPresentation.NavigationName(one, shortTitle: true));
+        Assert.Equal("23.01.2025", AgreementPresentation.Resolve(new[] { one, Main(2, date: "2025-01-23 13:15:00") })!.Date);
+        Assert.Equal("Длинное название приложения", AgreementPresentation.AnnexTitle(7, " Длинное название приложения "));
+        Assert.Equal("Приложение (ID 7)", AgreementPresentation.AnnexTitle(7, " "));
     }
 }

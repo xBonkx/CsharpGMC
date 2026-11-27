@@ -499,15 +499,15 @@
                                   Content="Смета" ContentTemplate="{StaticResource IconLabelList}"/>
                     <RadioButton x:Name="ContractCostsTab" GroupName="ContractNavigation"
                                  Checked="ContractCosts_Checked" Style="{StaticResource DocumentMainTab}"
-                                 ToolTip="Встроенная вкладка договора"
+                                 ToolTip="Встроенная вкладка документа"
                                   Content="Себестоимость" ContentTemplate="{StaticResource IconLabelBuilding}"/>
                     <RadioButton x:Name="ContractProcurementTab" GroupName="ContractNavigation"
                                  Checked="ContractProcurement_Checked" Style="{StaticResource DocumentMainTab}"
-                                 ToolTip="Встроенная вкладка договора"
+                                 ToolTip="Встроенная вкладка документа"
                                   Content="Закупки" ContentTemplate="{StaticResource IconLabelDownload}"/>
                     <RadioButton x:Name="ContractShipmentsTab" GroupName="ContractNavigation"
                                  Checked="ContractShipments_Checked" Style="{StaticResource DocumentMainTab}"
-                                 ToolTip="Встроенная вкладка договора"
+                                 ToolTip="Встроенная вкладка документа"
                                   Content="Выдача" ContentTemplate="{StaticResource IconLabelUpload}"/>
                     <RadioButton x:Name="ContractActsTab"
                                   GroupName="ContractNavigation" Tag="acts"
@@ -630,7 +630,7 @@
                                 ToolTip="У КП появятся Закупки, Выдача и КС-2 / КС-3"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Создать допсоглашение к этому приложению…" Click="CreateDop_Click" Tag="{StaticResource GlyphFilePlus}" x:Name="CreateDopItem"/>
                         <Button Style="{StaticResource EstimateMenuItem}" x:Name="MoveContractItem" Content="Перенести в другой договор / группу…" Click="MoveContract_Click" Tag="{StaticResource GlyphFilePlus}"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть договоры из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphStage}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть приложения из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphStage}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сравнить с другим документом…" Click="CompareDocs_Click" Tag="{StaticResource GlyphList}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>
                         <TextBlock Text="ЦЕНЫ" Style="{StaticResource EstimateMenuHeader}"/>

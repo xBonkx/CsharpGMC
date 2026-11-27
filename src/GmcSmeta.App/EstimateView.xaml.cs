@@ -244,10 +244,9 @@ public partial class EstimateView : UserControl
         ConfigureSpecialColumns();
         RequestEstimateColumnFit();
 
-        // Python kp_editor._fill_header: crumb = объект, чипы «КП» и организация, заголовок = c.title.
+        // Keep the full legal title in the tooltip; use the current snapshot, not the cached navigation row.
         var isAnnex = est.KindTitle == "Договор";
-        TitleText.Text = isAnnex && est.Title.StartsWith("Договор", StringComparison.Ordinal)
-            ? "Приложение · " + est.Title : est.Title;
+        TitleText.Text = est.AnnexDisplayTitle ?? est.Title;
         SubtitleText.Text = est.ObjectName;
         DocumentKindText.Text = isAnnex ? "Приложение" : est.KindTitle;
         CompanyText.Text = string.IsNullOrWhiteSpace(est.Company) ? "организация не указана" : est.Company;
@@ -459,7 +458,7 @@ public partial class EstimateView : UserControl
         catch (Exception ex)
         {
             MessageBox.Show(Window.GetWindow(this), ex.Message,
-                "Не удалось открыть раздел договора", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Не удалось открыть раздел документа", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

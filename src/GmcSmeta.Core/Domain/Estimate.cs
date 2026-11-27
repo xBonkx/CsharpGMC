@@ -66,6 +66,8 @@ public sealed record EstimateDocument(
     IReadOnlyList<EstimateRow> PositionsInOrder,
     ContractTotals Totals)
 {
+    // Display-only title from the same SQL snapshot as the full document title.
+    public string? AnnexDisplayTitle { get; init; }
     public EstimateStatistics Statistics { get; init; } = new(0, 0, 0);
     public string SmrMode { get; init; } = "";
     public decimal SmrPercent { get; init; }
@@ -374,6 +376,7 @@ public static partial class EstimateReader
             rows.Count(r => r.Kind == RowKind.System), inOrder.Count,
             rows, inOrder, totals)
         {
+            AnnexDisplayTitle = head.Kind == "main" ? AgreementPresentation.AnnexTitle(contractId, head.Name) : null,
             SmrMode = head.SmrMode,
             SmrPercent = head.SmrPercent,
             MoneyFromStages = head.MoneyFromStages,
@@ -403,6 +406,7 @@ public static partial class EstimateReader
     {
         public int ContractId;
         public string Title = "";
+        public string Name = "";
         public string KindTitle = "";
         public string ObjectName = "";
         public string Company = "";
@@ -438,6 +442,7 @@ public static partial class EstimateReader
             Kind = kind,
             KindTitle = kindTitle,
             Title = Title(kindTitle, Str(r, 2), Str(r, 3), Str(r, 4)),
+            Name = Str(r, 4),
             ObjectName = Str(r, 5),
             Company = Str(r, 6),
             Form = Str(r, 7),

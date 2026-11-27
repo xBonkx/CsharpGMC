@@ -27,9 +27,13 @@ public static class AgreementPresentation
         return new Requisites(number, date.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture), company);
     }
 
-    private static bool TryDate(string value, out DateTime date) =>
-        DateTime.TryParseExact(value.Trim(), new[] { "d.M.yyyy", "dd.MM.yyyy", "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss" },
+    internal static bool TryDate(string value, out DateTime date)
+    {
+        var valid = DateTime.TryParseExact(value.Trim(), new[] { "d.M.yyyy", "dd.MM.yyyy", "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss" },
             System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out date);
+        date = date.Date;
+        return valid;
+    }
 
     public static string? Heading(IEnumerable<(DocRow Document, string Company)> source)
     {
@@ -38,8 +42,10 @@ public static class AgreementPresentation
         return Resolve(documents.Select(x => x.Document))?.Heading;
     }
 
-    public static string AnnexTitle(DocRow doc) =>
-        string.IsNullOrWhiteSpace(doc.Name) ? $"Приложение (ID {doc.Id})" : doc.Name.Trim();
+    public static string AnnexTitle(int id, string name) =>
+        string.IsNullOrWhiteSpace(name) ? $"Приложение (ID {id})" : name.Trim();
+
+    public static string AnnexTitle(DocRow doc) => AnnexTitle(doc.Id, doc.Name);
 
     public static string FullAnnexTitle(DocRow doc) =>
         AnnexTitle(doc) + (string.IsNullOrWhiteSpace(doc.Number) ? "" : " · договор № " + doc.Number.Trim()) +

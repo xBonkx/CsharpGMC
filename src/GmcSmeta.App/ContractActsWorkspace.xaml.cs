@@ -468,7 +468,7 @@ public partial class ContractActsWorkspace : UserControl
         var extraDraft = decimal.Round(_extras.Sum(r => r.DraftSum), 2);
         var contractSigned = decimal.Round(signed - extraSigned, 2);
         var contractLeft = decimal.Round(total - contractSigned - pending, 2);
-        SumTotalCaption.Text = "Сдано по договору";
+        SumTotalCaption.Text = "Сдано по смете";
         SumTotalValue.Text = $"{Money.Format(contractSigned)}  ·  " +
             $"{(total == 0m ? 0m : decimal.Round(contractSigned / total * 100m, 0, MidpointRounding.ToEven)):0}%";
         SumLeftValue.Text = Money.Format(contractLeft);
@@ -476,7 +476,7 @@ public partial class ContractActsWorkspace : UserControl
         SumExtraValue.Text = Money.Format(extraSigned);
         SumExtraValue.ToolTip = $"Черновики: {Money.Format(extraDraft)}";
         SumAllValue.Text = Money.Format(signed);
-        SumAllValue.ToolTip = $"По договору {Money.Format(contractSigned)} + вне сметы {Money.Format(extraSigned)}; " +
+        SumAllValue.ToolTip = $"По смете {Money.Format(contractSigned)} + вне сметы {Money.Format(extraSigned)}; " +
             $"черновики {Money.Format(pending)}";
         ExtrasTilesPanel.Visibility = _extras.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }

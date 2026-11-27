@@ -20,4 +20,26 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("DateBox.Text = agreement.Date;", dialog);
         Assert.Contains("CompanyCombo.SelectedItem = company;", dialog);
     }
+
+    [Fact]
+    public void ExcelDsRequiresExplicitBaseAndEditorKeepsCurrentSnapshotTitle()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ExcelImportPreviewWindow.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var preview = File.ReadAllText(Path.Combine(app, "ExcelImportPreviewWindow.cs"));
+        Assert.Contains("new(\"main\", \"Приложение\")", preview);
+        Assert.Contains("_baseDocs.SelectedIndex = -1;", preview);
+        Assert.DoesNotContain("_baseDocs.SelectedIndex = 0", preview);
+        Assert.Contains("c.Kind == \"dop\" && c.BaseContractId is null", preview);
+        Assert.Contains("организацию по умолчанию", preview);
+        var editor = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("TitleText.Text = est.AnnexDisplayTitle ?? est.Title;", editor);
+        Assert.Contains("TitleText.ToolTip = $\"{est.Title}", editor);
+        var ks = File.ReadAllText(Path.Combine(app, "ContractActsWorkspace.xaml.cs"));
+        Assert.Contains("SumTotalCaption.Text = \"Сдано по смете\";", ks);
+        Assert.Contains("Totals.ReadOne(conn, contractId, token)", ks);
+    }
 }

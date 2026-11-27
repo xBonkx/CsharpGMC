@@ -27,6 +27,18 @@ public sealed class AgreementAuditTests
     }
 
     [Fact]
+    public void DateConflictsAndInvalidDatesAreReportedSeparately()
+    {
+        var rows = new[] { Main(1), Main(2) with { Date = "2025-01-23 12:00:00" },
+            Main(3) with { Date = "24.01.2025" }, Main(4) with { Date = "31.02.2025" } };
+        var findings = AgreementAudit.Inspect(rows);
+        Assert.Contains(findings, f => f.Code == "INVALID_AGREEMENT_DATE" && f.DocumentIds.SequenceEqual(new[] { 4 }));
+        Assert.Contains(findings, f => f.Code == "MULTIPLE_AGREEMENT_DATES" && f.DocumentIds.SequenceEqual(new[] { 1, 2, 3 }));
+        Assert.Contains(findings, f => f.Code == "KS_SCOPE_REVIEW");
+        Assert.Empty(AgreementAudit.Inspect(rows.Take(2)));
+    }
+
+    [Fact]
     public void MissingAndCrossCardLinksAreNotGuessed()
     {
         var rows = new[] { Main(1, number: ""), Main(2, objectId: 99),

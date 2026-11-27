@@ -21,6 +21,10 @@ public static class AgreementAudit
             if (mains.Select(d => d.Number.Trim()).Distinct(StringComparer.Ordinal).Count() > 1)
                 Add("MULTIPLE_NUMBERS", mains);
             Add("EMPTY_NUMBER", mains.Where(d => string.IsNullOrWhiteSpace(d.Number)));
+            Add("INVALID_AGREEMENT_DATE", mains.Where(d => !AgreementPresentation.TryDate(d.Date, out _)));
+            var datedMains = mains.Where(d => AgreementPresentation.TryDate(d.Date, out _)).ToArray();
+            if (datedMains.Select(d => { AgreementPresentation.TryDate(d.Date, out var date); return date; }).Distinct().Count() > 1)
+                Add("MULTIPLE_AGREEMENT_DATES", datedMains);
             Add("MISSING_COMPANY", documents.Where(d => d.CompanyId is null or <= 0));
             if (documents.Where(d => d.CompanyId is > 0).Select(d => d.CompanyId).Distinct().Count() > 1)
                 Add("MULTIPLE_COMPANIES", documents);
