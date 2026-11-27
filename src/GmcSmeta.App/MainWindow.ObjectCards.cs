@@ -19,6 +19,7 @@ public partial class MainWindow
     private async void ShowObject(ObjectRow o)
     {
         if (_startupClosed || _serverConn is null || _sqlConnectionString is not { } connectionString) return;
+        ActivateDocumentsWorkspace();
 
         // Только команды, перенесённые на SQL Server; вид страницы объекта — как в Python.
         if (ObjectRenameBox.Visibility == Visibility.Visible) EndPageRename();

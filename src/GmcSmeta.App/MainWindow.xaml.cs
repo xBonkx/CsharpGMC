@@ -67,6 +67,7 @@ public partial class MainWindow : Window
     {
         StartupTrace.Mark("main_initialize_component_begin");
         InitializeComponent();
+        Closing += (_, e) => { if (_peopleWorkspace is { } view && !view.TryLeave()) e.Cancel = true; };
         Title = WindowTitle + " — C#";
         _navigationSearchTimer = new System.Windows.Threading.DispatcherTimer(
             System.Windows.Threading.DispatcherPriority.Background)
@@ -466,6 +467,7 @@ public partial class MainWindow : Window
     private void ShowHome()
     {
         if (_serverConn is null) return;
+        ActivateDocumentsWorkspace();
         if (NavigationTree.SelectedItem is TreeViewItem node) node.IsSelected = false;
         _directorView ??= CreateDirectorView();
         ResetPageSelection();
@@ -475,6 +477,7 @@ public partial class MainWindow : Window
 
     private void ShowEmptyPage()
     {
+        ActivateDocumentsWorkspace();
         ResetPageSelection();
         ShowPage(null);
         StatusText.Text = "SQL Server · выберите объект или документ слева";
@@ -1306,6 +1309,7 @@ public partial class MainWindow : Window
     private async void OpenEstimate(int contractId, int? focusPosition = null)
     {
         if (_startupClosed || _serverConn is null || _sqlConnectionString is null) return;
+        ActivateDocumentsWorkspace();
         if (_openDocumentId == contractId)
         {
             if (focusPosition is int position && PageHost.Content is EstimateView current)
@@ -1601,6 +1605,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _startupClosed = true;
+        _peopleWorkspace?.CloseView();
         CancelEstimateCacheValidation();
         _navigationSearchTimer?.Stop();
         _estimateCacheTrimTimer?.Stop();

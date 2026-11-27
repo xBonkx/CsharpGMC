@@ -13,7 +13,7 @@ using Microsoft.Win32;
 namespace GmcSmeta.App;
 
 /// <summary>Python PeopleDialog dual-mode parity. The menu owner only calls the public constructor.</summary>
-public partial class PeopleWindow : Window
+public partial class PeopleView : UserControl
 {
     private SqlServerPeopleAccess _db = null!;
     private CancellationTokenSource? _initialCancellation;
@@ -36,13 +36,20 @@ public partial class PeopleWindow : Window
     private bool IsAccess => _objectId.HasValue;
 
     private sealed record HistoryOption(AccessHistory History, string Label);
+    internal string Title => IsAccess ? "Список на допуск" : "Люди и автомобили";
+    private Window OwnerWindow => Window.GetWindow(this) ?? throw new InvalidOperationException("Справочник не открыт.");
+    internal event Action? CloseRequested;
+    internal bool CanRestart => !_operationBusy && !_inlinePending && !_loading &&
+        !HasTextEditor(PeopleGrid) && !HasTextEditor(CarsGrid);
 
-    public PeopleWindow(string connectionString, long? objectId = null)
+    private static bool HasTextEditor(DataGrid grid) =>
+        grid.CurrentCell.IsValid && grid.CurrentCell.Column.GetCellContent(grid.CurrentCell.Item) is TextBox;
+
+    public PeopleView(string connectionString, long? objectId = null)
     {
         _loading = true;
         InitializeComponent();
         _objectId = objectId;
-        Title = IsAccess ? "Список на допуск" : "Люди и автомобили";
         TitleText.Text = Title;
         SubtitleText.Text = IsAccess ?
             "Отметьте людей и автомобили для выбранного объекта. История каждого объекта независима." :
@@ -67,20 +74,22 @@ public partial class PeopleWindow : Window
         HintText.Text = "Загрузка справочника…";
         Loaded += async (_, _) =>
         {
-            WindowState = WindowState.Maximized;
             await InitializeAsync(connectionString, content);
         };
-        Closing += (_, e) =>
-        {
-            if (_operationBusy || _inlinePending || (!_loading && (!CommitChecks() || _inlinePending)))
-                e.Cancel = true;
-        };
-        Closed += (_, _) =>
-        {
-            _closed = true;
-            _initialCancellation?.Cancel();
-            _reloadCancellation?.Cancel();
-        };
+    }
+
+    internal bool TryLeave()
+    {
+        if (_operationBusy || _inlinePending) return false;
+        return _loading || (CommitChecks() && !_inlinePending);
+    }
+
+    internal void CloseView()
+    {
+        if (_closed) return;
+        _closed = true;
+        _initialCancellation?.Cancel();
+        _reloadCancellation?.Cancel();
     }
 
     private async Task InitializeAsync(string connectionString, UIElement content)
@@ -128,8 +137,8 @@ public partial class PeopleWindow : Window
         {
             if (_closed || token.IsCancellationRequested) return;
             _revision = "";
-            MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
-            Close();
+            MessageBox.Show(OwnerWindow, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            CloseRequested?.Invoke();
         }
         finally
         {
@@ -162,19 +171,19 @@ public partial class PeopleWindow : Window
             try
             {
                 await ReloadMutationAsync();
-                MessageBox.Show(this, _registrationUncertain
+                MessageBox.Show(OwnerWindow, _registrationUncertain
                     ? "Файл списка уже создан. Проверьте запись журнала; не повторяйте экспорт."
                     : "Данные изменились в другом окне. Справочник перечитан; повторите действие.",
                     "Конфликт изменений", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(OwnerWindow, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Люди и автомобили", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(OwnerWindow, ex.Message, "Люди и автомобили", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -252,7 +261,7 @@ public partial class PeopleWindow : Window
             if (_closed || token.IsCancellationRequested) return;
             _revision = "";
             HintText.Text = "Не удалось обновить справочник. Сохранение заблокировано; измените фильтр или откройте окно заново.";
-            MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(OwnerWindow, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -419,7 +428,7 @@ public partial class PeopleWindow : Window
             item.Click += (_, _) =>
             {
                 if (IsMenuSnapshot(person, ids, revision)) action();
-                else MessageBox.Show(this, "Выбор изменился. Откройте меню снова.", Title);
+                else MessageBox.Show(OwnerWindow, "Выбор изменился. Откройте меню снова.", Title);
             };
             menu.Items.Add(item);
         }
@@ -471,7 +480,7 @@ public partial class PeopleWindow : Window
         if (!IsMenuSnapshot(person, ids, revision)) return;
         var names = string.Join(", ", entries.Take(5).Select(p => p.Name)) +
             (entries.Length > 5 ? "…" : "");
-        if (MessageBox.Show(this, $"Удалить из общей базы ({entries.Length}): {names}?\n\n" +
+        if (MessageBox.Show(OwnerWindow, $"Удалить из общей базы ({entries.Length}): {names}?\n\n" +
                 "Записи, связанные с ранее сформированными списками и приказами, будут отключены, а не удалены. " +
                 "Если сотрудник просто ушёл, лучше выбрать «Не работает у нас».",
                 "Удаление из базы", MessageBoxButton.YesNo, MessageBoxImage.Warning,
@@ -481,7 +490,7 @@ public partial class PeopleWindow : Window
         var checkedIds = person ? _checkedPeople : _checkedCars;
         foreach (var id in ids) checkedIds.Remove(id);
         await ReloadMutationAsync();
-        MessageBox.Show(this, $"Удалено: {result.Deleted}. Отключено (есть история): {result.Deactivated}.",
+        MessageBox.Show(OwnerWindow, $"Удалено: {result.Deleted}. Отключено (есть история): {result.Deactivated}.",
             Title, MessageBoxButton.OK, MessageBoxImage.Information);
     });
     private async void Move(bool person, int delta)
@@ -525,7 +534,7 @@ public partial class PeopleWindow : Window
     {
         var dialog = new Window
         {
-            Title = title, Owner = this, Width = 660, SizeToContent = SizeToContent.Height,
+            Title = title, Owner = OwnerWindow, Width = 660, SizeToContent = SizeToContent.Height,
             MaxHeight = SystemParameters.WorkArea.Height - 80, ResizeMode = ResizeMode.NoResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = System.Windows.Media.Brushes.White
         };
@@ -557,10 +566,10 @@ public partial class PeopleWindow : Window
     private async void Import_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var picker = new OpenFileDialog { Filter = "Excel (*.xlsx;*.xlsm)|*.xlsx;*.xlsm" };
-        if (picker.ShowDialog(this) != true) return;
+        if (picker.ShowDialog(OwnerWindow) != true) return;
         var path = picker.FileName;
         var detected = await Task.Run(() => PeopleDocuments.ReadImport(path));
-        var review = new PeopleImportPreviewWindow(picker.FileName, detected) { Owner = this };
+        var review = new PeopleImportPreviewWindow(picker.FileName, detected) { Owner = OwnerWindow };
         if (review.ShowDialog() != true) return;
         var preview = review.Preview;
         var resultImport = await MutateAsync(revision => _db.Import(preview, revision));
@@ -658,7 +667,7 @@ public partial class PeopleWindow : Window
     private async void Orders_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         if (!_objectId.HasValue) return;
-        var child = new OrdersWindow(_db, _objectId.Value) { Owner = this };
+        var child = new OrdersWindow(_db, _objectId.Value) { Owner = OwnerWindow };
         child.ShowDialog();
         _revision = "";
         var id = _objectId.Value;
@@ -676,7 +685,7 @@ public partial class PeopleWindow : Window
             .Select(p => new AccessPerson(p.Id, p.Fio, p.Post, p.Birth)).ToArray();
         var cars = _cars.Where(c => c.Selected)
             .Select(c => new AccessCar(c.Id, c.Model, c.Plate)).ToArray();
-        if (people.Length == 0) { MessageBox.Show(this, "Отметьте хотя бы одного человека."); return; }
+        if (people.Length == 0) { MessageBox.Show(OwnerWindow, "Отметьте хотя бы одного человека."); return; }
         var company = CompanyBox.SelectedItem as AccessCompany;
         var req = company is null ? "" :
             company.Name.Contains("ГМЦ", StringComparison.OrdinalIgnoreCase)
@@ -702,7 +711,7 @@ public partial class PeopleWindow : Window
                 " " + DateTime.Today.ToString("dd.MM.yyyy")) + ".xlsx",
             InitialDirectory = initialFolder
         };
-        if (picker.ShowDialog(this) != true) return;
+        if (picker.ShowDialog(OwnerWindow) != true) return;
         var path = picker.FileName;
         var operation = Guid.NewGuid();
         var snapshot = new AccessSnapshot(people, cars, intro, req, company?.Id,
@@ -735,10 +744,10 @@ public partial class PeopleWindow : Window
         catch (Exception ex)
         {
             HintText.Text = "Список зарегистрирован. Не удалось обновить историю.";
-            MessageBox.Show(this, "Файл сохранён: " + path + "\n" + ex.Message,
+            MessageBox.Show(OwnerWindow, "Файл сохранён: " + path + "\n" + ex.Message,
                 Title, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     });
-    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+    private void Close_Click(object sender, RoutedEventArgs e) => CloseRequested?.Invoke();
 }

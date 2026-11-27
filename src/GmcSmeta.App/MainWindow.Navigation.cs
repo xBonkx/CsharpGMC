@@ -51,8 +51,7 @@ public partial class MainWindow
                 new CompanyWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "File"));
             top.Items.Add(Item("Теги заказчиков (правила)…", () =>
                 new TagsWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Layers"));
-            top.Items.Add(Item("Люди и автомобили (для допуска)…", () =>
-                new PeopleWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Users"));
+            top.Items.Add(Item("Люди и автомобили (для допуска)…", OpenPeopleWorkspace, "Users"));
             top.Items.Add(Item("Журнал изменений…", () => OpenHistory(null), "History"));
             top.Items.Add(Item("Корзина (удалённые объекты и документы)…", OpenTrash, "Trash"));
             top.Items.Add(new Separator());

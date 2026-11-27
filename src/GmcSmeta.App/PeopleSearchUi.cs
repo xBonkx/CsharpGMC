@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace GmcSmeta.App;
 
-public partial class PeopleWindow
+public partial class PeopleView
 {
     private void ClearPeopleSearch_Click(object sender, RoutedEventArgs e)
     {

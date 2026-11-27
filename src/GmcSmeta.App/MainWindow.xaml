@@ -540,6 +540,19 @@
             </GridSplitter>
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <!-- The tab strip switches two retained workspace surfaces; the estimate is not reparented. -->
+                <TabControl x:Name="AuxWorkspaceTabs" Visibility="Collapsed" SelectedIndex="0"
+                            Style="{StaticResource PythonTabbedPane}" SelectionChanged="AuxWorkspaceTabs_SelectionChanged">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="TabControl">
+                            <TabPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </ControlTemplate>
+                    </TabControl.Template>
+                    <TabItem x:Name="DocumentsWorkspaceTab" Header="Объекты и договоры"/>
+                    <TabItem x:Name="PeopleWorkspaceTab" Header="Люди и автомобили"/>
+                </TabControl>
+                <Grid x:Name="DocumentsWorkspaceSurface" Grid.Row="1">
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                 <Button x:Name="ShowSidebarButton" Style="{StaticResource PythonToolbarButton}" Content="Показать объекты" ContentTemplate="{StaticResource IconLabelMenu}" Visibility="Collapsed" HorizontalAlignment="Left"
                         MinWidth="148" MinHeight="30" Margin="{StaticResource LayoutShowSidebarMargin}" Click="ToggleSidebar_Click" ToolTip="Показать панель (Ctrl+B)"/>
                 <Grid x:Name="EmptyPage" Grid.Row="1" Visibility="Collapsed" Margin="16,0">
@@ -659,6 +672,9 @@
                         </Grid>
                     </ContentControl.Content>
                 </ContentControl>
+                </Grid>
+                <ContentControl x:Name="PeopleWorkspaceHost" Grid.Row="1" Visibility="Collapsed"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
             </Grid>
         </Grid>
     </DockPanel>

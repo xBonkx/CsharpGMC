@@ -10,6 +10,7 @@ public partial class MainWindow
     internal bool CanRestartForUpdate =>
         _ready && !_startupClosed && !_startupInProgress && IsEnabled &&
         ObjectRenameBox.Visibility != Visibility.Visible &&
+        (_peopleWorkspace is null || _peopleWorkspace.CanRestart) &&
         _estimateCacheValidation is null &&
         _estimateCache.Values.All(view => view.CanRestartAfterUpdate) &&
         (PageHost.Content is not EstimateView current || current.CanRestartAfterUpdate);

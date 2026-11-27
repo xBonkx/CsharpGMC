@@ -12,7 +12,7 @@ public sealed class PeopleInitialReadLifecycleTests
             root = root.Parent;
         Assert.NotNull(root);
         var source = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "PeopleWindow.xaml.cs"));
-        var ctor = source[source.IndexOf("public PeopleWindow(", StringComparison.Ordinal)..source.IndexOf("private async Task InitializeAsync", StringComparison.Ordinal)];
+        var ctor = source[source.IndexOf("public PeopleView(", StringComparison.Ordinal)..source.IndexOf("private async Task InitializeAsync", StringComparison.Ordinal)];
         Assert.DoesNotContain("new SqlServerPeopleAccess(", ctor);
         Assert.DoesNotContain("Reload();", ctor);
         Assert.Contains("content.IsEnabled = false;", ctor);

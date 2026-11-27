@@ -4,7 +4,7 @@ using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
-public partial class PeopleWindow
+public partial class PeopleView
 {
     private bool _inlinePending;
 
