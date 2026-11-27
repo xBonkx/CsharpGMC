@@ -76,6 +76,10 @@ try
         throw new InvalidOperationException("Обновление уже выполняется. Повторите --update-only позже.");
     }
 
+    // Another worker may have finished between the fast-path state read
+    // and lock acquisition. Never make install decisions using that old state.
+    installed = InstalledApp.Load(paths);
+
     LauncherSelfUpdate.CleanupOld();
 
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
@@ -101,6 +105,12 @@ try
         StartupTrace.Mark("launcher_release_check_end");
     }
 
+    if (release is not null && !AppVersion.CanOfferRelease(installed?.Version, release.Version))
+    {
+        updateError = $"Версия выпуска {release.Version} некорректна или старше установленной версии {installed?.Version ?? "—"}. Установка отменена.";
+        release = null;
+    }
+
     if (options.UpdateOnly && release is null && updateError is not null)
         throw new InvalidOperationException("Не удалось проверить обновления: " + updateError);
 
@@ -115,7 +125,7 @@ try
             installed is not null &&
             !string.Equals(installed.Flavor, installer.PreferredFlavor, StringComparison.OrdinalIgnoreCase);
         var appUpdated = installed is null ||
-            !string.Equals(installed.Version, release.Version, StringComparison.OrdinalIgnoreCase) ||
+            AppVersion.IsOlder(installed.Version, release.Version) ||
             flavorMismatch ||
             !File.Exists(installed.Exe);
         if (appUpdated)

@@ -1,5 +1,7 @@
 # GMC-Смета C# — подробный TODO производительности и скорости загрузки (24.11.2026)
 
+27.11.2026 ChatGPT/main (base fae5e5c) — PERF-004 PARTIAL, follow-up: re-read installed.txt under the launcher update mutex; reject malformed numeric release versions and downgrades before installation/self-update, compare equivalent versions numerically, retain existing same-version flavor change. Extract existing AppVersion helper and add 15 theory/fact cases. Static source verification only; Windows/.NET tests and real multi-process update still open. No automatic rollback across potentially incompatible SQL schemas, no SQL/DDL/release changes. Disk cleanup remains open.
+
 27.11.2026 ChatGPT/main (base 486750c) — PERF-004 PARTIAL: immutable version folders; installation moves verified staging to unused canonical/suffixed directory, never recursively deletes an installed folder, only cleans its own unique temporary ZIP/staging, and publishes installed.txt atomically with unique temporary file. Preserved hash policy and normal Closing/save guards. Old versions intentionally retained (disk usage; offline cleanup separate). Three filesystem regression tests added, not executed: no .NET SDK/Windows in this environment. Remaining: real launcher/Windows update, live session/save and rollback after asynchronous startup failure, disk cleanup policy; no SQL, schema or release changes.
 
 ## 27.11.2026 — результат согласованного блока

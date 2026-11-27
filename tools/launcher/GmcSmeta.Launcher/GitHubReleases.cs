@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -11,55 +10,6 @@ namespace GmcSmeta.Launcher;
 internal sealed record ReleaseAsset(string Name, string ApiUrl, string BrowserUrl, long Size);
 
 internal sealed record ReleaseInfo(string Tag, string Version, IReadOnlyList<ReleaseAsset> Assets);
-
-/// <summary>Сравнение версий вида «v1.2.3» без внешних библиотек.</summary>
-internal static class AppVersion
-{
-    public static string Normalize(string tag)
-    {
-        var value = (tag ?? "").Trim();
-        if (value.StartsWith("v", StringComparison.OrdinalIgnoreCase)) value = value[1..];
-        var dash = value.IndexOf('-');
-        if (dash >= 0) value = value[..dash];
-        return value;
-    }
-
-    public static bool TryParse(string? text, out Version version)
-    {
-        version = new Version(0, 0, 0, 0);
-        var normalized = Normalize(text ?? "");
-        if (normalized.Length == 0) return false;
-        var parts = normalized.Split('.');
-        if (parts.Length > 4) return false;
-        var numbers = new int[4];
-        for (var index = 0; index < parts.Length; index++)
-        {
-            if (!int.TryParse(parts[index], NumberStyles.None, CultureInfo.InvariantCulture, out numbers[index]))
-                return false;
-        }
-        version = new Version(numbers[0], numbers[1], numbers[2], numbers[3]);
-        return true;
-    }
-
-    /// <summary>True, если installed старше available (или installed не разбирается).</summary>
-    public static bool IsOlder(string? installed, string available)
-    {
-        if (!TryParse(available, out var target)) return false;
-        if (!TryParse(installed, out var current)) return true;
-        return current < target;
-    }
-
-    public static string CurrentLauncher()
-    {
-        var assembly = System.Reflection.Assembly.GetEntryAssembly();
-        var info = assembly?.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
-            .FirstOrDefault()?.InformationalVersion;
-        if (string.IsNullOrWhiteSpace(info)) return "0.0.0";
-        var plus = info.IndexOf('+');
-        return plus >= 0 ? info[..plus] : info;
-    }
-}
 
 /// <summary>Токен доступа к закрытому репозиторию: переменная среды, файл или git credential manager.</summary>
 internal static class GitHubAuth
