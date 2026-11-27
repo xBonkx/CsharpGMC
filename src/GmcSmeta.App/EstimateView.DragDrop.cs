@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using GmcSmeta.Core.Db;
@@ -25,7 +26,11 @@ public partial class EstimateView
 
     private Point? _dragStart;
     private EditableEstimateRow? _dragStartRow;
-    private DataGridRow? _dragMarkerRow;
+    private EstimateInsertionAdorner? _dragMarker;
+    private AdornerLayer? _dragMarkerLayer;
+    private DragPayload? _activeDragPayload;
+    private Point? _dragPointer;
+    private bool _dragScrollQueued;
     private bool _dragMoving;
 
     // Modal position placement also works for main/dop documents. The mouse
@@ -134,12 +139,15 @@ public partial class EstimateView
         try
         {
             _dragMoving = true;
+            _activeDragPayload = payload;
             var dragData = new DataObject(DragFormat, payload);
             DragDrop.DoDragDrop(EstimateGrid, dragData, DragDropEffects.Move);
         }
         finally
         {
             _dragMoving = false;
+            _activeDragPayload = null;
+            _dragPointer = null;
             ClearDragMarker();
         }
     }
@@ -151,16 +159,25 @@ public partial class EstimateView
         destination = null!;
         rowVisual = null;
         before = false;
-        if (!CanDragEstimate || !e.Data.GetDataPresent(DragFormat) ||
-            e.Data.GetData(DragFormat) is not DragPayload data ||
-            data.ContractId != _contractId || data.Revision != _serverRevision ||
-            data.Ids.Length == 0 || e.OriginalSource is not DependencyObject hit)
-            return false;
+        if (!e.Data.GetDataPresent(DragFormat) ||
+            e.Data.GetData(DragFormat) is not DragPayload data) return false;
         payload = data;
+        return TryDragTargetAt(data, e.GetPosition(EstimateGrid), out destination, out rowVisual, out before);
+    }
+
+    private bool TryDragTargetAt(DragPayload data, Point point, out DragDestination destination,
+        out DataGridRow? rowVisual, out bool before)
+    {
+        destination = null!;
+        rowVisual = null;
+        before = false;
+        if (!CanDragEstimate || data.ContractId != _contractId || data.Revision != _serverRevision ||
+            data.Ids.Length == 0 || EstimateGrid.InputHitTest(point) is not DependencyObject hit)
+            return false;
         rowVisual = VisualAncestor<DataGridRow>(hit);
         if (rowVisual?.Item is not EditableEstimateRow on ||
             on.IsVirtual || on.Id < 0) return false;
-        before = e.GetPosition(rowVisual).Y < rowVisual.ActualHeight / 2;
+        before = EstimateGrid.TranslatePoint(point, rowVisual).Y < rowVisual.ActualHeight / 2;
 
         var sectionById = _rows.Where(x => x.IsSystem)
             .ToDictionary(x => (long)x.Source.SystemId);
@@ -235,6 +252,7 @@ public partial class EstimateView
 
     private void EstimateGrid_DragOver(object sender, DragEventArgs e)
     {
+        _dragPointer = e.GetPosition(EstimateGrid);
         if (TryDragTarget(e, out _, out var destination,
             out var row, out var before))
         {
@@ -251,32 +269,52 @@ public partial class EstimateView
 
     private void MarkDragRow(DataGridRow row, bool before, string description)
     {
-        ClearDragMarker();
-        _dragMarkerRow = row;
-        row.BorderBrush = Brushes.DodgerBlue;
-        row.BorderThickness = before ? new Thickness(0, 3, 0, 0)
-                                     : new Thickness(0, 0, 0, 3);
-        row.ToolTip = description;
+        if (_dragMarker is null)
+        {
+            _dragMarkerLayer = AdornerLayer.GetAdornerLayer(EstimateGrid);
+            if (_dragMarkerLayer is null) return;
+            _dragMarker = new EstimateInsertionAdorner(EstimateGrid);
+            _dragMarkerLayer.Add(_dragMarker);
+        }
+        _dragMarker.Show(row, before);
     }
 
     private void ClearDragMarker()
     {
-        if (_dragMarkerRow is not DataGridRow row) return;
-        row.ClearValue(DataGridRow.BorderBrushProperty);
-        row.ClearValue(DataGridRow.BorderThicknessProperty);
-        row.ClearValue(DataGridRow.ToolTipProperty);
-        _dragMarkerRow = null;
+        if (_dragMarker is not null) _dragMarkerLayer?.Remove(_dragMarker);
+        _dragMarker = null;
+        _dragMarkerLayer = null;
     }
 
     private void EstimateGrid_DragLeave(object sender, DragEventArgs e)
     {
+        // WPF raises DragLeave when moving between cell descendants too.
+        // Do not remove the indicator for a transition inside the grid.
+        var point = e.GetPosition(EstimateGrid);
+        if (new Rect(EstimateGrid.RenderSize).Contains(point)) return;
+        _dragPointer = null;
         ClearDragMarker();
+    }
+
+    private void RefreshDragMarkerAfterScroll()
+    {
+        if (!_dragMoving || _activeDragPayload is null || _dragPointer is null || _dragScrollQueued) return;
+        _dragScrollQueued = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _dragScrollQueued = false;
+            if (!_dragMoving || _activeDragPayload is not { } payload || _dragPointer is not Point point) return;
+            if (TryDragTargetAt(payload, point, out var destination, out var row, out var before) && row is not null)
+                MarkDragRow(row, before, destination.Description);
+            else ClearDragMarker();
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private async void EstimateGrid_Drop(object sender, DragEventArgs e)
     {
         var valid = TryDragTarget(e, out var source, out var destination,
             out _, out _);
+        _dragPointer = null;
         ClearDragMarker();
         e.Handled = true;
         if (!valid) return;

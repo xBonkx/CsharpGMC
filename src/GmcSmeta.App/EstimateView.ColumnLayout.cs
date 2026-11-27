@@ -44,11 +44,13 @@ public partial class EstimateView
 
     private void EstimateGridViewportChanged(object sender, ScrollChangedEventArgs e)
     {
-        // Ignore nested TextBox scroll viewers and ordinary scrolling.
-        if (Math.Abs(e.ViewportWidthChange) > 0.1 &&
-            e.OriginalSource is ScrollViewer scroll &&
-            ReferenceEquals(scroll, EstimateScrollViewer()))
-            RequestEstimateColumnFit();
+        // Ignore nested TextBox scroll viewers.
+        if (e.OriginalSource is not ScrollViewer scroll ||
+            !ReferenceEquals(scroll, EstimateScrollViewer())) return;
+        if (Math.Abs(e.ViewportWidthChange) > 0.1) RequestEstimateColumnFit();
+        if (e.VerticalChange != 0 || e.HorizontalChange != 0 ||
+            e.ViewportHeightChange != 0 || e.ViewportWidthChange != 0)
+            RefreshDragMarkerAfterScroll();
     }
 
     private ScrollViewer? EstimateScrollViewer()
