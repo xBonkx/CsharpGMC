@@ -9,8 +9,8 @@ namespace GmcSmeta.App;
 
 public partial class EstimateView
 {
-    // One optimistic structural insertion at a time. This view-only object
-    // must not enter the authoritative snapshot, ID map, formulas or SQL.
+    // Local drafts are isolated from the authoritative snapshot, ID map and SQL.
+    // Each draft has its own identity and buffered edits.
     private sealed class PendingEstimateInsert(EditableEstimateRow row, int? afterRootId)
     {
         public EditableEstimateRow Row { get; } = row;
@@ -21,9 +21,19 @@ public partial class EstimateView
         public Dictionary<string, string> EnteredEdits { get; } = new();
     }
 
-    private PendingEstimateInsert? _pendingEstimateInsert;
+    private readonly List<PendingEstimateInsert> _pendingEstimateInserts = new();
+    private int _nextPendingInsertId = -1;
+    private Task _pendingInsertTail = Task.CompletedTask;
 
-    private bool CanShowPendingInsert => !_inlineStagesOn &&
+    private PendingEstimateInsert? FindPendingInsert(int id) =>
+        _pendingEstimateInserts.FirstOrDefault(p => p.Row.Id == id);
+
+    private static long ResolvePendingAnchor(PendingEstimateInsert pending) =>
+        pending is { Failed: false, ServerId: int id } ? id :
+            throw new InvalidOperationException("Предыдущая позиция не подтверждена сервером.");
+
+    private bool CanShowPendingInsert =>
+        (!_inlineStagesOn || _inlineStagesFilter == StageAllocationPresentation.All) &&
         _temporaryGroupMode == EstimateViewProjection.DocumentOrder &&
         _temporarySort == EstimateViewProjection.DocumentOrder &&
         !_flatTemporaryView && !_noPriceTemporaryView &&
@@ -41,7 +51,7 @@ public partial class EstimateView
         var rootId = anchor.IsSystem ? (int?)null : anchor.Source.ParentPositionId ?? anchor.Id;
         var draft = new EditableEstimateRow(new EstimateRow(
             RowKind.Position, section.Level + (component ? 2 : 1), anchor.SortKey,
-            int.MinValue, component, "…", "", "шт", 1m, 0m, 0m, null, false, "")
+            checked(_nextPendingInsertId--), component, "", "", "шт", 1m, 0m, 0m, null, false, "")
         {
             SystemId = anchor.Source.SystemId,
             ParentSystemId = section.Source.ParentSystemId,
@@ -51,7 +61,8 @@ public partial class EstimateView
         var pending = new PendingEstimateInsert(draft, rootId);
         var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
         if (index < 0) return null;
-        _pendingEstimateInsert = pending;
+        _pendingEstimateInserts.Add(pending);
+        if (_inlineStagesOn) FillInlineStageCells(draft);
         // One collection Add, not ItemsSource reassignment: keep the scroll,
         // realized rows and column layout intact.
         visible.Insert(index, draft);
@@ -60,7 +71,7 @@ public partial class EstimateView
         EstimateGrid.ScrollIntoView(draft, NameColumn);
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (_detached || _serverConflict || !ReferenceEquals(_pendingEstimateInsert, pending) ||
+            if (_detached || _serverConflict || !_pendingEstimateInserts.Contains(pending) ||
                 !ReferenceEquals(EstimateGrid.SelectedItem, draft) ||
                 !EstimateGrid.IsVisible || !EstimateGrid.Items.Contains(draft)) return;
             EstimateGrid.Focus();
@@ -78,7 +89,7 @@ public partial class EstimateView
         foreach (var row in visible)
         {
             if (row.Source.SystemId == systemId &&
-                !row.IsVirtual &&
+                (!row.IsVirtual || row.IsPendingInsert) &&
                 (afterRootId is not int root ||
                     !row.IsSystem && (row.Id == root || row.Source.ParentPositionId == root)))
                 last = index;
@@ -89,15 +100,22 @@ public partial class EstimateView
 
     private void IncludePendingInsert(List<EditableEstimateRow> visible)
     {
-        if (_pendingEstimateInsert is not { } pending || !CanShowPendingInsert ||
-            !visible.Any(row => row.IsSystem && row.Source.SystemId == pending.Row.Source.SystemId &&
-                !row.IsCollapsed)) return;
-        var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
-        if (index >= 0) visible.Insert(index, pending.Row);
+        if (!CanShowPendingInsert) return;
+        foreach (var pending in _pendingEstimateInserts)
+        {
+            if (!visible.Any(row => row.IsSystem && row.Source.SystemId == pending.Row.Source.SystemId &&
+                !row.IsCollapsed)) continue;
+            var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
+            if (index >= 0)
+            {
+                if (_inlineStagesOn) FillInlineStageCells(pending.Row);
+                visible.Insert(index, pending.Row);
+            }
+        }
     }
 
     private bool CanEditPendingInsert(EditableEstimateRow row, string? field) =>
-        _pendingEstimateInsert is { Failed: false } pending &&
+        FindPendingInsert(row.Id) is { Failed: false } pending &&
         ReferenceEquals(pending.Row, row) && !_serverConflict && _estimate?.Locked == false &&
         (field is "name" or "unit" or "qty" or "note" ||
             !row.IsSub && (field is "price" or "purchase_price" ||
@@ -105,10 +123,8 @@ public partial class EstimateView
 
     private bool CommitPendingInsertCell(EditableEstimateRow row, string field, string input)
     {
-        if (_pendingEstimateInsert is not { } pending || !ReferenceEquals(pending.Row, row))
+        if (FindPendingInsert(row.Id) is not { } pending || !ReferenceEquals(pending.Row, row))
             return false;
-        // Cell-picking formulas require the authoritative row/revision. Plain
-        // text and numeric inputs can safely be buffered while SQL creates it.
         if (field is ("qty" or "price" or "purchase_price" or "work_price") &&
             input.TrimStart().StartsWith("="))
         {
@@ -134,21 +150,29 @@ public partial class EstimateView
 
     private void ReconcilePendingInsert(EstimateDocument document)
     {
-        if (_pendingEstimateInsert is not { } pending) return;
-        if (pending.ServerId is int id && document.Rows.Any(r => !r.IsSystem && r.Id == id))
+        if (_pendingEstimateInserts.Count == 0) return;
+        var ids = document.Rows.Where(r => !r.IsSystem).Select(r => r.Id).ToHashSet();
+        foreach (var pending in _pendingEstimateInserts)
         {
-            if (ReferenceEquals(EstimateGrid.SelectedItem, pending.Row))
+            if (pending.ServerId is int id && ids.Contains(id))
             {
-                _focusAfterReload = id;
-                _focusSystemAfterReload = null;
-                _editAfterReload = false;
+                if (ReferenceEquals(EstimateGrid.SelectedItem, pending.Row))
+                {
+                    _focusAfterReload = id;
+                    _focusSystemAfterReload = null;
+                    _editAfterReload = false;
+                }
             }
+            else
+                _saveError ??= "Одна или несколько новых позиций не найдены в подтверждённой смете.";
         }
-        else
-            _saveError ??= "Новая позиция не найдена в подтверждённой смете.";
-        if (_saveError is not null && pending.EnteredEdits.Count > 0)
-            _saveError += ". Введённые данные: " + string.Join("; ",
-                pending.EnteredEdits.Select(x => PendingFieldLabel(x.Key) + ": " + x.Value));
-        _pendingEstimateInsert = null;
+        if (_saveError is not null)
+        {
+            var entered = _pendingEstimateInserts.Where(p => p.EnteredEdits.Count > 0)
+                .Select(p => $"Строка {Math.Abs((long)p.Row.Id)}: " +
+                    string.Join("; ", p.EnteredEdits.Select(x => PendingFieldLabel(x.Key) + ": " + x.Value)));
+            _saveError += ". Введённые данные: " + string.Join(" | ", entered);
+        }
+        _pendingEstimateInserts.Clear();
     }
 }
