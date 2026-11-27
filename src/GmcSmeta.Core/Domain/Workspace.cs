@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Threading;
 using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.Core.Domain;
@@ -242,8 +243,13 @@ public static class Workspace
     }
 
     public static ObjectDocuments ReadObjectDocuments(DbConnection conn, ObjectRow obj,
-        IReadOnlyList<DocRow> allDocuments, NavigationMode mode)
+        IReadOnlyList<DocRow> allDocuments, NavigationMode mode) =>
+        ReadObjectDocuments(conn, obj, allDocuments, mode, CancellationToken.None);
+
+    public static ObjectDocuments ReadObjectDocuments(DbConnection conn, ObjectRow obj,
+        IReadOnlyList<DocRow> allDocuments, NavigationMode mode, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var all = allDocuments.Where(d => d.ObjectId == obj.Id).ToList();
         var docs = all.Where(d => mode == NavigationMode.Archive ||
             (mode == NavigationMode.Kp ? d.Kind == "kp" : d.Kind is "main" or "dop")).ToList();
@@ -254,7 +260,9 @@ public static class Workspace
         if (conn is Microsoft.Data.SqlClient.SqlConnection sql)
         {
             var rules = TagRules.LoadWithNames(sql, out tags);
+            token.ThrowIfCancellationRequested();
             estimates = EstimateReader.LoadCardsSql(sql, docs.Select(doc => doc.Id), rules);
+            token.ThrowIfCancellationRequested();
             finances = FinanceReader.ReadForCards(sql, estimates.Values.Select(e => e.Totals).ToArray(), rules);
         }
         else
@@ -267,10 +275,12 @@ public static class Workspace
             using var reader = cmd.ExecuteReader();
             while (reader.Read()) tags[Str(reader, 0)] = Str(reader, 1);
         }
+        token.ThrowIfCancellationRequested();
         var docsById = docs.ToDictionary(d => d.Id);
         var cards = new List<ObjectDocumentCard>(docs.Count);
         foreach (var doc in OrderDocumentCards(docs))
         {
+            token.ThrowIfCancellationRequested();
             var estimate = estimates is null
                 ? EstimateCardData.FromEstimate(EstimateReader.Load(conn, doc.Id))
                 : estimates[doc.Id];

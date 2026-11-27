@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using GmcSmeta.Core;
@@ -11,10 +12,13 @@ public partial class MainWindow
     // UI-only sequence; superseded object-card results never replace the
     // currently open page when a user navigates quickly.
     private int _objectCardLoadRequest;
-    private readonly Dictionary<(int ObjectId, NavigationMode Mode), ObjectDocuments> _objectCardCache = new();
-    private string? _objectCardCacheRevision;
+    private readonly ObjectCardSnapshotCache _objectCardCache = new();
+    private readonly SemaphoreSlim _objectCardReadGate = new(1, 1);
+    private CancellationTokenSource? _objectCardReadCancellation;
     private int? _displayedObjectId;
     private bool _objectCardTransitionPending;
+
+    private void CancelObjectCardRead() => _objectCardReadCancellation?.Cancel();
 
     private async void ShowObject(ObjectRow o)
     {
@@ -35,8 +39,13 @@ public partial class MainWindow
         // Never execute contract scans, totals, finance and card projections
         // on the WPF UI thread. Keep input order and current navigation mode
         // stable while the background read runs on its own SQL connection.
+        CancelObjectCardRead();
+        using var cancellation = new CancellationTokenSource();
+        _objectCardReadCancellation = cancellation;
+        var token = cancellation.Token;
         var request = ++_objectCardLoadRequest;
-        var documentsSnapshot = _docs.ToArray();
+        // Only this object's documents are used by both scoped readers.
+        var documentsSnapshot = _docs.Where(d => d.ObjectId == o.Id).ToArray();
         var mode = CurrentMode;
         var navigationGeneration = _estimateOpenGeneration;
         bool IsCurrent() => !_startupClosed &&
@@ -44,27 +53,33 @@ public partial class MainWindow
             mode == CurrentMode && connectionString == _sqlConnectionString &&
             _objectCardTransitionPending && _selectedObject?.Id == o.Id;
         StatusText.Text = $"{o.Name} · загрузка карточек SQL Server…";
-        var cacheKey = (o.Id, mode);
-        var cached = _objectCardCache.GetValueOrDefault(cacheKey);
-        var cachedRevision = _objectCardCacheRevision;
+        var cached = _objectCardCache.Find(connectionString, o.Id, mode);
         (ObjectDocuments Documents, string Revision) loaded;
+        var entered = false;
         try
         {
-            loaded = await Task.Run(() =>
+            await _objectCardReadGate.WaitAsync(token);
+            entered = true;
+            if (!IsCurrent() || token.IsCancellationRequested) return;
+            loaded = await Task.Run(async () =>
             {
-                using var read = SqlServerDatabase.Open(connectionString);
-                var before = SqlServerDatabase.Revision(read);
+                using var read = await SqlServerDatabase.OpenAsync(connectionString, token).ConfigureAwait(false);
+                var before = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
                 if (string.IsNullOrWhiteSpace(before) ||
                     !Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot))
                     throw new InvalidOperationException("Состав документов или реквизиты объекта изменились. Нажмите F5.");
-                var result = cached is not null && cachedRevision == before
-                    ? cached
-                    : Workspace.ReadObjectDocuments(read, o, documentsSnapshot, mode);
-                if (before != SqlServerDatabase.Revision(read))
+                token.ThrowIfCancellationRequested();
+                var result = cached is not null && cached.Revision == before
+                    ? cached.Documents
+                    : Workspace.ReadObjectDocuments(read, o, documentsSnapshot, mode, token);
+                token.ThrowIfCancellationRequested();
+                if (before != await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились во время загрузки карточек. Нажмите F5.");
                 return (result, before);
-            });
+            }, token);
         }
+        catch (Exception) when (token.IsCancellationRequested) { return; }
         catch (Exception ex)
         {
             if (IsCurrent())
@@ -84,13 +99,15 @@ public partial class MainWindow
             }
             return;
         }
+        finally
+        {
+            if (entered) _objectCardReadGate.Release();
+            if (ReferenceEquals(_objectCardReadCancellation, cancellation)) _objectCardReadCancellation = null;
+        }
         // A different object/estimate may have been selected before SQL replied.
         if (!IsCurrent()) return;
-        if (_objectCardCacheRevision != loaded.Revision || _objectCardCache.Count >= 24)
-            _objectCardCache.Clear();
-        _objectCardCacheRevision = loaded.Revision;
         var documents = loaded.Documents;
-        _objectCardCache[cacheKey] = documents;
+        _objectCardCache.Store(connectionString, o.Id, mode, loaded.Revision, documents);
         // Prepare the header, totals and cards on this dispatcher turn, with
         // no await or visibility gap before publication.
         var resetScroll = !ReferenceEquals(PageHost.Content, ObjectPage) || _displayedObjectId != o.Id;

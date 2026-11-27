@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base fe9ed6f) — PERF-011/038/039/046 PARTIAL: bounded object-card LRU, cancellation/serialization of object-card reads, scoped document copies, single-pass tree visibility and no-op card width guard. Tests added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 1bb903c) — PERF-034/035/037 PARTIAL: director same-mode revision/day cache, cancellable queued and between-phase reads, asynchronous captured XLSX export. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 3f542b4) — PERF-024/027/028/032 PARTIAL: background procurement row projection, shipment historical-line tracking bounded by line count, cost-summary queued/between-phase read cancellation. Source guards added, not run; see performance TODO.

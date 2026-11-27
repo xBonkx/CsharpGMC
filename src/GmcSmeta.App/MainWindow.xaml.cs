@@ -413,9 +413,11 @@ public partial class MainWindow : Window
         var visible = _navigationSearchIndex.Match(ObjectSearch.Text);
         foreach (TreeViewItem year in NavigationTree.Items)
         {
+            var yearVisible = false;
             foreach (TreeViewItem node in year.Items)
             {
                 var matched = node.Tag is ObjectRow obj && visible.Contains(obj.Id);
+                yearVisible |= matched;
                 var visibility = matched ? Visibility.Visible : Visibility.Collapsed;
                 if (node.Visibility != visibility) node.Visibility = visibility;
                 // Совпадение в названии документа тоже должно быть видно под объектом.
@@ -425,8 +427,8 @@ public partial class MainWindow : Window
                     if (!node.IsExpanded) node.IsExpanded = true;
                 }
             }
-            year.Visibility = year.Items.Cast<TreeViewItem>().Any(n => n.Visibility == Visibility.Visible)
-                ? Visibility.Visible : Visibility.Collapsed;
+            var yearVisibility = yearVisible ? Visibility.Visible : Visibility.Collapsed;
+            if (year.Visibility != yearVisibility) year.Visibility = yearVisibility;
             if (searching && year.Visibility == Visibility.Visible)
                 year.IsExpanded = true;
         }
@@ -500,6 +502,7 @@ public partial class MainWindow : Window
     {
         ++_estimateOpenGeneration; // Invalidate background navigation, including object/home switches.
         CancelEstimateCacheValidation();
+        CancelObjectCardRead();
         _objectCardTransitionPending = false;
         PageHost.Content = page;
         PageHost.IsEnabled = true;
@@ -988,7 +991,8 @@ public partial class MainWindow : Window
         var width = Math.Max(300, ObjectCardsScroll.ViewportWidth > 0 ? ObjectCardsScroll.ViewportWidth : ObjectCardsScroll.ActualWidth - 18);
         var columns = Math.Clamp((int)((width + 12) / 352), 1, 3);
         // WrapPanel учитывает завершающий отступ каждой карточки, включая последнюю.
-        CardWidth = Math.Floor(width / columns) - 12;
+        var cardWidth = Math.Floor(width / columns) - 12;
+        if (CardWidth != cardWidth) CardWidth = cardWidth;
         LayoutObjectTotals();
     }
 
@@ -1615,6 +1619,7 @@ public partial class MainWindow : Window
         _startupClosed = true;
         _peopleWorkspace?.CloseView();
         CancelEstimateCacheValidation();
+        CancelObjectCardRead();
         _navigationSearchTimer?.Stop();
         _estimateCacheTrimTimer?.Stop();
         if (_ready) RememberWindowGeometry();

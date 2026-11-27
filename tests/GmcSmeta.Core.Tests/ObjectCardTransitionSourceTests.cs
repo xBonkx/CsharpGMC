@@ -32,6 +32,13 @@ public sealed class ObjectCardTransitionSourceTests
         Assert.Contains("documents.Cards, SqlWritesEnabled && !o.Archived", success);
         Assert.Contains("_objectCardTransitionPending = false", main);
         Assert.Contains("PageHost.IsEnabled = true", main);
+        Assert.Contains("await _objectCardReadGate.WaitAsync(token)", cards);
+        Assert.Contains("if (entered) _objectCardReadGate.Release();", cards);
+        Assert.Contains("SqlServerDatabase.OpenAsync(connectionString, token)", cards);
+        Assert.Contains("Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot)", cards);
+        Assert.Contains("cached.Revision == before", cards);
+        Assert.Contains("_docs.Where(d => d.ObjectId == o.Id).ToArray()", cards);
+        Assert.Contains("CancelObjectCardRead();", main);
         Assert.Contains("if (_objectCardTransitionPending || !ReferenceEquals(PageHost.Content, ObjectPage)", main);
         Assert.Contains("_openDocumentId is not null && PageHost.Content is EstimateView editing", navigation);
     }
