@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — редактирование людей и автомобилей в ячейках
+
+27.11.2026 ChatGPT/main (base b7268bf) — WIN-17 PARTIAL, запрос владельца: inline editing existing People/Cars rows. Nine text columns use unbound editors; WPF cell commit builds detached record, validates changed field, defers SQL save through existing exclusive operation/revision guard and reloads by ID; Esc cancels, manual genitive is edited as raw override (empty = auto). Modal edit commands removed; add dialogs deliberately retained for collecting new-record required fields. Search/filter/close/competing commands guarded during pending cell save; access checkboxes retained. No icons, SQL schema, production DB, release changes. Five domain cases plus updated lifecycle source assertion; Windows build/xUnit, WPF focus/Tab/selection, slow LAN, conflict, failed/uncertain commit, filter and access mode still require acceptance. No DONE.
+
 ## 27.11.2026 — SQL BIT и целочисленные флаги
 
 27.11.2026 ChatGPT/main (base 05c7f43) — BUG-F54 PARTIAL. Static scan of 50 selected SQL Server Db files for strict GetBoolean and nearby conversions. Replaced 14 strict Boolean reads across seven files (KS detail/edit, shipment unfix, stage money, cost operations, global search, employee/car readers and passport archive). SqlFlag accepts BIT and TINYINT/SMALLINT/INT/BIGINT with existing nonzero=true semantics; required NULL and unrelated CLR values rejected, explicit nullable branches unchanged. People readers also use SqlInteger for IDs/sort order. BIT-only own tables included as preventive hardening; no reproduced failure claimed. Added seven SqlFlag cases plus two mixed integer-flag People cases; static checks only, tests and Windows/SQL Pilot not run. Existing Convert.ToBoolean calls, other providers and full repository scan remain outside this block. No DDL, production access, calculation or release changes.

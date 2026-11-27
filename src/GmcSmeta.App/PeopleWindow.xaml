@@ -89,7 +89,7 @@
                 </StackPanel>
                 <TextBlock x:Name="HintText" TextWrapping="Wrap" VerticalAlignment="Center"
                            Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"
-                           Text="Выберите строку для редактирования; все изменения сохраняются в SQL Server."/>
+                           Text="Двойной щелчок или F2 — редактировать ячейку; Enter — сохранить, Esc — отменить."/>
             </DockPanel>
         </StackPanel>
 
@@ -111,7 +111,7 @@
                     <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" Style="{StaticResource PythonToolbarButton}" ToolTip="Выше" Click="PersonUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
                     <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" Style="{StaticResource PythonToolbarButton}" ToolTip="Ниже" Click="PersonDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
                     <Button Content="Добавить человека" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PythonToolbarButton}" Click="PersonAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
-                    <Button Content="Редактировать" Click="PersonEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
+
                     <Button x:Name="PersonActiveButton" Content="Не работает / Снова работает"
                             Click="PersonActive_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button x:Name="PersonDeleteButton" Content="Удалить…" Click="PersonDelete_Click"
@@ -122,7 +122,7 @@
                           SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False" MinRowHeight="27" AlternationCount="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                           Background="White" CanUserReorderColumns="True"
                           SelectionChanged="Selection_Changed"
-                          MouseDoubleClick="People_DoubleClick" ContextMenuOpening="People_ContextMenuOpening"
+                          BeginningEdit="Inline_BeginningEdit" CellEditEnding="Inline_CellEditEnding" ContextMenuOpening="People_ContextMenuOpening"
                           PreviewKeyDown="People_PreviewKeyDown"
                           CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
                     <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
@@ -130,13 +130,13 @@
                         <DataGridCheckBoxColumn x:Name="PeopleSelectedColumn" Header="В списке"
                             Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                             Width="90"/>
-                        <DataGridTextColumn Header="ФИО" Binding="{Binding Fio}" Width="300" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="Должность" Binding="{Binding Post}" Width="210" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="Дата рождения" Binding="{Binding Birth}" Width="120" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                        <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="180" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="ФИО — кого" Binding="{Binding DisplayGenitive}" Width="280" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="Должность — кого" Binding="{Binding DisplayPostGenitive}"
-                                            Width="180" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="ФИО" Binding="{Binding Fio}" Field="Fio" Width="300"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Должность" Binding="{Binding Post}" Field="Post" Width="210"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Дата рождения" Binding="{Binding Birth}" Field="Birth" Width="120"  ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Примечание" Binding="{Binding Note}" Field="Note" Width="180"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="ФИО — кого" Binding="{Binding DisplayGenitive}" Field="FioGen" Width="280"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Должность — кого" Binding="{Binding DisplayPostGenitive}" Field="PostGen"
+                                            Width="180"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </DockPanel>
@@ -155,7 +155,7 @@
                     <Button Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" Style="{StaticResource PythonToolbarButton}" ToolTip="Выше" Click="CarUp_Click" Margin="0,0,4,0" Width="32" MinWidth="32" Padding="4" />
                     <Button Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" Style="{StaticResource PythonToolbarButton}" ToolTip="Ниже" Click="CarDown_Click" Margin="0,0,8,0" Width="32" MinWidth="32" Padding="4" />
                     <Button Content="Добавить автомобиль" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PythonToolbarButton}" Click="CarAdd_Click" Padding="8,4" Margin="0,0,5,0"/>
-                    <Button Content="Редактировать" Click="CarEdit_Click" Padding="8,4" Margin="0,0,5,0"/>
+
                     <Button Content="Не работает / Снова работает" Click="CarActive_Click"
                             Padding="8,4" Margin="0,0,5,0"/>
                     <Button Content="Удалить…" Click="CarDelete_Click" Padding="8,4"/>
@@ -163,16 +163,16 @@
                 <DataGrid local:TableColumnMenu.Key="cars" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="Марка|Госномер" x:Name="CarsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
                           HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
                           GridLinesVisibility="All" MinRowHeight="27" AlternationCount="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" Background="White"
-                          MouseDoubleClick="Cars_DoubleClick" ContextMenuOpening="Cars_ContextMenuOpening"
+                          BeginningEdit="Inline_BeginningEdit" CellEditEnding="Inline_CellEditEnding" ContextMenuOpening="Cars_ContextMenuOpening"
                           PreviewKeyDown="Cars_PreviewKeyDown"
                           CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
                     <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridCheckBoxColumn x:Name="CarsSelectedColumn" Header="В списке"
                              Width="90" Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <DataGridTextColumn Header="Марка" Binding="{Binding Model}" Width="300" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="Госномер" Binding="{Binding Plate}" Width="160" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                        <DataGridTextColumn Header="Примечание" Binding="{Binding Note}" Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Марка" Binding="{Binding Model}" Field="Model" Width="300"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Госномер" Binding="{Binding Plate}" Field="Plate" Width="160"  ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                        <local:PeopleInlineTextColumn Header="Примечание" Binding="{Binding Note}" Field="Note" Width="*"  ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </DockPanel>

@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+27.11.2026 ChatGPT/main (base b7268bf) — WIN-17 PARTIAL, запрос владельца: inline editing existing People/Cars rows. Nine text columns use unbound editors; WPF cell commit builds detached record, validates changed field, defers SQL save through existing exclusive operation/revision guard and reloads by ID; Esc cancels, manual genitive is edited as raw override (empty = auto). Modal edit commands removed; add dialogs deliberately retained for collecting new-record required fields. Search/filter/close/competing commands guarded during pending cell save; access checkboxes retained. No icons, SQL schema, production DB, release changes. Five domain cases plus updated lifecycle source assertion; Windows build/xUnit, WPF focus/Tab/selection, slow LAN, conflict, failed/uncertain commit, filter and access mode still require acceptance. No DONE.
+
 26.11.2026 — Windows, C# `f75d466`. Подтверждены переходы КС-2 на
 2505 позициях, SQL-перенос договора с ДС и deferred scrolling в реальной
 сетке сметы. Общий WPF-тест остановлен на `EstimateScrollingChecks.cs:33`.

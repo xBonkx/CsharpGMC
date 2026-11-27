@@ -15,7 +15,7 @@ public sealed class PeopleMutationLifecycleTests
     {
         var code=Source();
         Assert.Contains("if (_closed || _loading || _operationBusy) return;",code);
-        Assert.Contains("Closing += (_, e) => { if (_operationBusy) e.Cancel = true; };",code);
+        Assert.Contains("if (_operationBusy || _inlinePending || (!_loading && (!CommitChecks() || _inlinePending)))",code);
         Assert.Contains("return await Task.Run(() => mutation(revision));",code);
         Assert.Contains("await Task.Run(() => _db.Load(showInactive))",code);
         Assert.Contains("await MutateAsync(revision => _db.SavePerson(row, revision))",code);

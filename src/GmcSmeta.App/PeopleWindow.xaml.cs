@@ -70,7 +70,11 @@ public partial class PeopleWindow : Window
             WindowState = WindowState.Maximized;
             await InitializeAsync(connectionString, content);
         };
-        Closing += (_, e) => { if (_operationBusy) e.Cancel = true; };
+        Closing += (_, e) =>
+        {
+            if (_operationBusy || _inlinePending || (!_loading && (!CommitChecks() || _inlinePending)))
+                e.Cancel = true;
+        };
         Closed += (_, _) =>
         {
             _closed = true;
@@ -104,7 +108,7 @@ public partial class PeopleWindow : Window
                 return (Db: db, Site: site, Companies: companies, History: history, Directory: directory);
             }, token);
             if (_closed || token.IsCancellationRequested) return;
-            HintText.Text = "Выберите строку для редактирования; все изменения сохраняются в SQL Server.";
+            HintText.Text = "Двойной щелчок или F2 — редактировать ячейку; Enter — сохранить, Esc — отменить.";
             _db = snapshot.Db;
             _site = snapshot.Site;
             if (_site is not null)
@@ -136,6 +140,7 @@ public partial class PeopleWindow : Window
     private async Task RunAsync(Func<Task> action)
     {
         if (_closed || _loading || _operationBusy) return;
+        if (_inlinePending) return;
         if (string.IsNullOrWhiteSpace(_revision))
         {
             HintText.Text = "Нет актуальной ревизии справочника. Измените фильтр или откройте окно заново.";
@@ -146,6 +151,7 @@ public partial class PeopleWindow : Window
             HintText.Text = "Завершите редактирование списка.";
             return;
         }
+        if (_inlinePending) return; // Cell commit may have queued a directory write.
         RememberChecks();
         _operationBusy = true;
         var content = (UIElement)Content;
@@ -217,7 +223,8 @@ public partial class PeopleWindow : Window
     // Read-only refreshes may be cancelled; mutation readback is guarded until completion.
     private async Task ReloadReadOnlyAsync(AccessHistory? history = null)
     {
-        if (_closed || _loading || _operationBusy || _reloadCancellation is not null) return;
+        if (_closed || _loading || _operationBusy || _reloadCancellation is not null || _inlinePending) return;
+        if (!CommitChecks() || _inlinePending) return;
         RememberChecks();
         var selectedP = (PeopleGrid.SelectedItem as PeoplePerson)?.Id;
         var selectedC = (CarsGrid.SelectedItem as PeopleCar)?.Id;
@@ -236,7 +243,7 @@ public partial class PeopleWindow : Window
             if (_closed || token.IsCancellationRequested) return;
             HintText.Text = _registrationUncertain
                 ? "Файл создан, но запись в журнал не подтверждена. Повторный экспорт не выполняйте."
-                : "Выберите строку для редактирования; все изменения сохраняются в SQL Server.";
+                : "Двойной щелчок или F2 — редактировать ячейку; Enter — сохранить, Esc — отменить.";
             if (history is not null) RestoreHistory(history);
             ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
         }
@@ -313,21 +320,14 @@ public partial class PeopleWindow : Window
     }
     private void Search_Changed(object sender, TextChangedEventArgs e)
     {
-        if (!_loading && PeopleGrid is not null) ApplyFilter();
+        if (!_loading && !_operationBusy && !_inlinePending && PeopleGrid is not null &&
+            CommitChecks() && !_inlinePending) ApplyFilter();
     }
     private async void Filter_Changed(object sender, RoutedEventArgs e)
     {
         if (!_loading && PeopleGrid is not null) await ReloadReadOnlyAsync();
     }
     private void Selection_Changed(object sender, SelectionChangedEventArgs e) => UpdateCounts();
-    private void People_DoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (SelectedPerson() is not null) PersonEdit_Click(sender, e);
-    }
-    private void Cars_DoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (SelectedCar() is not null) CarEdit_Click(sender, e);
-    }
     private void People_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (Keyboard.Modifiers != ModifierKeys.Control || e.Key is not (Key.Up or Key.Down)) return;
@@ -373,22 +373,6 @@ public partial class PeopleWindow : Window
         if (IsAccess) _checkedPeople.Add(result.Id);
         await ReloadMutationAsync(personId: result.Id);
     });
-    private async void PersonEdit_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
-    {
-        var p = SelectedPerson();
-        if (p is null) return;
-        var values = EditFields("Редактировать сотрудника", new (string, string)[]
-        {
-            ("ФИО", p.Fio), ("Должность", p.Post), ("Дата рождения", p.Birth),
-            ("Примечание", p.Note), ("ФИО — кого (пусто = автоматически)", p.FioGen),
-            ("Должность — кого (пусто = автоматически)", p.PostGen)
-        });
-        if (values is null) return;
-        var row = p with { Fio = values[0], Post = values[1], Birth = values[2],
-            Note = values[3], FioGen = values[4], PostGen = values[5] };
-        await MutateAsync(revision => _db.SavePerson(row, revision));
-        await ReloadMutationAsync();
-    });
     private async void CarAdd_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var values = EditFields("Добавить автомобиль", new (string, string)[]
@@ -398,17 +382,6 @@ public partial class PeopleWindow : Window
         var result = await MutateAsync(revision => _db.SaveCar(row, revision));
         if (IsAccess) _checkedCars.Add(result.Id);
         await ReloadMutationAsync(carId: result.Id);
-    });
-    private async void CarEdit_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
-    {
-        var c = SelectedCar();
-        if (c is null) return;
-        var values = EditFields("Редактировать автомобиль", new (string, string)[]
-            { ("Марка / модель", c.Model), ("Госномер", c.Plate), ("Примечание", c.Note) });
-        if (values is null) return;
-        var row = c with { Model = values[0], Plate = values[1], Note = values[2] };
-        await MutateAsync(revision => _db.SaveCar(row, revision));
-        await ReloadMutationAsync();
     });
     private (long Id, bool Active, string Name)[] SelectedEntries(bool person) =>
         person ? PeopleGrid.SelectedItems.OfType<PeoplePerson>()
@@ -428,7 +401,7 @@ public partial class PeopleWindow : Window
     private void OpenEntryMenu(bool person, ContextMenuEventArgs e)
     {
         e.Handled = true;
-        if (_loading || _operationBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_loading || _operationBusy || _inlinePending || string.IsNullOrWhiteSpace(_revision)) return;
         var grid = person ? PeopleGrid : CarsGrid;
         if (person ? ContextMenuTarget.SelectRow<PeoplePerson>(grid, e) is null :
             ContextMenuTarget.SelectRow<PeopleCar>(grid, e) is null) return;
@@ -532,7 +505,7 @@ public partial class PeopleWindow : Window
     private void CarDown_Click(object sender, RoutedEventArgs e) => Move(false, +1);
     private void CheckAll(bool people, bool selected)
     {
-        if (_loading || _operationBusy || !CommitChecks()) return;
+        if (_loading || _operationBusy || _inlinePending || !CommitChecks() || _inlinePending) return;
         if (people)
             foreach (var p in _people.Where(p => IsVisible(PeopleGrid, p))) p.Selected = selected;
         else
