@@ -101,10 +101,30 @@ public static class SqlServerKsPrintData
             ? local.GroupBy(KsWorkspaceProjection.GroupKey)
                 .Select(g => KsGroupReport.Calculate(scope, g.Key, selectedDocumentOnly: true))
             : local.Select(a => KsGroupReport.CalculateSingle(scope, a.Id));
-        var packages = reports.Select(report => snapshot with { Report = report }).ToArray();
+        var packages = ScopeReports(snapshot, reports);
         if (before != SqlServerDatabase.Revision(conn))
             throw new InvalidOperationException("КС изменились во время подготовки экспорта. Обновите акт.");
         return packages;
+    }
+
+    /// <summary>
+    /// Partition an already read export snapshot by report membership in one
+    /// pass. Preserve the original line order and full legal/report context.
+    /// No SQL reads, monetary calculations, or changes to the input package.
+    /// </summary>
+    public static IReadOnlyList<Package> ScopeReports(Package snapshot,
+        IEnumerable<KsGroupReport> reports)
+    {
+        var ordered = reports.ToArray();
+        var reportIndexesByAct = ordered.SelectMany((report, index) =>
+            report.Acts.Select(act => act.Id).Distinct().Select(id => (Id: id, Index: index)))
+            .ToLookup(x => x.Id, x => x.Index);
+        var lines = ordered.Select(_ => new List<Line>()).ToArray();
+        foreach (var line in snapshot.Lines)
+            foreach (var index in reportIndexesByAct[line.ActId])
+                lines[index].Add(line);
+        return ordered.Select((report, index) =>
+            snapshot with { Report = report, Lines = lines[index].AsReadOnly() }).ToArray();
     }
 
     private static Package ReadPackage(SqlConnection conn, long contractId,

@@ -200,10 +200,11 @@ public static class KsCustomerForms
         DateCell(ws,"H19",act.PeriodTo);
         var lines = p.Lines.Where(l=>l.ActId==act.Id).ToList();
         var items = new List<(bool Heading, SqlServerKsPrintData.Line? Line, string Section)>();
+        int sectionNumber=0;
         foreach (var group in lines.GroupBy(l=>l.Section))
         {
             if (group.Key != "Без системы")
-                items.Add((true,null,"Раздел " + (items.Count(x=>x.Heading)+1) + ". " + group.Key));
+                items.Add((true,null,"Раздел " + (++sectionNumber) + ". " + group.Key));
             items.AddRange(group.Select(l=>(false,(SqlServerKsPrintData.Line?)l,"")));
         }
         const int first=26, footer=64;

@@ -131,6 +131,7 @@ public static class KsVorForms
             ?p.Requisites.ObjectName:p.Requisites.SiteFull;
         ws.Cell("A5").Value="Объект: "+site;
         ResizeBody(ws,first,footer,data.Count);
+        int serial=0;
         for(int i=0;i<data.Count;i++)
         {
             int row=first+i;Style(ws,row,style);
@@ -143,7 +144,7 @@ public static class KsVorForms
             }
             else if(item.Line is { } line)
             {
-                ws.Cell(row,1).Value=data.Take(i+1).Count(x=>x.Line is not null);
+                ws.Cell(row,1).Value=++serial;
                 ws.Cell(row,2).Value=line.Name;
                 ws.Cell(row,3).Value=line.Unit;
                 SetQuantity(ws,row,4,line.Quantity);

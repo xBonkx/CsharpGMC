@@ -39,6 +39,8 @@ internal static class Program
                 () => CheckMultiDs(frozenForm));
             Check(form + ": VOR numeric quantities without dangling separator",
                 () => CheckVorQuantityFormat(frozenForm));
+            Check(form + ": VOR numbering and act/section boundaries",
+                () => CheckVorNumbering(frozenForm, 12));
             foreach(var count in new[] { 2,300 })
             {
                 var frozenCount=count;
@@ -53,6 +55,9 @@ internal static class Program
             Check(form + ": frozen KS3 gross opening balance", () => CheckOpening(frozenForm));
         }
 
+        Check("standard: VOR 2500 positions with mixed sections", () => CheckVorNumbering("standard", 2500));
+        Check("DNS: KS2 section numbering skips no-system heading", CheckDnsSectionNumbering);
+        Check("all acts: scoped print snapshots preserve membership and original order", CheckScopedReports);
         Check("v31: KS2/KS3 discount and fixed total formulas", CheckAdjustments);
         Check("v31: KS2 section amounts, duplicate names and remainder", CheckSectionAmounts);
         Check("DNS: XLSX formulas preserve half-kopeck round_rows", CheckDnsRoundRows);
@@ -412,6 +417,98 @@ internal static class Program
             MoneyEquals(item.GetProperty("vat").GetDecimal(), calculated.Vat,
                 label + " Python VAT");
         }
+    }
+
+    private static void CheckScopedReports()
+    {
+        var original=Fixture("standard",2500,multiDs:true);
+        // Deliberately interleave acts and reverse the report order.
+        var source=original.Lines.OrderBy(l=>l.PositionNumber,StringComparer.Ordinal)
+            .ThenByDescending(l=>l.ActId).ToArray();
+        var snapshot=original with { Lines=source };
+        var first=snapshot.Report.Acts[0];
+        var second=snapshot.Report.Acts[1];
+        var reports=new[]
+        {
+            snapshot.Report with { Acts=new[]{second} },
+            snapshot.Report with { Acts=new[]{first} },
+            snapshot.Report with { Acts=new[]{second,first} }
+        };
+        var scoped=SqlServerKsPrintData.ScopeReports(snapshot,reports);
+        Assert(scoped.Count==reports.Length,"Report count changed");
+        for(int i=0;i<reports.Length;i++)
+        {
+            var ids=reports[i].Acts.Select(a=>a.Id).ToHashSet();
+            Assert(scoped[i].Lines.SequenceEqual(source.Where(l=>ids.Contains(l.ActId))),
+                "Scoped report lost, duplicated or reordered lines");
+            Assert(ReferenceEquals(scoped[i].Report,reports[i]) &&
+                ReferenceEquals(scoped[i].Scope,snapshot.Scope) &&
+                ReferenceEquals(scoped[i].Contractors,snapshot.Contractors) &&
+                ReferenceEquals(scoped[i].Sections,snapshot.Sections),
+                "Report snapshot lost shared legal context");
+        }
+        Assert(ReferenceEquals(snapshot.Lines,source),"Source lines were replaced");
+        Assert(SqlServerKsPrintData.ScopeReports(snapshot,Array.Empty<KsGroupReport>()).Count==0,
+            "Empty report list should remain empty");
+    }
+
+    private static void CheckVorNumbering(string form,int count)
+    {
+        var original=Fixture(form,count,multiDs:true);
+        var selected=original.Report.Acts[0].Id;
+        var lines=original.Lines.Select((line,i)=>line with
+        {
+            Name="VOR-SERIAL-"+i,
+            Section=(i%4) switch { 0=>"Система П1",1=>"Без системы",2=>"Система В1",_=>"Система П1" },
+            Quantity=i%11==0?0m:i%13==0?-1m:line.Quantity
+        }).ToArray();
+        var package=original with { Lines=lines };
+        using var book=KsVorForms.Create(package,selected);
+        var sheet=form=="r4"?book.Worksheet("ВОР"):book.Worksheet(1);
+        int row=form=="r4"?7:form=="dns"?3:10;
+        int nameCol=form=="r4"?6:form=="dns"?4:2;
+        int qtyCol=form=="r4"?8:form=="dns"?6:4;
+        int serial=0,sectionNumber=0;
+        foreach(var group in lines.Where(l=>l.ActId==selected&&l.Quantity>0m).GroupBy(l=>l.Section))
+        {
+            if(group.Key!="Без системы")
+            {
+                var heading=form=="dns"?"Раздел "+(++sectionNumber)+". "+group.Key:group.Key;
+                Assert(sheet.Cell(row,nameCol).GetString()==heading,"VOR section order");
+                if(form=="dns")
+                    Assert(sheet.Cell(row,1).GetDouble()==++serial,"DNS heading serial");
+                else
+                    Assert(sheet.Cell(row,1).GetString()=="","Heading must not consume a position serial");
+                row++;
+            }
+            foreach(var line in group)
+            {
+                Assert(sheet.Cell(row,nameCol).GetString()==line.Name,"VOR line order or act scope");
+                Assert(sheet.Cell(row,1).GetDouble()==++serial,"VOR serial sequence");
+                Assert((decimal)sheet.Cell(row,qtyCol).GetDouble()==line.Quantity,"VOR quantity");
+                row++;
+            }
+        }
+        var actualNames=sheet.Column(nameCol).CellsUsed()
+            .Select(c=>c.GetString()).Where(x=>x.StartsWith("VOR-SERIAL-",StringComparison.Ordinal)).ToArray();
+        Assert(actualNames.Length==lines.Count(l=>l.ActId==selected&&l.Quantity>0m),
+            "VOR included another act or nonpositive quantity");
+        Roundtrip(book,form+"_VOR_SERIAL_"+count+".xlsx",false);
+    }
+
+    private static void CheckDnsSectionNumbering()
+    {
+        var original=Fixture("dns",12);
+        var package=original with { Lines=original.Lines.Select((line,i)=>line with
+        {
+            Section=(i%4) switch { 0=>"Без системы",1=>"П1",2=>"В1",_=>"П2" }
+        }).ToArray() };
+        using var book=KsCustomerForms.Create(package);
+        var sheet=book.Worksheets.Single(w=>w.Name.StartsWith("кс-2",StringComparison.OrdinalIgnoreCase));
+        var headings=sheet.Column(3).CellsUsed().Select(c=>c.GetString())
+            .Where(s=>s.StartsWith("Раздел ",StringComparison.Ordinal)).ToArray();
+        Assert(headings.SequenceEqual(new[]{"Раздел 1. П1","Раздел 2. В1","Раздел 3. П2"}),
+            "DNS section numbering or group order changed");
     }
 
     private static void CheckVorPrintFooter(string form,int count)
