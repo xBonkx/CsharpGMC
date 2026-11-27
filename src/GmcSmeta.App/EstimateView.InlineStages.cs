@@ -227,13 +227,23 @@ public partial class EstimateView
                 warning.Setters.Add(new Setter(TextBlock.ForegroundProperty, StageBrush("#DC2626")));
                 style.Triggers.Add(warning);
             }
-            var column = new DataGridTextColumn
+            // DataGridBoundColumn coerces any OneWay binding to read-only,
+            // even when IsReadOnly=false. A template column keeps the snapshot
+            // immutable while the existing CellEditEnding reads the editor text.
+            var display = new FrameworkElementFactory(typeof(TextBlock));
+            display.SetValue(FrameworkElement.StyleProperty, style);
+            display.SetBinding(TextBlock.TextProperty,
+                new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay });
+            var editor = new FrameworkElementFactory(typeof(TextBox));
+            editor.SetValue(FrameworkElement.StyleProperty, (Style)FindResource("EstimateMoneyEditor"));
+            editor.SetBinding(TextBox.TextProperty,
+                new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay });
+            var column = new DataGridTemplateColumn
             {
                 Header = title,
                 Visibility = Visibility.Visible,
-                Binding = new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay },
-                ElementStyle = style,
-                EditingElementStyle = (Style)FindResource("EstimateMoneyEditor"),
+                CellTemplate = new DataTemplate { VisualTree = display },
+                CellEditingTemplate = new DataTemplate { VisualTree = editor },
                 Width = new DataGridLength(Math.Clamp(90 + title.Length * 5, 90, 170)),
                 IsReadOnly = rest || data.Stages[i].Locked,
                 CanUserSort = false,

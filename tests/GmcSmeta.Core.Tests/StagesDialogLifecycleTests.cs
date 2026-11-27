@@ -61,6 +61,11 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("EstimateGrid.Columns.Add(column);", code);
         Assert.Contains("column.DisplayIndex = EstimateGrid.Columns.Count - 1;", code);
         Assert.Contains("IsReadOnly = rest || data.Stages[i].Locked", code);
+        Assert.Contains("new DataGridTemplateColumn", code);
+        Assert.Contains("CellEditingTemplate = new DataTemplate", code);
+        Assert.DoesNotContain("new DataGridTextColumn", code);
+        var cells = Source("GmcSmeta.App/EstimateView.Cells.cs");
+        Assert.Contains("SaveInlineStageCell(row, e.Column, stageEditor.Text)", cells);
         Assert.Contains("RevealInlineStageColumns(data)", code);
         Assert.Contains("scroll.ScrollToHorizontalOffset", code);
         Assert.Contains("EstimateGrid.Columns.Remove(column)", code);
