@@ -17,7 +17,11 @@ namespace GmcSmeta.App;
 /// <summary>Shared, versioned Excel metal register. Edits preserve the workbook structure and cell styles.</summary>
 internal sealed class MetalRegisterWindow : Window
 {
-    private readonly SqlServerMetalWarehouse _warehouse;
+    private readonly string _connectionString;
+    private SqlServerMetalWarehouse? _warehouse;
+    private readonly WrapPanel _header = new() { Margin = new Thickness(0,0,0,9) };
+    private MetalRegisterSheet? _activePage;
+    private bool _busy, _switchingTabs;
     private readonly TabControl _tabs = new();
     private readonly TextBlock _status = new() { Foreground = Brushes.SlateGray };
     private XLWorkbook? _book;
@@ -33,17 +37,17 @@ internal sealed class MetalRegisterWindow : Window
         SetResourceReference(FontFamilyProperty,"UiFontFamily");
         SetResourceReference(FontSizeProperty,"UiBodySize");
         _tabs.SetResourceReference(FrameworkElement.StyleProperty,"PythonTabbedPane");
-        _warehouse = new SqlServerMetalWarehouse(connectionString);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        _connectionString = connectionString;
         var dock = new DockPanel { Margin = new Thickness(12) };
         Content = dock;
-        var header = new WrapPanel { Margin = new Thickness(0,0,0,9) };
-        DockPanel.SetDock(header,Dock.Top);
-        dock.Children.Add(header);
+        DockPanel.SetDock(_header,Dock.Top);
+        dock.Children.Add(_header);
         void Button(string title, RoutedEventHandler action)
         {
             var button = new Button { Content=title,Padding=new Thickness(14,6,14,6),Margin=new Thickness(0,0,6,6) };
             button.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
-            button.Click += action; header.Children.Add(button);
+            button.Click += action; _header.Children.Add(button);
         }
         Button("Загрузить Excel…",Import_Click);
         Button("Сохранить для всех",Save_Click);
@@ -55,9 +59,41 @@ internal sealed class MetalRegisterWindow : Window
         DockPanel.SetDock(_status,Dock.Bottom);
         dock.Children.Add(_status);
         dock.Children.Add(_tabs);
-        Closing += (_, e) => { if (!ConfirmDiscard()) e.Cancel = true; };
-        Loaded += async (_, _) => await Reload();
+        _tabs.SelectionChanged += Tabs_SelectionChanged;
+        SetBusy(false);
+        Closing += (_, e) =>
+        {
+            if (_busy || !CommitEditor() || !ConfirmDiscard()) e.Cancel = true;
+        };
+        Closed += (_, _) =>
+        {
+            _tabs.SelectionChanged -= Tabs_SelectionChanged;
+            _tabs.Items.Clear();
+            _activePage = null;
+            _book?.Dispose();
+            _book = null;
+        };
+        Loaded += InitializeAsync;
     }
+
+    private async void InitializeAsync(object sender, RoutedEventArgs e)
+    {
+        Loaded -= InitializeAsync;
+        SetBusy(true);
+        try { _warehouse = await Task.Run(() => new SqlServerMetalWarehouse(_connectionString)); }
+        catch (Exception ex) { Error(ex); }
+        finally { SetBusy(false); }
+        if (_warehouse is not null) await Reload();
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        _header.IsEnabled = !busy && _warehouse is not null;
+        _tabs.IsEnabled = !busy;
+    }
+
+    private bool CommitEditor() => _activePage?.CommitEditor() != false;
 
     private bool ConfirmDiscard() => !_dirty || MessageBox.Show(this,
         "Отбросить несохранённые изменения?", "Учёт металла",
@@ -70,85 +106,158 @@ internal sealed class MetalRegisterWindow : Window
         _status.Text = "Есть несохранённые изменения; при конфликте можно выгрузить локальный Excel.";
     }
 
-    private void Display(XLWorkbook? workbook)
+    private sealed record PreparedBook(XLWorkbook Book, IReadOnlyList<MetalRegisterSheet.Description> Sheets);
+
+    // ClosedXML access is exclusively on the worker before publication and
+    // on the dispatcher afterwards. Do not serialize a live grid-bound book
+    // concurrently with WPF cell bindings.
+    private static PreparedBook Prepare(XLWorkbook book)
     {
-        _tabs.Items.Clear();
-        _book?.Dispose();
-        _book = workbook;
-        if (_book is null)
+        try
         {
-            _status.Text = "Общая Excel-книга ещё не загружена.";
-            return;
+            var sheets = book.Worksheets.Select(MetalRegisterSheet.Describe).ToArray();
+            if (sheets.Length == 0 || sheets.Any(s => (long)s.RowLimit * s.ColLimit > 250_000))
+                throw new InvalidDataException("В книге нет листов либо есть лист больше 250 000 ячеек.");
+            return new PreparedBook(book, sheets);
         }
-        foreach (var sheet in _book.Worksheets)
+        catch { book.Dispose(); throw; }
+    }
+
+    private void Display(PreparedBook? prepared)
+    {
+        var items = new List<TabItem>();
+        MetalRegisterSheet? first = null;
+        try
         {
-            var page = new MetalRegisterSheet(sheet, MarkDirty);
-            _tabs.Items.Add(new TabItem
+            if (prepared is not null)
             {
-                Header = sheet.Name == "Лист1" && page.HasSections ? "Объёмы по объектам" : sheet.Name,
-                Content = page
-            });
+                foreach (var sheet in prepared.Sheets)
+                    items.Add(new TabItem
+                    {
+                        Header = sheet.Sheet.Name == "Лист1" && sheet.Sections.Count != 0
+                            ? "Объёмы по объектам" : sheet.Sheet.Name,
+                        Tag = sheet
+                    });
+                // Only the first sheet has a grid initially. Build it before
+                // destroying the previously displayed workbook.
+                first = new MetalRegisterSheet(prepared.Sheets[0], MarkDirty);
+                items[0].Content = first;
+            }
         }
-        _dirty = false; Title = "Учёт металла";
+        catch { prepared?.Book.Dispose(); throw; }
+
+        _switchingTabs = true;
+        try
+        {
+            _tabs.Items.Clear();
+            _activePage = null;
+            _book?.Dispose();
+            _book = prepared?.Book;
+            foreach (var item in items) _tabs.Items.Add(item);
+            if (items.Count != 0) _tabs.SelectedIndex = 0;
+            _activePage = first;
+            _dirty = false;
+            Title = "Учёт металла";
+        }
+        finally { _switchingTabs = false; }
+    }
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_switchingTabs || !ReferenceEquals(e.Source, _tabs) ||
+            _tabs.SelectedItem is not TabItem tab ||
+            tab.Tag is not MetalRegisterSheet.Description sheet) return;
+        var previous = e.RemovedItems.OfType<TabItem>().FirstOrDefault();
+        try
+        {
+            if (_busy || !CommitEditor())
+            {
+                RestoreTab(previous);
+                return;
+            }
+            if (tab.Content is not MetalRegisterSheet page)
+            {
+                page = new MetalRegisterSheet(sheet, MarkDirty);
+                tab.Content = page;
+            }
+            _activePage = page;
+        }
+        catch (Exception ex)
+        {
+            RestoreTab(previous);
+            Error(ex);
+        }
+    }
+
+    private void RestoreTab(TabItem? previous)
+    {
+        if (previous is null) return;
+        _switchingTabs = true;
+        try { _tabs.SelectedItem = previous; }
+        finally { _switchingTabs = false; }
     }
 
     private async Task Reload()
     {
-        if (!ConfirmDiscard()) return;
+        if (_busy || _warehouse is not { } store || !CommitEditor() || !ConfirmDiscard()) return;
+        SetBusy(true);
         try
         {
             _status.Text = "Загрузка общей книги…";
-            var shared = await Task.Run(_warehouse.ReadRegister);
-            XLWorkbook? book = shared is null ? null :
-                await Task.Run(() => new XLWorkbook(new MemoryStream(shared.Data, false)));
-            Display(book);
-            _version = shared?.Revision;
-            _status.Text = shared is null ? "Нет общей Excel-книги." :
-                "Версия " + shared.Revision + " · изменения коллег защищены от перезаписи.";
+            var data = await Task.Run(() =>
+            {
+                var shared = store.ReadRegister();
+                if (shared is null) return (Book: (PreparedBook?)null, Version: (long?)null);
+                var book = Prepare(new XLWorkbook(new MemoryStream(shared.Data, false)));
+                return (Book: (PreparedBook?)book, Version: (long?)shared.Revision);
+            });
+            Display(data.Book);
+            _version = data.Version;
+            _status.Text = data.Version is null ? "Нет общей Excel-книги." :
+                "Версия " + data.Version + " · изменения коллег защищены от перезаписи.";
         }
         catch (Exception ex) { Error(ex); }
+        finally { SetBusy(false); }
     }
 
-    private static XLWorkbook OpenLimited(string path)
+    private static PreparedBook OpenLimited(string path)
     {
         if (new FileInfo(path).Length is 0 or > 5_000_000)
             throw new InvalidDataException("Excel-книга должна быть не больше 5 МБ.");
-        var book = new XLWorkbook(path);
-        if (!book.Worksheets.Any() || book.Worksheets.Any(s =>
-            (long)(s.LastRowUsed(XLCellsUsedOptions.Contents)?.RowNumber() ?? 0) *
-            (s.LastColumnUsed(XLCellsUsedOptions.Contents)?.ColumnNumber() ?? 0) > 250_000))
-        {
-            book.Dispose();
-            throw new InvalidDataException("В книге нет листов либо есть лист больше 250 000 ячеек.");
-        }
-        return book;
+        return Prepare(new XLWorkbook(path));
     }
 
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
-        if (!ConfirmDiscard()) return;
+        if (_busy || _warehouse is null || !CommitEditor() || !ConfirmDiscard()) return;
         var picker = new OpenFileDialog { Title = "Загрузить таблицу металла",Filter = "Excel (*.xlsx)|*.xlsx" };
         if (picker.ShowDialog(this) != true) return;
         if (_book is not null && MessageBox.Show(this,
             "Заменить текущую таблицу выбранным Excel при сохранении для всех?",
             "Учёт металла",MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        SetBusy(true);
         try
         {
-            var workbook = await Task.Run(() => OpenLimited(picker.FileName));
+            var path = picker.FileName;
+            var workbook = await Task.Run(() => OpenLimited(path));
             Display(workbook);
             MarkDirty();
         }
         catch (Exception ex) { Error(ex); }
+        finally { SetBusy(false); }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_book is null || !_dirty) return;
+        if (_busy || _warehouse is not { } store || _book is not { } book ||
+            !CommitEditor() || !_dirty) return;
+        var version = _version;
+        SetBusy(true);
         try
         {
-            var bytes = LiveWorkbookSnapshot.Capture(_book);
-            var mainRevision = await Task.Run(_warehouse.Revision);
-            var next = await Task.Run(() => _warehouse.SaveRegister(bytes,_version,mainRevision));
+            var bytes = LiveWorkbookSnapshot.Capture(book);
+            var mainRevision = await Task.Run(store.Revision);
+            var next = await Task.Run(() => store.SaveRegister(bytes,version,mainRevision));
             _version = next;
             _dirty = false;
             Title = "Учёт металла";
@@ -159,44 +268,52 @@ internal sealed class MetalRegisterWindow : Window
             _status.Text = "Сохранение не подтверждено. Локальная книга сохранена в редакторе.";
             Error(ex);
         }
+        finally { SetBusy(false); }
     }
 
-    private void Export_Click(object sender, RoutedEventArgs e)
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (_book is null) return;
+        if (_busy || _book is not { } book || !CommitEditor()) return;
         var picker = new SaveFileDialog
         {
             Title = "Выгрузить таблицу металла", FileName = "Учёт металла.xlsx",
             DefaultExt = ".xlsx",Filter = "Excel (*.xlsx)|*.xlsx"
         };
         if (picker.ShowDialog(this) != true) return;
+        var path = picker.FileName;
+        SetBusy(true);
         try
         {
             // Never bind the live editable workbook to the exported filename.
             // It must survive deletion/locking of that file and later saves.
-            var bytes = LiveWorkbookSnapshot.Capture(_book);
-            ExportFilePublication.WriteBytes(picker.FileName, bytes);
-            _status.Text = "Файл сохранён: " + picker.FileName;
+            var bytes = LiveWorkbookSnapshot.Capture(book);
+            await Task.Run(() => ExportFilePublication.WriteBytes(path, bytes));
+            _status.Text = "Файл сохранён: " + path;
         }
         catch (Exception ex) { Error(ex); }
+        finally { SetBusy(false); }
     }
 
     private async void Opening_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy || _warehouse is not { } store || !CommitEditor()) return;
         var picker = new OpenFileDialog { Title = "Сверка исходных остатков",Filter = "Excel (*.xlsx)|*.xlsx" };
         if (picker.ShowDialog(this) != true) return;
+        SetBusy(true);
         try
         {
-            var preview = await Task.Run(() => MetalOpeningReader.Read(picker.FileName));
+            var path = picker.FileName;
+            var preview = await Task.Run(() => MetalOpeningReader.Read(path));
             if (new MetalOpeningPreviewDialog(preview) { Owner = this }.ShowDialog() != true) return;
             if (MessageBox.Show(this, "Перенести остатки в склад один раз?",
                 "Первоначальный импорт",MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-            var revision = await Task.Run(_warehouse.Revision);
-            await Task.Run(() => _warehouse.ImportOpening(
+            var revision = await Task.Run(store.Revision);
+            await Task.Run(() => store.ImportOpening(
                 preview.Records,preview.FileName,preview.Original,revision));
             MessageBox.Show(this,"Начальные остатки и потребности перенесены.","Склад металла");
         }
         catch (Exception ex) { Error(ex); }
+        finally { SetBusy(false); }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await Reload();
@@ -225,15 +342,23 @@ internal sealed class MetalRegisterSheet : UserControl
     private readonly int _colLimit;
     private IReadOnlyList<int> _columns = [];
     private int _heading;
+    private int _sectionIndex = -1;
+    private bool _sectionChanging, _refreshPending, _refreshQueued;
+
+    internal sealed record Description(IXLWorksheet Sheet, int RowLimit, int ColLimit,
+        IReadOnlyList<(int Header,string Name)> Sections);
 
     public bool HasSections => _sectionRows.Count != 0;
 
-    public MetalRegisterSheet(IXLWorksheet sheet, Action markDirty)
+    public MetalRegisterSheet(IXLWorksheet sheet, Action markDirty) : this(Describe(sheet), markDirty) { }
+
+    internal static Description Describe(IXLWorksheet sheet)
     {
-        _sheet = sheet; _markDirty = markDirty;
-        _formulas = new MetalFormulaEvaluator(sheet);
-        _rowLimit = sheet.LastRowUsed(XLCellsUsedOptions.Contents)?.RowNumber() ?? 0;
-        _colLimit = sheet.LastColumnUsed(XLCellsUsedOptions.Contents)?.ColumnNumber() ?? 0;
+        var rowLimit = sheet.LastRowUsed(XLCellsUsedOptions.Contents)?.RowNumber() ?? 0;
+        var colLimit = sheet.LastColumnUsed(XLCellsUsedOptions.Contents)?.ColumnNumber() ?? 0;
+        if ((long)rowLimit * colLimit > 250_000)
+            throw new InvalidDataException("Лист больше 250 000 ячеек.");
+        var sections = new List<(int Header,string Name)>();
         var names = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
         {
             ["металл/объект"] = "Металл в бухтах",
@@ -241,9 +366,19 @@ internal sealed class MetalRegisterSheet : UserControl
             ["металл в листах"] = "Металл в листах",
             ["огнезащита / объект"] = "Огнезащита"
         };
-        for (var row = 1; row <= _rowLimit; row++)
+        for (var row = 1; row <= rowLimit; row++)
             if (names.TryGetValue(sheet.Cell(row,1).CachedValue.ToString().Trim(),out var title))
-                _sectionRows.Add((row,title));
+                sections.Add((row,title));
+        return new Description(sheet,rowLimit,colLimit,sections);
+    }
+
+    internal MetalRegisterSheet(Description description, Action markDirty)
+    {
+        _sheet = description.Sheet; _markDirty = markDirty;
+        _formulas = new MetalFormulaEvaluator(_sheet);
+        _rowLimit = description.RowLimit;
+        _colLimit = description.ColLimit;
+        _sectionRows.AddRange(description.Sections);
         var dock = new DockPanel();
         Content = dock;
         if (HasSections)
@@ -255,10 +390,24 @@ internal sealed class MetalRegisterSheet : UserControl
             _sections.Items.Add("Весь лист");
             tools.Children.Add(_sections);
             dock.Children.Add(tools);
-            _sections.SelectionChanged += (_, _) => SetSection(_sections.SelectedIndex);
+            _sections.SelectionChanged += (_, _) =>
+            {
+                if (_sectionChanging) return;
+                if (CommitEditor()) SetSection(_sections.SelectedIndex);
+                else
+                {
+                    _sectionChanging = true;
+                    try { _sections.SelectedIndex = _sectionIndex < 0 ? _sectionRows.Count : _sectionIndex; }
+                    finally { _sectionChanging = false; }
+                }
+            };
         }
         _table.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
         _table.BeginningEdit += OnBeginningEdit;
+        _table.RowEditEnding += (_, _) => QueueRefresh();
+        _table.Loaded += (_, _) => QueueRefresh();
+        ScrollViewer.SetIsDeferredScrollingEnabled(_table, true);
+        VirtualizingPanel.SetVirtualizationMode(_table, VirtualizationMode.Recycling);
         _table.LoadingRow += (_, e) =>
         {
             e.Row.Header = e.Row.Item is MetalGridRow row ? row.ExcelRow : null;
@@ -268,14 +417,23 @@ internal sealed class MetalRegisterSheet : UserControl
         else SetSection(-1);
     }
 
+    internal bool CommitEditor() =>
+        _table.CommitEdit(DataGridEditingUnit.Cell, true) &&
+        _table.CommitEdit(DataGridEditingUnit.Row, true);
+
     private void SetSection(int index)
     {
         if (index >= _sectionRows.Count) index = -1;
+        _sectionIndex = index;
         _heading = index < 0 ? 0 : _sectionRows[index].Header;
         var start = _heading == 0 ? 1 : _heading + 1;
         var end = index < 0 || index == _sectionRows.Count - 1
             ? _rowLimit : _sectionRows[index+1].Header - 1;
         var rows = new List<int>();
+        var usedColumns = new bool[_colLimit + 1];
+        if (_heading != 0)
+            for (var col = 1; col <= _colLimit; col++)
+                usedColumns[col] = !_sheet.Cell(_heading,col).CachedValue.IsBlank;
         for (var row = start; row <= end; row++)
         {
             if (_heading != 0)
@@ -286,17 +444,15 @@ internal sealed class MetalRegisterSheet : UserControl
                 for (var col = 1; col <= _colLimit; col++)
                 {
                     var cell = _sheet.Cell(row,col);
-                    if (!cell.CachedValue.IsBlank || cell.HasFormula) { nonempty = true; break; }
+                    if (cell.CachedValue.IsBlank && !cell.HasFormula) continue;
+                    nonempty = usedColumns[col] = true;
                 }
                 if (!nonempty) continue;
             }
             rows.Add(row);
         }
         _columns = Enumerable.Range(1,_colLimit)
-            .Where(col => _heading == 0 ||
-                !_sheet.Cell(_heading,col).CachedValue.IsBlank ||
-                rows.Any(row => !_sheet.Cell(row,col).CachedValue.IsBlank ||
-                               _sheet.Cell(row,col).HasFormula)).ToList();
+            .Where(col => _heading == 0 || usedColumns[col]).ToList();
         _table.ColumnHeaderHeight = _heading == 0 ? 32 : 72;
         _table.Columns.Clear();
         for (var col = 0; col < _columns.Count; col++)
@@ -444,7 +600,23 @@ internal sealed class MetalRegisterSheet : UserControl
         else cell.Value = value; // Strings beginning with '=' remain text, not executable formulas.
         _formulas.Clear();
         _markDirty();
-        _table.Dispatcher.BeginInvoke(() => _table.Items.Refresh(), DispatcherPriority.Background);
+        _refreshPending = true;
+        QueueRefresh();
+    }
+
+    private void QueueRefresh()
+    {
+        if (!_refreshPending || _refreshQueued) return;
+        _refreshQueued = true;
+        _table.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _refreshQueued = false;
+            if (!_refreshPending) return;
+            if (!_table.IsLoaded) return;
+            if (_table.Items is IEditableCollectionView { IsEditingItem: true }) return;
+            _refreshPending = false;
+            _table.Items.Refresh();
+        }), DispatcherPriority.Background);
     }
 
     private sealed class MetalGridRow
