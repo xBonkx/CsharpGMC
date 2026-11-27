@@ -58,9 +58,9 @@ public static partial class SqlServerActs
             Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),Convert.ToInt64(r.GetValue(1),CultureInfo.InvariantCulture),r.IsDBNull(2) ? "" : r.GetString(2),
             date,r.IsDBNull(4) ? date : r.GetDateTime(4),
             r.IsDBNull(5) ? date : r.GetDateTime(5),
-            !r.IsDBNull(6) && r.GetBoolean(6),
-            !r.IsDBNull(7) && r.GetBoolean(7), D(8),D(9),D(10),
-            !r.IsDBNull(11) && r.GetBoolean(11),
+            !r.IsDBNull(6) && SqlFlag.Read(r, 6),
+            !r.IsDBNull(7) && SqlFlag.Read(r, 7), D(8),D(9),D(10),
+            !r.IsDBNull(11) && SqlFlag.Read(r, 11),
             r.IsDBNull(12) ? "" : r.GetString(12),
             r.IsDBNull(13) ? "" : r.GetString(13),
             r.IsDBNull(14) ? "" : r.GetString(14),
@@ -125,8 +125,8 @@ public static partial class SqlServerActs
             using var r=read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Акт не найден.",rev);
             contractId=Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture);
-            signed=r.GetBoolean(1);
-            locked=r.GetBoolean(2);
+            signed=SqlFlag.Read(r, 1);
+            locked=SqlFlag.Read(r, 2);
             smrMode=r.IsDBNull(3) ? "" : r.GetString(3);
             oldSmr=Money.FromDouble(Convert.ToDouble(r.GetValue(4),CultureInfo.InvariantCulture));
             if(schema31)

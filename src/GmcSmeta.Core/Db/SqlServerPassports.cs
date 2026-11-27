@@ -379,7 +379,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         var list = new List<ExportInfo>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read()) list.Add(new ExportInfo(reader.GetGuid(0), reader.GetString(1),
-            reader.GetString(2).TrimEnd(), reader.GetBoolean(3), SqlInteger.ReadInt32(reader, 4)));
+            reader.GetString(2).TrimEnd(), SqlFlag.Read(reader, 3), SqlInteger.ReadInt32(reader, 4)));
         return list;
     }
 }

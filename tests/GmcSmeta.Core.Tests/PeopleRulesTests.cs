@@ -91,12 +91,14 @@ public sealed class PeopleRulesTests
     }
 
     [Theory]
-    [InlineData(false, 0)]
-    [InlineData(false, 17)]
-    [InlineData(true, 0)]
-    [InlineData(true, 17)]
-    [InlineData(true, int.MaxValue)]
-    public void AccessReadersAcceptIntAndBigIntSortOrder(bool bigInt, int order)
+    [InlineData(false, 0, false)]
+    [InlineData(false, 17, false)]
+    [InlineData(true, 0, false)]
+    [InlineData(true, 17, false)]
+    [InlineData(true, int.MaxValue, false)]
+    [InlineData(false, 17, true)]
+    [InlineData(true, 17, true)]
+    public void AccessReadersAcceptIntAndBigIntSortOrder(bool bigInt, int order, bool integerFlag)
     {
         var orderType = bigInt ? typeof(long) : typeof(int);
         object orderValue = bigInt ? (object)(long)order : order;
@@ -105,9 +107,9 @@ public sealed class PeopleRulesTests
         people.Columns.Add("id", typeof(long));
         foreach (var column in new[] { "fio", "post", "birth", "note", "fio_gen", "post_gen" })
             people.Columns.Add(column, typeof(string));
-        people.Columns.Add("active", typeof(bool));
+        people.Columns.Add("active", integerFlag ? typeof(int) : typeof(bool));
         people.Columns.Add("sort_order", orderType);
-        people.Rows.Add(id, "Иванов", "монтажник", "", "", "", "", true, orderValue);
+        people.Rows.Add(id, "Иванов", "монтажник", "", "", "", "", integerFlag ? (object)1 : true, orderValue);
         using var personReader = people.CreateDataReader();
         Assert.True(personReader.Read());
         var person = SqlServerPeopleAccess.ReadPerson(personReader);
@@ -119,9 +121,9 @@ public sealed class PeopleRulesTests
         cars.Columns.Add("id", typeof(long));
         foreach (var column in new[] { "model", "plate", "note" })
             cars.Columns.Add(column, typeof(string));
-        cars.Columns.Add("active", typeof(bool));
+        cars.Columns.Add("active", integerFlag ? typeof(long) : typeof(bool));
         cars.Columns.Add("sort_order", orderType);
-        cars.Rows.Add(id, "Марка", "А123ВС", "", false, orderValue);
+        cars.Rows.Add(id, "Марка", "А123ВС", "", integerFlag ? (object)0L : false, orderValue);
         using var carReader = cars.CreateDataReader();
         Assert.True(carReader.Read());
         var car = SqlServerPeopleAccess.ReadCar(carReader);

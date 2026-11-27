@@ -117,7 +117,7 @@ public static partial class SqlServerCostOperations
                     Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
                     Dec(1), Dec(2), Dec(3) ?? 0m,
                     reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    !reader.IsDBNull(5) && reader.GetBoolean(5),
+                    !reader.IsDBNull(5) && SqlFlag.Read(reader, 5),
                     GmcSmeta.Core.Domain.EstimateStatistics.IsWorkName(name)));
             }
         }
@@ -284,7 +284,7 @@ WHERE sy.contract_id=@id AND p.purchase_price IS NULL
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Договор не найден.", rev);
-            locked = r.GetBoolean(0);
+            locked = SqlFlag.Read(r, 0);
             oldCustomer = Convert.ToDecimal(r.GetValue(1), CultureInfo.InvariantCulture);
         }
         if (locked && customerAmount != oldCustomer)

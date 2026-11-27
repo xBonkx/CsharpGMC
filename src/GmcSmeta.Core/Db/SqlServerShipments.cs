@@ -684,7 +684,7 @@ public static class SqlServerShipments
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
             number = r.GetString(0);
             objectName = r.GetString(1);
-            if (!r.GetBoolean(2)) return SqlServerDatabase.SaveResult.Fail("Ведомость уже является черновиком.", rev);
+            if (!SqlFlag.Read(r, 2)) return SqlServerDatabase.SaveResult.Fail("Ведомость уже является черновиком.", rev);
         }
         if (FixedLedgerProblem(conn, tx, shipmentId) is { } problem)
             return SqlServerDatabase.SaveResult.Fail(problem, rev);

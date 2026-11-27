@@ -143,15 +143,15 @@ public sealed class SqlServerPeopleAccess
     }
 
     // SQL Server copies may store sort_order as INT or BIGINT.
-    // Convert checks the Int32 range instead of requiring an exact provider type.
+    // SqlInteger checks the Int32 range instead of requiring an exact provider type.
     internal static PeoplePerson ReadPerson(IDataRecord reader) =>
-        new(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
+        new(SqlInteger.ReadInt64(reader, 0), reader.GetString(1), reader.GetString(2),
             reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
-            reader.GetBoolean(7), Convert.ToInt32(reader.GetValue(8)));
+            SqlFlag.Read(reader, 7), SqlInteger.ReadInt32(reader, 8));
 
     internal static PeopleCar ReadCar(IDataRecord reader) =>
         new(Convert.ToInt64(reader.GetValue(0)), reader.GetString(1), reader.GetString(2),
-            reader.GetString(3), reader.GetBoolean(4), Convert.ToInt32(reader.GetValue(5)));
+            reader.GetString(3), SqlFlag.Read(reader, 4), SqlInteger.ReadInt32(reader, 5));
 
     public (long Id, string Revision) SavePerson(PeoplePerson row, string expectedRevision)
     {

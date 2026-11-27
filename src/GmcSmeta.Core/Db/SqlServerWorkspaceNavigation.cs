@@ -93,7 +93,7 @@ public static class SqlServerWorkspaceNavigation
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 hits.Add(new SearchHit("object", Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture), 0, 0,
-                    reader.GetString(1), reader.GetBoolean(2) ? "Архив" : ""));
+                    reader.GetString(1), SqlFlag.Read(reader, 2) ? "Архив" : ""));
             }
         }
 

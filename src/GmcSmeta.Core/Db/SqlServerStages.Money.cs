@@ -52,8 +52,8 @@ public static partial class SqlServerStages
             if (!r.Read() || r.IsDBNull(0))
                 throw new InvalidOperationException("Этап больше не существует.");
             fullId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            rest = !r.IsDBNull(1) && r.GetBoolean(1);
-            locked = !r.IsDBNull(2) && r.GetBoolean(2);
+            rest = !r.IsDBNull(1) && SqlFlag.Read(r, 1);
+            locked = !r.IsDBNull(2) && SqlFlag.Read(r, 2);
             name = r.IsDBNull(3) ? "" : r.GetString(3);
             mode = r.IsDBNull(4) ? "" : r.GetString(4);
             smr = Amount(r, 5);
