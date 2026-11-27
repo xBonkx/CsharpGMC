@@ -21,9 +21,9 @@ public sealed class ProcurementGridVisualSourceTests
             Assert.Single(view.Descendants(p + "Style").Where(e => (string?)e.Attribute(x + "Key") == key))
                 .Elements(p + "Setter").Where(e => (string?)e.Attribute("Property") == property)).Attribute("Value");
         var grid = Named("BuyGrid");
-        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        Assert.Equal("{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}",
-            (string?)grid.Attribute("RowHeight"));
+        Assert.Equal("True", (string?)grid.Attribute(XName.Get("AdaptiveGridRowHeight.Enabled", "clr-namespace:GmcSmeta.App")));
+        Assert.Null(grid.Attribute("RowHeight"));
+        Assert.Null(grid.Attribute("MinRowHeight"));
         Assert.Null(grid.Attribute("AlternationCount"));
         Assert.Equal("4,4", Setter("ProcurementCell", "Padding"));
         Assert.Equal("6,8", Setter("ProcurementHeader", "Padding"));

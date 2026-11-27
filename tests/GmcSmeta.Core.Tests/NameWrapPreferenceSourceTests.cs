@@ -68,12 +68,16 @@ public sealed class NameWrapPreferenceSourceTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         var grid = Assert.Single(xaml.Descendants(ns + "DataGrid")
             .Where(e => (string?)e.Attribute(x + "Name") == gridName));
-        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        Assert.Equal("{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}",
-            (string?)grid.Attribute("RowHeight"));
+        Assert.Equal("True", (string?)grid.Attribute(XName.Get("AdaptiveGridRowHeight.Enabled", "clr-namespace:GmcSmeta.App")));
+        Assert.Null(grid.Attribute("RowHeight"));
+        Assert.Null(grid.Attribute("MinRowHeight"));
         var code = File.ReadAllText(Path.Combine(AppDirectory(), "NameWrapPreference.cs"));
-        Assert.Contains("IsEnabled ? double.NaN : 27d", code);
-        Assert.Contains("PropertyChangedEventArgs(nameof(RowHeight))", code);
+        var behavior = File.ReadAllText(Path.Combine(AppDirectory(), "AdaptiveGridRowHeight.cs"));
+        Assert.Contains("DataGrid.MinRowHeightProperty", behavior);
+        Assert.Contains("DataGrid.RowHeightProperty", behavior);
+        Assert.Contains("nameof(Control.FontSize)", behavior);
+        Assert.Contains("nameof(NameWrapPreference.IsEnabled)", behavior);
+        Assert.Contains("TableRowHeightPolicy.RowHeight", behavior);
         Assert.Contains("NameDisplayText.SingleLine(value as string)", code);
     }
 

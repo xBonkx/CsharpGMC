@@ -21,9 +21,9 @@ public sealed class EstimateGridGeometrySourceTests
             .Where(e => (string?)e.Attribute("Property") == property)).Attribute("Value");
         var grid = Assert.Single(view.Descendants(p + "DataGrid")
             .Where(e => (string?)e.Attribute(xaml + "Name") == "EstimateGrid"));
-        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        Assert.Equal("{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}",
-            (string?)grid.Attribute("RowHeight"));
+        Assert.Equal("True", (string?)grid.Attribute(XName.Get("AdaptiveGridRowHeight.Enabled", "clr-namespace:GmcSmeta.App")));
+        Assert.Null(grid.Attribute("RowHeight"));
+        Assert.Null(grid.Attribute("MinRowHeight"));
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
         Assert.Equal("Recycling", (string?)grid.Attribute("VirtualizingPanel.VirtualizationMode"));
         Assert.Equal("White", (string?)grid.Attribute("Background"));
@@ -34,7 +34,7 @@ public sealed class EstimateGridGeometrySourceTests
             .Where(e => (string?)e.Attribute("TargetType") == "DataGridColumnHeader"));
         Assert.Equal("6,8", Value(header, "Padding"));
         var row = Style("EstimateRow");
-        Assert.Equal("27", Value(row, "MinHeight"));
+        Assert.Equal("{Binding MinRowHeight, RelativeSource={RelativeSource AncestorType=DataGrid}}", Value(row, "MinHeight"));
         Assert.DoesNotContain(row.Descendants(p + "Setter"), e => (string?)e.Attribute("Property") == "Height");
         Assert.Equal("White", Value(row, "Background"));
         var system = Assert.Single(row.Descendants(p + "DataTrigger")

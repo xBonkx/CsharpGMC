@@ -146,7 +146,7 @@
     <DataGrid local:TableColumnMenu.Key="estimate-materials" x:Name="MaterialsGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="False"
               CellStyle="{StaticResource CompactCostCell}"
               RowStyle="{StaticResource MaterialsCostRow}"
-              MinRowHeight="27" ColumnHeaderStyle="{StaticResource CompactCostHeader}" RowHeight="{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}"
+              ColumnHeaderStyle="{StaticResource CompactCostHeader}" local:AdaptiveGridRowHeight.Enabled="True"
               CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False" RowHeaderWidth="0"
               HeadersVisibility="Column" GridLinesVisibility="All"
               HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF" BorderBrush="#E4E8EF" BorderThickness="1" Background="White"

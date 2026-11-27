@@ -22,9 +22,6 @@ public sealed class NameWrapPreference : INotifyPropertyChanged
     private NameWrapPreference() => IsEnabled = Load();
 
     public bool IsEnabled { get; private set; }
-    // NaN is WPF's automatic row height. The compact mode must constrain
-    // every row, including explicit newlines in names or other columns.
-    public double RowHeight => IsEnabled ? double.NaN : 27d;
     public TextWrapping EditorWrapping => IsEnabled ? TextWrapping.Wrap : TextWrapping.NoWrap;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -48,7 +45,6 @@ public sealed class NameWrapPreference : INotifyPropertyChanged
         if (IsEnabled == enabled) return;
         IsEnabled = enabled;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowHeight)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditorWrapping)));
         try
         {

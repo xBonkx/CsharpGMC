@@ -307,7 +307,7 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="EstimateRow" TargetType="DataGridRow">
-            <Setter Property="MinHeight" Value="27"/>
+            <Setter Property="MinHeight" Value="{Binding MinRowHeight, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
@@ -762,7 +762,7 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
-                <DataGrid x:Name="EstimateGrid" MinRowHeight="27" RowHeight="{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}" MinColumnWidth="36" BorderThickness="0" Background="White"
+                <DataGrid x:Name="EstimateGrid" local:AdaptiveGridRowHeight.Enabled="True" MinColumnWidth="36" BorderThickness="0" Background="White"
                           ContextMenuOpening="EstimateGrid_ContextMenuOpening" Sorting="EstimateGrid_Sorting"
                        AllowDrop="True"
                        PreviewMouseLeftButtonDown="EstimateGrid_DragMouseDown"
