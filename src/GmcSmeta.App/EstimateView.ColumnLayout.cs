@@ -50,7 +50,10 @@ public partial class EstimateView
         if (Math.Abs(e.ViewportWidthChange) > 0.1) RequestEstimateColumnFit();
         if (e.VerticalChange != 0 || e.HorizontalChange != 0 ||
             e.ViewportHeightChange != 0 || e.ViewportWidthChange != 0)
+        {
             RefreshDragMarkerAfterScroll();
+            RefreshEstimateFormulaHighlightsAfterScroll();
+        }
     }
 
     private ScrollViewer? EstimateScrollViewer()

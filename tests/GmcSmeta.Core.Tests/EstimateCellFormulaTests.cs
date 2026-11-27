@@ -18,6 +18,17 @@ public sealed class EstimateCellFormulaTests
     }
 
     [Fact]
+    public void StageFormulaRejectsMismatchAndZeroBeforeOpeningDatabase()
+    {
+        var mismatch = GmcSmeta.Core.Db.SqlServerStages.SetStageQty("not a connection", 1, 2, 5m,
+            "rev", qtyFormula: "=2+2");
+        Assert.False(mismatch.Saved);
+        var zero = GmcSmeta.Core.Db.SqlServerStages.SetStageQty("not a connection", 1, 2, 0m,
+            "rev", qtyFormula: "=2-2");
+        Assert.False(zero.Saved);
+    }
+
+    [Fact]
     public void StoredExpressionReopensAndOtherFieldsAreNotConfused()
     {
         Assert.Equal("=2*3", EstimateCellFormula.Read("{\"qty\":\"=2*3\",\"price\":\"=4+5\"}", "qty"));

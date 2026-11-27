@@ -17,6 +17,7 @@ public partial class EstimateView
     private readonly Dictionary<int, EstimateFormulaPick> _formulaPicks = new();
     private EstimateFormulaAdorner? _formulaAdorner;
     private AdornerLayer? _formulaLayer;
+    private bool _formulaScrollRefreshQueued;
 
     private bool IsEstimateFormulaColumn(DataGridColumn column) =>
         Field(column) is "qty" or "price" or "purchase_price" or "work_price" ||
@@ -134,7 +135,6 @@ public partial class EstimateView
             if (_formulaLayer is null) return;
             _formulaAdorner = new EstimateFormulaAdorner(EstimateGrid);
             _formulaLayer.Add(_formulaAdorner);
-            EstimateGrid.LayoutUpdated += EstimateFormula_LayoutUpdated;
         }
         _formulaAdorner.Update(refs.Where(_formulaPicks.ContainsKey).Select(i =>
         {
@@ -143,7 +143,16 @@ public partial class EstimateView
         }).ToArray());
     }
 
-    private void EstimateFormula_LayoutUpdated(object? sender, EventArgs e) => _formulaAdorner?.InvalidateVisual();
+    private void RefreshEstimateFormulaHighlightsAfterScroll()
+    {
+        if (_formulaAdorner is null || _formulaScrollRefreshQueued) return;
+        _formulaScrollRefreshQueued = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _formulaScrollRefreshQueued = false;
+            _formulaAdorner?.InvalidateVisual();
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
 
     private bool ResolveEstimateFormulaEdit(DataGridCellEditEndingEventArgs e)
     {
@@ -166,7 +175,11 @@ public partial class EstimateView
                 SetStatus("Формула этапа должна давать положительное количество; для удаления введите 0.", true);
                 return false;
             }
-            editor.Text = expanded;
+            // An explicit "=5" is still a formula for the user. Parentheses
+            // keep it in the existing arithmetic-formula storage contract.
+            editor.Text = NumberText.FormulaText(expanded) is null && NumberText.Parse(expanded) is decimal number &&
+                !(_inlineStageColumns.Contains(e.Column) && number <= StageAllocationPresentation.Epsilon)
+                ? "=(" + number.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")" : expanded;
         }
         EndEstimateFormulaEdit();
         return true;
@@ -189,7 +202,6 @@ public partial class EstimateView
         _formulaColumn = null;
         _formulaRevision = null;
         _formulaPicks.Clear();
-        EstimateGrid.LayoutUpdated -= EstimateFormula_LayoutUpdated;
         if (_formulaAdorner is not null) _formulaLayer?.Remove(_formulaAdorner);
         _formulaAdorner = null;
         _formulaLayer = null;
