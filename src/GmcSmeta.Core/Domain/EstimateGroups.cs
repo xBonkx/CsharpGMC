@@ -125,15 +125,16 @@ public static class EstimateGroups
                     g.Members.Any(r => allowed.Contains(r.SortKey)) ||
                     g.Components.Any(r => allowed.Contains(r.SortKey))).ToArray();
 
-        var areaKeys = new EstimateAreaSortKeys(EstimateViewProjection.SortField(sort));
-        int Compare(Group a, Group b, string key,
-            IReadOnlyDictionary<string, int>? ranks)
+        var field = EstimateViewProjection.SortField(sort);
+        var descending = EstimateViewProjection.IsDescending(sort);
+        var areaKeys = new EstimateAreaSortKeys(field);
+        int Compare(Group a, Group b)
         {
-            if (ranks is not null && ranks.TryGetValue(a.Key, out var ai) &&
-                ranks.TryGetValue(b.Key, out var bi) && ai != bi)
+            if (frozen is not null && frozen.TryGetValue(a.Key, out var ai) &&
+                frozen.TryGetValue(b.Key, out var bi) && ai != bi)
                 return ai.CompareTo(bi);
 
-            var value = EstimateViewProjection.SortField(key) switch
+            var value = field switch
             {
                 EstimateViewProjection.ByName => EstimateViewProjection.NaturalCompare(a.Name, b.Name),
                 EstimateViewProjection.ByNumber => EstimateViewProjection.NaturalCompare(a.Members[0].Num, b.Members[0].Num),
@@ -150,14 +151,14 @@ public static class EstimateGroups
                     Nullable.Compare(areaKeys.Get(a.Members[0]), areaKeys.Get(b.Members[0])),
                 _ => a.FirstSortKey.CompareTo(b.FirstSortKey)
             };
-            return value != 0 ? (EstimateViewProjection.IsDescending(key) ? -Math.Sign(value) : value)
+            return value != 0 ? (descending ? -Math.Sign(value) : value)
                 : a.FirstSortKey.CompareTo(b.FirstSortKey);
         }
 
+        var comparer = Comparer<Group>.Create(Compare);
         if (mode == Same)
         {
-            var sorted = groups.OrderBy(g => g, Comparer<Group>.Create((a, b) =>
-                Compare(a, b, sort, frozen))).ToArray();
+            var sorted = groups.OrderBy(g => g, comparer).ToArray();
             return new[] { new Section("", "", sorted.Sum(g => g.Amount),
                 sorted.Length > 0 ? sorted.Min(g => g.FirstSortKey) : 0, sorted) };
         }
@@ -166,14 +167,12 @@ public static class EstimateGroups
         var sections = groups.GroupBy(g => g.TypeKey, StringComparer.Ordinal)
             .Select(g =>
             {
-                var ordered = g.OrderBy(row => row, Comparer<Group>.Create((a, b) =>
-                    Compare(a, b, sort, frozen))).ToArray();
+                var ordered = g.OrderBy(row => row, comparer).ToArray();
                 var type = g.Key;
                 var title = CultureInfo.GetCultureInfo("ru-RU").TextInfo.ToTitleCase(type);
                 return new Section(type, $"{title} — {g.Sum(x => x.Members.Count)} строк",
                     g.Sum(x => x.Amount), g.Min(x => x.FirstSortKey), ordered);
             }).ToArray();
-        var field = EstimateViewProjection.SortField(sort);
         var numericKeys = field is EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice
             ? sections.ToDictionary(section => section.TypeKey, section => field == EstimateViewProjection.ByQuantity
                 ? section.Groups.Sum(x => x.Quantity)
@@ -189,7 +188,7 @@ public static class EstimateGroups
                         numericKeys![a.TypeKey].CompareTo(numericKeys[b.TypeKey]),
                     _ => 0
                 };
-                return result != 0 ? (EstimateViewProjection.IsDescending(sort) ? -Math.Sign(result) : result)
+                return result != 0 ? (descending ? -Math.Sign(result) : result)
                     : a.FirstSortKey.CompareTo(b.FirstSortKey);
             })).ToArray();
     }

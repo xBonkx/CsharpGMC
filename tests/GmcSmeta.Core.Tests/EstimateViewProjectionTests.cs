@@ -318,6 +318,65 @@ public sealed class EstimateViewProjectionTests
     }
 
     [Fact]
+    public void LargeRangeSortKeepsAllComponentsAndMatchesIndependentBlockOracle()
+    {
+        var rows = new List<EstimateRow>();
+        var blocks = new List<EstimateRow[]>();
+        for (var section = 0; section < 100; section++)
+        {
+            rows.Add(Section(rows.Count, section + 1, $"Система {section}"));
+            for (var n = 0; n < 100; n++)
+            {
+                var parent = rows.Count + 1;
+                var position = Pos(rows.Count, parent, section + 1, $"Позиция {n}",
+                    (n * 17 + section) % 31, n + 1);
+                var child = Pos(rows.Count + 1, parent + 1, section + 1, "Комплект", 0, parent: parent);
+                var block = new[] { position, child };
+                blocks.Add(block);
+                rows.AddRange(block);
+            }
+        }
+
+        var expected = blocks.OrderByDescending(b => b[0].Price)
+            .ThenBy(b => b[0].SortKey).SelectMany(b => b).ToArray();
+        Assert.Equal(expected, EstimateViewProjection.Apply(rows,
+            sort: EstimateViewProjection.ByPrice, flat: true));
+        Assert.Equal(rows.Where(r => !r.IsSystem), EstimateViewProjection.Apply(rows, flat: true));
+
+        var perSection = rows.Where(r => r.IsSystem).SelectMany(header =>
+            new[] { header }.Concat(blocks.Where(b => b[0].SystemId == header.SystemId)
+                .OrderByDescending(b => b[0].Price).ThenBy(b => b[0].SortKey).SelectMany(b => b)));
+        Assert.Equal(perSection, EstimateViewProjection.Apply(rows, sort: EstimateViewProjection.ByPrice));
+
+        var ranks = blocks.AsEnumerable().Reverse().Select((b, rank) => (b[0].Id, rank))
+            .ToDictionary(x => x.Id, x => x.rank);
+        Assert.Equal(blocks.AsEnumerable().Reverse().SelectMany(b => b),
+            EstimateViewProjection.Apply(rows, sort: EstimateViewProjection.ByPrice, flat: true, frozenOrder: ranks));
+    }
+
+    [Fact]
+    public void FlatSortPreservesLegacyComponentBlockAcrossHiddenHeader()
+    {
+        var parent = Pos(0, 100, 1, "В", 10);
+        var child = Pos(2, 101, 2, "А", 0, parent: 100);
+        var other = Pos(3, 102, 2, "Б", 20);
+        var rows = new[] { parent, Section(1, 2, "Система"), child, other };
+        Assert.Equal(new[] { other, parent, child },
+            EstimateViewProjection.Apply(rows, sort: EstimateViewProjection.ByPrice, flat: true));
+    }
+
+    [Fact]
+    public void MissingPriceBlankSearchPreservesAncestorsAndComponents()
+    {
+        var rows = new[] { Section(0, 10, "П1"), Section(1, 11, "Подсистема", 1),
+            Pos(2, 1, 11, "Без цены", 0), Pos(3, 2, 11, "Датчик", 0, parent: 1),
+            Pos(4, 3, 11, "С ценой", 12), Section(5, 12, "П2") };
+        var expected = new[] { 0, 1, 2, 3 };
+        Assert.Equal(expected, EstimateViewProjection.Apply(rows, noPriceOnly: true).Select(r => r.SortKey));
+        Assert.Equal(expected, EstimateViewProjection.Apply(rows, "  ", noPriceOnly: true).Select(r => r.SortKey));
+    }
+
+    [Fact]
     public void UnknownSortIsRejectedWithoutDataMutation() =>
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             EstimateViewProjection.Apply(Example(), sort: "sql-order-by"));

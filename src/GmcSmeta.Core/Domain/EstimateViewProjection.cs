@@ -84,12 +84,15 @@ public static class EstimateViewProjection
         IReadOnlyList<EstimateRow> filtered = searchResult;
         if (noPriceOnly)
         {
-            var allowed = searchResult.Select(row => row.SortKey).ToHashSet();
+            // Blank search already contains the entire document. Avoid a
+            // full membership set in the common missing-prices-only view.
+            var allowed = string.IsNullOrWhiteSpace(query) ? null
+                : searchResult.Select(row => row.SortKey).ToHashSet();
             // Display an empty-price top-level position together with its
             // components and section ancestors, but do not show other priced
             // positions from the same section.
             var matched = rows.Where(row => !row.IsSystem && !row.IsSub &&
-                row.HasNoPrice && allowed.Contains(row.SortKey)).ToArray();
+                row.HasNoPrice && (allowed is null || allowed.Contains(row.SortKey))).ToArray();
             var parentIds = matched.Select(row => row.Id).ToHashSet();
             var sectionIds = matched.Select(row => row.SystemId).ToHashSet();
 
@@ -114,59 +117,85 @@ public static class EstimateViewProjection
                 else if (row.IsSystem && sectionIds.Contains(row.SystemId))
                     requested.Add(row.SortKey);
             }
-            allowed.IntersectWith(requested);
-            filtered = rows.Where(row => allowed.Contains(row.SortKey)).ToList();
+            if (allowed is not null) requested.IntersectWith(allowed);
+            filtered = rows.Where(row => requested.Contains(row.SortKey)).ToList();
         }
         if (sort == DocumentOrder && !flat) return filtered;
 
         // Split into atomic position blocks (parent + its child components).
         // Keep system headers separately in their original sequence.
         var result = new List<EstimateRow>(filtered.Count);
-        var blocks = new List<List<EstimateRow>>();
-        List<EstimateRow>? block = null;
+        // A flat unsorted view simply removes section headers. The
+        // original order of every parent and component stays unchanged.
+        if (sort == DocumentOrder)
+        {
+            foreach (var row in filtered)
+                if (!row.IsSystem) result.Add(row);
+            return result;
+        }
+
+        if (flat)
+            filtered = filtered.Where(row => !row.IsSystem).ToArray();
+
+        // Ranges reference the existing filtered list, rather than allocating
+        // one List<EstimateRow> (and backing array) for every position.
+        var blocks = new List<(int Start, int Count)>();
+        var blockStart = -1;
+        var blockCount = 0;
         var field = SortField(sort);
+        var descending = IsDescending(sort);
         var areaKeys = new EstimateAreaSortKeys(field);
+        int CompareBlocks((int Start, int Count) a, (int Start, int Count) b) =>
+            Compare(filtered[a.Start], filtered[b.Start], field, descending, frozenOrder, areaKeys);
 
         void Flush()
         {
-            if (block is not null && block.Count > 0) blocks.Add(block);
-            block = null;
+            if (blockCount > 0) blocks.Add((blockStart, blockCount));
+            blockStart = -1;
+            blockCount = 0;
         }
 
         void OutputBlocks()
         {
             Flush();
-            if (sort != DocumentOrder)
-                blocks.Sort((a, b) => Compare(a[0], b[0], sort, frozenOrder, areaKeys));
-            foreach (var group in blocks) result.AddRange(group);
+            blocks.Sort(CompareBlocks);
+            foreach (var group in blocks)
+                for (var i = 0; i < group.Count; i++)
+                    result.Add(filtered[group.Start + i]);
             blocks.Clear();
         }
 
-        foreach (var row in filtered)
+        for (var i = 0; i < filtered.Count; i++)
         {
+            var row = filtered[i];
             if (row.IsSystem)
             {
-                if (!flat) OutputBlocks();
-                if (!flat) result.Add(row);
+                // In flat mode headers are omitted. End the current range
+                // without sorting yet so all sections can be sorted together.
+                if (flat) Flush();
+                else
+                {
+                    OutputBlocks();
+                    result.Add(row);
+                }
                 continue;
             }
 
-            if (row.IsSub && block is not null &&
-                row.ParentPositionId == block[0].Id)
-            {
-                block.Add(row);
-            }
+            if (row.IsSub && blockCount > 0 &&
+                row.ParentPositionId == filtered[blockStart].Id)
+                blockCount++;
             else
             {
                 Flush();
-                block = new List<EstimateRow> { row };
+                blockStart = i;
+                blockCount = 1;
             }
         }
         OutputBlocks();
         return result;
     }
 
-    private static int Compare(EstimateRow left, EstimateRow right, string sort,
+    private static int Compare(EstimateRow left, EstimateRow right, string field, bool descending,
         IReadOnlyDictionary<int, int>? frozenOrder, EstimateAreaSortKeys areaKeys)
     {
         // Python kp_editor._view_key: keep the result of the first sort
@@ -178,7 +207,7 @@ public static class EstimateViewProjection
             var existing = leftRank.CompareTo(rightRank);
             if (existing != 0) return existing;
         }
-        var compared = SortField(sort) switch
+        var compared = field switch
         {
             ByName => NaturalCompare(left.Name, right.Name),
             ByNumber => NaturalCompare(left.Num, right.Num),
@@ -194,7 +223,7 @@ public static class EstimateViewProjection
             ByAreaUnit or ByAreaTotal => Nullable.Compare(areaKeys.Get(left), areaKeys.Get(right)),
             _ => left.SortKey.CompareTo(right.SortKey)
         };
-        return compared != 0 ? (IsDescending(sort) ? -Math.Sign(compared) : compared)
+        return compared != 0 ? (descending ? -Math.Sign(compared) : compared)
             : left.SortKey.CompareTo(right.SortKey);
     }
 

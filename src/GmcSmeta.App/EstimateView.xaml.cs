@@ -716,7 +716,8 @@ public partial class EstimateView : UserControl
         var rootFolded = false;
         var subFolded = false;
         var visible = new List<EditableEstimateRow>(projected.Count);
-        var areaSummaryIds = index.AreaSummaryIds;
+        var areaSummaryIds = honorFolds ? index.AreaSummaryIds : null;
+        var showPositionNumbers = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber;
         foreach (var row in index.Project(projected, _estimate.Rows))
         {
             if (row.IsSystem && row.Level == 0)
@@ -731,12 +732,11 @@ public partial class EstimateView : UserControl
             if (subFolded && row.Level > 1) continue;
             if (honorFolds && row.IsSub &&
                 row.Source.ParentPositionId is int areaId &&
-                areaSummaryIds.Contains(areaId) && !_expandedAreaSummaries.Contains(areaId))
+                areaSummaryIds!.Contains(areaId) && !_expandedAreaSummaries.Contains(areaId))
                 continue;
             // Prepare only rows surviving search and folds. Stage filtering
             // below needs their current presentation depth to find ancestors.
-            index.PrepareDocumentRow(row, _flatTemporaryView,
-                EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber);
+            index.PrepareDocumentRow(row, _flatTemporaryView, showPositionNumbers);
             visible.Add(row);
         }
 

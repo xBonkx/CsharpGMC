@@ -19,6 +19,9 @@ internal static class EstimateSelectionRestore
         IReadOnlyList<EditableEstimateRow> selected, EditableEstimateRow? primary,
         EditableEstimateRow? current)
     {
+        if (selected.Count == 0 && primary is null && current is null)
+            return new Result(Array.Empty<EditableEstimateRow>(), null, null);
+
         var wanted = selected.Select(Identity).ToHashSet();
         if (primary is not null) wanted.Add(Identity(primary));
         if (current is not null) wanted.Add(Identity(current));
