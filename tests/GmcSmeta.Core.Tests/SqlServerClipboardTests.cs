@@ -20,6 +20,23 @@ public sealed class SqlServerClipboardTests
     }
 
     [Fact]
+    public void ParseTsv_NameOnlyEightRows_PreservesOrderAndDefaults()
+    {
+        var names = new[] { "Канальный вентилятор", "Преобразователь частоты", "Гибкая вставка",
+            "Клапан 100x100", "Клапан 200x100", "Клапан 300x200",
+            "Клапан противопожарный 100x100", "Клапан противопожарный 200x100" };
+        var rows = PastedPositions.Parse(string.Join("\r\n", names));
+        Assert.Equal(names, rows.Select(row => row.Name).ToArray());
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("шт", row.Unit);
+            Assert.Equal(1m, row.Qty);
+            Assert.Equal(0m, row.Price);
+            Assert.Null(row.PurchasePrice);
+        });
+    }
+
+    [Fact]
     public void ParseTsv_QuotedCellsPreserveNewlinesAndQuotes()
     {
         var rows = PastedPositions.Parse("\"Клапан\tуниверсальный\"\tшт\t1\t10\t\t\"строка 1\r\n\"\"тест\"\"\"");
