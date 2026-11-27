@@ -255,12 +255,11 @@
                           SelectionChanged="ProcurementSupplier_Changed"
                           ToolTip="Все поставщики, не указан или конкретный поставщик"/>
                 <Grid Grid.Column="2" MinWidth="100" Margin="0,0,0,4">
-                    <TextBox x:Name="ProcurementSearchBox" Style="{StaticResource PythonSearch}" Height="32"
-                             Padding="30,5,32,5" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
+                    <TextBox x:Name="ProcurementSearchBox" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
                              ToolTip="Поиск по названию, системе, поставщику, заявке и счёту"/>
                     <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
                     <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,32,0"
-                               VerticalAlignment="Center" IsHitTestVisible="False">
+                               VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style><Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=ProcurementSearchBox}" Value="">
