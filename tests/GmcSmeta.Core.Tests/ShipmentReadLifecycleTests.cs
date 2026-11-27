@@ -44,5 +44,9 @@ public sealed class ShipmentReadLifecycleTests
         Assert.Contains("await ReloadAsync(preserveStatus: true)", pane);
         Assert.Contains("if (attachment != _attachmentGeneration) ResumeShipmentReadIfNeeded();", pane);
         Assert.Contains("SqlServerShipments.ReadChangedRows(", pane);
+        Assert.Contains("var unmatched = byId.Keys.ToHashSet();", loader);
+        Assert.Contains("unmatched.Remove(row.PositionId);", loader);
+        Assert.Contains("lines.Where(l => unmatched.Contains(l.PositionId))", loader);
+        Assert.DoesNotContain("rows.Select(r => r.PositionId).ToHashSet()", loader);
     }
 }

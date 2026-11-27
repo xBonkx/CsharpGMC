@@ -73,23 +73,25 @@ public partial class ShipmentsPane
                 var lines = SqlServerShipments.LinesOf(conn, current.Id, token: token);
                 lineCount = lines.Count;
                 var byId = lines.ToDictionary(l => l.PositionId);
+                // Track only actual historical line IDs, not every candidate.
+                var unmatched = byId.Keys.ToHashSet();
                 var documentTitles = obj.Documents.ToDictionary(d => d.Id, d => d.Title);
                 var multipleDocs = obj.Documents.Count > 1;
                 var editable = !current.Fixed || current.Id == editingFixedId;
                 foreach (var row in obj.Candidates)
                 {
                     token.ThrowIfCancellationRequested();
-                    byId.TryGetValue(row.PositionId, out var line);
+                    if (byId.TryGetValue(row.PositionId, out var line))
+                        unmatched.Remove(row.PositionId);
                     var label = row.SystemName + (multipleDocs && documentTitles.TryGetValue(row.ContractId, out var title)
                         ? $" · {title}" : "");
                     rows.Add(BuildPreviewRow(row, line, current, editable, label));
                 }
                 // Historical lines remain visible even if the current
                 // issuable query no longer contains their positions.
-                if (lines.Count > 0)
+                if (unmatched.Count > 0)
                 {
-                    var known = rows.Select(r => r.PositionId).ToHashSet();
-                    foreach (var line in lines.Where(l => !known.Contains(l.PositionId)))
+                    foreach (var line in lines.Where(l => unmatched.Contains(l.PositionId)))
                     {
                         token.ThrowIfCancellationRequested();
                         rows.Add(new ShipmentPreviewRow

@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 3f542b4) — PERF-024/027/028/032 PARTIAL: background procurement row projection, shipment historical-line tracking bounded by line count, cost-summary queued/between-phase read cancellation. Source guards added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 38f2bea) — PERF-022/023 PARTIAL, BUG-F15 follow-up: requisites form disabled until coherent snapshot and during save; close guarded pending acknowledgement; conflict requires reopen. KS financial overview keeps period, report windows cancel queued reads and group export checks lifetime before publication; source regressions added, not run. See performance/functional TODO.
 
 28.11.2026 ChatGPT/main (base faec827) — PERF-022 PARTIAL: batched object-scoped KS contractor metadata reads; regression checks added, not run. See performance TODO.

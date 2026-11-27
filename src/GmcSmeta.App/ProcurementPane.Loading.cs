@@ -107,33 +107,22 @@ public partial class ProcurementPane
                     return true;
                 }
             }
-            var rows = snapshot.Rows;
-            var systems = snapshot.Systems;
-            var items = new List<ProcurementPreviewRow>(rows.Count);
-            var loadedDay = snapshot.Day;
-            var originalIndex = 0;
-            var number = 1;
-            var systemNumbers = new Dictionary<long, string>();
-            foreach (var row in rows)
-            {
-                // Python procurement omits purely work rows from buying and warehouse views.
-                if (row.Work) continue;
-                if (!systemNumbers.ContainsKey(row.SystemId))
-                    systemNumbers[row.SystemId] = row.SystemName == "Без системы" ? "" : (number++).ToString(CultureInfo.CurrentCulture);
-                var rowNumber = row.ParentPositionId is null && !row.OutOfKp ? (number++).ToString(CultureInfo.CurrentCulture) : "";
-                items.Add(BuildBuyPreview(row, rowNumber, systemNumbers[row.SystemId], originalIndex++));
-            }
+            var accepted = snapshot;
+            var items = await Task.Run(() => PrepareBuyRows(accepted, token), token);
+            if (token.IsCancellationRequested || generation != _reloadGeneration || !IsLoaded) return false;
+            if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
+                throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
             _applyingBuySnapshot = true;
             try
             {
                 _allRows = items;
                 _buyRowIndex = null;
-                _allSystems = systems.ToList();
+                _allSystems = accepted.Systems.ToList();
                 RebuildScopeFilters();
                 UpdateCategoryCounts();
                 ApplyProcurementFilters();
-                _snapshotDay = loadedDay;
-                _revision = snapshot.Revision;
+                _snapshotDay = accepted.Day;
+                _revision = accepted.Revision;
                 _buySnapshotMayReuse = true;
                 _needsReloadAfterAttach = false;
             }
@@ -151,6 +140,30 @@ public partial class ProcurementPane
         {
             if (ReferenceEquals(_ordinaryReloadCancellation, cancellation)) _ordinaryReloadCancellation = null;
         }
+    }
+
+    // Only plain, unbound rows are created on the worker. All collection
+    // views, control state and publication remain on the Dispatcher.
+    private static List<ProcurementPreviewRow> PrepareBuyRows(
+        SqlServerProcurement.BuySnapshot snapshot, CancellationToken token)
+    {
+        var rows = snapshot.Rows;
+        var items = new List<ProcurementPreviewRow>(rows.Count);
+        var originalIndex = 0;
+        var number = 1;
+        var systemNumbers = new Dictionary<long, string>();
+        foreach (var row in rows)
+        {
+            token.ThrowIfCancellationRequested();
+            // Python procurement omits purely work rows from buying and warehouse views.
+            if (row.Work) continue;
+            if (!systemNumbers.ContainsKey(row.SystemId))
+                systemNumbers[row.SystemId] = row.SystemName == "Без системы" ? "" : (number++).ToString(CultureInfo.CurrentCulture);
+            var rowNumber = row.ParentPositionId is null && !row.OutOfKp ? (number++).ToString(CultureInfo.CurrentCulture) : "";
+            items.Add(BuildBuyPreview(row, rowNumber, systemNumbers[row.SystemId], originalIndex++));
+        }
+        token.ThrowIfCancellationRequested();
+        return items;
     }
 
     private async Task TryReloadAsync(bool preserveStatus = false, bool allowUnchanged = false,

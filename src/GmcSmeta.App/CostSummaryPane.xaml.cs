@@ -65,6 +65,7 @@ public partial class CostSummaryPane : UserControl
     private string _operationRevision = "";
     private string? _loadError;
     private long _loadGeneration;
+    private CancellationTokenSource? _costReadCancellation;
     private volatile bool _attached;
     private long _attachmentGeneration;
     private long _operationAttachment;
@@ -175,6 +176,7 @@ public partial class CostSummaryPane : UserControl
             _attached = false;
             Interlocked.Increment(ref _attachmentGeneration);
             ++_loadGeneration;
+            _costReadCancellation?.Cancel();
             _revision = "";
             _loadingCosts = false;
             _needsReloadAfterAttach = true;
@@ -261,13 +263,17 @@ public partial class CostSummaryPane : UserControl
         List<CostSummaryPreviewRow> Rows, List<SmrExpensePreviewRow> Expenses, string SmrMode, string Revision,
         CostMissingPriceIndex MissingPrices);
 
-    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId)
+    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         using var conn = SqlServerDatabase.Open(connectionString);
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            token.ThrowIfCancellationRequested();
             var before = SqlServerDatabase.Revision(conn);
+            token.ThrowIfCancellationRequested();
             var (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
+            token.ThrowIfCancellationRequested();
             var expenses = SqlServerSmrExpenses.List(conn, contractId).Select(x => new SmrExpensePreviewRow
             {
                 Id = x.Id,
@@ -275,14 +281,21 @@ public partial class CostSummaryPane : UserControl
                 Kind = x.Kind, Who = x.Who,
                 Amount = x.Amount.ToString("0.##", CultureInfo.CurrentCulture), Note = x.Note,
             }).ToList();
+            token.ThrowIfCancellationRequested();
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                 "SELECT smr_mode FROM dbo.contracts WHERE id=@id", conn);
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             var mode = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "sum";
+            token.ThrowIfCancellationRequested();
             var after = SqlServerDatabase.Revision(conn);
+            token.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(before) && before == after)
-                return new CostLoadSnapshot(summary, totals, BuildSummaryPreview(summary), expenses, mode, after,
+            {
+                var rows = BuildSummaryPreview(summary);
+                token.ThrowIfCancellationRequested();
+                return new CostLoadSnapshot(summary, totals, rows, expenses, mode, after,
                     new CostMissingPriceIndex(summary.Rows));
+            }
         }
         throw new InvalidOperationException("Себестоимость изменилась во время чтения. Повторите загрузку.");
     }
@@ -291,6 +304,7 @@ public partial class CostSummaryPane : UserControl
     {
         if (!_attached) return;
         var generation = ++_loadGeneration;
+        _costReadCancellation?.Cancel();
         _loadingCosts = true;
         _revision = "";
         _loadError = null;
@@ -300,10 +314,13 @@ public partial class CostSummaryPane : UserControl
         await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
         if (!_attached || generation != _loadGeneration) return;
         CostTabs.IsEnabled = false;
+        using var cancellation = new CancellationTokenSource();
+        _costReadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
-            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId));
-            if (!_attached || generation != _loadGeneration) return;
+            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, token), token);
+            if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             _summaryRows = data.Summary.Rows.ToList();
             _summaryData = data.Summary;
             _allRows = new ObservableCollection<CostSummaryPreviewRow>(data.Rows);
@@ -335,6 +352,7 @@ public partial class CostSummaryPane : UserControl
         }
         finally
         {
+            if (ReferenceEquals(_costReadCancellation, cancellation)) _costReadCancellation = null;
             if (generation == _loadGeneration) _loadingCosts = false;
         }
     }

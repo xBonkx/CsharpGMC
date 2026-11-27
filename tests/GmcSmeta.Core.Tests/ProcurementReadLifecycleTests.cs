@@ -41,5 +41,10 @@ public sealed class ProcurementReadLifecycleTests
         Assert.Contains("catch (Exception) when (!requiredReadback &&", loader);
         Assert.Contains("_ = _owner.TryReloadAsync();", pane);
         Assert.Contains("_allRows = items;", loader);
+        Assert.Contains("await Task.Run(() => PrepareBuyRows(accepted, token), token)", loader);
+        var projection = loader.IndexOf("await Task.Run(() => PrepareBuyRows", StringComparison.Ordinal);
+        var guard = loader.IndexOf("generation != _reloadGeneration", projection, StringComparison.Ordinal);
+        var publish = loader.IndexOf("_allRows = items;", StringComparison.Ordinal);
+        Assert.True(projection >= 0 && guard > projection && publish > guard);
     }
 }
