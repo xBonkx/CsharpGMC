@@ -496,7 +496,7 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true))
         {
-            SetStatus("Заверши редактирование ячейки перед удалением.", true);
+            ShowPositionDeleteError("Заверши редактирование ячейки перед удалением.");
             return;
         }
         // Delete and the context-menu command operate on the SAME Extended selection.
@@ -505,12 +505,13 @@ public partial class EstimateView
         if (selected.Length == 0 || selected.Any(row =>
                 row.IsSystem || row.IsVirtual || row.IsAreaSummary || row.Id <= 0))
         {
-            SetStatus("Выдели только обычные позиции или комплектующие, без разделов и групп.", true);
+            ShowPositionDeleteError("Выдели только обычные позиции или комплектующие, без разделов и групп.");
             return;
         }
         if (_serverConflict || HasUnsettledCacheWrites)
         {
-            SetStatus("Сначала заверши сохранение или обнови смету с сервера.", true);
+            ShowPositionDeleteError("Сохранение или сверка с SQL Server ещё не завершены. " +
+                "Дождись завершения или обнови смету.");
             return;
         }
 
@@ -534,7 +535,7 @@ public partial class EstimateView
             !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
                 .Select(row => (long)row.Id).ToHashSet().SetEquals(selectedIds))
         {
-            SetStatus("Выделение или данные изменились. Повтори удаление после обновления.", true);
+            ShowPositionDeleteError("Выделение или данные изменились. Повтори удаление после обновления.");
             return;
         }
 
@@ -550,16 +551,18 @@ public partial class EstimateView
             {
                 _focusAfterReload = null;
                 _focusSystemAfterReload = sectionToFocus;
-            });
+            }, showDeleteFailure: true);
     }
 
     /// <summary>Run every structural command behind the same save lock as cell editing.</summary>
     private async Task RunSectionCommandAsync(Func<string, SqlServerDatabase.SaveResult> operation,
-        string busy, string success, Action? onSuccess = null)
+        string busy, string success, Action? onSuccess = null, bool showDeleteFailure = false)
     {
         _reloadTimer.Stop();
+        if (showDeleteFailure) AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"{busy}… ({count})", false);
+        string? deleteError = null;
         await _writeLock.WaitAsync();
         try
         {
@@ -569,14 +572,22 @@ public partial class EstimateView
             if (!result.Saved)
             {
                 if (result.Revision != _serverRevision) _serverConflict = true;
+                if (showDeleteFailure) deleteError = result.Error ?? "Сервер отклонил удаление.";
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил команду.");
             }
             _serverRevision = result.Revision;
+            if (showDeleteFailure) _saveAwaitingReadback = true;
             onSuccess?.Invoke();
         }
         catch (Exception ex)
         {
             _saveError = ex.Message;
+            if (showDeleteFailure && deleteError is null)
+            {
+                _serverConflict = true;
+                _saveAwaitingReadback = true;
+                deleteError = "Удаление не подтверждено SQL Server. Обнови смету перед повтором.\n" + ex.Message;
+            }
         }
         finally
         {
@@ -589,6 +600,18 @@ public partial class EstimateView
                 _reloadTimer.Start();
             }
         }
+        if (showDeleteFailure && Volatile.Read(ref _pendingWrites) == 0)
+        {
+            _reloadTimer.Stop();
+            await ReloadDocumentAsync();
+        }
+        if (deleteError is not null) ShowPositionDeleteError(deleteError);
+    }
+
+    private void ShowPositionDeleteError(string message)
+    {
+        SetStatus("Удаление: " + message, true);
+        MessageBox.Show(message, "Удаление позиций", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private async void DeleteSection_Click(object sender, RoutedEventArgs e)
