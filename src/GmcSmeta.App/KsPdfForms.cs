@@ -80,7 +80,8 @@ public static class KsPdfForms
 
     private static void DrawAct(Canvas pdf,SqlServerKsPrintData.Package p,SqlServerActs.ActInfo act)
     {
-        var contractor=p.Contractors[act.ContractId];
+        var legal=KsLegalRequisites.ForDocument(p,act.ContractId);
+        var contractor=legal.Contractor;
         var r=p.Requisites;
         void StartPage(bool continued)
         {
@@ -96,10 +97,15 @@ public static class KsPdfForms
             pdf.Text("АКТ О ПРИЁМКЕ ВЫПОЛНЕННЫХ РАБОТ"+(continued?" (продолжение)":""),0,pdf.Y,750,17,true,13);
             pdf.Y+=23;
             pdf.Text("КС-2 №"+act.Number+"  от "+act.Date.ToString("dd.MM.yyyy")+
-                "    Договор №"+p.Report.AgreementNumber+
+                "    Договор №"+legal.Number+" от "+legal.Date+
                 "    Период: "+act.PeriodFrom?.ToString("dd.MM.yyyy")+" — "+
                 act.PeriodTo?.ToString("dd.MM.yyyy"),0,pdf.Y,750,13);
             pdf.Y+=20;
+            foreach(var ds in KsLegalRequisites.ForActSupplements(p,act))
+            {
+                pdf.Text("Дополнительное соглашение "+ds.Label,0,pdf.Y,750,16);
+                pdf.Y+=18;
+            }
             pdf.Grid(KsColumns,new[]{"№","Поз.","Наименование работ","Код работ","Ед.","Кол-во","Цена, ₽","Сумма, ₽"},33,true);
         }
         StartPage(false);
@@ -178,6 +184,7 @@ public static class KsPdfForms
     {
         var g=p.Report;
         var r=p.Requisites;
+        var legal=KsLegalRequisites.ForSummary(p);
         pdf.NewPage();
         pdf.Text("Унифицированная форма № КС-3  •  ОКУД 0322001",0,pdf.Y,750,13,true);
         pdf.Y+=20;
@@ -187,10 +194,16 @@ public static class KsPdfForms
         pdf.Y+=28;
         pdf.Text("СПРАВКА О СТОИМОСТИ ВЫПОЛНЕННЫХ РАБОТ И ЗАТРАТ",0,pdf.Y,750,18,true,13);
         pdf.Y+=27;
-        pdf.Text("КС-3 №"+g.Key+"    Договор №"+g.AgreementNumber+
+        pdf.Text("КС-3 №"+g.Key+"    Договор №"+legal.Number+" от "+legal.Date+
             "    Период: "+g.PeriodFrom?.ToString("dd.MM.yyyy")+" — "+
             g.PeriodTo?.ToString("dd.MM.yyyy"),0,pdf.Y,750,17);
         pdf.Y+=25;
+        var supplements=string.Join("; ",KsLegalRequisites.ForSummarySupplements(p).Select(ds=>ds.Label));
+        if(supplements.Length>0)
+        {
+            pdf.Text("Дополнительные соглашения: "+supplements,0,pdf.Y,750,16);
+            pdf.Y+=18;
+        }
         var columns=new double[]{32,275,90,110,116,103};
         pdf.Grid(columns,new[]{"№","Наименование работ и затрат","Код",
             "С начала работ, ₽","С начала года, ₽","За период, ₽"},36,true);
@@ -243,7 +256,7 @@ public static class KsPdfForms
             pdf.Text(r.SecondRole+": "+r.SecondPosition+" "+r.SecondName+"   ____________________",
                 0,pdf.Y,750,18);
         }
-        var firstCo=p.Contractors[g.Acts[0].ContractId];
+        var firstCo=legal.Contractor;
         pdf.Y+=25;
         pdf.Text("Сдал: "+firstCo.SignerPosition+" "+firstCo.SignerName+"   ____________________",
             0,pdf.Y,750,18);

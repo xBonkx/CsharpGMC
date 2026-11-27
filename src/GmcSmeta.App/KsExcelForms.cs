@@ -150,7 +150,8 @@ public static class KsExcelForms
     {
         Start(ws,6.4,8,60,11,10,11,13,15);
         var contract=p.Scope.Documents.Single(x=>x.Id==act.ContractId);
-        var co=p.Contractors[act.ContractId];
+        var legal=KsLegalRequisites.ForDocument(p,act.ContractId);
+        var co=legal.Contractor;
         var r=p.Requisites;
         for(var headingRow=1;headingRow<=3;headingRow++)
         {
@@ -174,7 +175,7 @@ public static class KsExcelForms
         Text(ws,"C11","Договор подряда");
         Text(ws,"E11","номер");
         ws.Range("F11:H11").Merge();
-        Text(ws,"F11",p.Scope.AgreementNumber);
+        Text(ws,"F11",legal.Number);
         ws.Cell("F11").Style.Alignment.Horizontal=XLAlignmentHorizontalValues.Center;
         Text(ws,"E12","дата");
         Text(ws,"F12",co.ContractDate);
@@ -182,6 +183,7 @@ public static class KsExcelForms
         Text(ws,"F13","СМР");
         Merged(ws,14,1,8,"Источник: "+contract.Label+
             (string.IsNullOrWhiteSpace(contract.SitePart) ? "" : "; "+contract.SitePart));
+        KsPrintedRequisites.SingleLine(ws,"A15:D16",string.Join("; ",KsLegalRequisites.ForActSupplements(p,act).Select(ds=>ds.Label)));
         Text(ws,"E15","Номер документа");
         Text(ws,"F15","Дата составления");
         ws.Range("G15:H15").Merge();
@@ -392,7 +394,8 @@ public static class KsExcelForms
     {
         Start(ws,6.7,46,10,18,2,18,18,6,6);
         var r=p.Requisites;var report=p.Report;
-        var co=p.Contractors[report.Acts[0].ContractId];
+        var legal=KsLegalRequisites.ForSummary(p);
+        var co=legal.Contractor;
         for(var headingRow=1;headingRow<=3;headingRow++)
         {
             ws.Range(headingRow,4,headingRow,7).Merge();
@@ -414,11 +417,12 @@ public static class KsExcelForms
         Text(ws,"A12","Договор подряда (контракт)");
         Text(ws,"F12","номер");
         ws.Range("G12:I12").Merge();
-        Text(ws,"G12",report.AgreementNumber);
+        Text(ws,"G12",legal.Number);
         ws.Cell("G12").Style.Alignment.Horizontal=XLAlignmentHorizontalValues.Center;
         Text(ws,"F13","дата");
         Text(ws,"G13",co.ContractDate);
         Text(ws,"F14","Вид операции");
+        KsPrintedRequisites.SingleLine(ws,"A15:I15",string.Join("; ",KsLegalRequisites.ForSummarySupplements(p).Select(ds=>ds.Label)));
         ws.Range("F16:G16").Merge();
         Text(ws,"C16","Номер");Text(ws,"D16","Дата");
         Text(ws,"F16","Отчётный период");

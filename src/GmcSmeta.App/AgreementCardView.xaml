@@ -16,13 +16,29 @@
    <StackPanel x:Name="Fields" IsEnabled="False" MaxWidth="1100" HorizontalAlignment="Stretch">
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
+      <StackPanel x:Name="LegalSelectorPanel" Visibility="Collapsed" Margin="0,0,0,12">
+       <TextBlock Text="Юридический договор"/>
+       <ComboBox x:Name="LegalSelector" DisplayMemberPath="Caption" SelectedValuePath="Id" SelectionChanged="LegalSelector_Changed" MinHeight="32"/>
+       <Button Content="Создать ещё один договор на этом объекте" Click="NewLegal_Click" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+      </StackPanel>
       <TextBlock Text="Данные договора" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
       <Grid Margin="0,12,0,8">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
        <StackPanel Margin="0,0,8,0"><TextBlock Text="№ договора"/><TextBox x:Name="AgreementNumberBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
        <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Дата договора"/><TextBox x:Name="AgreementDateBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="Подрядчик"/><TextBox x:Name="CompanyBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Подрядчик"/><TextBox x:Name="CompanyBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/><ComboBox x:Name="LegalCompanySelector" Visibility="Collapsed" DisplayMemberPath="Name" SelectedValuePath="Id" MinHeight="32" Margin="0,4,0,0" SelectionChanged="LegalCompany_Changed"/></StackPanel>
       </Grid>
+      <StackPanel x:Name="LegalDetailsPanel" Visibility="Collapsed">
+       <TextBlock Text="Подписанный PDF договора"/>
+       <TextBox x:Name="LegalPdfBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,6"/>
+       <WrapPanel Margin="0,0,0,12"><Button Content="Добавить подписанный PDF…" Click="LegalPdf_Add" Style="{StaticResource PythonToolbarButton}"/><Button Content="Открыть PDF" Click="LegalPdf_Open" Style="{StaticResource PythonToolbarButton}" Margin="8,0,0,0"/></WrapPanel>
+       <TextBlock Text="Предмет договора"/><TextBox x:Name="LegalSubjectBox" MinHeight="48" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,4,0,10"/>
+       <TextBlock Text="Адрес заказчика"/><TextBox x:Name="LegalCustomerAddressBox" MinHeight="32" Margin="0,4,0,10"/>
+       <TextBlock Text="Подрядчик для печати"/><TextBox x:Name="LegalContractorFullBox" MinHeight="32" Margin="0,4,0,10"/>
+       <TextBlock Text="Должность подписанта подрядчика"/><TextBox x:Name="LegalContractorPostBox" MinHeight="32" Margin="0,4,0,10"/>
+       <TextBlock Text="ФИО подписанта подрядчика"/><TextBox x:Name="LegalContractorNameBox" MinHeight="32" Margin="0,4,0,10"/>
+       <TextBlock Text="Дата окончания работ (дд.мм.гггг)"/><TextBox x:Name="LegalWorksEndBox" Width="200" MinHeight="32" HorizontalAlignment="Left" Margin="0,4,0,10"/>
+      </StackPanel>
       <TextBlock x:Name="AgreementText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,8"/>
       <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
        <StackPanel Margin="0,8,0,0">

@@ -7,7 +7,11 @@ namespace GmcSmeta.App;
 
 /// <summary>Что вернул диалог документа. CopyFrom — только для «Новое КП» (копия).</summary>
 public sealed record ContractDialogResult(string Kind, string Number, string Date, string Name,
-    long? CompanyId, long? BaseContractId, decimal? VatRate, string Note, string Form, long? CopyFrom);
+    long? CompanyId, long? BaseContractId, decimal? VatRate, string Note, string Form, long? CopyFrom)
+{
+    public long? AgreementId { get; init; }
+    public string AnnexNumber { get; init; } = "";
+}
 
 /// <summary>
 /// Один диалог на два случая Python: «Свойства документа» (ContractDialog) и
@@ -50,6 +54,7 @@ public partial class ContractDialog : Window
     {
         InitializeComponent();
         _isNew = false;
+        _preserveLegacyLegalMetadata=info.Kind=="main" && !makeContract;
         _agreement = makeContract ? agreement : null;
         ContentPanel.Visibility = Visibility.Collapsed;
         Title = makeContract ? "Оформить как приложение" : "Свойства документа";
@@ -242,9 +247,10 @@ public partial class ContractDialog : Window
 
         var kind = SelectedKind();
         var copyFrom = _isNew && CopyRadio.IsChecked == true ? SelectedId(SourceCombo) : null;
-        Result = new ContractDialogResult(kind, NumberBox.Text.Trim(), date, NameBox.Text.Trim(),
-            SelectedId(CompanyCombo), kind == "dop" ? SelectedId(BaseCombo) : null,
-            VatValue(), NoteBox.Text, (TagCombo.SelectedItem as TagItem)?.Key ?? "", copyFrom);
+        Result = new ContractDialogResult(kind, _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } original ? original.Number : NumberBox.Text.Trim(),
+            _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } originalDate ? originalDate.Date : date, NameBox.Text.Trim(),
+            _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } originalCompany ? originalCompany.Company : SelectedId(CompanyCombo), kind == "dop" ? SelectedId(BaseCombo) : null,
+            VatValue(), NoteBox.Text, (TagCombo.SelectedItem as TagItem)?.Key ?? "", copyFrom) { AgreementId = LegalAgreementCombo.SelectedValue is long agreementId ? agreementId : null, AnnexNumber = LegalAnnexNumberBox.Text.Trim() };
         DialogResult = true;
     }
 

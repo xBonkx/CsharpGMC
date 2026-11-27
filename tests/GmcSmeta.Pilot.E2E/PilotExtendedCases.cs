@@ -341,6 +341,12 @@ internal static class PilotExtendedCases
                 "CAST(GETDATE() AS date),CAST(GETDATE() AS date),0)",
                 ("@id", ds));
         }
+        using (var supplementFixture = p.Conn())
+            PilotRunner.Execute(supplementFixture,
+                "UPDATE dbo.acts SET ds_extra=N'№2 от 10.10.2026' WHERE id=@id", ("@id", dsAct));
+        using (var supplementRead = p.Conn())
+            PilotRunner.Check(SqlServerActs.ActsOf(supplementRead, ds).Single(a => a.Id == dsAct).DsExtra == "№2 от 10.10.2026",
+                "Public act reader lost additional supplement requisites");
         PilotRunner.Check(SqlServerActs.SetQty(p.PilotConnection, mainAct,
             mainPos, 1m, p.Revision()).Saved, "Main KS-2 quantity failed");
         PilotRunner.Check(SqlServerActs.SetQty(p.PilotConnection, dsAct,

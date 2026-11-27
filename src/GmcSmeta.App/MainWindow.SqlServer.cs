@@ -92,6 +92,7 @@ public partial class MainWindow
                 allowExcelImport: kind == "kp" && baseId is null && copyFrom is null,
                 agreement: agreement, baseCompanies: baseCompanies)
                 { Owner = this };
+            dialog.ConfigureAgreements(SqlServerAgreements.Read(_serverConn, objectId));
             if (dialog.ShowDialog() != true) return;
             if (dialog.ImportExcelRequested)
             {
@@ -101,7 +102,7 @@ public partial class MainWindow
             if (dialog.Result is not { } value) return;
 
             var data = new SqlServerWorkspace.NewContractData(value.Kind, value.Number, value.Date,
-                value.Name, value.CompanyId, value.BaseContractId);
+                value.Name, value.CompanyId, value.BaseContractId) { AgreementId = value.AgreementId, AnnexNumber = value.AnnexNumber };
             var created = value.CopyFrom is long sourceId
                 ? SqlServerWorkspace.CopyContract(_sqlConnectionString, sourceId, data, revision)
                 : SqlServerWorkspace.CreateEmptyContract(_sqlConnectionString, objectId, data, revision);
@@ -361,13 +362,14 @@ public partial class MainWindow
                 throw new InvalidOperationException("Данные изменились. Обновите список и повторите открытие свойств.");
             var dialog = new ContractDialog(objectName, info, companies,
                 tags, mains, makeContract, agreement) { Owner = this };
+            dialog.ConfigureAgreements(SqlServerAgreements.Read(_serverConn,doc.ObjectId),SqlServerAgreements.DocumentAgreementId(_serverConn,doc.Id),SqlServerAgreements.AnnexNumber(_serverConn,doc.Id));
             if (dialog.ShowDialog() != true || dialog.Result is not { } value) return;
 
             // Python: make_contract при выборе «КП» превращает документ в договор.
             var kind = makeContract && value.Kind == "kp" ? "main" : value.Kind;
             var changed = SqlServerWorkspace.UpdateContract(_sqlConnectionString, doc.Id,
                 new ContractProperties(kind, value.Number, value.Date, value.Name, value.CompanyId,
-                    value.BaseContractId, value.VatRate, value.Note, value.Form), revision);
+                    value.BaseContractId, value.VatRate, value.Note, value.Form) { AgreementId = value.AgreementId, AnnexNumber = value.AnnexNumber }, revision);
 
             if (!changed) return;      // как в эталоне: без изменений страница не перечитывается
             ReloadAndSelect(doc.ObjectId);

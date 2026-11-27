@@ -29,7 +29,7 @@ public static partial class SqlServerTrash
     // Порядок следует trash.ORDER: родительские таблицы вставляются раньше дочерних.
     private static readonly string[] RestoreOrder =
     {
-        "objects", "contracts", "systems", "positions", "procurement", "shipments",
+        "objects", "agreements", "contracts", "systems", "positions", "procurement", "shipments",
         "movements", "acts", "act_lines", "shipment_lines", "smr_costs",
         "attachments", "spec_revisions", "access_lists",
     };
@@ -38,7 +38,7 @@ public static partial class SqlServerTrash
     private static readonly IReadOnlyDictionary<string, string> RestoreForeignKeys =
         new Dictionary<string, string>
         {
-            ["object_id"] = "objects", ["contract_id"] = "contracts",
+            ["object_id"] = "objects", ["contract_id"] = "contracts", ["agreement_id"] = "agreements",
             ["base_contract_id"] = "contracts", ["system_id"] = "systems",
             ["position_id"] = "positions", ["act_id"] = "acts",
             ["shipment_id"] = "shipments", ["stage_of"] = "contracts",
@@ -141,9 +141,10 @@ public static partial class SqlServerTrash
         // Runs under the existing SERIALIZABLE/meta.rev transaction, before INSERT.
         TrashRestoreSafety.ValidateSnapshot(snapshot.RootElement, kind, allowStage: true);
 
-        var columns = LoadColumns(conn, tx, RestoreOrder);
-        var decoded = RestoreOrder.ToDictionary(t => t, t => SnapshotRows(snapshot.RootElement, t, columns[t]));
-        var maps = RestoreOrder.ToDictionary(t => t, _ => new Dictionary<long, long>());
+        var restoreOrder = RestoreOrder.Where(t => t != "agreements" || SqlServerAgreements.Enabled(conn, tx)).ToArray();
+        var columns = LoadColumns(conn, tx, restoreOrder);
+        var decoded = restoreOrder.ToDictionary(t => t, t => SnapshotRows(snapshot.RootElement, t, columns[t]));
+        var maps = restoreOrder.ToDictionary(t => t, _ => new Dictionary<long, long>());
         var copied = decoded.ToDictionary(p => p.Key,
             p => p.Value.Select(r => Convert.ToInt64(r["id"]!, CultureInfo.InvariantCulture)).ToHashSet());
         if ((kind == "object" && decoded["objects"].Count == 0)
@@ -172,7 +173,7 @@ public static partial class SqlServerTrash
 
         // Отложенные ссылки: цель в копии, но ещё не вставлена — NULL сейчас, UPDATE после всех вставок.
         var pending = new List<(string Table, long OldId, Dictionary<string, (string Target, long Ref)> Links)>();
-        foreach (var table in RestoreOrder)
+        foreach (var table in restoreOrder)
         {
             var rows = decoded[table];
             if (Array.IndexOf(SelfParentTables, table) >= 0)
@@ -223,7 +224,10 @@ public static partial class SqlServerTrash
                 {
                     if (row.TryGetValue(column, out var value) && value is not null &&
                         !Exists(conn, tx, target, Convert.ToInt64(value, CultureInfo.InvariantCulture)))
+                    {
+                        if (table == "agreements") throw new InvalidOperationException("Подрядчик договора удалён. Восстановление без потери ссылки запрещено.");
                         row[column] = null;
+                    }
                 }
                 if (table == "act_lines" && row.TryGetValue("qty_formula", out var formula)
                     && formula is string text && text.Contains('@', StringComparison.Ordinal))
@@ -509,7 +513,7 @@ public static partial class SqlServerTrash
         var result = tables.ToDictionary(t => t, _ => new List<ColumnMeta>());
         using var cmd = new SqlCommand(
             "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS " +
-            $"WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME IN ({names}) ORDER BY TABLE_NAME, ORDINAL_POSITION", conn, tx);
+            $"WHERE TABLE_SCHEMA='dbo' AND DATA_TYPE<>'timestamp' AND TABLE_NAME IN ({names}) ORDER BY TABLE_NAME, ORDINAL_POSITION", conn, tx);
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {

@@ -13,7 +13,11 @@ namespace GmcSmeta.Core.Db;
 public static partial class SqlServerWorkspace
 {
     public sealed record NewContractData(string Kind, string Number, string Date, string Name,
-        long? CompanyId, long? BaseContractId);
+        long? CompanyId, long? BaseContractId)
+    {
+        public long? AgreementId { get; init; }
+        public string AnnexNumber { get; init; } = "";
+    }
 
     public static void RequirePilotDatabase(string connectionString)
     {
@@ -249,6 +253,8 @@ public static partial class SqlServerWorkspace
         insert.Parameters.Add("@phase", SqlDbType.NVarChar, 24).Value = v.Kind == "kp" ? "volumes" : "";
         insert.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = form;
         var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId);
+        SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
         Log(conn, tx, "contract", id, "create",
             objName + ": " + Documents.ContractTitleText(v.Kind, v.Number, v.Date, v.Name), id, objectId);
         BumpRevision(conn, tx);
@@ -319,6 +325,8 @@ public static partial class SqlServerWorkspace
                 src.TransportCost is double cost ? cost : DBNull.Value;
             var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
 
+            SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, sourceId);
+            SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
             Log(conn, tx, "contract", id, "create",
                 objName + ": " + Documents.ContractTitleText(v.Kind, v.Number, v.Date, v.Name), id, src.ObjectId);
             Log(conn, tx, "contract", id, "copy", "из «" + src.Title + "»", id, src.ObjectId);
@@ -693,6 +701,20 @@ public static partial class SqlServerWorkspace
         Compare("note", old.Note, value.Note);
         Compare("form", old.Form, value.Form);
 
+        if (SqlServerAgreements.Enabled(conn,tx))
+        {
+            if(value.AgreementId is long chosen)
+            {
+                if(SqlServerAgreements.Read(conn,old.ObjectId,tx).All(a=>a.Id!=chosen))throw new ArgumentException("Выбранный договор относится к другому объекту.");
+                Compare("agreement_id",SqlServerAgreements.DocumentAgreementId(conn,id,tx),chosen);
+            }
+            else if(value.Kind=="kp") Compare("agreement_id",SqlServerAgreements.DocumentAgreementId(conn,id,tx),null);
+            if(value.AnnexNumber is not null)
+            {
+                if(value.AnnexNumber.Length>200)throw new ArgumentException("Номер приложения превышает 200 символов.");
+                Compare("annex_number",SqlServerAgreements.AnnexNumber(conn,id,tx),value.AnnexNumber.Trim());
+            }
+        }
         if (changes.Count == 0) return false;
 
         var set = string.Join(", ", changes.Keys.Select(c => $"[{c}]=@{c}"));
@@ -706,6 +728,7 @@ public static partial class SqlServerWorkspace
             else update.Parameters.AddWithValue($"@{field}", after);
         }
         if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Документ был удалён.");
+        SqlServerAgreements.AttachNewDocument(conn, tx, id, linkChanged ? null : SqlServerAgreements.DocumentAgreementId(conn,id,tx));
         Log(conn, tx, "contract", id, "update", string.Join("; ", details), id, old.ObjectId);
         BumpRevision(conn, tx);
         tx.Commit();
@@ -1064,6 +1087,11 @@ public static partial class SqlServerWorkspace
         Execute(conn, tx, "DELETE dbo.contracts WHERE object_id=@id", objectId);
         Execute(conn, tx, "DELETE dbo.access_lists WHERE object_id=@id", objectId);
         Execute(conn, tx, "DELETE dbo.shipments WHERE object_id=@id", objectId);
+        if (SqlServerAgreements.Enabled(conn, tx))
+        {
+            Execute(conn, tx, "DELETE dbo.agreement_files WHERE agreement_id IN (SELECT id FROM dbo.agreements WHERE object_id=@id)", objectId);
+            Execute(conn, tx, "DELETE dbo.agreements WHERE object_id=@id", objectId);
+        }
         Execute(conn, tx, "DELETE dbo.objects WHERE id=@id", objectId);
         BumpRevision(conn, tx);
         tx.Commit();

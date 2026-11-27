@@ -9,13 +9,19 @@ internal static class Program
 {
     /// <summary>End-to-end offline checks: SQL snapshots are synthetic, no DB connection.</summary>
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--requisites-only")
+            {
+                KsRequisitesChecks.Run(Fixture);
+                return 0;
+            }
             var samples=Environment.GetEnvironmentVariable("GMC_EXPORT_SAMPLE_DIR");
             if(!string.IsNullOrWhiteSpace(samples)) Directory.CreateDirectory(samples);
             ProcurementExportChecks.Run(samples);
+            KsRequisitesChecks.Run(Fixture);
             foreach (var (form, name) in new[]
             {
                 ("default","Обычный объект"),("dns","ДНС"),("r4","Р4")

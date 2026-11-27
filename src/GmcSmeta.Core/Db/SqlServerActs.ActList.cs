@@ -43,7 +43,7 @@ public static partial class SqlServerActs
         var raw = new List<(long Id, string Number, DateTime Date, DateTime? Start, DateTime? End,
             bool Signed, decimal Smr, decimal Transport, decimal Pnr, bool Exact,
             long Adjustment, decimal VatRate, string Form, string DsNo, string DsDate,
-            decimal Discount, bool Override, long ManualTotal, string SectionJson, bool BySystem)>();
+            decimal Discount, bool Override, long ManualTotal, string SectionJson, bool BySystem, string DsExtra)>();
         using (var cmd = new SqlCommand(
             "SELECT a.id,a.number,a.[date],a.period_from,a.period_to,a.signed," +
             "ISNULL(a.smr_amount,0),ISNULL(a.transport_amount,0),ISNULL(a.pnr_amount,0)," +
@@ -52,7 +52,7 @@ public static partial class SqlServerActs
             (schemaVersion>=29?",a.discount_percent":",CAST(0 AS float)")+
             (schemaVersion>=31?",a.discount_override,a.manual_total_cents":",CAST(0 AS bit),CAST(-1 AS bigint)")+
             (schemaVersion>=30?",a.section_amounts_json":",CAST(N'' AS nvarchar(max))")+
-            ",a.smr_by_system " +
+            ",a.smr_by_system,ISNULL(a.ds_extra,N'') " +
             "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id " +
             "WHERE a.contract_id=@id ORDER BY a.[date],a.id", conn, transaction))
         {
@@ -80,7 +80,8 @@ public static partial class SqlServerActs
                     !r.IsDBNull(16)&&Convert.ToBoolean(r.GetValue(16)),
                     !r.IsDBNull(17)?Convert.ToInt64(r.GetValue(17)):-1L,
                     !r.IsDBNull(18)?r.GetString(18):"",
-                    !r.IsDBNull(19)&&Convert.ToBoolean(r.GetValue(19),CultureInfo.InvariantCulture)));
+                    !r.IsDBNull(19)&&Convert.ToBoolean(r.GetValue(19),CultureInfo.InvariantCulture),
+                    r.GetString(20)));
             }
         }
 
@@ -125,7 +126,7 @@ public static partial class SqlServerActs
                 contractId, "", sum.Ks3Net, sum.Vat, sum.Materials,
                 sum.Smr, sum.Transport, sum.Pnr, a.VatRate, vatTop, a.Adjustment,
                 a.Exact, KsFinancialPolicy.HasRule(json, "round_rows"),
-                a.DsNo, a.DsDate, a.Discount, a.Override, a.ManualTotal, a.SectionJson, a.BySystem));
+                a.DsNo, a.DsDate, a.Discount, a.Override, a.ManualTotal, a.SectionJson, a.BySystem) { DsExtra = a.DsExtra });
         }
         token.ThrowIfCancellationRequested();
         return acts;

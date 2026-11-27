@@ -19,6 +19,19 @@ public sealed record MigrationFinanceSnapshot(
     public static MigrationFinanceSnapshot Read(SqlConnection connection,int expectedVersion)
     {
         SqlMigrationPlan.RequireRehearsalSource(connection.Database);
+        return ReadCore(connection,expectedVersion);
+    }
+
+    public static MigrationFinanceSnapshot ReadApprovedAgreementMigration(SqlConnection connection,int expectedVersion)
+    {
+        if (!SqlSchemaCompatibility.IsApprovedCutover(connection.Database,connection.DataSource) &&
+            !SqlSchemaCompatibility.IsAgreementTestDatabase(connection.Database,connection.DataSource))
+            throw new InvalidOperationException("This migration snapshot requires the approved office database or its dedicated local Agreement Pilot.");
+        return ReadCore(connection,expectedVersion);
+    }
+
+    private static MigrationFinanceSnapshot ReadCore(SqlConnection connection,int expectedVersion)
+    {
         _=SqlMigrationPlan.Script(expectedVersion,expectedVersion);
         using(var cmd=new SqlCommand(
             "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key]=N'schema_version'",connection))

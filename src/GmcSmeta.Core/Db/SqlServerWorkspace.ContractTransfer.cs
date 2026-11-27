@@ -85,9 +85,12 @@ public static partial class SqlServerWorkspace
         using var max=new SqlCommand("SELECT COALESCE(MAX([order]),0) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE object_id=@target",conn,tx);
         max.Parameters.Add("@target",SqlDbType.BigInt).Value=targetId;
         var order=Convert.ToInt32(max.ExecuteScalar());
+        var hasLegal=SqlServerAgreements.Enabled(conn,tx);
+        var targetLegal=hasLegal?SqlServerAgreements.TransferTarget(conn,tx,contractId,targetId):null;
         foreach(var doc in group)
         {
-            using var update=new SqlCommand("UPDATE dbo.contracts SET object_id=@target,[order]=@order WHERE id=@id AND object_id=@source",conn,tx);
+            using var update=new SqlCommand("UPDATE dbo.contracts SET object_id=@target,[order]=@order"+(hasLegal?",agreement_id=@legal":"")+" WHERE id=@id AND object_id=@source",conn,tx);
+            if(hasLegal) update.Parameters.Add("@legal",SqlDbType.BigInt).Value=targetLegal is long legalId?legalId:DBNull.Value;
             update.Parameters.Add("@target",SqlDbType.BigInt).Value=targetId;
             update.Parameters.Add("@source",SqlDbType.BigInt).Value=sourceId;
             update.Parameters.Add("@id",SqlDbType.BigInt).Value=doc.Id;

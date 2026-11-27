@@ -134,6 +134,7 @@ public static partial class SqlServerStages
             insert.Parameters.Add("@no", SqlDbType.Int).Value = nextNo;
             insert.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
             stageId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            SqlServerAgreements.AttachNewDocument(conn, tx, stageId);
         }
         using (var log = new SqlCommand(
             "INSERT INTO dbo.change_log (ts,[user],entity,entity_id,action,details,contract_id,object_id) " +
@@ -1340,7 +1341,9 @@ public static partial class SqlServerStages
         insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = stageName;
         insert.Parameters.Add("@no", SqlDbType.Int).Value = nextNo;
         insert.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
-        return Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var created = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        SqlServerAgreements.AttachNewDocument(conn, tx, created);
+        return created;
     }
 
     private static void Execute(SqlConnection conn, SqlTransaction tx, string sql, long id)

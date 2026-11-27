@@ -23,4 +23,5 @@
     <EmbeddedResource Include="Assets\logo_gmc.png" LogicalName="GmcSmeta.Core.Assets.logo_gmc.png" />
   </ItemGroup>
 
+  <ItemGroup><InternalsVisibleTo Include="GmcSmeta.AgreementMigration" /></ItemGroup>
 </Project>

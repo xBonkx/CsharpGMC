@@ -17,6 +17,21 @@ internal static class Program
     {
         try
         {
+            if (args.Length == 2 && args[0] == "--background-agreement-check")
+            {
+                var background = CreateApplication();
+                BackgroundAgreementChecks.Run(args[1]);
+                background.Shutdown();
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "--background-estimate-check")
+            {
+                AppContext.SetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", false);
+                var background = CreateApplication();
+                BackgroundEstimateChecks.Run(args[1]);
+                background.Shutdown();
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--column-menu-check")
             {
                 ColumnMenuChecks.Run();

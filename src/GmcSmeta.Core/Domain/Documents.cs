@@ -31,6 +31,8 @@ public sealed record ContractProperties(string Kind = "kp", string Number = "", 
     string Name = "", long? CompanyId = null, long? BaseContractId = null, decimal? VatRate = null,
     string Note = "", string Form = "")
 {
+    public long? AgreementId { get; init; }
+    public string? AnnexNumber { get; init; }
     public ContractProperties Normalize()
     {
         var kind = Kind is "main" or "dop" ? Kind : "kp";

@@ -27,10 +27,15 @@ public partial class AgreementCardView : UserControl
     private async void LoadOnce(object sender, RoutedEventArgs e)
     {
         Loaded -= LoadOnce;
+        await LoadCard(null);
+    }
+
+    private async Task LoadCard(long? legalId)
+    {
         StatusText.Text = "Загрузка реквизитов…";
         try
         {
-            var snapshot = await Task.Run(() => SqlServerWorkspace.ReadAgreementCard(_connection, _objectId));
+            var snapshot = await Task.Run(() => SqlServerWorkspace.ReadAgreementCard(_connection, _objectId, legalId));
             if (!IsLoaded) return;
             _snapshot = snapshot;
             var p = snapshot.Properties;
@@ -66,6 +71,7 @@ public partial class AgreementCardView : UserControl
             SecondNameBox.Text = v.SecondName;
             WorkTitleBox.Text = v.WorkTitle;
             WorksStartBox.Text = v.WorksStart;
+            InitializeLegal(snapshot);
             Fields.IsEnabled = SaveButton.IsEnabled = true;
             StatusText.Text = "Изменения вступят в силу после сохранения. Переход на другую карточку отменяет несохранённые правки.";
         }
@@ -89,8 +95,10 @@ public partial class AgreementCardView : UserControl
         if (_saving || _snapshot is not { } snapshot || !SaveButton.IsEnabled) return;
         var properties = ReadProperties();
         var print = ReadPrint(snapshot.Print);
+        var legal = ReadLegal(print);
         try
         {
+            if (legal is not null) SqlServerAgreements.Validate(legal);
             SqlServerWorkspace.ValidateObject(properties);
             SqlServerWorkspace.ValidateSharedPrint(_objectId, print);
         }
@@ -100,7 +108,7 @@ public partial class AgreementCardView : UserControl
         StatusText.Text = "Сохранение…";
         try
         {
-            await Task.Run(() => SqlServerWorkspace.SaveAgreementCard(_connection, _objectId, properties, print, snapshot.Revision));
+            await Task.Run(() => SqlServerWorkspace.SaveAgreementCard(_connection, _objectId, properties, print, snapshot.Revision, legal));
         }
         catch (Exception ex)
         {
@@ -112,7 +120,7 @@ public partial class AgreementCardView : UserControl
     }
 
     private bool HasUnsavedChanges() => _snapshot is { } snapshot &&
-        (ReadProperties() != snapshot.Properties || ReadPrint(snapshot.Print) != snapshot.Print);
+        (ReadProperties() != snapshot.Properties || ReadPrint(snapshot.Print) != snapshot.Print || LegalHasChanges(snapshot));
 
     private void EditDocument_Click(object sender, RoutedEventArgs e)
     {

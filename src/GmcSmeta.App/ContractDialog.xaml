@@ -17,6 +17,11 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock x:Name="CaptionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Text="Документ" TextWrapping="Wrap"/>
             <TextBlock x:Name="ObjectText" Foreground="#64748B" Margin="0,3,0,0" TextWrapping="Wrap"/>
+            <StackPanel x:Name="LegalAgreementPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                <TextBlock Text="Юридический договор"/>
+                <ComboBox x:Name="LegalAgreementCombo" DisplayMemberPath="Caption" SelectedValuePath="Id" MinHeight="32"/>
+                <TextBlock Text="Номер приложения (если есть)" Margin="0,6,0,0"/><TextBox x:Name="LegalAnnexNumberBox" MaxLength="200" MinHeight="32"/>
+            </StackPanel>
             <Button x:Name="AgreementDefaultsButton" Content="Подставить реквизиты договора" Visibility="Collapsed"
                     Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
                     Click="AgreementDefaults_Click" ToolTip="Заполнить номер, дату и организацию из совпадающих реквизитов приложений."/>

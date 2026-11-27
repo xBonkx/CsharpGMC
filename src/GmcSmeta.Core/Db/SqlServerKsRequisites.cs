@@ -46,18 +46,21 @@ public static class SqlServerKsRequisites
         if (!reader.Read()) throw new InvalidOperationException("Договор не найден.");
         string S(int i) => reader.IsDBNull(i) ? "" :
             Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-        return new Values(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
+        var result = new Values(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
             S(1), S(2), S(3), S(4), S(5), S(6), S(7), S(8), S(9),
             S(10), S(11), S(12), S(13));
+        reader.Close();
+        var legal = SqlServerAgreements.ForDocument(conn, contractId);
+        return legal is null ? result : legal.Print with { SitePart = result.SitePart };
     }
 
     // Card-level editor does not require an arbitrary annex to exist.
-    internal static Values ReadShared(SqlConnection conn, long objectId)
+    internal static Values ReadShared(SqlConnection conn, long objectId, SqlTransaction? tx = null)
     {
         using var command = new SqlCommand(
             "SELECT id,name,customer_full,site_full,cust_org,cust_post,cust_name," +
             "second_role,second_org,second_post,second_name,work_title,works_start " +
-            "FROM dbo.objects WHERE id=@id", conn);
+            "FROM dbo.objects WHERE id=@id", conn, tx);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
         using var reader = command.ExecuteReader();
         if (!reader.Read()) throw new InvalidOperationException("Карточка договора не найдена.");
@@ -146,6 +149,11 @@ public static class SqlServerKsRequisites
             log.ExecuteNonQuery();
         }
 
+        if (SqlServerAgreements.DocumentAgreementId(conn, contractId, tx) is long legalId)
+        {
+            var legal = SqlServerAgreements.Read(conn, objectId, tx).Single(a => a.Id == legalId);
+            SqlServerAgreements.Save(conn, tx, legal with { Print = data with { SitePart = "" } });
+        }
         var savedRevision = SqlServerDatabase.BumpPositionRevision(conn, tx);
         tx.Commit();
         return new SqlServerDatabase.SaveResult(true, null, savedRevision);

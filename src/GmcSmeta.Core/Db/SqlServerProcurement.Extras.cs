@@ -275,6 +275,7 @@ public static partial class SqlServerProcurement
             insert.Parameters.Add("@base", SqlDbType.BigInt).Value = sourceContractId;
             insert.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = form;
             dopId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            SqlServerAgreements.AttachNewDocument(conn, tx, dopId);
         }
         var destinations = new Dictionary<string, long>(StringComparer.Ordinal);
         var order = new Dictionary<long, int>();

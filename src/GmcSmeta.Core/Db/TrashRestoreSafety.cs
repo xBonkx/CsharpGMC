@@ -14,7 +14,7 @@ public static class TrashRestoreSafety
     [
         "acts", "act_lines", "shipments", "shipment_lines", "movements",
         "procurement", "smr_costs", "spec_revisions", "attachments",
-        "access_lists", "contract_links", "price_links", "metal_links"
+        "access_lists", "contract_links", "price_links", "metal_links", "agreement_files"
     ];
 
     public static void ValidateSnapshot(JsonElement root, string kind, bool allowStage = false)
@@ -32,7 +32,7 @@ public static class TrashRestoreSafety
         // Only the four explicitly supported, independent table groups may contain rows.
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
-            "objects", "contracts", "systems", "positions"
+            "objects", "contracts", "systems", "positions", "agreements"
         };
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in root.EnumerateObject())
@@ -56,6 +56,13 @@ public static class TrashRestoreSafety
 
         var linkedStage = allowStage && kind == "contract" && HasReference(contracts[0], "stage_of");
         var objectIds = Ids(objects);
+        var legalCards = Rows(root, "agreements");
+        var legalIds = Ids(legalCards);
+        foreach (var legal in legalCards)
+        {
+            if (kind != "object") throw new InvalidDataException("Договор должен восстанавливаться вместе со своим объектом.");
+            MustReference(legal, "object_id", objectIds);
+        }
         var contractIds = Ids(contracts);
         var systemIds = Ids(systems);
         var positionIds = Ids(positions);
@@ -70,7 +77,11 @@ public static class TrashRestoreSafety
                 !TryText(contract, "kind", out var type) || type != "kp" ||
                 (!linkedStage && HasReference(contract, "stage_of")) || IsTrue(contract, "stage_rest"))
                 throw new InvalidOperationException("Только незакрытые КП допускаются к восстановлению.");
-            if (kind == "object") MustReference(contract, "object_id", objectIds);
+            if (kind == "object")
+            {
+                MustReference(contract, "object_id", objectIds);
+                OptionalReference(contract, "agreement_id", legalIds);
+            }
             // The current restore drops missing external company/parent links to NULL.
             // Do not accept that loss under the restricted restoration policy.
             if ((!linkedStage && HasReference(contract, "company_id")) || HasReference(contract, "base_contract_id"))

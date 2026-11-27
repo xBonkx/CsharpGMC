@@ -23,7 +23,10 @@ public static partial class SqlServerActs
         bool RowsExact = false, bool RoundRows = false,
         string DsNo = "", string DsDate = "",
         decimal DiscountPercent = 0m, bool DiscountOverride = false, long ManualTotalCents = -1,
-        string SectionAmountsJson = "", bool SmrBySystem = false);
+        string SectionAmountsJson = "", bool SmrBySystem = false)
+    {
+        public string DsExtra { get; init; } = "";
+    }
 
     /// <summary>
     /// Read-only per-position progress across acts of one document. Uses two

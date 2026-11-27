@@ -27,6 +27,7 @@ public static class SqlServerKsPrintData
         KsGroupReport Report, SqlServerKsRequisites.Values Requisites,
         IReadOnlyList<Line> Lines, IReadOnlyDictionary<long, Contractor> Contractors)
     {
+        public IReadOnlyDictionary<long, KsLegalRequisites.Agreement> LegalAgreements { get; init; } = new Dictionary<long, KsLegalRequisites.Agreement>();
         public IReadOnlyList<Section> Sections {get;init;}=Array.Empty<Section>();
 
         // Resolve by stable ID, not section caption; include sections with no closed positions.
@@ -212,6 +213,32 @@ public static class SqlServerKsPrintData
             while(reader.Read())sections.Add(new(Convert.ToInt64(reader.GetValue(0)),Convert.ToInt64(reader.GetValue(1)),
                 reader.IsDBNull(2)?"":reader.GetString(2)));
         }
-        return new Package(scope,report,requisites,lines,contractors){Sections=sections};
+        var legalSources = new Dictionary<long, KsLegalRequisites.Agreement>();
+        if (SqlServerAgreements.Enabled(conn))
+        {
+            var objectId = scope.Documents[0].ObjectId;
+            var cards = SqlServerAgreements.Read(conn, objectId).ToDictionary(c => c.Id);
+            var companies = SqlServerWorkspace.Companies(conn).ToDictionary(c => c.Id, c => c.Name);
+            var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
+            using (var mapping = new SqlCommand("SELECT id,agreement_id FROM dbo.contracts WHERE object_id=@object AND agreement_id IS NOT NULL", conn))
+            {
+                mapping.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
+                using var reader = mapping.ExecuteReader();
+                while (reader.Read())
+                {
+                    var id = Convert.ToInt64(reader.GetValue(0));
+                    if (!documentIds.Contains(id)) continue;
+                    var legal = cards[Convert.ToInt64(reader.GetValue(1))];
+                    var companyName = legal.CompanyId is long companyId ? companies.GetValueOrDefault(companyId) ?? "" : "";
+                    var co = new Contractor(id, legal.Date, companyName, legal.ContractorFull, legal.ContractorPosition, legal.ContractorName);
+                    legalSources[id] = new(legal.Id, legal.Number, legal.Date, co);
+                }
+            }
+            var activeLegalIds = report.Acts.Select(a => legalSources.TryGetValue(a.ContractId, out var legal) ? legal.SourceId : 0).Distinct().ToArray();
+            if (activeLegalIds.Length != 1 || activeLegalIds[0] == 0)
+                throw new InvalidOperationException("Общая КС-3 содержит документы разных договоров или без привязки. Проверьте реквизиты приложений.");
+            requisites = cards[activeLegalIds[0]].Print with { SitePart = requisites.SitePart };
+        }
+        return new Package(scope,report,requisites,lines,contractors){Sections=sections, LegalAgreements=legalSources};
     }
 }

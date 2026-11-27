@@ -9,7 +9,10 @@ public static class SqlSchemaCompatibility
 {
     // Single authoritative version for ordinary writable SQL Server clients.
     // Updating this requires an approved database migration and release gate.
-    public const int WritableSchemaVersion = 28;
+    public const int WritableSchemaVersion = 32;
+    public const int AgreementSchemaVersion = 32;
+    public static bool IsAgreementTestDatabase(string? name, string? source) =>
+        (name ?? "").StartsWith("GmcSmetaPilot_Test_Agreement_", StringComparison.Ordinal) && IsLocalServer(source);
     // Keep disabled until all schema31 routes (including undo/trash/export) pass SQL acceptance.
     public static bool OrdinarySchema31Enabled => WritableSchemaVersion == 31;
     public const string PreviewDatabase = "GmcSmetaPilot_Test_Csharp";
@@ -57,7 +60,7 @@ public static class SqlSchemaCompatibility
     /// <summary>True when ordinary (UI) writers may persist schema 31 rows for this
     /// database. Production stays on schema 28 until the owner approves cutover.</summary>
     public static bool Schema31WritesAllowed(string? name, string? dataSource) =>
-        OrdinarySchema31Enabled || IsOrdinarySchema31TestDatabase(name, dataSource) ||
+        OrdinarySchema31Enabled || IsAgreementTestDatabase(name, dataSource) || IsOrdinarySchema31TestDatabase(name, dataSource) ||
         IsApprovedCutover(name, dataSource);
 
     public static bool Schema31WritesAllowed(string? connectionString)
@@ -94,7 +97,7 @@ public static class SqlSchemaCompatibility
         conn is Microsoft.Data.SqlClient.SqlConnection sql &&
         (IsPreviewDatabase(sql.Database) || IsWriteTestDatabase(sql.Database) ||
             IsOrdinarySchema31TestDatabase(sql.Database, sql.DataSource) ||
-            IsApprovedCutover(sql.Database, sql.DataSource) ||
+            IsApprovedCutover(sql.Database, sql.DataSource) || IsAgreementTestDatabase(sql.Database, sql.DataSource) ||
             OrdinarySchema31Enabled && IsWritablePilot(sql.Database,sql.DataSource));
 
     public static bool IsPreviewDatabase(string? name) =>
@@ -134,6 +137,14 @@ public static class SqlSchemaCompatibility
         string? dataSource = null)
     {
         RejectProduction(name, dataSource);
+        if (version == "28" && !IsProductionCutover(name,dataSource) && !IsPreviewDatabase(name) && !IsWriteTestDatabase(name) && !IsOrdinarySchema31TestDatabase(name,dataSource)) return;
+        if (version == "32" && (IsApprovedCutover(name, dataSource) || IsAgreementTestDatabase(name, dataSource)))
+        {
+            if (!requiredColumns || !string.Equals(updateability, "READ_WRITE", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Схема договоров 32 неполна или недоступна для записи.");
+            return;
+        }
+        if (version == "32") throw new InvalidOperationException("Схема договоров 32 допускается только для согласованной рабочей базы и отдельной локальной копии Agreement.");
         if (IsWriteTestDatabase(name))
             throw new InvalidOperationException("Специальная база теста записи v31 недоступна обычному приложению.");
         if (IsPreviewDatabase(name))

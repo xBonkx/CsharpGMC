@@ -15,7 +15,7 @@ internal static class MigrationFingerprint
     internal sealed record Digest(long Rows,string Hash);
     private static string Id(string value)=>"["+value.Replace("]","]]")+"]";
 
-    internal static List<Table> Describe(SqlConnection connection)
+    internal static List<Table> Describe(SqlConnection connection,SqlTransaction? transaction=null)
     {
         using var cmd=new SqlCommand("""
             SELECT SCHEMA_NAME(t.schema_id),t.name,c.name,TYPE_NAME(c.system_type_id),
@@ -25,7 +25,7 @@ internal static class MigrationFingerprint
             LEFT JOIN sys.index_columns ic ON ic.object_id=pk.object_id AND ic.index_id=pk.index_id
                 AND ic.column_id=c.column_id
             WHERE t.is_ms_shipped=0 ORDER BY t.schema_id,t.name,c.column_id
-            """,connection);
+            """,connection,transaction);
         using var r=cmd.ExecuteReader();
         var grouped=new Dictionary<(string Schema,string Name),List<Column>>();
         while(r.Read())
@@ -42,11 +42,13 @@ internal static class MigrationFingerprint
         return tables;
     }
 
-    internal static Dictionary<string,Digest> Read(SqlConnection connection,IReadOnlyList<Table> originals)
+    internal static Dictionary<string,Digest> Read(SqlConnection connection,IReadOnlyList<Table> originals,bool allowAgreementExtension=false,SqlTransaction? transaction=null)
     {
-        var actual=Describe(connection).ToDictionary(t=>t.Key,StringComparer.Ordinal);
-        if(actual.Count!=originals.Count)
+        var actual=Describe(connection,transaction).ToDictionary(t=>t.Key,StringComparer.Ordinal);
+        if(!allowAgreementExtension && actual.Count!=originals.Count)
             throw new InvalidOperationException("Existing table set changed.");
+        if(allowAgreementExtension && actual.Keys.Except(originals.Select(t=>t.Key)).Any(k=>k is not ("[dbo].[agreements]" or "[dbo].[agreement_files]" or "[dbo].[agreement_migration_links]")))
+            throw new InvalidOperationException("Unexpected added tables.");
         var result=new Dictionary<string,Digest>(StringComparer.Ordinal);
         foreach(var table in originals)
         {
@@ -55,8 +57,8 @@ internal static class MigrationFingerprint
                 throw new InvalidOperationException("Original column schema changed: "+table.Key);
             var projection=string.Join(",",table.Columns.Select(c=>"CONVERT(varbinary(max),"+Id(c.Name)+")"));
             var order=string.Join(",",table.Columns.Where(c=>c.KeyOrdinal>0).OrderBy(c=>c.KeyOrdinal).Select(c=>Id(c.Name)));
-            var where=table.Schema=="dbo"&&table.Name=="meta"?" WHERE [key]<>N'schema_version'":"";
-            using var cmd=new SqlCommand("SELECT "+projection+" FROM "+table.Key+where+" ORDER BY "+order,connection)
+            var where=table.Schema=="dbo"&&table.Name=="meta"?allowAgreementExtension?" WHERE [key] NOT IN(N'schema_version',N'agr10_schema_manifest')":" WHERE [key]<>N'schema_version'":"";
+            using var cmd=new SqlCommand("SELECT "+projection+" FROM "+table.Key+where+" ORDER BY "+order,connection,transaction)
                 {CommandTimeout=1800};
             using var reader=cmd.ExecuteReader(CommandBehavior.SequentialAccess);
             using var hash=new MigrationValueHash();

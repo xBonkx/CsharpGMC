@@ -58,7 +58,8 @@ public static partial class SqlServerDatabase
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
-                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
+                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource)
+                || SqlSchemaCompatibility.IsAgreementTestDatabase(conn.Database, builder.DataSource);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
             var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
@@ -134,7 +135,8 @@ public static partial class SqlServerDatabase
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
             var preview = SqlSchemaCompatibility.IsPreviewDatabase(conn.Database)
-                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource);
+                || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource)
+                || SqlSchemaCompatibility.IsAgreementTestDatabase(conn.Database, builder.DataSource);
             token.ThrowIfCancellationRequested();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
@@ -202,6 +204,10 @@ public static partial class SqlServerDatabase
                           AND COL_LENGTH(N'dbo.acts', N'section_amounts_json') IS NOT NULL
                           AND COL_LENGTH(N'dbo.acts', N'discount_override') IS NOT NULL
                           AND COL_LENGTH(N'dbo.acts', N'manual_total_cents') IS NOT NULL
+                          AND ((SELECT CONVERT(nvarchar(32),[value]) FROM dbo.meta WHERE [key]=N'schema_version')<>N'32'
+                            OR (OBJECT_ID(N'dbo.agreements',N'U') IS NOT NULL AND OBJECT_ID(N'dbo.agreement_files',N'U') IS NOT NULL
+                                AND COL_LENGTH(N'dbo.contracts',N'agreement_id') IS NOT NULL AND COL_LENGTH(N'dbo.agreements',N'contractor_full') IS NOT NULL
+                                AND EXISTS(SELECT 1 FROM dbo.meta WHERE [key]=N'agr10_schema_manifest' AND [value]=N'AGR10-expand-1')))
                          THEN 1 ELSE 0 END
                     """
         ;

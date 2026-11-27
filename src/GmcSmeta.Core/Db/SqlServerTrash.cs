@@ -35,6 +35,14 @@ public static partial class SqlServerTrash
             "SELECT id FROM dbo.shipments WHERE object_id=@id ORDER BY id", objectId);
         var extra = DumpRows(conn, tx, "shipment_lines", shipmentIds, "shipment_id");
         shipmentLines.AddRange(extra.Where(r => !have.Contains(SqlInteger.RequireInt64(r["id"]))));
+        if (SqlServerAgreements.Enabled(conn, tx))
+        {
+            var legalIds = IdList(conn, tx, "SELECT id FROM dbo.agreements WHERE object_id=@id ORDER BY id", objectId);
+            var cards = DumpRows(conn, tx, "agreements", new List<long> { objectId }, "object_id");
+            foreach (var card in cards) card.Remove("row_version");
+            dump["agreements"] = cards;
+            dump["agreement_files"] = DumpRows(conn, tx, "agreement_files", legalIds, "agreement_id");
+        }
         dump["objects"] = DumpRows(conn, tx, "objects", new List<long> { objectId }, "id");
         dump["access_lists"] = DumpRows(conn, tx, "access_lists", new List<long> { objectId }, "object_id");
         dump["shipments"] = DumpRows(conn, tx, "shipments", new List<long> { objectId }, "object_id");

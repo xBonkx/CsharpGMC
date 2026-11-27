@@ -7,9 +7,10 @@ public static class SqlMigrationPlan
 {
     public static string? Script(int current, int target)
     {
-        if (current is < 28 or > 31 || target is < 28 or > 31 || current > target)
+        if (current is < 28 or > 32 || target is < 28 or > 32 || current > target)
             throw new InvalidOperationException($"Неподдерживаемый переход схемы {current} → {target}.");
         if (current == target) return null;
+        if (target == 32) throw new InvalidOperationException("Переход договоров выполняется согласованным мигратором после резервной копии.");
         return target switch
         {
             29 => "migrate_discount_v29.sql",

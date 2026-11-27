@@ -177,21 +177,22 @@ public static class KsCustomerForms
         string customerCell, string contractorCell, string siteCell, string numberCell)
     {
         var r = p.Requisites;
-        var co = p.Contractors[docId];
-        var doc = p.Scope.Documents.Single(d => d.Id == docId);
+        var legal = KsLegalRequisites.ForDocument(p, docId);
+        var co = legal.Contractor;
         ws.Cell(customerCell).Value = "Заказчик  - " +
             (string.IsNullOrWhiteSpace(r.CustomerFull) ? r.CustomerOrganization : r.CustomerFull);
         ws.Cell(contractorCell).Value = "Подрядчик  - " +
             (string.IsNullOrWhiteSpace(co.LegalName) ? co.CompanyName : co.LegalName);
         ws.Cell(siteCell).Value = "Стройка - " +
             (string.IsNullOrWhiteSpace(r.SiteFull) ? r.ObjectName : r.SiteFull);
-        ws.Cell(numberCell).Value = p.Scope.AgreementNumber.TrimStart('№', ' ');
+        ws.Cell(numberCell).Value = legal.Number.TrimStart('№', ' ');
     }
 
     private static (int Total, int Vat) FillDnsAct(IXLWorksheet ws, SqlServerKsPrintData.Package p,
         SqlServerActs.ActInfo act)
     {
         FillAgreement(ws,p,act.ContractId,"A6","A8","A9","F11");
+        KsPrintedRequisites.DnsAct(ws, p, act);
         if (!string.IsNullOrWhiteSpace(p.Requisites.SecondOrganization))
             ws.Cell("A7").Value = p.Requisites.SecondRole + ": " + p.Requisites.SecondOrganization;
         ws.Cell("E19").Value = act.Number;
@@ -271,6 +272,7 @@ public static class KsCustomerForms
     private static (int Total, int Vat) FillR4Act(IXLWorksheet ws, SqlServerKsPrintData.Package p,
         SqlServerActs.ActInfo act)
     {
+        KsPrintedRequisites.R4Act(ws, p, act);
         ws.Cell("E18").Value=act.Number;
         DateCell(ws,"F18",act.Date);
         DateCell(ws,"G18",act.PeriodFrom);
@@ -363,6 +365,7 @@ public static class KsCustomerForms
     {
         var g=p.Report;
         FillAgreement(ws,p,g.Acts[0].ContractId,"A7","A9","A10","G13");
+        KsPrintedRequisites.DnsSummary(ws, p);
         ws.Cell("C21").Value=g.Key;
         DateCell(ws,"D21",g.Date);
         DateCell(ws,"F21",g.PeriodFrom);
@@ -393,6 +396,7 @@ public static class KsCustomerForms
         List<(string Name,int Total,int Vat)> refs)
     {
         var g=p.Report;
+        KsPrintedRequisites.R4Summary(ws, p);
         ws.Cell("C18").Value=g.Key;
         DateCell(ws,"D18",g.Date);
         DateCell(ws,"F18",g.PeriodFrom);
