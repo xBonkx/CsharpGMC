@@ -108,4 +108,66 @@ public sealed class KsGroupReportTests
         Assert.Equal(244m, report.YearNet);
         Assert.Equal(200m, report.PeriodNet);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreparedSingleBatchMatchesIndependentLegacyCalculationWithMixedVat(bool opening)
+    {
+        var scope = Example() with
+        {
+            Acts = Enumerable.Range(1, 500).Select(i =>
+                Act(i, $"{i / 4}.{i % 4}", new DateTime(2025, 11, 1).AddDays(i / 2),
+                    i * 0.13m, i * 0.1m, i * 0.03m, i % 3 == 0 ? 11 : 10)
+                    with { VatRate = i % 5 == 0 ? 0m : i % 2 == 0 ? 20m : 22m })
+                .Reverse().ToArray(),
+            Opening = opening ? new Ks3OpeningBalance(new DateTime(2025, 12, 31), 1234.56m) : null
+        };
+        var local = scope.Acts.Where(a => a.ContractId == scope.SelectedDocumentId)
+            .OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
+        var groups = KsWorkspaceProjection.Build(scope.Acts);
+        var prepared = new KsGroupReport.Prepared(scope);
+        foreach (var act in local)
+        {
+            var expected = SqlServerActs.CalculateKs3ReportFromActs(local, act.Id);
+            var groupIndex = groups.ToList().FindIndex(g => g.Key == KsWorkspaceProjection.GroupKey(act));
+            var cumulative = scope.Opening?.Cumulative(act.Date,
+                groups.Take(groupIndex).SelectMany(g => g.Acts).Select(a => (a.Date, a.Total)),
+                new[] { (act.Date, act.Total) });
+            var actual = prepared.Single(act.Id);
+            Assert.Equal(expected.Period, actual.PeriodNet);
+            Assert.Equal(expected.Vat, actual.PeriodVat);
+            Assert.Equal(expected.Total, actual.PeriodGross);
+            Assert.Equal(cumulative?.YearGross ?? expected.Year, actual.YearNet);
+            Assert.Equal(cumulative?.SinceStartGross ?? expected.Start, actual.SinceStartNet);
+            Assert.Equal(cumulative is not null, actual.GrossCumulative);
+            Assert.Equal(expected.Previous.Select(a => a.Net), actual.Previous.Select(a => a.Net));
+            Assert.Equal(act.Id, Assert.Single(actual.Acts).Id);
+        }
+        Assert.Throws<InvalidOperationException>(() => prepared.Single(3));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreparedGroupsPreservePreviousLegalHistoryAndLocalMembership(bool localOnly)
+    {
+        var scope = Example() with { Acts = Example().Acts.Reverse().ToArray(),
+            Opening = new Ks3OpeningBalance(new DateTime(2025, 12, 31), 1000m) };
+        var prepared = new KsGroupReport.Prepared(scope);
+        var later = prepared.Group("3", localOnly);
+        var current = prepared.Group("2", localOnly);
+        Assert.Equal(100m, later.PeriodNet);
+        Assert.Equal(1732m, later.SinceStartNet);
+        Assert.Equal(732m, later.YearNet);
+        Assert.Equal(2, later.Previous.Count);
+        Assert.Equal(610m, later.Previous[1].Gross);
+        Assert.Equal(localOnly ? 244m : 610m, current.PeriodGross);
+        Assert.Equal(localOnly ? 1244m : 1610m, current.SinceStartNet);
+        Assert.Equal(localOnly ? new long[] { 2 } : new long[] { 2, 3 },
+            current.Acts.Select(a => a.Id));
+        Assert.Same(later.Previous[0], current.Previous[0]);
+        Assert.Throws<InvalidOperationException>(() => prepared.Group("999"));
+    }
+
 }

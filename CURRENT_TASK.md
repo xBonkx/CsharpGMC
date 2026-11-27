@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 4671be4) — PERF-022 PARTIAL: prepared report context for batch KS-3 calculations; tests added, not run. See performance TODO.
+
 28.11.2026 ChatGPT/main (base a8c7eba) — PERF-022 PARTIAL: prepared all-acts overview search and stable visible selection; tests added, not run. See performance TODO.
 
 28.11.2026 ChatGPT/main (base 0fc090b) — PERF-022/023 PARTIAL: background KS progress XLSX with context guard and atomic publication; workbook/source checks added, not run. See performance TODO.

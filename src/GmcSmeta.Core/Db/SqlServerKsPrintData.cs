@@ -92,16 +92,17 @@ public static class SqlServerKsPrintData
             .OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
         if (local.Length == 0 || local.Length > 500)
             throw new InvalidOperationException("Неверное число актов для экспорта.");
+        var prepared = new KsGroupReport.Prepared(scope);
         var snapshot = ReadPackage(conn, contractId, scope,
-            KsGroupReport.CalculateSingle(scope, local[0].Id), local);
+            prepared.Single(local[0].Id), local);
         var document = scope.Documents.Single(d => d.Id == contractId);
         var objectName = snapshot.Requisites.ObjectName.Trim().ToLowerInvariant();
         var grouped = document.Form.Trim().Equals("r4", StringComparison.OrdinalIgnoreCase) &&
             objectName is ("р4" or "p4" or "r4");
         var reports = (grouped
             ? local.GroupBy(KsWorkspaceProjection.GroupKey)
-                .Select(g => KsGroupReport.Calculate(scope, g.Key, selectedDocumentOnly: true))
-            : local.Select(a => KsGroupReport.CalculateSingle(scope, a.Id))).ToArray();
+                .Select(g => prepared.Group(g.Key, selectedDocumentOnly: true))
+            : local.Select(a => prepared.Single(a.Id))).ToArray();
         // The first package's guard is not sufficient for later reports in a
         // batch: their previous groups and opening-balance usage can differ.
         if (snapshot.LegalAgreements.Count != 0)
