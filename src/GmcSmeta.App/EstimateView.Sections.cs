@@ -180,16 +180,9 @@ public partial class EstimateView
         }
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
-        if (_pendingEstimateInsert is not null)
-        {
-            // Commit the active draft first, so repeated Add never leaves the
-            // WPF row in edit mode and prevents mandatory readback forever.
-            SetStatus("Предыдущая новая позиция ещё сверяется с сервером.", false);
-            return;
-        }
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
         selected ??= _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected?.IsVirtual == true)
+        if (selected is { IsVirtual: true, IsPendingInsert: false })
         {
             SetStatus("В режиме группировки сначала раскрой группу и выбери конкретную позицию.", true);
             return;
@@ -206,10 +199,22 @@ public partial class EstimateView
         }
 
         var systemId = selected.Source.SystemId;
+        var anchorDraft = selected.IsPendingInsert ? FindPendingInsert(selected.Id) : null;
+        if (selected.IsPendingInsert && anchorDraft is null) return;
         long? afterId = selected.IsSystem ? null : selected.Id;
         long? parentId = component
             ? selected.Source.ParentPositionId ?? selected.Id
             : null;
+        var parentDraft = parentId is < 0 ? FindPendingInsert(checked((int)parentId.Value)) : null;
+        if (parentId is < 0 && parentDraft is null) return;
+        if (anchorDraft is not null && !CanShowPendingInsert)
+        {
+            SetStatus("Для добавления под новой строкой верни обычный вид сметы.", true);
+            return;
+        }
+        var previousInsert = _pendingInsertTail;
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingInsertTail = completion.Task;
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
@@ -222,12 +227,15 @@ public partial class EstimateView
             // Publish a local draft before any SQL/undo wait; it is NOT in the
             // authoritative document or in the SQL row index.
             preview = TryShowPendingInsert(selected, component);
+            await previousInsert;
             await _writeLock.WaitAsync();
             acquired = true;
             if (_serverConflict || _cellSaveQueue.Blocked)
                 throw new InvalidOperationException("Серверная смета устарела, обнови её.");
+            var realAfterId = anchorDraft is null ? afterId : ResolvePendingAnchor(anchorDraft);
+            var realParentId = parentDraft is null ? parentId : ResolvePendingAnchor(parentDraft);
             var result = await Task.Run(() => SqlServerDatabase.AddPosition(
-                _sqlConnectionString, _contractId, systemId, afterId, parentId, _serverRevision));
+                _sqlConnectionString, _contractId, systemId, realAfterId, realParentId, _serverRevision));
             if (!result.Saved)
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил вставку.");
             _serverRevision = result.Revision;
@@ -262,6 +270,7 @@ public partial class EstimateView
                     QueueSave(realId, edit.Key, edit.Value);
                 preview.BufferedEdits.Clear();
             }
+            completion.TrySetResult(true);
             if (Interlocked.Decrement(ref _pendingWrites) == 0)
             {
                 SetStatus(_saveError is null ? "Строка добавлена; сверка с SQL Server…" : "Ошибка записи: " + _saveError,
