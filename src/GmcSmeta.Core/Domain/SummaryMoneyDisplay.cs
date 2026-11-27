@@ -5,6 +5,19 @@ namespace GmcSmeta.Core.Domain;
 public static class SummaryMoneyDisplay
 {
     public readonly record struct MarginCell(string Text, bool Negative);
+    public readonly record struct UnitCell(string Text, string Raw, bool Marked);
+
+    /// <summary>Format the unit-price display, editor value and missing marker
+    /// together. Zero retail is blank; zero cost/work remains a valid value.
+    /// A forced missing-cost marker never removes the underlying editor value.</summary>
+    public static UnitCell Unit(decimal? value, bool differs, bool isPrice,
+        bool markMissing = false, bool forceMissing = false)
+    {
+        var visible = !differs && value is decimal v && (v != 0m || !isPrice);
+        var marked = forceMissing || (markMissing && !visible);
+        return new UnitCell(marked ? "—" : visible ? Money.Format(value!.Value) : "",
+            visible ? NumberText.QtyText(value!.Value) : "", marked);
+    }
 
     public static MarginCell Margin(decimal cost, decimal sell)
     {

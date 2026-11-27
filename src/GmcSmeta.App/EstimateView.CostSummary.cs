@@ -323,18 +323,12 @@ public partial class EstimateView
         var systemIds = SummarySystemSelection.Expand(_summarySelectedSystems, data.SystemParents);
         var rows = (_summarySearchIndex ??= new CostSummarySearchIndex(recs, _summaryLabels))
             .Filter(SummarySearch?.Text, systemIds, _summaryMissingOn, missingMask)
-            .Select(ToRec).ToList();
+            .ToList();
         bool filtered = rows.Count != recs.Count;
 
         var built = new List<SummaryRow>();
         decimal totMCost = 0m, totMSell = 0m, totWCost = 0m, totWSell = 0m;
         int stripe = 0;
-
-        void AddStripe(SummaryRow row)
-        {
-            built.Add(row with { IsOdd = stripe % 2 == 1 });
-            stripe++;
-        }
 
         if (_summaryMode == "same")
         {
@@ -350,7 +344,7 @@ public partial class EstimateView
                     {
                         SystemId = r.SystemId, Name = r.Name, Unit = r.Unit, Qty = 0m,
                         UCost = r.UCost, UPrice = r.UPrice, UWcost = r.UWcost, UWsell = r.UWsell,
-                        Work = r.Work, Supplier = "",
+                        Work = r.Work,
                     };
                     map[key] = m;
                     merged.Add(m);
@@ -358,10 +352,9 @@ public partial class EstimateView
                 MergeInto(m, r);
             }
             var list = SortRecs(merged);
-            foreach (var m in list)
-                AddStripe(SummaryRowFromRec(m, kinds: markKinds));
             foreach (var item in list)
             {
+                built.Add(SummaryRowFromRec(item, markKinds, stripe++ % 2 == 1));
                 totMCost += item.MCost; totMSell += item.MSell;
                 totWCost += item.WCost; totWSell += item.WSell;
             }
@@ -369,17 +362,18 @@ public partial class EstimateView
         else
         {
             // группы: по системам или по поставщикам; свёрнутая группа тоже редактируется
+            var records = rows.Select(ToRec);
             var groups = new List<(string Title, long SystemId, string? SupplierKey, List<SummaryRec> Items)>();
             if (_summaryMode == "sup")
             {
-                foreach (var g in rows.GroupBy(r => r.Supplier).OrderBy(g => g.Key.Length == 0 ? 1 : 0)
+                foreach (var g in records.GroupBy(r => r.Supplier).OrderBy(g => g.Key.Length == 0 ? 1 : 0)
                          .ThenBy(g => g.Key.Length == 0 ? "" : g.Key.ToLowerInvariant(), StringComparer.Ordinal))
                     groups.Add((g.Key.Length == 0 ? "Поставщик не указан" : $"Поставщик: {g.Key}",
                         0, g.Key, g.ToList()));
             }
             else
             {
-                var bySystem = rows.ToLookup(r => r.SystemId);
+                var bySystem = records.ToLookup(r => r.SystemId);
                 foreach (var (id, label, _) in data.Systems)
                 {
                     var items = bySystem[id].ToList();
@@ -398,59 +392,43 @@ public partial class EstimateView
                 if (SummaryGroupCollapsed(sysId, supplierKey))
                     continue;
                 foreach (var r in sorted)
-                    AddStripe(SummaryRowFromRec(r, kinds: markKinds) with { IsIndented = true });
+                    built.Add(SummaryRowFromRec(r, markKinds, stripe++ % 2 == 1, indented: true));
             }
         }
 
         // extra: прочие затраты на монтаж / куплено вне КП / транспорт — только без фильтра
         if (!filtered)
         {
+            var zeroMargin = SummaryMoneyDisplay.Margin(0m, 0m).Text;
             foreach (var (name, cost, sell, kind) in data.Extra)
             {
-                if (kind == "works")
+                var work = kind == "works";
+                if (work) { totWCost += cost; totWSell += sell; }
+                else { totMCost += cost; totMSell += sell; }
+
+                var costText = SumText(cost);
+                var sellText = SumText(sell);
+                var margin = SummaryMoneyDisplay.Margin(cost, sell);
+                built.Add(new SummaryRow
                 {
-                    totWCost += cost; totWSell += sell;
-                    AddStripe(new SummaryRow
-                    {
-                        Kind = "extra", Name = name,
-                        WCostText = SumText(cost), WSellText = SumText(sell),
-                        TotalCostText = SumText(cost), TotalSellText = SumText(sell),
-                        WorkLegacyMargin = sell - cost,
-                        MatMarginText = MarginText(0m, 0m), WorkMarginText = MarginText(cost, sell),
-                        WorkMarginNeg = MarginNeg(cost, sell),
-                    });
-                }
-                else if (kind == "trans")
-                {
-                    // транспорт: закуп и розница на стороне материалов, правится вручную
-                    totMCost += cost; totMSell += sell;
-                    AddStripe(new SummaryRow
-                    {
-                        Kind = "extra", IsTransport = true, Name = name,
-                        MCostText = SumText(cost), MSellText = SumText(sell),
-                        TotalCostText = SumText(cost), TotalSellText = SumText(sell),
-                        MatLegacyMargin = sell - cost,
-                        MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
-                        MatMarginNeg = MarginNeg(cost, sell),
-                    });
-                }
-                else
-                {
-                    totMCost += cost; totMSell += sell;
-                    AddStripe(new SummaryRow
-                    {
-                        Kind = "extra", Name = name,
-                        MCostText = SumText(cost), MSellText = SumText(sell),
-                        TotalCostText = SumText(cost), TotalSellText = SumText(sell),
-                        MatLegacyMargin = sell - cost,
-                        MatMarginText = MarginText(cost, sell), WorkMarginText = MarginText(0m, 0m),
-                        MatMarginNeg = MarginNeg(cost, sell),
-                    });
-                }
+                    Kind = "extra", Name = name, IsTransport = kind == "trans",
+                    IsOdd = stripe++ % 2 == 1,
+                    MCostText = work ? "" : costText, MSellText = work ? "" : sellText,
+                    WCostText = work ? costText : "", WSellText = work ? sellText : "",
+                    TotalCostText = costText, TotalSellText = sellText,
+                    MatLegacyMargin = work ? 0m : sell - cost,
+                    WorkLegacyMargin = work ? sell - cost : 0m,
+                    MatMarginText = work ? zeroMargin : margin.Text,
+                    WorkMarginText = work ? margin.Text : zeroMargin,
+                    MatMarginNeg = !work && margin.Negative,
+                    WorkMarginNeg = work && margin.Negative,
+                });
             }
         }
 
         // ИТОГО
+        var matMargin = SummaryMoneyDisplay.Margin(totMCost, totMSell);
+        var workMargin = SummaryMoneyDisplay.Margin(totWCost, totWSell);
         built.Add(new SummaryRow
         {
             Kind = "total",
@@ -459,10 +437,10 @@ public partial class EstimateView
             WCostText = SumText(totWCost), WSellText = SumText(totWSell),
             TotalCostText = SumText(totMCost + totWCost), TotalSellText = SumText(totMSell + totWSell),
             MatLegacyMargin = totMSell - totMCost, WorkLegacyMargin = totWSell - totWCost,
-            MatMarginText = MarginText(totMCost, totMSell),
-            WorkMarginText = MarginText(totWCost, totWSell),
-            MatMarginNeg = MarginNeg(totMCost, totMSell),
-            WorkMarginNeg = MarginNeg(totWCost, totWSell),
+            MatMarginText = matMargin.Text,
+            WorkMarginText = workMargin.Text,
+            MatMarginNeg = matMargin.Negative,
+            WorkMarginNeg = workMargin.Negative,
         });
 
         SummaryReplaceRows(built);
@@ -590,9 +568,9 @@ public partial class EstimateView
             grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Restore(true)));
     }
 
-    private void MergeInto(SummaryRec m, SummaryRec r)
+    private static void MergeInto(SummaryRec m, CostSummaryRow r)
     {
-        m.Ids.AddRange(r.Ids);
+        m.Ids.Add(r.Id);
         m.Qty += r.Qty;
         m.MCost += r.MCost; m.MSell += r.MSell;
         m.WCost += r.WCost; m.WSell += r.WSell;
@@ -603,13 +581,8 @@ public partial class EstimateView
         m.NoCost |= r.NoCost; m.NoPrice |= r.NoPrice;
         m.NowCost |= r.NowCost; m.NowSell |= r.NowSell;
         m.Fact |= r.Fact; m.Kids |= r.Kids;
-        if (r.Supplier.Length > 0)
-        {
-            var sups = m.Supplier.Length == 0
-                ? new HashSet<string>() : new HashSet<string>(m.Supplier.Split(", "));
-            sups.Add(r.Supplier);
-            m.Supplier = string.Join(", ", sups.OrderBy(s => s, StringComparer.Ordinal));
-        }
+        // The merged presentation has no supplier column or supplier sort.
+        // Search has already matched the original rows, including suppliers.
     }
 
     private SummaryRec ToRec(CostSummaryRow r) => new()
@@ -648,132 +621,6 @@ public partial class EstimateView
             _ => list,
         };
         return sorted.ToList();
-    }
-
-    // ------------------------------------------------------------------ row factory
-    private static string SumText(decimal v) => Math.Abs(v) >= 0.005m ? Money.Format(v) : "";
-
-    // Display-only policy from Python _money_item. Actual totals and SQL remain unchanged.
-    private static string MarginText(decimal cost, decimal sell) =>
-        SummaryMoneyDisplay.Margin(cost, sell).Text;
-
-    private static bool MarginNeg(decimal cost, decimal sell) =>
-        SummaryMoneyDisplay.Margin(cost, sell).Negative;
-
-    private static string UnitText(decimal? value, bool diff, bool isPrice) =>
-        diff || value is null ? "" : (value.Value != 0m || !isPrice ? Money.Format(value.Value) : "");
-
-    private static string UnitRaw(decimal? value, bool diff, bool isPrice) =>
-        diff || value is null ? "" : (value.Value != 0m || !isPrice ? NumberText.QtyText(value.Value) : "");
-
-    private SummaryRow SummaryRowFromRec(SummaryRec r, HashSet<string> kinds)
-    {
-        var markup = "";
-        if (r.UWcost is { } wc && wc != 0m && r.UWsell is { } ws)
-            markup = ((ws - wc) / wc * 100m).ToString("0.00", Ru).Replace('.', ',');
-        var costTip = r.Fact
-            ? "Закуп — факт по счёту (из закупок). Вписанное здесь станет плановым закупом"
-            : r.Kids ? "Закуп строки + её комплектующие (в «Материалы: закуп»)" : "";
-        var costText = r.NoCost ? "—" : UnitText(r.UCost, r.UCostDiff, isPrice: false);
-        var priceText = UnitText(r.UPrice, r.UPriceDiff, isPrice: true);
-        if (kinds.Contains("noprice") && r.NoPrice && priceText.Length == 0) priceText = "—";
-        var workCostText = UnitText(r.UWcost, r.UWcostDiff, isPrice: false);
-        if (kinds.Contains("nowcost") && r.NowCost && workCostText.Length == 0) workCostText = "—";
-        var workSellText = UnitText(r.UWsell, r.UWsellDiff, isPrice: false);
-        if (kinds.Contains("nowsell") && r.NowSell && workSellText.Length == 0) workSellText = "—";
-        return new SummaryRow
-        {
-            Kind = "pos",
-            SystemId = r.SystemId,
-            PositionId = r.Ids.Count == 1 ? r.Ids[0] : 0,
-            MemberIds = r.Ids.ToArray(),
-            IsWork = r.Work,
-            IsFact = r.Fact,
-            HasKids = r.Kids,
-            Name = r.Name,
-            Unit = r.Unit,
-            QtyText = NumberText.QtyText(r.Qty),
-            QtyRaw = r.Ids.Count == 1 ? NumberText.QtyText(r.Qty) : "",
-            CostUnitText = costText,
-            CostUnitRaw = UnitRaw(r.UCost, r.UCostDiff, isPrice: false),
-            CostUnitTip = costTip,
-            PriceUnitText = priceText,
-            PriceUnitRaw = UnitRaw(r.UPrice, r.UPriceDiff, isPrice: true),
-            PriceUnitTip = r.Work ? "Строка работ: цена клиенту — это цена работы, её правят во вкладке «Смета»" : "",
-            WorkCostText = workCostText,
-            WorkCostRaw = UnitRaw(r.UWcost, r.UWcostDiff, isPrice: false),
-            WorkSellText = workSellText,
-            WorkSellRaw = UnitRaw(r.UWsell, r.UWsellDiff, isPrice: false),
-            MCostText = SumText(r.MCost), MSellText = SumText(r.MSell),
-            WCostText = SumText(r.WCost), WSellText = SumText(r.WSell),
-            TotalCostText = SumText(r.Cost), TotalSellText = SumText(r.Sell),
-            MatLegacyMargin = r.MSell - r.MCost, WorkLegacyMargin = r.WSell - r.WCost,
-            MatMarginText = MarginText(r.MCost, r.MSell),
-            WorkMarginText = MarginText(r.WCost, r.WSell),
-            MatMarginNeg = MarginNeg(r.MCost, r.MSell),
-            WorkMarginNeg = MarginNeg(r.WCost, r.WSell),
-            MarkupText = markup,
-            NoCost = r.NoCost, NoPrice = r.NoPrice, NowCost = r.NowCost, NowSell = r.NowSell,
-            CostMark = r.NoCost,
-            PriceMark = kinds.Contains("noprice") && r.NoPrice && UnitText(r.UPrice, r.UPriceDiff, true).Length == 0,
-            WorkCostMark = kinds.Contains("nowcost") && r.NowCost && UnitText(r.UWcost, r.UWcostDiff, false).Length == 0,
-            WorkSellMark = kinds.Contains("nowsell") && r.NowSell && UnitText(r.UWsell, r.UWsellDiff, false).Length == 0,
-        };
-    }
-
-    /// <summary>Шапка системы / поставщика: суммы группы и цены, вписываемые во все строки.</summary>
-    private SummaryRow SummaryRowFromGroup(long systemId, string? supplierKey, string title,
-        List<SummaryRec> items, SummaryGroupAccumulator amounts)
-    {
-        var mCost = amounts.MaterialCost;
-        var mSell = amounts.MaterialSell;
-        var wCost = amounts.WorkCost;
-        var wSell = amounts.WorkSell;
-
-        static (string Text, string Raw, bool Uniform) Price(SummaryGroupAccumulator.UniformPrice price)
-        {
-            if (price.Value is decimal v)
-                return (v != 0m ? Money.Format(v) : "", NumberText.QtyText(v), true);
-            return ("", "", price.IsUniform);
-        }
-
-        var cost = Price(amounts.MaterialUnitCost);
-        var price = Price(amounts.MaterialUnitSell);
-        var wcost = Price(amounts.WorkUnitCost);
-        var wsell = Price(amounts.WorkUnitSell);
-        static string Tip(string what, bool uniform, int n) =>
-            $"Впишите {what} — получат все {n} строк этой группы" + (uniform ? "" : " (сейчас цены у них разные)");
-
-        return new SummaryRow
-        {
-            Kind = "system",
-            SystemId = systemId,
-            SupplierGroupKey = supplierKey,
-            MemberIds = items.SelectMany(x => x.Ids).ToArray(),
-            Name = title,
-            QtyText = $"{items.Count} поз.",
-            CollapseMark = SummaryGroupCollapsed(systemId, supplierKey) ? "▸" : "▾",
-            CostUnitText = cost.Text, CostUnitRaw = cost.Raw,
-            CostUnitTip = Tip("закуп материала за ед.", cost.Uniform, items.Count),
-            PriceUnitText = price.Text, PriceUnitRaw = price.Raw,
-            PriceUnitTip = Tip("цена клиенту за ед.", price.Uniform, items.Count),
-            WorkCostText = wcost.Text, WorkCostRaw = wcost.Raw,
-            WorkCostTip = Tip("затраты на работу за ед.", wcost.Uniform, items.Count),
-            WorkSellText = wsell.Text, WorkSellRaw = wsell.Raw,
-            WorkSellTip = Tip("розница работы за ед.", wsell.Uniform, items.Count),
-            MCostText = SumText(mCost), MSellText = SumText(mSell),
-            WCostText = SumText(wCost), WSellText = SumText(wSell),
-            TotalCostText = SumText(mCost + wCost), TotalSellText = SumText(mSell + wSell),
-            MatLegacyMargin = mSell - mCost, WorkLegacyMargin = wSell - wCost,
-            MatMarginText = MarginText(mCost, mSell),
-            WorkMarginText = MarginText(wCost, wSell),
-            MatMarginNeg = MarginNeg(mCost, mSell),
-            WorkMarginNeg = MarginNeg(wCost, wSell),
-            NoCost = amounts.NoCost,
-            NoPrice = amounts.NoPrice,
-            NowCost = amounts.NowCost,
-            NowSell = amounts.NowSell,
-        };
     }
 
     // ------------------------------------------------------------------ tiles

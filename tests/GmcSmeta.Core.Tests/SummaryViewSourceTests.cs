@@ -111,6 +111,21 @@ public sealed class SummaryViewSourceTests
     }
 
     [Fact]
+    public void SummaryMergeConsumesOriginalRowsAndFactoriesBuildFinalPresentationOnce()
+    {
+        var logic = SummarySource("EstimateView.CostSummary.cs");
+        Assert.Contains("MergeInto(SummaryRec m, CostSummaryRow r)", logic);
+        Assert.Contains("m.Ids.Add(r.Id);", logic);
+        Assert.DoesNotContain("m.Supplier.Split(", logic);
+        Assert.DoesNotContain("AddStripe(", logic);
+        var rows = SummarySource("EstimateView.CostSummary.Rows.cs");
+        Assert.Contains("Kind = \"pos\", IsOdd = odd, IsIndented = indented,", rows);
+        Assert.Contains("QtyRaw = r.Ids.Count == 1 ? qty : \"\"", rows);
+        Assert.Contains("PriceMark = price.Marked", rows);
+        Assert.Contains("MatMarginNeg = matMargin.Negative", rows);
+    }
+
+    [Fact]
     public void SummaryColumnsHaveStableKeysAndDefaultVisibility()
     {
         var grid = Panel().Descendants(Wpf + "DataGrid").Single();

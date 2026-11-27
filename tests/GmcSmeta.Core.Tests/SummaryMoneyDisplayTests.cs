@@ -38,4 +38,31 @@ public sealed class SummaryMoneyDisplayTests
         Assert.Equal(GmcSmeta.Core.Money.Format(19_144_180.98m), cell.Text);
         Assert.False(cell.Negative);
     }
+
+    [Theory]
+    [InlineData(null, false, false, false, false)]
+    [InlineData(null, false, false, true, false)]
+    [InlineData(0, false, true, false, false)]
+    [InlineData(0, false, true, true, false)]
+    [InlineData(0, false, false, true, false)]
+    [InlineData(12, false, true, true, false)]
+    [InlineData(12, false, false, false, true)]
+    [InlineData(12, true, false, true, false)]
+    [InlineData(12, true, false, false, true)]
+    [InlineData(-12, false, false, true, false)]
+    public void UnitCellMatchesFormerTextRawAndMarkerRules(int? number,
+        bool differs, bool isPrice, bool markMissing, bool forceMissing)
+    {
+        decimal? value = number;
+        var oldText = differs || value is null ? "" :
+            value.Value != 0m || !isPrice ? GmcSmeta.Core.Money.Format(value.Value) : "";
+        var oldRaw = differs || value is null ? "" :
+            value.Value != 0m || !isPrice ? GmcSmeta.Core.NumberText.QtyText(value.Value) : "";
+        var oldMarked = forceMissing || (markMissing && oldText.Length == 0);
+        var result = SummaryMoneyDisplay.Unit(value, differs, isPrice, markMissing, forceMissing);
+        Assert.Equal(oldMarked ? "—" : oldText, result.Text);
+        Assert.Equal(oldRaw, result.Raw);
+        Assert.Equal(oldMarked, result.Marked);
+    }
+
 }
