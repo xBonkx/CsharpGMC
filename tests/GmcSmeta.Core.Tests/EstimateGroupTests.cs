@@ -47,6 +47,65 @@ public sealed class EstimateGroupTests
     }
 
     [Fact]
+    public void PreparedGroupingReusesAggregatesAcrossSearchSortAndMode()
+    {
+        var rows = Rows();
+        var prepared = EstimateGroups.Prepare(rows);
+        Assert.Same(rows, prepared.Rows);
+        var original = EstimateGroups.BuildPrepared(prepared, EstimateGroups.Same)[0].Groups;
+        var fan = original.Single(g => g.Members.Count == 2);
+        var matched = EstimateGroups.BuildPrepared(prepared, EstimateGroups.Same,
+            EstimateViewProjection.ByAmount, "комплектующая", missingOnly: true)[0].Groups;
+        Assert.Same(fan, Assert.Single(matched));
+        var types = EstimateGroups.BuildPrepared(prepared, EstimateGroups.Type);
+        Assert.Same(fan, types.SelectMany(section => section.Groups).Single(g => g.Members.Count == 2));
+        var edited = rows.Select(row => row.Id == 201 ? row with { Qty = 7, Price = 100, Amount = 700 } : row).ToArray();
+        var newFan = EstimateGroups.BuildPrepared(EstimateGroups.Prepare(edited), EstimateGroups.Same)[0]
+            .Groups.Single(g => g.Members.Count == 2);
+        Assert.Equal(5m, fan.Quantity);
+        Assert.Equal(9m, newFan.Quantity);
+        Assert.Equal(1300m, newFan.Amount);
+        Assert.False(newFan.MissingPrice);
+    }
+
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData(null, 5, true)]
+    [InlineData(5, null, true)]
+    [InlineData(5, 5, false)]
+    [InlineData(5, 6, true)]
+    public void MixedOptionalPricesPreserveDisplayMeaning(int? first, int? second, bool mixed)
+    {
+        var rows = new[] {
+            Pos(0, 1, 10, "Клапан", "шт", 1, 10, first) with { WorkPrice = first },
+            Pos(1, 2, 10, "Клапан", "шт", 1, 10, second) with { WorkPrice = second }
+        };
+        var group = Assert.Single(EstimateGroups.Build(rows, EstimateGroups.Same)[0].Groups);
+        Assert.Equal(mixed, group.MixedPurchase);
+        Assert.Equal(mixed, group.MixedWork);
+        Assert.Equal(mixed ? (decimal?)null : first, group.CommonPurchase);
+        Assert.Equal(mixed ? (decimal?)null : first, group.CommonWork);
+    }
+
+    [Fact]
+    public void PreparedGroupingLargeSnapshotKeepsEveryMemberAndComponent()
+    {
+        var rows = Enumerable.Range(1, 12500).SelectMany(id => new[]
+        {
+            Pos(id * 2, id, 1, "Клапан " + (id % 100), "шт", 1, 10),
+            Pos(id * 2 + 1, 12500 + id, 1, "Датчик", "шт", 1, 0, parent: id)
+        }).ToArray();
+        var prepared = EstimateGroups.Prepare(rows);
+        var all = EstimateGroups.BuildPrepared(prepared, EstimateGroups.Same)[0].Groups;
+        Assert.Equal(100, all.Count);
+        Assert.Equal(12500, all.Sum(g => g.Members.Count));
+        Assert.Equal(12500, all.Sum(g => g.Components.Count));
+        Assert.Equal(125000m, all.Sum(g => g.Amount));
+        var search = EstimateGroups.BuildPrepared(prepared, EstimateGroups.Same, query: "Датчик")[0].Groups;
+        Assert.Equal(all.Select(g => g.Key), search.Select(g => g.Key));
+    }
+
+    [Fact]
     public void TypeGroups_UseFirstWordAndAmounts()
     {
         var types = EstimateGroups.Build(Rows(), EstimateGroups.Type);

@@ -61,6 +61,28 @@ internal static class EstimateGridRowUpdates
         return true;
     }
 
+    /// <summary>Restore stable identities on full rebind, not temporary
+    /// sort keys or recycled virtual row numbers. Bound restoration work
+    /// for very large selections to the primary row.</summary>
+    internal static void PublishFull(DataGrid grid, List<EditableEstimateRow> next, bool observable = true)
+    {
+        var primary = grid.SelectedItem as EditableEstimateRow;
+        var previousCell = grid.CurrentCell;
+        var current = previousCell.IsValid ? previousCell.Item as EditableEstimateRow : null;
+        var selection = grid.SelectedItems.Count <= MaxReplacements
+            ? grid.SelectedItems.OfType<EditableEstimateRow>().ToArray()
+            : primary is null ? Array.Empty<EditableEstimateRow>() : new[] { primary };
+
+        var targets = EstimateSelectionRestore.Find(next, selection, primary, current);
+        grid.ItemsSource = observable ? CreateSource(next) : next;
+        if (targets.Primary is not null) grid.SelectedItem = targets.Primary;
+        foreach (var row in targets.Selected)
+            if (!grid.SelectedItems.Contains(row)) grid.SelectedItems.Add(row);
+        if (targets.Current is not null && previousCell.Column is { } column &&
+            grid.Columns.Contains(column) && column.Visibility == System.Windows.Visibility.Visible)
+            grid.CurrentCell = new DataGridCellInfo(targets.Current, column);
+    }
+
     private static bool SameIdentity(EditableEstimateRow a, EditableEstimateRow b) =>
         !a.IsVirtual && !b.IsVirtual && a.Id == b.Id && a.SortKey == b.SortKey &&
         a.Kind == b.Kind && a.IsSub == b.IsSub && a.Level == b.Level && a.ParentSystemId == b.ParentSystemId &&

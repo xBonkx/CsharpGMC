@@ -220,7 +220,7 @@ public partial class EstimateView : UserControl
         EditableEstimateRow? selected = focusSystem is int systemId
             ? RowViewIndex.FindSection(systemId)
             : focusId is int id ? RowViewIndex.ByPositionId.GetValueOrDefault(id) : null;
-        if (selected is not null)
+        if (selected is not null && EstimateGrid.Items.Contains(selected))
         {
             if (!ReferenceEquals(EstimateGrid.SelectedItem, selected) &&
                 (focusSystem is not null || selectedId != focusId || !EstimateGrid.SelectedItems.Contains(selected)))
@@ -740,7 +740,6 @@ public partial class EstimateView : UserControl
             visible.Add(row);
         }
 
-        var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
         visible = ApplyInlineStagesFilter(visible);
         IncludePendingInsert(visible);
         // No collection reset if the filtered projection is identical. WPF
@@ -749,11 +748,7 @@ public partial class EstimateView : UserControl
             !existing.SequenceEqual(visible, ReferenceEqualityComparer.Instance))
         {
             if (_inlineStagesOn || !EstimateGridRowUpdates.TryReplace(EstimateGrid, visible))
-            {
-                EstimateGrid.ItemsSource = EstimateGridRowUpdates.CreateSource(visible);
-                if (selected is not null && visible.Contains(selected))
-                    EstimateGrid.SelectedItem = selected;
-            }
+                EstimateGridRowUpdates.PublishFull(EstimateGrid, visible);
         }
 
         RefreshTemporaryViewControls();

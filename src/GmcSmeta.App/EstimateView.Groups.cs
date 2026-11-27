@@ -17,14 +17,20 @@ public partial class EstimateView
     private readonly HashSet<string> _expandedGroupKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _collapsedTypeKeys = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _frozenGroupedOrder = new(StringComparer.Ordinal);
+    private EstimateGroups.Prepared? _preparedGroups;
 
     private bool ApplyGroupedFilter(bool expandAllGroups)
     {
         if (_temporaryGroupMode is not (EstimateGroups.Same or EstimateGroups.Type) ||
-            _estimate is null) return false;
+            _estimate is null)
+        {
+            _preparedGroups = null;
+            return false;
+        }
 
-        var selections = EstimateGrid.SelectedItem as EditableEstimateRow;
-        var sections = EstimateGroups.Build(_estimate.Rows, _temporaryGroupMode,
+        if (_preparedGroups is null || !ReferenceEquals(_preparedGroups.Rows, _estimate.Rows))
+            _preparedGroups = EstimateGroups.Prepare(_estimate.Rows);
+        var sections = EstimateGroups.BuildPrepared(_preparedGroups, _temporaryGroupMode,
             _temporarySort, EstimateSearch.Text, _noPriceTemporaryView,
             _frozenGroupedOrder);
         // Expand all uses this very projection; do not build groups twice.
@@ -37,11 +43,14 @@ public partial class EstimateView
         var byId = index.ByPositionId;
         var projected = new List<EditableEstimateRow>(_rows.Count);
         var virtualKey = -1;
+        var showPositionNumbers = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber;
+        var searching = !string.IsNullOrWhiteSpace(EstimateSearch.Text);
+        var typeMode = _temporaryGroupMode == EstimateGroups.Type;
 
         void ShowPosition(EstimateRow source, int depth)
         {
             var original = byId[source.Id];
-            original.DisplayNum = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber
+            original.DisplayNum = showPositionNumbers
                 ? original.Num : index.SectionName(source.SystemId, original.Num);
             original.DisplayIndentLevel = depth;
             projected.Add(original);
@@ -49,7 +58,6 @@ public partial class EstimateView
 
         foreach (var section in sections)
         {
-            var typeMode = _temporaryGroupMode == EstimateGroups.Type;
             if (typeMode)
             {
                 var typeHeader = new EditableEstimateRow(new EstimateRow(
@@ -72,15 +80,12 @@ public partial class EstimateView
                     _frozenGroupedOrder.Add(group.Key, _frozenGroupedOrder.Count);
 
                 var depth = typeMode ? 1 : 0;
-                var components = group.Components.Count == 0 ? null
-                    : group.Components.ToLookup(x => x.ParentPositionId);
                 if (group.Members.Count <= 1)
                 {
                     var only = group.Members[0];
                     ShowPosition(only, depth);
-                    foreach (var child in components?[only.Id] ?? Enumerable.Empty<EstimateRow>())
-                        if (!only.IsAreaSummary || _expandedAreaSummaries.Contains(only.Id) ||
-                            !string.IsNullOrWhiteSpace(EstimateSearch.Text))
+                    if (!only.IsAreaSummary || _expandedAreaSummaries.Contains(only.Id) || searching)
+                        foreach (var child in group.Components)
                             ShowPosition(child, depth + 1);
                     continue;
                 }
@@ -88,7 +93,7 @@ public partial class EstimateView
                 var systems = group.Members
                     .Select(p => index.SectionName(p.SystemId, ""))
                     .Where(label => label.Length > 0)
-                    .Distinct(StringComparer.Ordinal).ToArray();
+                    .Distinct(StringComparer.Ordinal).Take(9).ToArray();
                 var note = $"{group.Members.Count} строк: " +
                     string.Join(", ", systems.Take(8)) +
                     (systems.Length > 8 ? " …" : "");
@@ -108,37 +113,26 @@ public partial class EstimateView
                 };
                 virtualKey--;
                 if (group.CommonPrice is null) display.PriceText = "разные";
-                if (group.CommonPurchase is null &&
-                    group.Members.Select(p => p.PurchasePrice).Distinct().Count() > 1)
-                    display.PurchaseText = "разные";
-                if (group.CommonWork is null &&
-                    group.Members.Select(p => p.WorkPrice).Distinct().Count() > 1)
-                    display.WorkText = "разные";
+                if (group.MixedPurchase) display.PurchaseText = "разные";
+                if (group.MixedWork) display.WorkText = "разные";
                 projected.Add(display);
                 if (display.IsCollapsed) continue;
 
+                // Collapsed groups never need a component lookup.
+                var components = group.Components.Count == 0 ? null
+                    : group.Components.ToLookup(x => x.ParentPositionId);
                 foreach (var member in group.Members)
                 {
                     ShowPosition(member, depth + 1);
-                    foreach (var child in components?[member.Id] ?? Enumerable.Empty<EstimateRow>())
-                        if (!member.IsAreaSummary || _expandedAreaSummaries.Contains(member.Id) ||
-                            !string.IsNullOrWhiteSpace(EstimateSearch.Text))
+                    if (!member.IsAreaSummary || _expandedAreaSummaries.Contains(member.Id) || searching)
+                        foreach (var child in components?[member.Id] ?? Enumerable.Empty<EstimateRow>())
                             ShowPosition(child, depth + 2);
                 }
             }
         }
 
         projected = ApplyInlineStagesFilter(projected);
-        EstimateGrid.ItemsSource = projected;
-        if (selections?.IsGroup == true)
-            EstimateGrid.SelectedItem = projected.FirstOrDefault(row =>
-                row.IsGroup && row.GroupKey == selections.GroupKey);
-        else if (selections?.IsTypeHeader == true)
-            EstimateGrid.SelectedItem = projected.FirstOrDefault(row =>
-                row.IsTypeHeader && row.TypeKey == selections.TypeKey);
-        else if (selections is not null)
-            EstimateGrid.SelectedItem = projected.FirstOrDefault(row =>
-                !row.IsVirtual && !row.IsSystem && row.Id == selections.Id);
+        EstimateGridRowUpdates.PublishFull(EstimateGrid, projected, observable: false);
 
         // Materials has its own SQL snapshot, filter and row type.
         // Never publish the estimate's temporary projection to that grid.

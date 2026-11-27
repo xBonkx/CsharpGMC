@@ -66,6 +66,35 @@ internal static class EstimateRowIndexReadbackChecks
                     throw new Exception("Large readback must fall back to a fresh index.");
             }
         }
+        CheckSelectionIdentity();
         Console.WriteLine("Estimate row index incremental readback OK (0–25000 positions).");
     }
+
+    private static void CheckSelectionIdentity()
+    {
+        EditableEstimateRow Position(int id, int sort) => new(new EstimateRow(
+            RowKind.Position, 1, sort, id, false, "", "Позиция", "шт", 1, 1, 1, null, false, ""));
+        EditableEstimateRow Section(int id, int sort) => new(new EstimateRow(
+            RowKind.System, 0, sort, 0, false, "", "Система", "", 0, 0, 0, null, false, "")
+            { SystemId = id });
+        EditableEstimateRow Group(string key, int id) => new(new EstimateRow(
+            RowKind.Position, 0, id, id, false, "", "Группа", "шт", 2, 1, 2, null, false, ""))
+            { GroupKey = key, GroupMemberIds = new long[] { 1, 2 } };
+
+        var position = Position(1, 1);
+        var system = Section(7, 0);
+        var group = Group("same", -1);
+        var removed = Position(3, 3);
+        var nextPosition = Position(1, 20);
+        var nextSystem = Section(7, 9);
+        var nextGroup = Group("same", -9);
+        var unrelated = Group("other", -1);
+        var result = EstimateSelectionRestore.Find(
+            new[] { unrelated, nextSystem, nextGroup, nextPosition },
+            new[] { position, system, group, removed }, group, position);
+        if (!result.Selected.SequenceEqual(new[] { nextPosition, nextSystem, nextGroup }) ||
+            !ReferenceEquals(result.Primary, nextGroup) || !ReferenceEquals(result.Current, nextPosition))
+            throw new Exception("Full estimate rebind lost or misidentified the selected rows.");
+    }
+
 }

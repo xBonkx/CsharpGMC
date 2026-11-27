@@ -32,6 +32,8 @@ public static class EstimateGroups
         bool MissingPrice, int FirstSortKey)
     {
         public IReadOnlyList<int> PositionIds => Members.Select(x => x.Id).ToArray();
+        public bool MixedPurchase { get; init; }
+        public bool MixedWork { get; init; }
     }
 
     public sealed record Section(string TypeKey, string Title, decimal Amount,
@@ -43,22 +45,23 @@ public static class EstimateGroups
         return match.Success ? match.Value.ToLowerInvariant().Replace('ё', 'е') : "прочее";
     }
 
-    /// <summary>
-    /// Build groups before filtering: a row displayed due to a search matches
-    /// all equal positions, as in the Python editor. Out-of-KP rows are excluded.
-    /// </summary>
-    public static IReadOnlyList<Section> Build(IReadOnlyList<EstimateRow> rows,
-        string mode, string sort = EstimateViewProjection.DocumentOrder,
-        string? query = null, bool missingOnly = false,
-        IReadOnlyDictionary<string, int>? frozen = null)
+    /// <summary>Immutable authoritative grouping input. Reuse only for the
+    /// same SQL row snapshot; never reuse it after a changed document.</summary>
+    public sealed class Prepared
     {
-        if (mode is not (Same or Type))
-            throw new ArgumentOutOfRangeException(nameof(mode));
-        if (!EstimateViewProjection.IsValidSort(sort))
-            throw new ArgumentOutOfRangeException(nameof(sort));
+        internal Prepared(IReadOnlyList<EstimateRow> rows, Group[] groups)
+        {
+            Rows = rows;
+            Groups = groups;
+        }
 
-        var allowed = string.IsNullOrWhiteSpace(query) ? null
-            : EstimateFilter.Apply(rows, query).Select(r => r.SortKey).ToHashSet();
+        public IReadOnlyList<EstimateRow> Rows { get; }
+        internal Group[] Groups { get; }
+    }
+
+    public static Prepared Prepare(IReadOnlyList<EstimateRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
         var components = rows.Where(r => r.IsSub && r.ParentPositionId is not null)
             .GroupBy(r => r.ParentPositionId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(r => r.SortKey).ToArray());
@@ -73,11 +76,13 @@ public static class EstimateGroups
                 var first = members[0];
                 decimal quantity = 0, amount = 0;
                 decimal? price = first.Price, purchase = first.PurchasePrice, work = first.WorkPrice;
-                bool missing = false;
+                bool missing = false, mixedPurchase = false, mixedWork = false;
                 foreach (var member in members)
                 {
                     quantity += member.Qty;
                     amount += member.Amount;
+                    mixedPurchase |= first.PurchasePrice != member.PurchasePrice;
+                    mixedWork |= first.WorkPrice != member.WorkPrice;
                     if (price != member.Price) price = null;
                     if (purchase != member.PurchasePrice) purchase = null;
                     if (work != member.WorkPrice) work = null;
@@ -85,13 +90,40 @@ public static class EstimateGroups
                 }
                 return new Group(g.Key, TypeOf(first.Name),
                     first.Name, first.Unit, members, allChildren, quantity, amount,
-                    price, purchase, work, missing, first.SortKey);
+                    price, purchase, work, missing, first.SortKey)
+                    { MixedPurchase = mixedPurchase, MixedWork = mixedWork };
             })
-            .Where(g => !missingOnly || g.MissingPrice)
-            .Where(g => allowed is null ||
-                g.Members.Any(r => allowed.Contains(r.SortKey)) ||
-                g.Components.Any(r => allowed.Contains(r.SortKey)))
             .ToArray();
+
+        return new Prepared(rows, groups);
+    }
+
+    /// <summary>Build groups before filtering, including all equal positions
+    /// when a single member matches. Out-of-KP rows remain excluded.</summary>
+    public static IReadOnlyList<Section> Build(IReadOnlyList<EstimateRow> rows,
+        string mode, string sort = EstimateViewProjection.DocumentOrder,
+        string? query = null, bool missingOnly = false,
+        IReadOnlyDictionary<string, int>? frozen = null) =>
+        BuildPrepared(Prepare(rows), mode, sort, query, missingOnly, frozen);
+
+    public static IReadOnlyList<Section> BuildPrepared(Prepared prepared,
+        string mode, string sort = EstimateViewProjection.DocumentOrder,
+        string? query = null, bool missingOnly = false,
+        IReadOnlyDictionary<string, int>? frozen = null)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        if (mode is not (Same or Type))
+            throw new ArgumentOutOfRangeException(nameof(mode));
+        if (!EstimateViewProjection.IsValidSort(sort))
+            throw new ArgumentOutOfRangeException(nameof(sort));
+
+        var allowed = string.IsNullOrWhiteSpace(query) ? null
+            : EstimateFilter.Apply(prepared.Rows, query).Select(r => r.SortKey).ToHashSet();
+        var groups = !missingOnly && allowed is null ? prepared.Groups
+            : prepared.Groups.Where(g => !missingOnly || g.MissingPrice)
+                .Where(g => allowed is null ||
+                    g.Members.Any(r => allowed.Contains(r.SortKey)) ||
+                    g.Components.Any(r => allowed.Contains(r.SortKey))).ToArray();
 
         var areaKeys = new EstimateAreaSortKeys(EstimateViewProjection.SortField(sort));
         int Compare(Group a, Group b, string key,
