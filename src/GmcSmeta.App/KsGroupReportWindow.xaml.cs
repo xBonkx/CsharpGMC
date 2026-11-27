@@ -72,18 +72,18 @@ public partial class KsGroupReportWindow : Window
     {
         if (_package is not { } p) return;
         await ExportFileAsync("КС-2 и КС-3 №" + p.Report.Key, false,
-            path => SaveWorkbook(path, () => KsCustomerForms.Create(p)));
+            stream => SaveWorkbook(stream, () => KsCustomerForms.Create(p)));
     }
 
     private async void Pdf_Click(object sender, RoutedEventArgs e)
     {
         if (_package is not { } p) return;
-        await ExportFileAsync("КС-2 + КС-3 №" + p.Report.Key, true, path =>
+        await ExportFileAsync("КС-2 + КС-3 №" + p.Report.Key, true, stream =>
         {
             var pdf = KsPdfForms.Create(p);
             if (pdf.Length < 10 || pdf[0] != '%' || pdf[1] != 'P' || pdf[2] != 'D' || pdf[3] != 'F')
                 throw new InvalidDataException("PDF не сформирован.");
-            File.WriteAllBytes(path, pdf);
+            stream.Write(pdf);
         });
     }
 
@@ -94,15 +94,15 @@ public partial class KsGroupReportWindow : Window
             ?? p.Report.Acts.FirstOrDefault();
         if (act is null) return;
         await ExportFileAsync("ВОР КС-2 №" + act.Number, false,
-            path => SaveWorkbook(path, () => KsVorForms.Create(p, act.Id)));
+            stream => SaveWorkbook(stream, () => KsVorForms.Create(p, act.Id)));
     }
 
-    private static void SaveWorkbook(string path, Func<XLWorkbook> create)
+    private static void SaveWorkbook(Stream stream, Func<XLWorkbook> create)
     {
         using var workbook = create();
         if (workbook.Worksheets.Count == 0)
             throw new InvalidOperationException("В книге нет листов.");
-        workbook.SaveAs(path);
+        workbook.SaveAs(stream);
     }
 
     private void SetExportButtons(bool enabled)
@@ -114,12 +114,12 @@ public partial class KsGroupReportWindow : Window
 
     // The preview package and selected act are captured on the UI thread.
     // Rendering never touches the visual tree or re-reads a different act.
-    private async Task ExportFileAsync(string name, bool pdf, Action<string> render)
+    private async Task ExportFileAsync(string name, bool pdf, Action<Stream> render)
     {
         if (_closed || _exportInProgress) return;
         _exportInProgress = true;
         SetExportButtons(false);
-        string? temporary = null;
+        ExportFilePublication.PreparedExport? prepared = null;
         try
         {
             var invalid = Path.GetInvalidFileNameChars();
@@ -131,20 +131,15 @@ public partial class KsGroupReportWindow : Window
             };
             if (dialog.ShowDialog(this) != true || _closed) return;
             var destination = Path.GetFullPath(dialog.FileName);
-            var folder = Path.GetDirectoryName(destination)!;
-            temporary = Path.Combine(folder, ".gmc-ks-group-" + Guid.NewGuid().ToString("N") +
-                (pdf ? ".pdf" : ".xlsx"));
-            var staged = temporary;
             StatusText.Text = "Формирование файла…";
             var timer = Stopwatch.StartNew();
-            await Task.Run(() => render(staged));
+            prepared = await Task.Run(() => ExportFilePublication.Stage(destination, render));
             var renderMs = timer.ElapsedMilliseconds;
             if (_closed) return;
 
             // Commit point: until here an existing destination is untouched.
             timer.Restart();
-            await Task.Run(() => File.Move(staged, destination, overwrite: true));
-            temporary = null;
+            await Task.Run(prepared.Publish);
             Trace.WriteLine($"KS group export: render+stage={renderMs}ms; publish={timer.ElapsedMilliseconds}ms");
             if (_closed) return;
             StatusText.Text = "Сохранено: " + Path.GetFileName(destination);
@@ -158,12 +153,8 @@ public partial class KsGroupReportWindow : Window
         }
         finally
         {
-            if (temporary is not null)
-            {
-                var staged = temporary;
-                try { await Task.Run(() => File.Delete(staged)); }
-                catch { /* Preserve original error. */ }
-            }
+            if (prepared is not null)
+                await Task.Run(prepared.Dispose);
             _exportInProgress = false;
             if (!_closed) SetExportButtons(_package is not null);
         }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using ClosedXML.Excel;
+using GmcSmeta.Core;
 using Microsoft.Win32;
 
 namespace GmcSmeta.App;
@@ -23,30 +24,32 @@ public static class ContractDocumentSave
         if (cancellationToken.IsCancellationRequested) return false;
         var path = Destination(owner, "Экспорт Excel", "Excel (*.xlsx)|*.xlsx", ".xlsx", proposedName);
         if (path is null || cancellationToken.IsCancellationRequested) return false;
-        return await SaveAsync(owner, path, temporary =>
+        return await SaveAsync(owner, path, stream =>
         {
             using var workbook = create();
             if (workbook.Worksheets.Count == 0)
                 throw new InvalidDataException("Книга не содержит листов.");
-            workbook.SaveAs(temporary);
-            using var check = new XLWorkbook(temporary);
+            workbook.SaveAs(stream);
+            stream.Flush();
+            stream.Position = 0;
+            using var check = new XLWorkbook(stream);
             if (check.Worksheets.Count == 0)
                 throw new InvalidDataException("Не удалось проверить сохранённую книгу.");
-        }, ".xlsx", cancellationToken);
+        }, cancellationToken);
     }
 
     public static async Task<bool> PdfAsync(Window? owner, string proposedName, Func<byte[]> create)
     {
         var path = Destination(owner, "Экспорт PDF", "PDF (*.pdf)|*.pdf", ".pdf", proposedName);
         if (path is null) return false;
-        return await SaveAsync(owner, path, temporary =>
+        return await SaveAsync(owner, path, stream =>
         {
             var bytes = create();
             if (bytes.Length < 100 || bytes[0] != '%' || bytes[1] != 'P' ||
                 bytes[2] != 'D' || bytes[3] != 'F')
                 throw new InvalidDataException("PDF не сформирован.");
-            File.WriteAllBytes(temporary, bytes);
-        }, ".pdf");
+            stream.Write(bytes);
+        });
     }
 
     private static string? Destination(Window? owner, string title, string filter,
@@ -64,19 +67,17 @@ public static class ContractDocumentSave
     }
 
     private static async Task<bool> SaveAsync(Window? owner, string destination,
-        Action<string> generate, string extension, CancellationToken cancellationToken = default)
+        Action<Stream> generate, CancellationToken cancellationToken = default)
     {
-        var folder = Path.GetDirectoryName(Path.GetFullPath(destination))!;
-        var temporary = Path.Combine(folder, ".gmc-export-" + Guid.NewGuid().ToString("N") + extension);
         try
         {
             await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                generate(temporary);
+                using var prepared = ExportFilePublication.Stage(destination, generate);
                 // Before publication the old destination is still untouched.
                 cancellationToken.ThrowIfCancellationRequested();
-                File.Move(temporary, destination, true);
+                prepared.Publish();
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -89,11 +90,6 @@ public static class ContractDocumentSave
             MessageBox.Show(owner, error.Message, "Экспорт документа",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
-        }
-        finally
-        {
-            try { if (File.Exists(temporary)) File.Delete(temporary); }
-            catch { /* Temporary file cleanup must not mask the original error. */ }
         }
 
         if (cancellationToken.IsCancellationRequested) return true;

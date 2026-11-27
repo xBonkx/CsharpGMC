@@ -1667,7 +1667,11 @@ public partial class ActsEditorView : UserControl
         var isPdf = dlg.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
         await ExportActFileAsync(target, dlg.FileName, "КС-2 и КС-3",
             () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
-            package => isPdf ? KsPdfForms.Create(package) : SerializeKsWorkbook(() => KsCustomerForms.Create(package)));
+            (package, stream) =>
+            {
+                if (isPdf) stream.Write(KsPdfForms.Create(package));
+                else SaveKsWorkbook(stream, () => KsCustomerForms.Create(package));
+            });
     }
 
     /// <summary>«Ведомость объёмов работ (ВОР) по этому акту…».</summary>
@@ -1685,7 +1689,7 @@ public partial class ActsEditorView : UserControl
         if (dlg.ShowDialog() != true) return;
         await ExportActFileAsync(target, dlg.FileName, "ВОР",
             () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
-            package => SerializeKsWorkbook(() => KsVorForms.Create(package, target.ActId)));
+            (package, stream) => SaveKsWorkbook(stream, () => KsVorForms.Create(package, target.ActId)));
     }
 
     /// <summary>All acts of this document, in one workbook (Python export_all).</summary>
@@ -1702,21 +1706,21 @@ public partial class ActsEditorView : UserControl
         if (dlg.ShowDialog() != true) return;
         await ExportActFileAsync(target, dlg.FileName, "всех актов",
             () => SqlServerKsPrintData.ReadAll(target.ConnectionString, target.ContractId, target.Revision),
-            packages => SerializeKsWorkbook(() => KsCustomerForms.CreateAll(packages)));
+            (packages, stream) => SaveKsWorkbook(stream, () => KsCustomerForms.CreateAll(packages)));
     }
 
-    private static byte[] SerializeKsWorkbook(Func<ClosedXML.Excel.XLWorkbook> create)
+    private static void SaveKsWorkbook(Stream stream, Func<ClosedXML.Excel.XLWorkbook> create)
     {
         using var book = create();
-        using var stream = new MemoryStream();
+        if (book.Worksheets.Count == 0)
+            throw new InvalidDataException("В книге нет листов.");
         book.SaveAs(stream);
-        return stream.ToArray();
     }
 
     // The snapshot and output are independent of the live UI. Recheck the
     // editor context after each await and publish only a complete staged file.
     private async Task ExportActFileAsync<T>(ActCommandTarget target, string destination,
-        string label, Func<T> read, Func<T, byte[]> render)
+        string label, Func<T> read, Action<T, Stream> render)
     {
         if (_exportInProgress) return;
         _exportInProgress = true;
@@ -1731,7 +1735,7 @@ public partial class ActsEditorView : UserControl
             RequireCurrentActCommand(target);
         }
 
-        string? temporary = null;
+        ExportFilePublication.PreparedExport? prepared = null;
         var timings = new System.Diagnostics.Stopwatch();
         try
         {
@@ -1743,24 +1747,16 @@ public partial class ActsEditorView : UserControl
             RequireExportContext();
 
             timings.Restart();
-            var bytes = await Task.Run(() => render(snapshot));
+            prepared = await Task.Run(() => ExportFilePublication.Stage(destination,
+                stream => render(snapshot, stream)));
             var renderMs = timings.ElapsedMilliseconds;
-            RequireExportContext();
-
-            // Stage beside the final destination; the previous file remains
-            // untouched on rendering, write or context-validation failure.
-            timings.Restart();
-            var folder = Path.GetDirectoryName(Path.GetFullPath(destination))!;
-            temporary = Path.Combine(folder, ".gmc-ks-export-" + Guid.NewGuid().ToString("N") + ".tmp");
-            var staged = temporary;
-            await Task.Run(() => File.WriteAllBytes(staged, bytes));
             RequireExportContext();
 
             // Commit point: after the final UI-context check the already
             // prepared file may be published even if the user navigates away.
-            await Task.Run(() => File.Move(staged, destination, overwrite: true));
-            temporary = null;
-            System.Diagnostics.Trace.WriteLine($"KS export: SQL={sqlMs}ms; render={renderMs}ms; save={timings.ElapsedMilliseconds}ms");
+            timings.Restart();
+            await Task.Run(prepared.Publish);
+            System.Diagnostics.Trace.WriteLine($"KS export: SQL={sqlMs}ms; render+stage={renderMs}ms; publish={timings.ElapsedMilliseconds}ms");
             if (IsSameView() && IsCurrentActCommand(target))
                 SetStatus("Сохранено: " + Path.GetFileName(destination));
         }
@@ -1775,12 +1771,8 @@ public partial class ActsEditorView : UserControl
         }
         finally
         {
-            if (temporary is not null)
-            {
-                var staged = temporary;
-                try { await Task.Run(() => File.Delete(staged)); }
-                catch { /* Do not hide the original export failure. */ }
-            }
+            if (prepared is not null)
+                await Task.Run(prepared.Dispose);
             _exportInProgress = false;
             SaveButton.IsEnabled = true;
         }

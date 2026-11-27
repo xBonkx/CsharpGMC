@@ -18,13 +18,17 @@ public sealed class KsAsyncExportSourceTests
         Assert.Contains("private async void ExportVor_Click(", export);
         Assert.Contains("private async void ExportAll_Click(", export);
         Assert.Contains("await Task.Run(read)", export);
-        Assert.Contains("await Task.Run(() => render(snapshot))", export);
-        Assert.Contains("await Task.Run(() => File.WriteAllBytes(staged, bytes));\n            RequireExportContext();", export.Replace("\r\n", "\n"));
-        Assert.Contains("File.Move(staged, destination, overwrite: true)", export);
+        Assert.Contains("await Task.Run(() => ExportFilePublication.Stage(destination,", export);
+        Assert.Contains("stream => render(snapshot, stream)));", export);
+        var stage = export.IndexOf("stream => render(snapshot, stream)));", StringComparison.Ordinal);
+        var guard = export.IndexOf("RequireExportContext();", stage, StringComparison.Ordinal);
+        var publish = export.IndexOf("await Task.Run(prepared.Publish);", StringComparison.Ordinal);
+        Assert.True(stage >= 0 && guard > stage && publish > guard);
+        Assert.DoesNotContain("new MemoryStream()", export);
         Assert.Contains("attachment == _exportAttachmentGeneration", export);
         Assert.Contains("RequireCurrentActCommand(target);", export);
         Assert.Contains("if (_exportInProgress) return;", export);
-        Assert.Contains("File.Delete(staged)", export);
+        Assert.Contains("await Task.Run(prepared.Dispose);", export);
     }
 
     [Fact]
@@ -43,11 +47,11 @@ public sealed class KsAsyncExportSourceTests
         Assert.Contains("KsPdfForms.Create(p)", code);
         Assert.Contains("KsVorForms.Create(p, act.Id)", code);
         Assert.Contains("if (_closed || _exportInProgress) return;", code);
-        Assert.Contains("await Task.Run(() => render(staged));", code);
-        var check = code.IndexOf("if (_closed) return;", code.IndexOf("await Task.Run(() => render(staged));", StringComparison.Ordinal), StringComparison.Ordinal);
-        var publish = code.IndexOf("File.Move(staged, destination, overwrite: true)", StringComparison.Ordinal);
+        Assert.Contains("await Task.Run(() => ExportFilePublication.Stage(destination, render));", code);
+        var check = code.IndexOf("if (_closed) return;", code.IndexOf("ExportFilePublication.Stage(destination, render)", StringComparison.Ordinal), StringComparison.Ordinal);
+        var publish = code.IndexOf("await Task.Run(prepared.Publish);", StringComparison.Ordinal);
         Assert.True(check >= 0 && publish > check);
-        Assert.Contains("File.Delete(staged)", code);
+        Assert.Contains("await Task.Run(prepared.Dispose);", code);
         Assert.Contains("if (!_closed) SetExportButtons(_package is not null);", code);
         Assert.DoesNotContain("XlsxExport.SaveCreatedWorkbook(", code);
         Assert.DoesNotContain("KsPdfForms.Save(", code);

@@ -20,7 +20,9 @@ public sealed class Ks3FinancialExportSourceTests
         Assert.Contains("if (_closed || _exportInProgress || report is null) return;", window);
         Assert.Contains("if (!_closed) ExportButton.IsEnabled = _report is not null;", window);
         Assert.DoesNotContain("XlsxExport.Save(this", window);
-        Assert.Contains("cancellationToken.ThrowIfCancellationRequested();\n                File.Move(temporary, destination, true);", save);
+        Assert.Contains("using var prepared = ExportFilePublication.Stage(destination, generate);", save);
+        Assert.Contains("cancellationToken.ThrowIfCancellationRequested();\n                prepared.Publish();", save);
+        Assert.Contains("using var check = new XLWorkbook(stream);", save);
         Assert.Contains("create, CancellationToken.None", save);
     }
 }

@@ -72,5 +72,48 @@ public sealed class ExportFilePublicationTests : IDisposable
         Assert.Empty(Directory.GetFiles(_folder, ".gmc-export-*"));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbandonedStageNeverPublishes(bool existing)
+    {
+        var path = Path.Combine(_folder, "report.xlsx");
+        if (existing) File.WriteAllText(path, "old");
+        using (var prepared = ExportFilePublication.Stage(path, stream => stream.WriteByte(42)))
+        {
+            Assert.Equal(existing, File.Exists(path));
+            if (existing) Assert.Equal("old", File.ReadAllText(path));
+            Assert.Single(Directory.GetFiles(_folder, ".gmc-export-*"));
+        }
+        Assert.Equal(existing, File.Exists(path));
+        if (existing) Assert.Equal("old", File.ReadAllText(path));
+        Assert.Empty(Directory.GetFiles(_folder, ".gmc-export-*"));
+    }
+
+    [Fact]
+    public void StagePublishesOnceAndDisposeIsIdempotent()
+    {
+        var path = Path.Combine(_folder, "report.pdf");
+        File.WriteAllText(path, "old");
+        using var prepared = ExportFilePublication.Stage(path, stream => stream.WriteByte(42));
+        Assert.Equal("old", File.ReadAllText(path));
+        prepared.Publish();
+        Assert.Throws<ObjectDisposedException>(prepared.Publish);
+        prepared.Dispose();
+        prepared.Dispose();
+        Assert.Equal(new byte[] { 42 }, File.ReadAllBytes(path));
+        Assert.Single(Directory.GetFiles(_folder));
+    }
+
+    [Fact]
+    public void DisposedStageCannotPublish()
+    {
+        var path = Path.Combine(_folder, "report.xlsx");
+        using var prepared = ExportFilePublication.Stage(path, stream => stream.WriteByte(42));
+        prepared.Dispose();
+        Assert.Throws<ObjectDisposedException>(prepared.Publish);
+        Assert.Empty(Directory.GetFiles(_folder));
+    }
+
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 }
