@@ -115,6 +115,7 @@ public partial class ProcurementPane : UserControl
     private bool _buySnapshotMayReuse;
     private List<ProcurementPreviewRow> _allRows = new();
     private string _activeCategory = "all";
+    private bool _categoryRefreshPending, _categoryDispatchQueued;
     private readonly HashSet<long> _selectedSystemIds = new();
     private bool _rebuildingScopeFilters;
     private bool _batchBusy;
@@ -169,6 +170,7 @@ public partial class ProcurementPane : UserControl
             ++_buyViewportGeneration;
             _revision = _historyRevision = "";
             _buySnapshotMayReuse = false;
+            _categoryDispatchQueued = false;
             _needsReloadAfterAttach = true;
         };
     }
@@ -204,6 +206,7 @@ public partial class ProcurementPane : UserControl
             _owner.IsEnabled = true;
             if (!_owner.IsLoaded) return;
             _owner.UpdateHistoryButtons();
+            if (_owner._categoryRefreshPending) _owner.QueueCategoryRefresh(finishEdit: false);
             if (_owner._needsReloadAfterAttach && _attachment != _owner._attachmentGeneration)
                 _ = _owner.TryReloadAsync();
         }
@@ -426,11 +429,49 @@ public partial class ProcurementPane : UserControl
         ProcFilterShop.Visibility = counts.Shop > 0 || _activeCategory == "shop" ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void ProcurementCategory_Checked(object sender, RoutedEventArgs e)
+    private void ProcurementCategory_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not RadioButton { Tag: string category }) return;
+        // Click also fires for an already checked radio. Keep the requested
+        // category even while a cell commit temporarily prevents rebuilding.
         _activeCategory = category;
-        ApplyProcurementFilters();
+        _categoryRefreshPending = true;
+        QueueCategoryRefresh(finishEdit: true);
+    }
+
+    private void BuyGrid_RowEditEnding(object sender, DataGridRowEditEndingEventArgs e)
+    {
+        if (_categoryRefreshPending) QueueCategoryRefresh(finishEdit: false);
+    }
+
+    private void QueueCategoryRefresh(bool finishEdit)
+    {
+        if (_categoryDispatchQueued) return;
+        _categoryDispatchQueued = true;
+        var attachment = _attachmentGeneration;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+        {
+            _categoryDispatchQueued = false;
+            if (!IsLoaded || attachment != _attachmentGeneration || !_categoryRefreshPending || _batchBusy) return;
+            if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
+            {
+                if (!finishEdit) return;
+                if (!BuyGrid.CommitEdit(DataGridEditingUnit.Cell, true))
+                {
+                    SetStatus("Завершите редактирование ячейки. Выбранный фильтр будет применён после сохранения.");
+                    return;
+                }
+                // A real cell change starts an operation that owns row commit
+                // and authoritative readback. Do not commit twice or replace its view.
+                if (_batchBusy) return;
+                if (!BuyGrid.CommitEdit(DataGridEditingUnit.Row, true))
+                {
+                    SetStatus("Завершите редактирование строки. Выбранный фильтр будет применён после сохранения.");
+                    return;
+                }
+            }
+            ApplyProcurementFilters();
+        }));
     }
 
     private void ApplyProcurementFilters()
@@ -476,6 +517,7 @@ public partial class ProcurementPane : UserControl
             return row;
         }).ToList();
         ApplyBuyDisplay(display, !(_viewMode == "kp" && _viewSort != "kp"));
+        _categoryRefreshPending = false;
     }
 
     private void ProcurementSelectGroup_Click(object sender, RoutedEventArgs e)

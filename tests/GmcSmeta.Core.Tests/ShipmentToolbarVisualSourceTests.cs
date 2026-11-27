@@ -17,6 +17,14 @@ public sealed class ShipmentToolbarVisualSourceTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         XElement Named(string name) => Assert.Single(view.Descendants()
             .Where(e => (string?)e.Attribute(x + "Name") == name));
+        var date = Named("DateBox");
+        Assert.Equal("{StaticResource ShipmentDateField}", (string?)date.Attribute("Style"));
+        var dateStyle = Assert.Single(view.Descendants(p + "Style")
+            .Where(e => (string?)e.Attribute(x + "Key") == "ShipmentDateField"));
+        foreach (var part in new[] { "PART_TextBox", "PART_Button", "PART_Popup", "PART_ContentHost", "PART_Watermark" })
+            Assert.Single(dateStyle.Descendants().Where(e => (string?)e.Attribute(x + "Name") == part));
+        Assert.Contains(dateStyle.Descendants(p + "Border"), e => (string?)e.Attribute("CornerRadius") == "8");
+        Assert.Contains(dateStyle.Descendants(p + "Trigger"), e => (string?)e.Attribute("Property") == "IsKeyboardFocusWithin");
         var search = Named("RowSearch");
         Assert.Equal("{StaticResource PythonSearch}", (string?)search.Attribute("Style"));
         Assert.Equal("190", (string?)search.Parent!.Attribute("Width"));

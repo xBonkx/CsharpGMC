@@ -6,6 +6,79 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <UserControl.Resources>
+        <Style x:Key="ShipmentDateField" TargetType="DatePicker">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#D0D7E2"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DatePicker">
+                        <Border x:Name="DateChrome" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="30"/>
+                                </Grid.ColumnDefinitions>
+                                <DatePickerTextBox x:Name="PART_TextBox" Margin="8,0,0,0"
+                                                   Foreground="{TemplateBinding Foreground}" VerticalContentAlignment="Center"
+                                                   BorderThickness="0" Background="Transparent" Padding="0">
+                                    <DatePickerTextBox.Template>
+                                        <ControlTemplate TargetType="DatePickerTextBox">
+                                            <Grid Background="Transparent">
+                                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False"/>
+                                                <ContentControl x:Name="PART_Watermark" Foreground="#94A3B8"
+                                                                VerticalAlignment="Center" IsHitTestVisible="False"
+                                                                Visibility="Collapsed"/>
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="Text" Value="">
+                                                    <Setter TargetName="PART_Watermark" Property="Visibility" Value="Visible"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </DatePickerTextBox.Template>
+                                </DatePickerTextBox>
+                                <Button x:Name="PART_Button" Grid.Column="1" Padding="0" MinWidth="0" MinHeight="0"
+                                        BorderThickness="0" Background="Transparent" Focusable="False"
+                                        AutomationProperties.Name="Открыть календарь" ToolTip="Открыть календарь">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="0,7,7,0">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                    <Viewbox Width="16" Height="16" IsHitTestVisible="False">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Style="{StaticResource SvgGlyphPath}" Data="M5 5h14a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2z M7 3v4 M17 3v4 M3 10h18" Stroke="#64748B"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
+                                <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                       StaysOpen="False" PlacementTarget="{Binding ElementName=PART_TextBox}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="DateChrome" Property="BorderBrush" Value="#94A3B8"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="DateChrome" Property="BorderBrush" Value="#2563EB"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="DateChrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="DateChrome" Property="BorderBrush" Value="#E4E8EF"/>
+                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter TargetName="PART_Button" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="ShipmentStep" TargetType="ContentControl">
             <Setter Property="Foreground" Value="#64748B"/>
             <Setter Property="Padding" Value="10,5"/>
@@ -325,7 +398,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="Дата:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                <DatePicker x:Name="DateBox" Width="142" Height="32" SelectedDateFormat="Short"/>
+                <DatePicker x:Name="DateBox" Style="{StaticResource ShipmentDateField}" Width="142" Height="32" SelectedDateFormat="Short"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="Получатель:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
@@ -413,7 +486,7 @@
                 </Button>
             </Grid>
         </WrapPanel>
-        <DataGrid local:TableColumnMenu.Key="shipments" CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="24" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+        <DataGrid local:TableColumnMenu.Key="shipments" CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
                   Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="LinesGrid" Grid.Row="4" Margin="0,2,0,0"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
@@ -473,23 +546,23 @@
                 </GroupStyle>
             </DataGrid.GroupStyle>
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Выдать" Width="74" IsReadOnly="True" HeaderStyle="{StaticResource ShipmentMarkHeader}">
+                <DataGridTemplateColumn Header="Выдать" Width="74" MinWidth="74" IsReadOnly="True" HeaderStyle="{StaticResource ShipmentMarkHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <CheckBox IsChecked="{Binding InShipment, Mode=OneWay}" IsEnabled="{Binding CanChange}"
                                   HorizontalAlignment="Center" VerticalAlignment="Center" Click="MarkRow_Click"
                                   AutomationProperties.Name="Включить позицию в ведомость"/>
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True" ElementStyle="{StaticResource ShipmentNameText}" HeaderStyle="{StaticResource CompactCostTextHeader}"/>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
-                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="110" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
-                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="112" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentStockHeader}"/>
+                <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="240" IsReadOnly="True" ElementStyle="{StaticResource ShipmentNameText}" HeaderStyle="{StaticResource CompactCostTextHeader}"/>
+                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" MinWidth="48" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="90" MinWidth="90" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentStockHeader}"/>
                 <DataGridTextColumn x:Name="QtyColumn" Header="Выдать сейчас ✎"
-                                    Binding="{Binding Qty, Mode=TwoWay}" Width="130"
+                                    Binding="{Binding Qty, Mode=TwoWay}" Width="140" MinWidth="140"
                                     ElementStyle="{StaticResource ShipmentNowText}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"
                                     CellStyle="{StaticResource ShipmentNowCell}" HeaderStyle="{StaticResource ShipmentNowHeader}"/>
-                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="130" IsReadOnly="True" ElementStyle="{StaticResource ShipmentLeftText}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
+                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="145" MinWidth="145" IsReadOnly="True" ElementStyle="{StaticResource ShipmentLeftText}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>

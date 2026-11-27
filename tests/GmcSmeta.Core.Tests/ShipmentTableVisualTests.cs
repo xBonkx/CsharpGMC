@@ -20,6 +20,14 @@ public sealed class ShipmentTableVisualTests
 
         var grid = Named("LinesGrid");
         Assert.Equal("0", (string?)grid.Attribute("AlternationCount"));
+        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
+        var widths = grid.Element(p + "DataGrid.Columns")!.Elements().ToArray();
+        Assert.Equal(8, widths.Length);
+        Assert.All(widths, col => Assert.True(double.Parse((string)col.Attribute("MinWidth")!,
+            System.Globalization.CultureInfo.InvariantCulture) >= 48));
+        Assert.Equal("*", (string?)widths[1].Attribute("Width"));
+        Assert.Equal("240", (string?)widths[1].Attribute("MinWidth"));
+        Assert.Equal("Auto", (string?)grid.Attribute("ScrollViewer.HorizontalScrollBarVisibility"));
         var columns = grid.Descendants(p + "DataGridTextColumn")
             .ToDictionary(e => (string)e.Attribute("Header")!);
         foreach (var name in new[] { "По смете", "Выдано раньше", "Есть на складе" })

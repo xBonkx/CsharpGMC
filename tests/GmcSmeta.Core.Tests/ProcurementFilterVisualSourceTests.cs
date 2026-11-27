@@ -42,6 +42,34 @@ public sealed class ProcurementFilterVisualSourceTests
     }
 
     [Fact]
+    public void CategoryClickSurvivesEditAndIsScopedToItsPane()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ProcurementPane.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var doc = XDocument.Load(Path.Combine(app, "ProcurementPane.xaml"));
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var radios = doc.Descendants(p + "RadioButton")
+            .Where(e => (string?)e.Attribute("Click") == "ProcurementCategory_Click").ToArray();
+        Assert.Equal(8, radios.Length);
+        Assert.All(radios, e =>
+        {
+            Assert.Null(e.Attribute("GroupName"));
+            Assert.Null(e.Attribute("Checked"));
+            Assert.Same(radios[0].Parent, e.Parent);
+        });
+        var code = File.ReadAllText(Path.Combine(app, "ProcurementPane.xaml.cs"));
+        Assert.Contains("_categoryRefreshPending = true;", code);
+        Assert.Contains("QueueCategoryRefresh(finishEdit: true);", code);
+        Assert.Contains("if (_categoryRefreshPending) QueueCategoryRefresh(finishEdit: false);", code);
+        Assert.Contains("_owner.QueueCategoryRefresh(finishEdit: false);", code);
+        Assert.Contains("if (_batchBusy) return;", code);
+        Assert.Contains("_categoryRefreshPending = false;", code);
+    }
+
+    [Fact]
     public void EquivalentScopeChoicesDoNotRebindFilterControls()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);

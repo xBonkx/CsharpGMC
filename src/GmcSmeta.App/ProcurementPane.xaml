@@ -179,29 +179,29 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <WrapPanel x:Name="ProcurementChips" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
                 <RadioButton x:Name="ProcFilterAll" Content="Все" Tag="all"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked" IsChecked="True"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click" IsChecked="True"/>
                 <RadioButton x:Name="ProcFilterNone" Content="Не заказано" Tag="none"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterWork" Content="В работе" Tag="work"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterLate" Content="Просрочено" Tag="late"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterShop" Content="Цех" Tag="shop"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterStock" Content="На складе" Tag="stock"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterIssued" Content="Выдано" Tag="issued"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
                 <RadioButton x:Name="ProcFilterProblem" Content="Проблемы" Tag="problem"
-                             Style="{StaticResource PythonFilterRadio}" GroupName="ProcurementCategories"
-                             Margin="0,0,5,4" Checked="ProcurementCategory_Checked"/>
+                             Style="{StaticResource PythonFilterRadio}"
+                             Margin="0,0,5,4" Click="ProcurementCategory_Click"/>
             </WrapPanel>
             <Grid x:Name="ProcurementFilterTail" Grid.Column="1" VerticalAlignment="Center">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -328,7 +328,7 @@
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0" CanUserSortColumns="False"
                   SelectionMode="Extended" SelectionUnit="FullRow"
-                  BeginningEdit="BuyGrid_BeginningEdit" CellEditEnding="BuyGrid_CellEditEnding"
+                  BeginningEdit="BuyGrid_BeginningEdit" CellEditEnding="BuyGrid_CellEditEnding" RowEditEnding="BuyGrid_RowEditEnding"
                   ContextMenuOpening="BuyGrid_ContextMenuOpening"
                   SelectionChanged="BuyGrid_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.IsVirtualizingWhenGrouping="True" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="True">
             <DataGrid.Resources>
