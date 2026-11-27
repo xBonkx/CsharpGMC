@@ -117,7 +117,7 @@
                                Foreground="#9A3412" TextWrapping="Wrap" Margin="0,5,0,0"/>
                 </StackPanel>
             </Border>
-            <TextBlock Text="Операцию нельзя отменить обычной командой Ctrl+Z."
+            <TextBlock Text="Проверьте выделение перед подтверждением — будут удалены все показанные строки."
                        Foreground="#64748B" Margin="24,11,24,0" FontSize="12"/>
             <Border BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="24,15,24,18">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
