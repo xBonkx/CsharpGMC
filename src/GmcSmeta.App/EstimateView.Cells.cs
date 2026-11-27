@@ -72,15 +72,9 @@ public partial class EstimateView
         // Even a cancelled edit can leave transient TwoWay binding values.
         // Require a full reconciliation before taking the tab cache shortcut.
         _publishedEstimateRevision = "";
-        // Python GridDelegate selects the entire raw value in a group cell.
-        // The label «разные» is only a visual placeholder, never SQL input.
-        if (e.Row.Item is EditableEstimateRow row &&
-            (row.IsGroup || _inlineStageColumns.Contains(e.Column)) &&
-            FindTextBox(e.EditingElement) is { } editor)
-        {
-            editor.Focus();
-            editor.SelectAll();
-        }
+        // Every editable cell, including the Name/Price template columns,
+        // must focus the actual TextBox on the first edit activation.
+        GridEditInteraction.FocusTextEditor(EstimateGrid, e);
         BeginEstimateFormulaEdit(e);
     }
 
