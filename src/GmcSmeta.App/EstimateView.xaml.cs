@@ -314,6 +314,8 @@ public partial class EstimateView : UserControl
         if (_visibleEstimateMode == "materials") _ = LoadMaterialsAsync();
         if (_inlineStagesOn)
             _ = RefreshInlineStagesAsync();
+        else
+            ApplyRequestedInlineStages();
     }
 
 

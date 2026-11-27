@@ -265,26 +265,28 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Окно «Этапы»: разбивка КП на 100 % работы; открытие КП выбранного этапа.</summary>
+    /// <summary>Открыть режим этапов внутри полного КП, без отдельной матрицы.</summary>
     private void OpenStages(DocRow doc)
     {
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
-            var dialog = new StagesDialog(_sqlConnectionString, doc.Id, doc.Title) { Owner = this };
-            dialog.OpenStageRequested += stageId =>
-            {
-                ReloadAndSelect(doc.ObjectId);
-                OpenEstimate(stageId);
-            };
-            dialog.ShowDialog();
-            ReloadAndSelect(doc.ObjectId);
+            var fullId = SqlServerStages.FullOf(_serverConn, doc.Id);
+            OpenEstimate(checked((int)fullId), showStages: true);
         }
         catch (Exception ex)
         {
             LogError(ex);
             MessageBox.Show(this, ex.Message, "Этапы", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    internal void RefreshStageNavigation(EstimateView page, int contractId)
+    {
+        if (_serverConn is null || !ReferenceEquals(PageHost.Content, page)) return;
+        ReloadNavigationData();
+        if (_docs.FirstOrDefault(d => d.Id == contractId) is { } doc)
+            SynchronizeNavigation(doc, rebuildTree: true);
     }
 
     /// <summary>

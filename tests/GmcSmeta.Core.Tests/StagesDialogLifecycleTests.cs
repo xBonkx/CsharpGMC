@@ -25,8 +25,29 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("await ReloadAsync();", code);
         Assert.DoesNotContain("private void Reload()", code);
         var inline = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
-        Assert.Contains("dialog.InitialSnapshotReady += () =>", inline);
-        Assert.Contains("dialog.InvokeInlineMenuAction(id, action, snapshot.Revision)", inline);
+        Assert.DoesNotContain("new StagesDialog(", inline);
+        var commands = Source("GmcSmeta.App/EstimateView.InlineStages.Commands.cs");
+        Assert.Contains("ReferenceEquals(snapshot, _inlineStagesData)", commands);
+        Assert.Contains("snapshot.Revision != _serverRevision", commands);
+        Assert.Contains("await Task.Run(write)", commands);
+        Assert.Contains("_inlineStagesData = null", commands);
+    }
+
+    [Fact]
+    public void StageEntryPointsStayInsideEstimateAndUseDirectCommands()
+    {
+        var xaml = Source("GmcSmeta.App/EstimateView.xaml");
+        Assert.Contains("Click=\"InlineNewStage_Click\"", xaml);
+        Assert.Contains("Click=\"InlineCreateRest_Click\"", xaml);
+        Assert.DoesNotContain("OpenStagesDialog_Click", xaml);
+        var main = Source("GmcSmeta.App/MainWindow.SqlServer.cs");
+        Assert.Contains("showStages: true", main);
+        Assert.DoesNotContain("new StagesDialog(", main);
+        var commands = Source("GmcSmeta.App/EstimateView.InlineStages.Commands.cs");
+        Assert.DoesNotContain("new StagesDialog(", commands);
+        foreach (var method in new[] { "CreateStage", "CreateRest", "RenameStage", "SaveStageMoney",
+            "SaveStageSystems", "PutRest", "ClearStage", "DeleteStage" })
+            Assert.Contains("SqlServerStages." + method + "(", commands);
     }
 
     [Fact]

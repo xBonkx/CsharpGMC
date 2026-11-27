@@ -1,5 +1,7 @@
 # P0 / Issue #32 — этапы и остатки: матрица паритета и безопасность
 
+27.11.2026 ChatGPT/main (base 609ab32) — Issue #32 / CTX-033/034 PARTIAL: Python aa6b34dcf0314df93086a297f01d549ff58cf705, smeta/ui/stage_mode.py StageMode.__init__, _stage_menu, header_click: этапы встроены в смету; кнопки plus/file/x соответствуют существующим IconLabelPlus/File/X, меню использует прежние File/List/Edit/Download/X/Trash. C#: убран переход в StagesDialog из панели, карточек и дерева; создание этапа/остатка, rename/money/systems/put/clear/delete идут из той же сметы через прежние SqlServerStages, подтверждения и узкие диалоги параметров; Pilot guard, revision, очередь записи и readback сохранены; остаток показывается как карточка, меню и создание по условию Python. Старый класс StagesDialog оставлен без пользовательских entry points для совместимости тестов. Исходный порядок/номера/схема/формулы не менялись. Source tests добавлены, Windows build/xUnit/GUI/SQL Pilot не запускались. Приёмка: создание/переименование/остаток/удаление, карточки и заголовки, обновление дерева без смены сметы, signed/target guards, конкурентная запись, 2500+ строк и DPI. Не DONE.
+
 Срез: 21.11.2026. Ветка: `feature/stages-rest-parity`. Python-эталон:
 `python/sql-server-current/smeta/stages.py` и `smeta/ui/stage_mode.py`.
 Основной C#: `SqlServerStages.cs`, `SqlServerStages.Batch.cs`, `StagesDialog.xaml.cs`.

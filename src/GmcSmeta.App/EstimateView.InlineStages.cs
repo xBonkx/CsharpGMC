@@ -23,6 +23,8 @@ public partial class EstimateView
         Dictionary<long, decimal> DocumentTotals, string Revision);
 
     private bool _inlineStagesOn;
+    private bool _requestInlineStages;
+    private bool _inlineStageCommandBusy;
     private bool _inlineStagesLoading;
     private int _inlineStagesVersion;
     private InlineStagesSnapshot? _inlineStagesData;
@@ -41,8 +43,24 @@ public partial class EstimateView
 
     private async void ToggleInlineStages_Click(object sender, RoutedEventArgs e)
     {
+        if (_inlineStageCommandBusy) return;
         if (_inlineStagesOn) { DisableInlineStages(); return; }
         await EnableInlineStagesAsync();
+    }
+
+    internal void RequestInlineStages()
+    {
+        if (!_isKp || _detached) return;
+        _requestInlineStages = true;
+        if (_estimate is not null) ApplyRequestedInlineStages();
+    }
+
+    private void ApplyRequestedInlineStages()
+    {
+        if (!_requestInlineStages || _estimate is null) return;
+        _requestInlineStages = false;
+        EstimateModeTab.IsChecked = true;
+        if (!_inlineStagesOn) _ = EnableInlineStagesAsync();
     }
 
     private async Task EnableInlineStagesAsync()
@@ -62,8 +80,10 @@ public partial class EstimateView
         SaveEstimateUiSettings();
     }
 
-    private void CloseInlineStages_Click(object sender, RoutedEventArgs e) =>
-        DisableInlineStages();
+    private void CloseInlineStages_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_inlineStageCommandBusy) DisableInlineStages();
+    }
 
     private void DisableInlineStages()
     {
@@ -96,6 +116,7 @@ public partial class EstimateView
         var version = ++_inlineStagesVersion;
         _inlineStagesLoading = true;
         _inlineStagesData = null; // No stale allocation may remain writable after a failed read.
+        RefreshInlineStageCommandButtons();
         InlineStagesSummary.Text = "Читаю распределение из SQL Server…";
         try
         {
@@ -238,7 +259,7 @@ public partial class EstimateView
         {
             InlineStagesCards.Children.Add(new TextBlock
             {
-                Text = "Этапов пока нет — нажмите «Управление этапами…» → «+ Этап»",
+                Text = "Этапов пока нет — нажмите «+ Этап»",
                 Foreground = StageBrush("#64748B"), Margin = new Thickness(3)
             });
         }
@@ -317,7 +338,7 @@ public partial class EstimateView
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
         var name = stage.Rest ? "Остаток" : ShortStageName(stage.Name);
         bool Writable() => BulkStageAllowed && ReferenceEquals(snapshot, _inlineStagesData) &&
-            !stage.Rest && !stage.Locked && stage.StageSum is null;
+            !stage.Locked && stage.StageSum is null;
         var open = ContextMenuIcons.Create($"Открыть КП «{name}»", "File");
         open.Click += (_, _) =>
         {
@@ -335,7 +356,14 @@ public partial class EstimateView
             };
             menu.Items.Add(item);
         }
-        if (!stage.Rest)
+        if (stage.Rest)
+        {
+            Add("СМР по системам…", "List", "systems");
+            Add("СМР и транспорт…", "List", "money");
+            menu.Items.Add(new Separator());
+            Add("Удалить документ «Остаток»…", "Trash", "delete", danger: true);
+        }
+        else
         {
             Add("СМР по системам…", "List", "systems");
             Add("Название…", "Edit", "rename");
@@ -348,34 +376,13 @@ public partial class EstimateView
         menu.IsOpen = true;
     }
 
-    private async Task InvokeInlineStageActionAsync(long id, string action, InlineStagesSnapshot snapshot)
-    {
-        if (!BulkStageAllowed || !ReferenceEquals(snapshot, _inlineStagesData) || _estimate is null) return;
-        try
-        {
-            var owner = Window.GetWindow(this);
-            var dialog = new StagesDialog(_sqlConnectionString, _contractId, _estimate.Title) { Owner = owner };
-            if (owner is MainWindow main)
-                dialog.OpenStageRequested += stageId => main.NavigateToStageEstimate(stageId, _objectId);
-            dialog.InitialSnapshotReady += () =>
-                dialog.InvokeInlineMenuAction(id, action, snapshot.Revision);
-            dialog.ShowDialog();
-            if (!_detached && IsLoaded && _inlineStagesOn)
-            {
-                await ReloadDocumentAsync();
-                await RefreshInlineStagesAsync();
-            }
-        }
-        catch (Exception ex) { SetStatus("Этапы: " + ex.Message, true); }
-    }
-
     /// <summary>True only for individual rows of an editable, unsigned stage.</summary>
     private bool CanEditInlineStage(EditableEstimateRow row, DataGridColumn column,
         out int stageIndex)
     {
         stageIndex = _inlineStageColumns.IndexOf(column);
         var data = _inlineStagesData;
-        return !_detached && _inlineStagesOn && !_inlineStagesLoading && data is not null &&
+        return !_detached && _inlineStagesOn && !_inlineStagesLoading && !_inlineStageCommandBusy && data is not null &&
             !string.IsNullOrWhiteSpace(data.Revision) && data.Revision == _serverRevision &&
             stageIndex >= 0 && stageIndex < data.Stages.Count &&
             !data.Stages[stageIndex].Locked &&
@@ -560,20 +567,4 @@ public partial class EstimateView
         return visible;
     }
 
-    private async void OpenStagesDialog_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_inlineStagesOn || _estimate is null) return;
-        var owner = Window.GetWindow(this);
-        var dialog = new StagesDialog(_sqlConnectionString, _contractId, _estimate.Title)
-        { Owner = owner };
-        if (owner is MainWindow main)
-            dialog.OpenStageRequested += stageId =>
-                main.NavigateToStageEstimate(stageId, _objectId);
-        dialog.ShowDialog();
-        if (IsLoaded && _inlineStagesOn)
-        {
-            await ReloadDocumentAsync();
-            await RefreshInlineStagesAsync();
-        }
-    }
 }

@@ -1310,12 +1310,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OpenEstimate(int contractId, int? focusPosition = null)
+    private async void OpenEstimate(int contractId, int? focusPosition = null, bool showStages = false)
     {
         if (_startupClosed || _serverConn is null || _sqlConnectionString is null) return;
         ActivateDocumentsWorkspace();
         if (_openDocumentId == contractId)
         {
+            if (showStages && PageHost.Content is EstimateView stagePage)
+                stagePage.RequestInlineStages();
             if (focusPosition is int position && PageHost.Content is EstimateView current)
             {
                 if (current.IsEnabled) current.FocusPositionFromSearch(position);
@@ -1380,6 +1382,7 @@ public partial class MainWindow : Window
                         _estimateCacheOrder.AddFirst(contractId);
                         cached.IsEnabled = true;
                         CompleteEstimateOpen(doc, cached);
+                        if (showStages) cached.RequestInlineStages();
                         return;
                     }
                     break;
@@ -1397,6 +1400,7 @@ public partial class MainWindow : Window
             _openDocumentId = contractId;
             SynchronizeNavigation(doc);
             CompleteEstimateOpen(doc, page, loading: true);
+            if (showStages) page.RequestInlineStages();
         }
         catch (OperationCanceledException) when (validation?.IsCancellationRequested == true)
         {
@@ -1433,7 +1437,7 @@ public partial class MainWindow : Window
                     Margin = new Thickness(0, 12, 0, 0),
                     HorizontalAlignment = HorizontalAlignment.Center,
                 };
-                retry.Click += (_, _) => OpenEstimate(contractId, retryFocus);
+                retry.Click += (_, _) => OpenEstimate(contractId, retryFocus, showStages);
                 panel.Children.Add(retry);
                 ShowPage(panel);
                 SetEstimateStatus("Смета не проверена · редактирование недоступно", true);

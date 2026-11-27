@@ -15,7 +15,7 @@ namespace GmcSmeta.App;
 public partial class EstimateView
 {
     private bool BulkStageAllowed =>
-        !_detached && _inlineStagesOn && _inlineStagesData is { } snapshot && !_inlineStagesLoading &&
+        !_detached && _inlineStagesOn && _inlineStagesData is { } snapshot && !_inlineStagesLoading && !_inlineStageCommandBusy &&
         !string.IsNullOrWhiteSpace(snapshot.Revision) && snapshot.Revision == _serverRevision &&
         !_serverConflict && System.Threading.Volatile.Read(ref _pendingWrites) == 0 &&
         new SqlConnectionStringBuilder(_sqlConnectionString).InitialCatalog
@@ -64,6 +64,7 @@ public partial class EstimateView
 
     private void RefreshInlineStagesSelectionButtons()
     {
+        RefreshInlineStageCommandButtons();
         if (InlineStagesSelectionButtons is null || InlineStagesSelectionInfo is null)
             return;
         InlineStagesSelectionButtons.Children.Clear();

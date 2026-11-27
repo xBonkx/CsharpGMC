@@ -718,10 +718,14 @@
                     <StackPanel>
                         <DockPanel LastChildFill="True">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <Button Content="Управление этапами…" Click="OpenStagesDialog_Click"
-                                        ToolTip="Создание этапов, изменение количеств, договорные суммы и документ «Остаток»"
-                                        Margin="4,0,6,0"/>
-                                <Button Content="Выйти из режима" Click="CloseInlineStages_Click"
+                                <Button x:Name="InlineNewStageButton" Content="Этап" ContentTemplate="{StaticResource IconLabelPlus}"
+                                        Style="{StaticResource PythonToolbarButton}" Click="InlineNewStage_Click" IsEnabled="False"
+                                        ToolTip="Создать этап и распределять количества в его колонке" Margin="4,0,6,0"/>
+                                <Button x:Name="InlineRestButton" Content="Документ «Остаток»" ContentTemplate="{StaticResource IconLabelFile}"
+                                        Style="{StaticResource PythonToolbarButton}" Click="InlineCreateRest_Click" IsEnabled="False" Visibility="Collapsed"
+                                        ToolTip="Отдельное КП: полное КП минус этапы" Margin="0,0,6,0"/>
+                                <Button Content="Выйти из режима" ContentTemplate="{StaticResource IconLabelX}"
+                                        Style="{StaticResource PythonToolbarButton}" Click="CloseInlineStages_Click"
                                         ToolTip="Убрать колонки этапов из таблицы"/>
                             </StackPanel>
                             <TextBlock Text="ЭТАПЫ" Foreground="#1D4ED8" FontWeight="Bold"
