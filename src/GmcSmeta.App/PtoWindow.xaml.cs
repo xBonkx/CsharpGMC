@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using GmcSmeta.Core.Domain;
 using Microsoft.Win32;
 
@@ -16,6 +17,8 @@ public partial class PtoWindow : Window
     private readonly PtoSqlSource _source;
     private PtoArchive _archive=null!;
     private IReadOnlyList<PtoPackageListProjection.Row> _rows=Array.Empty<PtoPackageListProjection.Row>();
+    private readonly DispatcherTimer _filterTimer=new(){Interval=TimeSpan.FromMilliseconds(150)};
+    private (string Query,string? Status)? _publishedFilter;
     private bool _initializing=true;
     private bool _initialReadStarted;
     private bool _initializingArchive=true;
@@ -33,6 +36,7 @@ public partial class PtoWindow : Window
         _source=new PtoSqlSource(connection);
         SetLoading(true);
         ArchiveLabel.Text="Загрузка исполнительной документации…";
+        _filterTimer.Tick+=FilterTimer_Tick;
         Loaded+=async (_,_)=>await InitializeAsync();
         // Archive initialization includes the existing Pilot-only schema check/creation.
         Closing+=(_,e)=>{if(_initializingArchive||_archiveOperation)e.Cancel=true;};
@@ -40,12 +44,15 @@ public partial class PtoWindow : Window
         {
             _closed=true;
             _readCancellation?.Cancel();
+            _filterTimer.Stop();
+            _filterTimer.Tick-=FilterTimer_Tick;
         };
     }
 
     private void SetLoading(bool value)
     {
         _loading=value;
+        if(value)_filterTimer.Stop();
         PtoContent.IsEnabled=!value;
     }
 
@@ -108,6 +115,7 @@ public partial class PtoWindow : Window
     private void ApplyRows(IReadOnlyList<PtoPackageListProjection.Row> rows,Guid? selected)
     {
         _rows=rows;
+        _publishedFilter=null;
         ArchiveLabel.Text="Файловый архив: "+_archive.Root+
             " · карточки, сертификаты, версии: Microsoft SQL Server (только GmcSmetaPilot_*)";
         ApplyFilter(selected);
@@ -117,13 +125,16 @@ public partial class PtoWindow : Window
     {
         var q=Search.Text.Trim();
         var status=(StatusFilter.SelectedItem as ComboBoxItem)?.Content?.ToString();
+        if(_publishedFilter is { } published && published==(q,status))return;
         var visible=PtoPackageListProjection.Filter(_rows,q,status);
         Packages.ItemsSource=visible;
         Packages.SelectedItem=visible.FirstOrDefault(r=>r.Id==selected);
+        _publishedFilter=(q,status);
     }
 
     private void InvalidateRows()
     {
+        _publishedFilter=null;
         _rows=Array.Empty<PtoPackageListProjection.Row>();
         Packages.ItemsSource=_rows;
         ArchiveLabel.Text="Список не загружен. Нажмите «Обновить».";
@@ -161,14 +172,31 @@ public partial class PtoWindow : Window
 
     private void Filter_Changed(object sender,RoutedEventArgs e)
     {
-        if(!_closed && !_loading && !_initializing && Packages is not null && Search is not null)
-            ApplyFilter(SelectedId());
+        if(_closed || _loading || _initializing || Packages is null || Search is null)return;
+        _filterTimer.Stop();
+        if(ReferenceEquals(sender,StatusFilter))ApplyFilter(SelectedId());
+        else _filterTimer.Start();
     }
+
+    private void FilterTimer_Tick(object? sender,EventArgs e)
+    {
+        _filterTimer.Stop();
+        if(!_closed && !_loading && !_initializing)ApplyFilter(SelectedId());
+    }
+
+    private void FlushPendingFilter()
+    {
+        if(!_filterTimer.IsEnabled)return;
+        _filterTimer.Stop();
+        ApplyFilter(SelectedId());
+    }
+
     private async void Refresh_Click(object sender,RoutedEventArgs e)=>await RefreshAsync();
 
     private async Task RunArchiveOperationAsync(Func<Task> action)
     {
         if(_closed||_loading||_initializing)return;
+        FlushPendingFilter();
         _archiveOperation=true;
         SetLoading(true);
         try{await action();}

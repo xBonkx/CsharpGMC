@@ -30,8 +30,13 @@ public static class PtoPackageListProjection
         return rows.ToArray();
     }
 
-    public static IReadOnlyList<Row> Filter(IReadOnlyList<Row> rows,string query,string? status)=>
-        rows.Where(p=>
-            (string.IsNullOrWhiteSpace(query)||p.SearchText.Contains(query,StringComparison.OrdinalIgnoreCase))&&
-            (status is null or "Все статусы" ||p.Status==status)).ToArray();
+    public static IReadOnlyList<Row> Filter(IReadOnlyList<Row> rows,string query,string? status)
+    {
+        var allText=string.IsNullOrWhiteSpace(query);
+        var allStatuses=status is null or "Все статусы";
+        if(allText && allStatuses)return rows;
+        // A cheap status comparison first avoids scanning large JSON payloads for excluded rows.
+        return rows.Where(p=>(allStatuses||p.Status==status)&&
+            (allText||p.SearchText.Contains(query,StringComparison.OrdinalIgnoreCase))).ToArray();
+    }
 }

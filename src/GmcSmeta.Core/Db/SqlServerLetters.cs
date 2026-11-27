@@ -161,14 +161,42 @@ END;
         {
             var item = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(0), LettersRules.Json)!;
             item.Revision = reader.GetInt64(1);
-            if (status != "Все" && item.Status != status) continue;
-            if (!string.IsNullOrWhiteSpace(query) && !new[]
-                {item.Number, item.Subject, item.Object, item.Recipient}
-                .Any(x => x.Contains(query, StringComparison.CurrentCultureIgnoreCase))) continue;
-            list.Add(item);
+            if (MatchesList(item, query, status)) list.Add(item);
         }
         return list;
     }
+
+    // Keep the original payload and culture-based filtering semantics. Scope is applied
+    // while reading rather than building a second full list on the caller's thread.
+    public async Task<IReadOnlyList<LetterDocument>> ListAsync(string query, string status,
+        CancellationToken token, Func<LetterDocument, bool>? belongs = null)
+    {
+        token.ThrowIfCancellationRequested();
+        using var conn = Open();
+        token.ThrowIfCancellationRequested();
+        using var cmd = new SqlCommand(
+            "SELECT payload_json,revision FROM dbo.gmc_letters ORDER BY updated_utc DESC,id DESC", conn);
+        using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+        var list = new List<LetterDocument>();
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
+        {
+            token.ThrowIfCancellationRequested();
+            var item = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(0), LettersRules.Json)!;
+            item.Revision = reader.GetInt64(1);
+            if (MatchesList(item, query, status) && (belongs is null || belongs(item)))
+                list.Add(item);
+        }
+        token.ThrowIfCancellationRequested();
+        return list;
+    }
+
+    private static bool MatchesList(LetterDocument item, string query, string status) =>
+        (status == "Все" || item.Status == status) &&
+        (string.IsNullOrWhiteSpace(query) ||
+            item.Number.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Subject.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Object.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Recipient.Contains(query, StringComparison.CurrentCultureIgnoreCase));
 
     private static string Allocate(SqlConnection conn, SqlTransaction tx, DateTime date, Guid exclude)
     {

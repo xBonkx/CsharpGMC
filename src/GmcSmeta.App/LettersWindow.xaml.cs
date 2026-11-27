@@ -20,6 +20,7 @@ public partial class LettersWindow : Window
     private readonly DispatcherTimer _searchTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private bool _closed, _busy, _reading, _refreshRequested, _ready;
     private long _generation;
+    private CancellationTokenSource? _listReadCancellation;
     private static readonly string SettingsFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "GMC-Smeta-Next", "letters.settings.json");
@@ -95,6 +96,7 @@ public partial class LettersWindow : Window
     {
         if (_closed || _busy || _archive is null) return;
         ++_generation;
+        _listReadCancellation?.Cancel();
         _ready = false;
         SetControls();
         ArchivePath.Text = "Чтение списка писем…";
@@ -132,10 +134,13 @@ public partial class LettersWindow : Window
                 var selectedId = Selected()?.Id;
                 var query = SearchBox.Text.Trim();
                 var status = (StatusFilter.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Все";
+                using var cancellation = new CancellationTokenSource();
+                _listReadCancellation = cancellation;
+                var token = cancellation.Token;
                 try
                 {
-                    var letters = await Task.Run(() => archive.Sql.List(query, status).Where(Belongs).ToList());
-                    if (_closed || generation != _generation || !ReferenceEquals(archive, _archive)) continue;
+                    var letters = await Task.Run(() => archive.Sql.ListAsync(query, status, token, Belongs), token);
+                    if (_closed || token.IsCancellationRequested || generation != _generation || !ReferenceEquals(archive, _archive)) continue;
                     LetterList.ItemsSource = letters;
                     LetterList.SelectedItem = letters.FirstOrDefault(x => x.Id == selectedId);
                     ArchivePath.Text = "Отдельный архив файлов: " + archive.Root +
@@ -144,7 +149,7 @@ public partial class LettersWindow : Window
                 }
                 catch (Exception error)
                 {
-                    if (_closed || generation != _generation) continue;
+                    if (_closed || token.IsCancellationRequested || generation != _generation) continue;
                     LetterList.ItemsSource = null;
                     ArchivePath.Text = "Не удалось прочитать письма: " + error.Message;
                     // Search/filter remains available for a fresh read.
@@ -152,6 +157,7 @@ public partial class LettersWindow : Window
                 }
                 finally
                 {
+                    _listReadCancellation = null;
                     if (!_closed) SetControls();
                 }
             }
@@ -176,6 +182,7 @@ public partial class LettersWindow : Window
     {
         _closed = true;
         ++_generation;
+        _listReadCancellation?.Cancel();
         _searchTimer.Stop();
         _searchTimer.Tick -= SearchTimer_Tick;
         base.OnClosed(e);

@@ -21,7 +21,10 @@ public sealed class LettersWindowLifecycleTests
         Assert.Contains("if (_closed || _busy || _reading || _archive is null) return;", code);
         Assert.Contains("while (_refreshRequested && !_closed && !_busy)", code);
         Assert.Contains("generation != _generation || !ReferenceEquals(archive, _archive)", code);
-        Assert.Contains("await Task.Run(() => archive.Sql.List(query, status).Where(Belongs).ToList())", code);
+        Assert.Contains("await Task.Run(() => archive.Sql.ListAsync(query, status, token, Belongs), token)", code);
+        Assert.Contains("_listReadCancellation?.Cancel();", code);
+        Assert.Contains("token.IsCancellationRequested || generation != _generation", code);
+        Assert.Contains("_listReadCancellation = null;", code);
         Assert.Contains("_searchTimer.Tick -= SearchTimer_Tick;", code);
     }
 
@@ -66,5 +69,22 @@ public sealed class LettersWindowLifecycleTests
         Assert.Contains("Dispatcher.BeginInvoke(new Action(Close))", code);
         Assert.Contains("request != _numberRequest", code);
         Assert.Contains("await Task.Run(() => _archive.Sql.ReadHistory(_letter.Id))", code);
+    }
+
+    [Fact]
+    public void ListReaderObservesCancellationAndSharesLegacySearchPolicy()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerLetters.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerLetters.cs"));
+        Assert.Contains("await cmd.ExecuteReaderAsync(token)", code);
+        Assert.Contains("await reader.ReadAsync(token)", code);
+        Assert.Contains("token.ThrowIfCancellationRequested();", code);
+        Assert.Contains("if (MatchesList(item, query, status)) list.Add(item);", code);
+        Assert.Contains("MatchesList(item, query, status) && (belongs is null || belongs(item))", code);
+        Assert.Contains("StringComparison.CurrentCultureIgnoreCase", code);
+        Assert.Contains("ORDER BY updated_utc DESC,id DESC", code);
     }
 }

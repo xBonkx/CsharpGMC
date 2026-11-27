@@ -64,6 +64,10 @@ public sealed class PtoPackageListProjectionTests
         var filter=source[source.IndexOf("private void Filter_Changed",StringComparison.Ordinal)..
             source.IndexOf("private async void Refresh_Click",StringComparison.Ordinal)];
         Assert.Contains("ApplyFilter(SelectedId());",filter);
+        Assert.Contains("_filterTimer.Start();",filter);
+        Assert.Contains("FlushPendingFilter();",source);
+        Assert.Contains("_filterTimer.Tick-=FilterTimer_Tick;",source);
+        Assert.Contains("published==(q,status)",source);
         Assert.DoesNotContain("Refresh(",filter);
         Assert.Contains("await Task.Run(()=>ReadRows(archive,token),token)",source);
         Assert.Contains("if(_closed || token.IsCancellationRequested)return;",source);
@@ -77,5 +81,17 @@ public sealed class PtoPackageListProjectionTests
         Assert.Contains("archive.Sql.Packages(_scopeObjectId,_scopeContractId,token)",source);
         Assert.True(source.IndexOf("_initializingArchive=false;",StringComparison.Ordinal) <
             source.IndexOf("await Task.Run(()=>ReadRows(snapshot.Archive,token),token)",StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UnfilteredProjectionReusesSnapshotAndStatusFilterKeepsOrder()
+    {
+        var rows=Enumerable.Range(0,25000).Select(i=>new PtoPackageListProjection.Row(
+            Guid.NewGuid(),"","","","",i%2==0?"Черновик":"Готов",0,"","nested payload")).ToArray();
+        Assert.Same(rows,PtoPackageListProjection.Filter(rows,"","Все статусы"));
+        Assert.Same(rows,PtoPackageListProjection.Filter(rows,"   ",null));
+        Assert.Equal(rows.Where(x=>x.Status=="Готов").Select(x=>x.Id),
+            PtoPackageListProjection.Filter(rows,"PAYLOAD","Готов").Select(x=>x.Id));
+        Assert.Empty(PtoPackageListProjection.Filter(rows,"absent","Готов"));
     }
 }
