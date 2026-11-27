@@ -65,7 +65,7 @@
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
                   BeginningEdit="StagesGrid_BeginningEdit" CellEditEnding="StagesGrid_CellEditEnding" RowEditEnding="StagesGrid_RowEditEnding"
-                  ContextMenuOpening="StagesGrid_ContextMenuOpening" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.IsDeferredScrollingEnabled="True" Style="{StaticResource DocumentTable}">
+                  ContextMenuOpening="StagesGrid_ContextMenuOpening" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.IsDeferredScrollingEnabled="False" Style="{StaticResource DocumentTable}">
             <DataGrid.ContextMenu>
                 <ContextMenu x:Name="StageMenu"/>
             </DataGrid.ContextMenu>

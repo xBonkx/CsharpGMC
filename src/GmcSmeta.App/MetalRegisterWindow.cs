@@ -406,7 +406,7 @@ internal sealed class MetalRegisterSheet : UserControl
         _table.BeginningEdit += OnBeginningEdit;
         _table.RowEditEnding += (_, _) => QueueRefresh();
         _table.Loaded += (_, _) => QueueRefresh();
-        ScrollViewer.SetIsDeferredScrollingEnabled(_table, true);
+        ScrollViewer.SetIsDeferredScrollingEnabled(_table, false);
         VirtualizingPanel.SetVirtualizationMode(_table, VirtualizationMode.Recycling);
         _table.LoadingRow += (_, e) =>
         {

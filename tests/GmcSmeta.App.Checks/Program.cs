@@ -201,6 +201,7 @@ internal static class Program
         EstimateRowReadbackChecks.Run();
         EstimateGridRowUpdateChecks.Run();
         EstimateScrollingChecks.Run();
+        GridEditingChecks.Run();
         VisualAuditChecks.RunLayoutChecks();
         CheckProcurementUnchangedDisplay();
         CheckShipmentTabReuse();

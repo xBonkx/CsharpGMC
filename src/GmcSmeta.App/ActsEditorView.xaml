@@ -208,7 +208,7 @@
                       VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                       BeginningEdit="ActGrid_BeginningEdit" PreparingCellForEdit="ActGrid_PreparingCellForEdit"
                       CellEditEnding="ActGrid_CellEditEnding" SelectionChanged="ActGrid_SelectionChanged"
-                      MouseDoubleClick="ActGrid_DoubleClick" ContextMenuOpening="ActGrid_ContextMenuOpening" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="True">
+                      MouseDoubleClick="ActGrid_DoubleClick" ContextMenuOpening="ActGrid_ContextMenuOpening" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="False">
                 <DataGrid.Resources>
                     <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
                 </DataGrid.Resources>

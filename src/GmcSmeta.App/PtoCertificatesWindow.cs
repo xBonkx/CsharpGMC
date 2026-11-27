@@ -90,7 +90,7 @@ public sealed class PtoCertificatesWindow : Window
         TableColumnMenu.SetProtect(_grid, "Продукция|Номер|До|Проверено");
         TableColumnMenu.SetKey(_grid, "pto-certificates");
         _grid.MouseDoubleClick+=async (_,_)=>{if(_busy||!_ready)return;if(_pick)Choose();else await RunAsync(Edit);};
-        ScrollViewer.SetIsDeferredScrollingEnabled(_grid,true);
+        ScrollViewer.SetIsDeferredScrollingEnabled(_grid,false);
         VirtualizingPanel.SetVirtualizationMode(_grid,VirtualizationMode.Recycling);
         panel.Children.Add(_grid);Content=panel;
         Loaded+=InitialLoad;

@@ -11,7 +11,7 @@ public sealed class DeferredGridScrollingSourceTests
     [InlineData("ProcurementPane.xaml", "BuyGrid", true)]
     [InlineData("ShipmentsPane.xaml", "LinesGrid", true)]
     [InlineData("ActsEditorView.xaml", "ActGrid", false)]
-    public void LargeGridDefersThumbDragWithoutDisablingVirtualization(string file, string name, bool grouped)
+    public void LargeGridUpdatesDuringThumbDragWithoutDisablingVirtualization(string file, string name, bool grouped)
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", file)))
@@ -22,7 +22,7 @@ public sealed class DeferredGridScrollingSourceTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         var grid = Assert.Single(doc.Descendants(p + "DataGrid")
             .Where(e => (string?)e.Attribute(x + "Name") == name));
-        Assert.Equal("True", (string?)grid.Attribute("ScrollViewer.IsDeferredScrollingEnabled"));
+        Assert.Equal("False", (string?)grid.Attribute("ScrollViewer.IsDeferredScrollingEnabled"));
         Assert.Equal("True", (string?)grid.Attribute("ScrollViewer.CanContentScroll"));
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
         Assert.Equal("True", (string?)grid.Attribute("EnableColumnVirtualization"));

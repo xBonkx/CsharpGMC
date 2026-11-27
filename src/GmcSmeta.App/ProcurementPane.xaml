@@ -330,7 +330,7 @@
                   SelectionMode="Extended" SelectionUnit="FullRow"
                   BeginningEdit="BuyGrid_BeginningEdit" CellEditEnding="BuyGrid_CellEditEnding" RowEditEnding="BuyGrid_RowEditEnding"
                   ContextMenuOpening="BuyGrid_ContextMenuOpening"
-                  SelectionChanged="BuyGrid_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.IsVirtualizingWhenGrouping="True" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="True">
+                  SelectionChanged="BuyGrid_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.IsVirtualizingWhenGrouping="True" ScrollViewer.CanContentScroll="True" ScrollViewer.IsDeferredScrollingEnabled="False">
             <DataGrid.Resources>
                 <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
             </DataGrid.Resources>

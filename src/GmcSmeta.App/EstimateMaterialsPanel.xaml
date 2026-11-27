@@ -160,7 +160,7 @@
               
               ScrollViewer.CanContentScroll="True"
               ScrollViewer.HorizontalScrollBarVisibility="Auto"
-              ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.IsDeferredScrollingEnabled="True">
+              ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.IsDeferredScrollingEnabled="False">
         <DataGrid.Resources>
             <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
             <!-- Python GridDelegate.paint: выделенная строка — ровная светло-голубая

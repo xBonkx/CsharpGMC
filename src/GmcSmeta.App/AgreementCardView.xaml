@@ -1,6 +1,7 @@
 <UserControl x:Class="GmcSmeta.App.AgreementCardView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:GmcSmeta.App"
  UseLayoutRounding="True" SnapsToDevicePixels="True">
  <Grid Margin="{StaticResource LayoutPageMargin}">
   <Grid.RowDefinitions>
@@ -26,13 +27,13 @@
       <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
        <StackPanel Margin="0,8,0,0">
         <TextBlock Text="У ДС собственные номер и дата. Изменить можно только неподписанные документы, не являющиеся этапами." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,8"/>
-        <DataGrid x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column">
+        <DataGrid local:TableColumnMenu.Key="agreement.sources" local:TableColumnMenu.Protect="Документ" local:TableColumnMenu.Exclude="Действия" x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column">
          <DataGrid.Columns>
           <DataGridTextColumn Header="Документ" Binding="{Binding Name}" Width="2*"/>
           <DataGridTextColumn Header="№" Binding="{Binding Number}" Width="*"/>
           <DataGridTextColumn Header="Дата" Binding="{Binding Date}" Width="*"/>
           <DataGridTextColumn Header="Подрядчик" Binding="{Binding Contractor}" Width="2*"/>
-          <DataGridTemplateColumn Header="" Width="Auto">
+          <DataGridTemplateColumn local:TableColumnMenu.MenuTitle="Действия" Header="" Width="Auto">
            <DataGridTemplateColumn.CellTemplate><DataTemplate>
             <Button Content="Изменить…" Style="{StaticResource PythonToolbarButton}" IsEnabled="{Binding CanEdit}" Click="EditDocument_Click" Padding="6,2"/>
            </DataTemplate></DataGridTemplateColumn.CellTemplate>

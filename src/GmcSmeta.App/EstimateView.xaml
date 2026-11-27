@@ -784,7 +784,7 @@
                       VirtualizingPanel.ScrollUnit="Pixel"
                       EnableRowVirtualization="True"
                       ScrollViewer.CanContentScroll="True"
-                      ScrollViewer.IsDeferredScrollingEnabled="True"
+                      ScrollViewer.IsDeferredScrollingEnabled="False"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                        ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <DataGrid.Resources>
