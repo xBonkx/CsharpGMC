@@ -56,4 +56,24 @@ public sealed class KsAsyncExportSourceTests
         Assert.DoesNotContain("XlsxExport.SaveCreatedWorkbook(", code);
         Assert.DoesNotContain("KsPdfForms.Save(", code);
     }
+
+    [Fact]
+    public void ContractorReadUsesBoundedObjectScopedParameterizedBatches()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerKsPrintData.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var db = Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db");
+        var code = File.ReadAllText(Path.Combine(db, "SqlServerKsPrintData.Contractors.cs"));
+        var package = File.ReadAllText(Path.Combine(db, "SqlServerKsPrintData.cs"));
+        Assert.Contains("documents.GroupBy(d => d.ObjectId).SelectMany(g => g.Chunk(500))", code);
+        Assert.Contains("WHERE c.object_id=@obj AND c.id IN (", code);
+        Assert.Contains("cmd.Parameters.Add(\"@obj\", SqlDbType.BigInt).Value = batch[0].ObjectId;", code);
+        Assert.Contains("cmd.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = batch[i].Id;", code);
+        Assert.Contains("RequireContractorCoverage(documents, contractors);", code);
+        Assert.Contains("ReadContractors(conn, scope.Documents)", package);
+        Assert.Contains("KsLegalRequisites.RequirePrintAgreement(scope, report, legalSources, groupReport)", package);
+    }
+
 }

@@ -11,7 +11,7 @@ namespace GmcSmeta.Core.Db;
 /// A single selected legal contract defines the scope; no arbitrary act IDs
 /// may be used to read data from other objects.
 /// </summary>
-public static class SqlServerKsPrintData
+public static partial class SqlServerKsPrintData
 {
     public sealed record Line(long ActId, string Section, string Name, string Unit,
         string PositionNumber, decimal Quantity, decimal Price, decimal WorkPrice,
@@ -141,21 +141,7 @@ public static class SqlServerKsPrintData
         if (selectedActs.Count == 0 || selectedActs.Count > 500)
             throw new InvalidOperationException("Неверное число актов для экспорта.");
 
-        var contractors = new Dictionary<long, Contractor>();
-        foreach (var doc in scope.Documents)
-        {
-            using var cmd = new SqlCommand(
-                "SELECT c.[date],co.name,co.legal_full,co.signer_post,co.signer_name " +
-                "FROM dbo.contracts c LEFT JOIN dbo.companies co ON co.id=c.company_id " +
-                "WHERE c.id=@id AND c.object_id=@obj", conn);
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = doc.Id;
-            cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = doc.ObjectId;
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) throw new InvalidOperationException("Не найден договор для КС-2.");
-            string S(int i) => r.IsDBNull(i) ? "" :
-                Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-            contractors.Add(doc.Id, new Contractor(doc.Id,S(0),S(1),S(2),S(3),S(4)));
-        }
+        var contractors = ReadContractors(conn, scope.Documents);
 
         var ids = selectedActs.Select(a => a.Id).ToList();
         var parameters = ids.Select((id, i) => "@act" + i.ToString(CultureInfo.InvariantCulture)).ToArray();

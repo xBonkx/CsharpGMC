@@ -72,4 +72,46 @@ public sealed class KsContractScopeTests
         Assert.Throws<InvalidOperationException>(()=>
             SqlServerKsContractScope.ResolveDocuments(999,new[] {Main}));
     }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(500, 1)]
+    [InlineData(501, 2)]
+    [InlineData(2500, 5)]
+    public void ContractorReadBatchesAreBoundedAndPreserveAllDocumentIds(int count, int batches)
+    {
+        var docs = Enumerable.Range(1, count).Select(i => Main with { Id = i }).ToArray();
+        var result = SqlServerKsPrintData.ContractorBatches(docs).ToArray();
+        Assert.Equal(batches, result.Length);
+        Assert.All(result, batch => Assert.InRange(batch.Length, 1, 500));
+        Assert.Equal(docs.Select(d => d.Id), result.SelectMany(b => b).Select(d => d.Id));
+    }
+
+    [Fact]
+    public void ContractorReadBatchesNeverMixObjectsOrDuplicateIds()
+    {
+        var docs = new[] { Main, Ds with { ObjectId = 99 }, Other };
+        var batches = SqlServerKsPrintData.ContractorBatches(docs).ToArray();
+        Assert.Equal(2, batches.Length);
+        Assert.Equal(new long[] { Main.Id, Other.Id }, batches[0].Select(d => d.Id));
+        Assert.Equal(99L, Assert.Single(batches[1]).ObjectId);
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlServerKsPrintData.ContractorBatches(new[] { Main, Main }));
+    }
+
+    [Fact]
+    public void ContractorCoverageRejectsMissingDocumentEvenWhenOtherRequisitesExist()
+    {
+        var docs = new[] { Main, Ds };
+        var contractors = new Dictionary<long, SqlServerKsPrintData.Contractor>
+        {
+            [Main.Id] = new(Main.Id, "", "", "", "", "")
+        };
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlServerKsPrintData.RequireContractorCoverage(docs, contractors));
+        contractors[Ds.Id] = new(Ds.Id, "", "", "", "", "");
+        SqlServerKsPrintData.RequireContractorCoverage(docs, contractors);
+    }
+
 }

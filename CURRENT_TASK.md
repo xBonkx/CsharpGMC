@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base faec827) — PERF-022 PARTIAL: batched object-scoped KS contractor metadata reads; regression checks added, not run. See performance TODO.
+
 28.11.2026 ChatGPT/main (base 3404795) — PERF-022 PARTIAL: indexed print package lines and reusable section projection for KS/VOR exports; golden checks extended, not run. See performance TODO.
 
 28.11.2026 ChatGPT/main (base 4671be4) — PERF-022 PARTIAL: prepared report context for batch KS-3 calculations; tests added, not run. See performance TODO.
