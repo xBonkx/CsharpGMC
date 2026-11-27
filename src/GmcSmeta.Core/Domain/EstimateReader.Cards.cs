@@ -72,21 +72,21 @@ public static partial class EstimateReader
         Next();
         var systems = ids.ToDictionary(id => id, _ => new List<SystemRow>());
         while (reader.Read())
-            systems[Convert.ToInt32(reader.GetValue(3))].Add(new SystemRow
+            systems[SqlInteger.ReadInt32(reader, 3)].Add(new SystemRow
             {
-                Id = Convert.ToInt32(reader.GetValue(0)),
-                ParentId = reader.IsDBNull(1) ? null : Convert.ToInt32(reader.GetValue(1)),
+                Id = SqlInteger.ReadInt32(reader, 0),
+                ParentId = reader.IsDBNull(1) ? null : SqlInteger.ReadInt32(reader, 1),
                 SmrAmount = Dec(reader, 2)
             });
 
         Next();
         var positions = ids.ToDictionary(id => id, _ => new List<PositionRow>());
         while (reader.Read())
-            positions[Convert.ToInt32(reader.GetValue(8))].Add(new PositionRow
+            positions[SqlInteger.ReadInt32(reader, 8)].Add(new PositionRow
             {
-                Id = Convert.ToInt32(reader.GetValue(0)),
-                SystemId = Convert.ToInt32(reader.GetValue(1)),
-                ParentId = reader.IsDBNull(2) ? null : Convert.ToInt32(reader.GetValue(2)),
+                Id = SqlInteger.ReadInt32(reader, 0),
+                SystemId = SqlInteger.ReadInt32(reader, 1),
+                ParentId = reader.IsDBNull(2) ? null : SqlInteger.ReadInt32(reader, 2),
                 Name = Str(reader, 3),
                 Qty = Dec(reader, 4),
                 Price = Dec(reader, 5),

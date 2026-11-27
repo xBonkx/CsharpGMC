@@ -434,7 +434,7 @@ public static partial class EstimateReader
         var kindTitle = kind switch { "main" => "Договор", "dop" => "Допсоглашение", _ => "КП" };
         return new Head
         {
-            ContractId = Convert.ToInt32(r.GetValue(0)),
+            ContractId = SqlInteger.ReadInt32(r, 0),
             Kind = kind,
             KindTitle = kindTitle,
             Title = Title(kindTitle, Str(r, 2), Str(r, 3), Str(r, 4)),
@@ -468,10 +468,10 @@ public static partial class EstimateReader
 
     private static SystemRow ReadSystemCurrent(DbDataReader r) => new SystemRow
     {
-        Id = Convert.ToInt32(r.GetValue(0)),
+        Id = SqlInteger.ReadInt32(r, 0),
         Name = Str(r, 1),
-        ParentId = r.IsDBNull(2) ? null : Convert.ToInt32(r.GetValue(2)),
-        Order = r.IsDBNull(3) ? 0 : Convert.ToInt32(r.GetValue(3)),
+        ParentId = r.IsDBNull(2) ? null : SqlInteger.ReadInt32(r, 2),
+        Order = r.IsDBNull(3) ? 0 : SqlInteger.ReadInt32(r, 3),
         SmrAmount = Dec(r, 4),
         SourceNum = Str(r, 5),
     };
@@ -485,9 +485,9 @@ public static partial class EstimateReader
 
     private static PositionRow ReadPositionCurrent(DbDataReader r) => new PositionRow
     {
-        Id = Convert.ToInt32(r.GetValue(0)),
-        SystemId = Convert.ToInt32(r.GetValue(1)),
-        ParentId = r.IsDBNull(2) ? null : Convert.ToInt32(r.GetValue(2)),
+        Id = SqlInteger.ReadInt32(r, 0),
+        SystemId = SqlInteger.ReadInt32(r, 1),
+        ParentId = r.IsDBNull(2) ? null : SqlInteger.ReadInt32(r, 2),
         Num = Str(r, 3),
         Name = Str(r, 4),
         Unit = Str(r, 5),
@@ -496,7 +496,7 @@ public static partial class EstimateReader
         PurchasePrice = r.IsDBNull(8) ? null : Dec(r, 8),
         OutOfKp = !r.IsDBNull(9) && Convert.ToBoolean(r.GetValue(9)),
         Note = Str(r, 10),
-        Order = r.IsDBNull(11) ? 0 : Convert.ToInt32(r.GetValue(11)),
+        Order = r.IsDBNull(11) ? 0 : SqlInteger.ReadInt32(r, 11),
         WorkPrice = r.IsDBNull(12) ? null : Dec(r, 12),
         AreaManual = r.IsDBNull(13) ? null : Convert.ToDouble(r.GetValue(13), CultureInfo.InvariantCulture),
         Basis = Str(r, 14),

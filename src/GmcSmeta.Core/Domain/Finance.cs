@@ -101,7 +101,7 @@ public static partial class FinanceReader
     private static string Text(DbDataReader r, int i) => r.IsDBNull(i) ? "" :
         Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
 
-    private static int Id(DbDataReader r, int i) => Convert.ToInt32(r.GetValue(i), CultureInfo.InvariantCulture);
+    private static int Id(DbDataReader r, int i) => SqlInteger.ReadInt32(r, i);
 
     public static IReadOnlyDictionary<int, ContractFinance> ReadAll(DbConnection conn) =>
         ReadAll(conn, out _);

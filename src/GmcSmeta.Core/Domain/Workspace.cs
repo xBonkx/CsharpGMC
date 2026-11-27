@@ -1,4 +1,5 @@
 using System.Data.Common;
+using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.Core.Domain;
 
@@ -103,7 +104,7 @@ public static class Workspace
         while (r.Read())
         {
             list.Add(new ObjectRow(
-                Convert.ToInt32(r.GetValue(0)),
+                SqlInteger.ReadInt32(r, 0),
                 Str(r, 1),
                 Str(r, 2),
                 Str(r, 3),
@@ -134,13 +135,13 @@ public static class Workspace
         var list = new List<DocRow>();
         while (reader.Read())
         {
-            var id = Convert.ToInt32(reader.GetValue(0));
+            var id = SqlInteger.ReadInt32(reader, 0);
             var kind = Str(reader, 2);
             var kindTitle = KindTitles.GetValueOrDefault(kind, "КП");
             var t = totals?.GetValueOrDefault(id);
             list.Add(new DocRow(
                 id,
-                Convert.ToInt32(reader.GetValue(1)),
+                SqlInteger.ReadInt32(reader, 1),
                 kind,
                 kindTitle,
                 Title(kindTitle, Str(reader, 3), Str(reader, 4), Str(reader, 5)),
@@ -153,12 +154,12 @@ public static class Workspace
                 t?.Total ?? 0m,
                 t?.Positions ?? 0)
             {
-                StageOf = reader.IsDBNull(7) ? null : Convert.ToInt32(reader.GetValue(7)),
-                StageNo = reader.IsDBNull(8) ? 0 : Convert.ToInt32(reader.GetValue(8)),
+                StageOf = reader.IsDBNull(7) ? null : SqlInteger.ReadInt32(reader, 7),
+                StageNo = reader.IsDBNull(8) ? 0 : SqlInteger.ReadInt32(reader, 8),
                 StageRest = !reader.IsDBNull(9) && Convert.ToBoolean(reader.GetValue(9)),
                 KpPhase = Str(reader, 10),
-                BaseContractId = reader.IsDBNull(11) ? null : Convert.ToInt32(reader.GetValue(11)),
-                Order = reader.IsDBNull(12) ? 0 : Convert.ToInt32(reader.GetValue(12))
+                BaseContractId = reader.IsDBNull(11) ? null : SqlInteger.ReadInt32(reader, 11),
+                Order = reader.IsDBNull(12) ? 0 : SqlInteger.ReadInt32(reader, 12)
             });
         }
         return list;

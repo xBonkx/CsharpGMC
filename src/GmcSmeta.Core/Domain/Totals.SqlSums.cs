@@ -1,4 +1,5 @@
 using System.Data.Common;
+using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.Core.Domain;
 
@@ -30,7 +31,7 @@ public static partial class Totals
         while (reader.Read())
         {
             token.ThrowIfCancellationRequested();
-            var systemId = Convert.ToInt32(reader.GetValue(0));
+            var systemId = SqlInteger.ReadInt32(reader, 0);
             if (!ownership.TryGetValue(systemId, out var owner)) continue;
             var qty = Dec(reader, 1);
             var amount = qty * Dec(reader, 2);

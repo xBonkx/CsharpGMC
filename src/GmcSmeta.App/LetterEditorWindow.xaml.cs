@@ -171,7 +171,7 @@ public partial class LetterEditorWindow : Window
         }
     }
 
-    private static (int Id, string Name)? Select(Window owner, string title, IReadOnlyList<(int Id, string Name)> items)
+    private static (long Id, string Name)? Select(Window owner, string title, IReadOnlyList<(long Id, string Name)> items)
     {
         if (items.Count == 0)
         {
@@ -210,9 +210,9 @@ public partial class LetterEditorWindow : Window
                 using var command = new SqlCommand(
                     "SELECT id,name,legal_full,signer_post,signer_name FROM dbo.companies ORDER BY name,id", conn);
                 using var reader = command.ExecuteReader();
-                var rows = new List<(int Id, string Name, string Legal, string Position, string Signer)>();
+                var rows = new List<(long Id, string Name, string Legal, string Position, string Signer)>();
                 while (reader.Read())
-                    rows.Add((Convert.ToInt32(reader.GetValue(0)), reader.GetString(1),
+                    rows.Add((SqlInteger.ReadInt64(reader, 0), reader.GetString(1),
                         reader.IsDBNull(2) ? "" : reader.GetString(2),
                         reader.IsDBNull(3) ? "" : reader.GetString(3),
                         reader.IsDBNull(4) ? "" : reader.GetString(4)));
@@ -240,9 +240,9 @@ public partial class LetterEditorWindow : Window
                     "SELECT id,name,customer,customer_full,cust_post,cust_name FROM dbo.objects " +
                     "WHERE archived=0 ORDER BY name,id", conn);
                 using var r = cmd.ExecuteReader();
-                var rows = new List<(int Id, string Name, string Customer, string Full, string Post, string Person)>();
+                var rows = new List<(long Id, string Name, string Customer, string Full, string Post, string Person)>();
                 while (r.Read())
-                    rows.Add((Convert.ToInt32(r.GetValue(0)), r.GetString(1),
+                    rows.Add((SqlInteger.ReadInt64(r, 0), r.GetString(1),
                         r.IsDBNull(2) ? "" : r.GetString(2),
                         r.IsDBNull(3) ? "" : r.GetString(3),
                         r.IsDBNull(4) ? "" : r.GetString(4),

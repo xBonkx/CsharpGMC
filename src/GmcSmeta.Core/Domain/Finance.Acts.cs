@@ -83,7 +83,7 @@ public static partial class FinanceReader
                 GrossAdjustment = (int)Number(r, 6), GrossAdjustmentRaw = Number(r, 6),
                 Note = Text(r, 12),
                 DiscountPercent = schema31 ? DiscountPolicy.ReadPercent(r, 13) : 0m,
-                ManualTotalCents = schema31 && !r.IsDBNull(14) ? Convert.ToInt64(r.GetValue(14)) : -1,
+                ManualTotalCents = schema31 && !r.IsDBNull(14) ? SqlInteger.ReadInt64(r, 14) : -1,
             };
             headers.Add(state.Id, state);
         }

@@ -299,7 +299,7 @@ public static partial class Totals
         {
             list.Add(new ContractRow
             {
-                Id = Convert.ToInt32(r.GetValue(0)),
+                Id = SqlInteger.ReadInt32(r, 0),
                 Kind = Str(r, 1),
                 Form = Str(r, 2),
                 VatRate = Dec(r, 3),
@@ -330,10 +330,10 @@ public static partial class Totals
         var map = new Dictionary<int, List<SystemRow>>();
         while (r.Read())
         {
-            var loadedContractId = Convert.ToInt32(r.GetValue(1));
+            var loadedContractId = SqlInteger.ReadInt32(r, 1);
             if (!map.TryGetValue(loadedContractId, out var list))
                 map[loadedContractId] = list = new List<SystemRow>();
-            list.Add(new SystemRow(Convert.ToInt32(r.GetValue(0)), Dec(r, 2)));
+            list.Add(new SystemRow(SqlInteger.ReadInt32(r, 0), Dec(r, 2)));
         }
         return map;
     }
@@ -355,7 +355,7 @@ public static partial class Totals
         var map = new Dictionary<int, List<PositionRow>>();
         while (r.Read())
         {
-            var systemId = Convert.ToInt32(r.GetValue(0));
+            var systemId = SqlInteger.ReadInt32(r, 0);
             if (!map.TryGetValue(systemId, out var list))
                 map[systemId] = list = new List<PositionRow>();
             list.Add(new PositionRow(Dec(r, 1), Dec(r, 2), Dec(r, 3), !r.IsDBNull(4) && Convert.ToBoolean(r.GetValue(4))));
@@ -379,7 +379,7 @@ public static partial class Totals
     private static Dictionary<int, int> ReadCountRows(DbDataReader r)
     {
         var map = new Dictionary<int, int>();
-        while (r.Read()) map[Convert.ToInt32(r.GetValue(0))] = Convert.ToInt32(r.GetValue(1));
+        while (r.Read()) map[SqlInteger.ReadInt32(r, 0)] = SqlInteger.ReadInt32(r, 1);
         return map;
     }
 
