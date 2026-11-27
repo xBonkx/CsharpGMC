@@ -143,6 +143,50 @@ public sealed class ContractCellSaveQueueTests
     }
 
     [Fact]
+    public async Task EveryIdleNotificationAllowsImmediateReadbackAndNextBurst()
+    {
+        var queue = new ContractCellSaveQueue(edit =>
+            Task.FromResult(ContractCellSaveQueue.Receipt.Success("rev-" + edit.PositionId)),
+            TimeSpan.Zero);
+
+        for (var i = 1; i <= 500; i++)
+        {
+            var receipt = queue.Enqueue(Edit(i));
+            await queue.WhenIdleAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            queue.ResumeAfterReadback();
+            Assert.True((await receipt).Saved);
+            Assert.Equal(0, queue.PendingCount);
+        }
+    }
+
+    [Fact]
+    public async Task LargeSuccessfulBurstPreservesEveryReceiptAndOrder()
+    {
+        const int size = 2500;
+        var attempted = new List<long>();
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queue = new ContractCellSaveQueue(async edit =>
+        {
+            if (edit.PositionId == 1) await release.Task;
+            attempted.Add(edit.PositionId);
+            return ContractCellSaveQueue.Receipt.Success("rev-" + edit.PositionId);
+        }, TimeSpan.Zero);
+
+        var pending = Enumerable.Range(1, size).Select(i => queue.Enqueue(Edit(i))).ToArray();
+        var idle = queue.WhenIdleAsync();
+        Assert.False(idle.IsCompleted);
+        release.TrySetResult(true);
+        var receipts = await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10));
+        await idle.WaitAsync(TimeSpan.FromSeconds(5));
+        queue.ResumeAfterReadback();
+        Assert.Equal(Enumerable.Range(1, size).Select(i => (long)i), attempted);
+        Assert.Equal(Enumerable.Range(1, size).Select(i => "rev-" + i),
+            receipts.Select(r => r.Revision));
+        Assert.All(receipts, r => Assert.True(r.Saved));
+        Assert.Equal(0, queue.PendingCount);
+    }
+
+    [Fact]
     public void SameServerDatabaseContract_UsesSameGate()
     {
         var first = ContractSqlWriteLock.For(

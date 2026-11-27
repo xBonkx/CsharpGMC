@@ -30,11 +30,24 @@ public partial class EstimateView
             var result = SqlServerDatabase.SaveCell(
                 _sqlConnectionString, edit.PositionId, edit.Field, edit.Input, _serverRevision);
             if (!result.Saved)
+            {
+                // Publish the conflict BEFORE releasing the shared writer.
+                // A waiting structure mutation must not run while the UI
+                // continuation has yet to process the failed receipt.
+                _serverConflict = true;
                 return ContractCellSaveQueue.Receipt.Reject(
                     result.Error ?? "Сервер отказал в сохранении ячейки.", result.Revision);
+            }
 
             _serverRevision = result.Revision;
             return ContractCellSaveQueue.Receipt.Success(result.Revision);
+        }
+        catch
+        {
+            // COMMIT may be ambiguous. Block other writers before releasing
+            // the gate; the cell queue still creates the error receipt.
+            _serverConflict = true;
+            throw;
         }
         finally
         {

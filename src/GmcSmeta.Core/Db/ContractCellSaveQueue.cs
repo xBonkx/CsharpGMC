@@ -137,8 +137,15 @@ public sealed class ContractCellSaveQueue
                     }
                     _running = false;
                 }
-                SignalIdleIfNeeded();
-                if (!receipt.Saved) return;
+                // The idle notification and worker lifecycle must change in
+                // the same critical section. A readback or a new burst must
+                // not observe zero outstanding edits while _running is true.
+                if (_outstanding == 0)
+                {
+                    _running = false;
+                    SignalIdleIfNeeded();
+                    return;
+                }
             }
         }
     }
