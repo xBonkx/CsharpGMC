@@ -579,11 +579,11 @@
                 Checked="PurchaseToggle_Changed" Unchecked="PurchaseToggle_Changed"
                 ToolTip="Показать закупочную цену рядом с ценой заказчика. Видна только нам"/>
                 <Button x:Name="EstimateColumnsButton" Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>
-                <Grid Width="150" Height="34" Margin="0,0,0,4">
-                <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonSearch}" TextChanged="EstimateSearch_TextChanged"
-                         ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете" Padding="30,6,27,6"/>
+                <Grid Width="170" MinHeight="34" Margin="0,0,0,4">
+                <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonIconSearch}" TextChanged="EstimateSearch_TextChanged"
+                         ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете"/>
                  <Viewbox Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                <TextBlock Text="Найти в смете…" Foreground="#64748B" Margin="30,0,27,0"
+                <TextBlock Text="Найти в смете…" Foreground="#64748B" Margin="30,0,32,0"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style><Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -591,7 +591,7 @@
                     </Style></TextBlock.Style>
                 </TextBlock>
                 <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" Click="ClearEstimateSearch_Click" HorizontalAlignment="Right"
-                        VerticalAlignment="Center" Width="26" Height="26" Padding="0"
+                        VerticalAlignment="Center" Width="26" Height="26" MinWidth="0" Padding="0"
                         ToolTip="Очистить поиск по смете" AutomationProperties.Name="Очистить поиск по смете">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
