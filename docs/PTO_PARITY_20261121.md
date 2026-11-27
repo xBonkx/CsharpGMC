@@ -1,5 +1,7 @@
 # GMC-Смета №14 — перенос исполнительной документации / ПТО
 
+28.11.2026 ChatGPT/main (base a9f1c79) — AGR-07/08/11 PARTIAL: PTO KS selection captures a stable SQL revision, raw positive work rows (source IDs and quantity format retained) and single-act print snapshot share that revision; recheck after XLSX render before archive attachment. Removed grouped KS-3 read from PTO VOR; single-act export keeps existing opening/ownership guards. VOR template resolution uses selected act only even in a mixed-form group; no change to official KS-3 grouping or finance. One source regression and two offline XLSX roundtrip scenarios added, not run; static review only. Remaining: real SQL two-client changes during selection/read/render, archive failures, Windows XLSX/GUI. No DB, schema, icons or release changes. Scope is snapshot consistency, not a transaction spanning SMB/PTO attachment publication; an edit after the last revision check can still occur.
+
 Срез 21.11.2026 · Python-эталон: python/sql-server-current/smeta/pto/
 Ветка feature/pto-parity от main bac70e0a. Только Microsoft SQL Server (GmcSmetaPilot_* для всех записей и DDL); исторический pto.sqlite3 не открывается.
 

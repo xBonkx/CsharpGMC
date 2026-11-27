@@ -330,21 +330,17 @@ public partial class PtoEditorWindow : Window
         if(chosen is null)return;
         if(_data.Positions.Any(x=>x.SourceActId==chosen.Id))
             throw new InvalidOperationException("ВОР этого акта уже добавлена в комплект.");
-        var rows=await Task.Run(()=>_source.KsWorks(cid,chosen.Id));
-        if(rows.Count==0)throw new InvalidOperationException("В КС нет выполненных объёмов.");
-        // Exact shared KS export logic. No writes to acts, positions, contract or estimate.
+        var snapshot=await Task.Run(()=>_source.ReadKsVor(cid,chosen));
+        var rows=snapshot.Rows;
+        // Exact shared single-act KS export logic. No writes to acts, positions, contract or estimate.
         var folder=Directory.CreateTempSubdirectory("gmc-pto-ks-").FullName;
         var temp=Path.Combine(folder,"vor.xlsx");
         try
         {
             var attachment=await Task.Run(()=>
             {
-                var scope=SqlServerKsContractScope.Read(_connection,cid);
-                var group=KsWorkspaceProjection.Build(scope.Acts)
-                    .FirstOrDefault(g=>g.Acts.Any(a=>a.Id==chosen.Id));
-                if(group is null)throw new InvalidOperationException("Не найдена группа КС исходного акта.");
-                var print=SqlServerKsPrintData.Read(_connection,cid,group.Key);
-                using(var book=KsVorForms.Create(print,chosen.Id))book.SaveAs(temp);
+                using(var book=KsVorForms.Create(snapshot.Print,chosen.Id))book.SaveAs(temp);
+                _source.RequireKsRevision(chosen.Revision);
                 return _archive.AddAttachment(_data,temp,
                     "ВОР по КС № "+chosen.Number+" от "+chosen.Date,"ВОР");
             });

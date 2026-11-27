@@ -18,7 +18,12 @@ public static class KsVorForms
     public static XLWorkbook Create(SqlServerKsPrintData.Package package, long actId)
     {
         var act=package.Report.Acts.Single(a=>a.Id==actId);
-        var form=KsCustomerForms.Resolve(package);
+        // VOR belongs to one act even when opened from a grouped preview.
+        // Another annex's customer form must not select or block this act's template.
+        var form=KsCustomerForms.Resolve(package with
+        {
+            Report=package.Report with { Acts=new[]{act} }
+        });
         var name=form switch
         {
             KsCustomerForms.Form.Dns=>"vor_dns_template.xlsx",

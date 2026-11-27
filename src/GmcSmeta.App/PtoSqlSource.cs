@@ -21,7 +21,7 @@ public sealed class PtoSqlSource
         public override string ToString()=> (Kind=="dop"?"ДС ":"Договор ")+"№"+Number+
             (string.IsNullOrWhiteSpace(Name)?"":" · "+Name);
     }
-    public sealed record KsChoice(long Id,string Number,string Date)
+    public sealed record KsChoice(long Id,string Number,string Date,string Revision)
     {
         public override string ToString()=>"КС № "+Number+" от "+Date;
     }
@@ -85,21 +85,54 @@ public sealed class PtoSqlSource
     public IReadOnlyList<KsChoice> Ks(long contractId)
     {
         using var conn=SqlServerDatabase.Open(_connection);
-        using var cmd=new SqlCommand(
-            "SELECT id,number,CONVERT(nvarchar(80),[date]) FROM dbo.acts "+
-            "WHERE contract_id=@id ORDER BY [date],id",conn);
-        cmd.Parameters.AddWithValue("@id",contractId);
-        var result=new List<KsChoice>();
-        using var r=cmd.ExecuteReader();
-        while(r.Read())
-            result.Add(new KsChoice(SqlInteger.ReadInt64(r, 0),r.IsDBNull(1)?"":r.GetString(1),
-                r.IsDBNull(2)?"":r.GetString(2)));
-        return result;
+        for(var attempt=0;attempt<2;attempt++)
+        {
+            var revision=SqlServerDatabase.Revision(conn);
+            using var cmd=new SqlCommand(
+                "SELECT id,number,CONVERT(nvarchar(80),[date]) FROM dbo.acts "+
+                "WHERE contract_id=@id ORDER BY [date],id",conn);
+            cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=contractId;
+            var result=new List<KsChoice>();
+            using(var r=cmd.ExecuteReader())
+                while(r.Read())
+                    result.Add(new KsChoice(SqlInteger.ReadInt64(r, 0),r.IsDBNull(1)?"":r.GetString(1),
+                        r.IsDBNull(2)?"":r.GetString(2),revision));
+            if(!string.IsNullOrWhiteSpace(revision)&&revision==SqlServerDatabase.Revision(conn))
+                return result;
+        }
+        throw new InvalidOperationException("Список КС изменился. Повторите выбор акта.");
     }
 
-    public IReadOnlyList<PtoWork> KsWorks(long contractId,long actId)
+    /// <summary>Raw positive work quantities and the single-act workbook source
+    /// must describe the same revision. Never substitute a KS-3 group for this act.</summary>
+    public (IReadOnlyList<PtoWork> Rows,SqlServerKsPrintData.Package Print) ReadKsVor(
+        long contractId,KsChoice choice)
     {
         using var conn=SqlServerDatabase.Open(_connection);
+        RequireKsRevision(conn,choice.Revision);
+        var rows=KsWorks(conn,contractId,choice.Id);
+        if(rows.Count==0)
+            throw new InvalidOperationException("В КС нет выполненных объёмов.");
+        var print=SqlServerKsPrintData.ReadSingle(_connection,contractId,choice.Id,choice.Revision);
+        RequireKsRevision(conn,choice.Revision);
+        return (rows,print);
+    }
+
+    // Recheck after rendering, before adding the generated file to the PTO archive.
+    public void RequireKsRevision(string expectedRevision)
+    {
+        using var conn=SqlServerDatabase.Open(_connection);
+        RequireKsRevision(conn,expectedRevision);
+    }
+
+    private static void RequireKsRevision(SqlConnection conn,string expectedRevision)
+    {
+        if(string.IsNullOrWhiteSpace(expectedRevision)||expectedRevision!=SqlServerDatabase.Revision(conn))
+            throw new InvalidOperationException("КС изменились во время подготовки ВОР. Повторите выбор акта.");
+    }
+
+    private static IReadOnlyList<PtoWork> KsWorks(SqlConnection conn,long contractId,long actId)
+    {
         using var check=new SqlCommand(
             "SELECT COUNT_BIG(1) FROM dbo.acts WHERE id=@act AND contract_id=@contract",conn);
         check.Parameters.AddWithValue("@act",actId);

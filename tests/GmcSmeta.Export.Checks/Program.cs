@@ -164,6 +164,39 @@ internal static class Program
                 Roundtrip(book);
             }
 
+            // A VOR uses only the chosen act's own form and lines, even in a
+            // group containing a second annex with a different customer form.
+            var mixed=Fixture("default","Обычный объект",2);
+            var firstAct=mixed.Report.Acts[0];
+            var secondAct=firstAct with {Id=2,ContractId=2,Number="2"};
+            var actsMixed=new[]{firstAct,secondAct};
+            mixed=mixed with
+            {
+                Scope=mixed.Scope with
+                {
+                    Acts=actsMixed,
+                    Documents=mixed.Scope.Documents.Append(mixed.Scope.Documents[0] with {Id=2,Form="dns"}).ToArray()
+                },
+                Report=mixed.Report with {Acts=actsMixed},
+                Lines=mixed.Lines.Concat(mixed.Lines.Select(x=>x with {ActId=2,Name="Только второй акт"})).ToArray()
+            };
+            using(var standardVor=KsVorForms.Create(mixed,1))
+            {
+                var sheet=standardVor.Worksheet(1);
+                Assert(sheet.Cell("A1").GetString().Contains("Ведомость объемов работ №1"),"Wrong standard VOR template");
+                Assert(!sheet.CellsUsed().Any(c=>c.GetString().Contains("Только второй акт")),"Foreign VOR rows");
+                Roundtrip(standardVor);
+            }
+            using(var dnsVor=KsVorForms.Create(mixed,2))
+            {
+                var sheet=dnsVor.Worksheet(1);
+                Assert(sheet.Cell("A1").GetString().Contains("Ведомость выполненных работ №2"),"Wrong DNS VOR template");
+                Assert(sheet.CellsUsed().Any(c=>c.GetString().Contains("Только второй акт")),"Selected VOR rows missing");
+                Assert(!sheet.CellsUsed().Any(c=>c.GetString().Contains("Изделие")),"Foreign VOR rows");
+                Roundtrip(dnsVor);
+            }
+            Console.WriteLine("PASS mixed-form VOR selected-act isolation");
+
             var external=Fixture("default","Днепровский",2);
             try
             {
