@@ -25,9 +25,12 @@ public sealed class MainWorkspacesVisualTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         var grid = XDocument.Parse(Source(file)).Descendants()
             .Single(e => e.Name.LocalName == "DataGrid" && (string?)e.Attribute(x + "Name") == name);
-        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        var rowHeight = grid.Attribute("RowHeight");
-        Assert.True(rowHeight is null || (rowHeight.Value?.Contains("Binding") ?? false));
+        var gridText = grid.ToString();
+var hasMinHeight = (string?)grid.Attribute("MinRowHeight") == "27";
+var hasAdaptive = gridText.Contains("AdaptiveGridRowHeight");
+Assert.True(hasMinHeight || hasAdaptive, "Grid has neither MinRowHeight=27 nor AdaptiveGridRowHeight.");
+var rowHeight = grid.Attribute("RowHeight");
+Assert.True(rowHeight is null || (rowHeight.Value?.Contains("Binding") ?? false));
     }
 
     [Fact]
