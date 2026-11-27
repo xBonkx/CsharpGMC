@@ -75,6 +75,9 @@ public sealed class PtoVisualTests
         var source=Source("PtoVorWindow.cs");
         Assert.Contains("MaxHeight=95",source);
         Assert.Contains("Parsed is null||_confirmed.IsChecked!=true",source);
+        Assert.Contains("await Task.Run(()=>PtoVor.Sheets(_path))",source);
+        Assert.Contains("await Task.Run(()=>PtoVor.Read(_path,sheet,first,cols))",source);
+        Assert.Contains("if(_closed||generation!=_generation)return;",source);
         Assert.Contains("Parsed.Rows.Take(250)",source);
         Assert.Contains("Parsed=null;_confirmed.IsChecked=false;",source);
         Assert.Contains("IsCancel=true",source);

@@ -53,4 +53,18 @@ public sealed class LettersWindowLifecycleTests
         Assert.Contains("AddJson(zip, \"history.json\"", backup);
         Assert.DoesNotContain("ZipFile.Open(zipPath", backup);
     }
+
+    [Fact]
+    public void EditorUsesExclusiveWorkerAndStaForDocumentRendering()
+    {
+        var code = Source("LetterEditorWindow.xaml.cs");
+        Assert.Contains("await Task.Run(() => _archive.Sql.Save(_letter))", code);
+        Assert.Contains("await RunStaAsync(() => _archive.Build(_letter, combine))", code);
+        Assert.Contains("thread.SetApartmentState(ApartmentState.STA)", code);
+        Assert.Contains("FilesGrid.ItemsSource = _letter.Files.ToArray();", code);
+        Assert.Contains("if (_busy) { e.Cancel = true; return; }", code);
+        Assert.Contains("Dispatcher.BeginInvoke(new Action(Close))", code);
+        Assert.Contains("request != _numberRequest", code);
+        Assert.Contains("await Task.Run(() => _archive.Sql.ReadHistory(_letter.Id))", code);
+    }
 }

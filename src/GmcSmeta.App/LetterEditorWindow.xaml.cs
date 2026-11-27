@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -18,7 +20,8 @@ public partial class LetterEditorWindow : Window
     private readonly string _connectionString;
     private readonly LetterDocument _letter;
     private bool _loading;
-    private bool _commitUncertain;
+    private bool _commitUncertain, _busy, _closed, _closeApproved, _revisionConflict;
+    private long _numberRequest;
 
     private void MarkCommitUncertain(LetterCommitUncertainException ex)
     {
@@ -34,10 +37,11 @@ public partial class LetterEditorWindow : Window
         _letter = letter;
         _connectionString = connectionString;
         LoadLetter();
-        PreviewKeyDown += (_, args) =>
+        Closed += (_, _) => { _closed = true; _numberRequest++; };
+        PreviewKeyDown += async (_, args) =>
         {
             if (args.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
-            { TrySave(); args.Handled = true; }
+            { args.Handled = true; await RunAsync(async () => { await TrySaveAsync(); }); }
             if (args.Key == Key.Escape) { Close(); args.Handled = true; }
         };
     }
@@ -69,7 +73,7 @@ public partial class LetterEditorWindow : Window
             BodyBox.IsReadOnly = sent;
             ScanMode.IsEnabled = !sent;
             CompanyButton.IsEnabled = !sent;
-        ObjectButton.IsEnabled = !sent && _letter.ObjectId is null && _letter.ContractId is null;
+            ObjectButton.IsEnabled = !sent && _letter.ObjectId is null && _letter.ContractId is null;
             BuildButton.IsEnabled = SendButton.IsEnabled = !sent;
             if (sent)
             {
@@ -85,15 +89,15 @@ public partial class LetterEditorWindow : Window
     {
         var selected = (FilesGrid.SelectedItem as LetterAttachment)?.Id;
         FilesGrid.ItemsSource = null;
-        FilesGrid.ItemsSource = _letter.Files;
+        FilesGrid.ItemsSource = _letter.Files.ToArray();
         if (selected is not null) FilesGrid.SelectedItem = _letter.Files.FirstOrDefault(x => x.Id == selected);
         ReleasesBox.ItemsSource = null;
         ReleasesBox.ItemsSource = _letter.Releases.Select(x => x.Split('/').Last()).ToArray();
     }
 
-    private bool TrySave()
+    private async Task<bool> TrySaveAsync()
     {
-        if (_commitUncertain) return false;
+        if (_commitUncertain || _revisionConflict) return false;
         try
         {
             if (_letter.Sent is null)
@@ -109,7 +113,7 @@ public partial class LetterEditorWindow : Window
                 _letter.UseScan = ScanMode.IsChecked == true;
                 _letter.Body = LettersPdf.SaveBody(BodyBox.Document);
             }
-            _archive.Sql.Save(_letter);
+            await Task.Run(() => _archive.Sql.Save(_letter));
             _loading = true;
             NumberBox.Text = _letter.Number;
             Title = "Письмо — " + _letter.Number;
@@ -124,6 +128,7 @@ public partial class LetterEditorWindow : Window
         }
         catch (Exception exception)
         {
+            if (exception is DBConcurrencyException) _revisionConflict = true;
             _loading = false;
             MessageBox.Show(this, exception.Message, "Письмо", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
@@ -132,30 +137,37 @@ public partial class LetterEditorWindow : Window
 
     private void Number_Changed(object sender, TextChangedEventArgs e)
     {
-        if (!_loading && _letter.Sent is null) _letter.NumberAuto = false;
+        if (!_loading && _letter.Sent is null) { _numberRequest++; _letter.NumberAuto = false; }
     }
 
     private void Date_LostFocus(object sender, RoutedEventArgs e)
     {
-        if (_letter.Sent is not null || !_letter.NumberAuto || _letter.Date == DateBox.Text.Trim()) return;
+        if (_loading || _busy || _closed || _letter.Sent is not null || !_letter.NumberAuto || _letter.Date == DateBox.Text.Trim()) return;
         AutoNumber_Click(sender, e);
     }
 
-    private void AutoNumber_Click(object sender, RoutedEventArgs e)
+    private async void AutoNumber_Click(object sender, RoutedEventArgs e)
     {
-        if (_letter.Sent is not null) return;
+        if (_loading || _busy || _closed || _letter.Sent is not null || _commitUncertain || _revisionConflict) return;
+        var date = DateBox.Text.Trim();
+        var id = _letter.Id;
+        var request = ++_numberRequest;
         try
         {
-            var value = _archive.Sql.SuggestNumber(DateBox.Text.Trim(), _letter.Id);
+            var value = await Task.Run(() => _archive.Sql.SuggestNumber(date, id));
+            if (_closed || _busy || request != _numberRequest || DateBox.Text.Trim() != date) return;
             _loading = true;
-            NumberBox.Text = value;
-            _letter.NumberAuto = true;
-            _loading = false;
+            try
+            {
+                NumberBox.Text = value;
+                _letter.NumberAuto = true;
+            }
+            finally { _loading = false; }
         }
         catch (Exception ex)
         {
-            _loading = false;
-            MessageBox.Show(this, ex.Message, "Номер по дате", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!_closed && !_busy && request == _numberRequest && DateBox.Text.Trim() == date)
+                MessageBox.Show(this, ex.Message, "Номер по дате", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -186,21 +198,26 @@ public partial class LetterEditorWindow : Window
         return dlg.ShowDialog() == true ? items[list.SelectedIndex] : null;
     }
 
-    private void Company_Click(object sender, RoutedEventArgs e)
+    private async void Company_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (_letter.Sent is not null) return;
         try
         {
-            using var conn = SqlServerDatabase.Open(_connectionString);
-            using var command = new SqlCommand(
-                "SELECT id,name,legal_full,signer_post,signer_name FROM dbo.companies ORDER BY name,id", conn);
-            using var reader = command.ExecuteReader();
-            var values = new List<(int Id, string Name, string Legal, string Position, string Signer)>();
-            while (reader.Read())
-                values.Add((Convert.ToInt32(reader.GetValue(0)), reader.GetString(1),
-                    reader.IsDBNull(2) ? "" : reader.GetString(2),
-                    reader.IsDBNull(3) ? "" : reader.GetString(3),
-                    reader.IsDBNull(4) ? "" : reader.GetString(4)));
+            var values = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(_connectionString);
+                using var command = new SqlCommand(
+                    "SELECT id,name,legal_full,signer_post,signer_name FROM dbo.companies ORDER BY name,id", conn);
+                using var reader = command.ExecuteReader();
+                var rows = new List<(int Id, string Name, string Legal, string Position, string Signer)>();
+                while (reader.Read())
+                    rows.Add((Convert.ToInt32(reader.GetValue(0)), reader.GetString(1),
+                        reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        reader.IsDBNull(3) ? "" : reader.GetString(3),
+                        reader.IsDBNull(4) ? "" : reader.GetString(4)));
+                return rows;
+            });
             var choice = Select(this, "Наши организации", values.Select(v => (v.Id, v.Name)).ToArray());
             if (choice is null) return;
             var co = values.First(v => v.Id == choice.Value.Id);
@@ -208,25 +225,30 @@ public partial class LetterEditorWindow : Window
             SignerBox.Text = string.Join(' ', new[] { co.Position, co.Signer }.Where(s => !string.IsNullOrWhiteSpace(s)));
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Организация"); }
-    }
+    });
 
-    private void Object_Click(object sender, RoutedEventArgs e)
+    private async void Object_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (_letter.Sent is not null || _letter.ObjectId is not null || _letter.ContractId is not null) return;
         try
         {
-            using var conn = SqlServerDatabase.Open(_connectionString);
-            using var cmd = new SqlCommand(
-                "SELECT id,name,customer,customer_full,cust_post,cust_name FROM dbo.objects " +
-                "WHERE archived=0 ORDER BY name,id", conn);
-            using var r = cmd.ExecuteReader();
-            var values = new List<(int Id, string Name, string Customer, string Full, string Post, string Person)>();
-            while (r.Read())
-                values.Add((Convert.ToInt32(r.GetValue(0)), r.GetString(1),
-                    r.IsDBNull(2) ? "" : r.GetString(2),
-                    r.IsDBNull(3) ? "" : r.GetString(3),
-                    r.IsDBNull(4) ? "" : r.GetString(4),
-                    r.IsDBNull(5) ? "" : r.GetString(5)));
+            var values = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(_connectionString);
+                using var cmd = new SqlCommand(
+                    "SELECT id,name,customer,customer_full,cust_post,cust_name FROM dbo.objects " +
+                    "WHERE archived=0 ORDER BY name,id", conn);
+                using var r = cmd.ExecuteReader();
+                var rows = new List<(int Id, string Name, string Customer, string Full, string Post, string Person)>();
+                while (r.Read())
+                    rows.Add((Convert.ToInt32(r.GetValue(0)), r.GetString(1),
+                        r.IsDBNull(2) ? "" : r.GetString(2),
+                        r.IsDBNull(3) ? "" : r.GetString(3),
+                        r.IsDBNull(4) ? "" : r.GetString(4),
+                        r.IsDBNull(5) ? "" : r.GetString(5)));
+                return rows;
+            });
             var choice = Select(this, "Выбрать объект", values.Select(v => (v.Id, v.Name)).ToArray());
             if (choice is null) return;
             var obj = values.First(v => v.Id == choice.Value.Id);
@@ -238,7 +260,7 @@ public partial class LetterEditorWindow : Window
                     obj.Post, obj.Person }.Where(s => !string.IsNullOrWhiteSpace(s)));
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Объект"); }
-    }
+    });
 
     private void Bold_Click(object sender, RoutedEventArgs e) =>
         EditingCommands.ToggleBold.Execute(null, BodyBox);
@@ -260,9 +282,10 @@ public partial class LetterEditorWindow : Window
 
     private LetterAttachment? SelectedFile => FilesGrid.SelectedItem as LetterAttachment;
 
-    private void FileAdd_Click(object sender, RoutedEventArgs e)
+    private async void FileAdd_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
-        if (!TrySave()) return;
+        if (!await TrySaveAsync()) return;
         var kind = (RoleBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Приложение";
         if (_letter.Sent is not null) kind = "Подтверждение отправки";
         var dlg = new OpenFileDialog
@@ -273,76 +296,85 @@ public partial class LetterEditorWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         foreach (var path in dlg.FileNames)
         {
-            try { _archive.AddFile(_letter, path, kind); }
+            try { await RunStaAsync(() => _archive.AddFile(_letter, path, kind)); }
             catch (LetterCommitUncertainException ex) { MarkCommitUncertain(ex); break; }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Вложение"); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Вложение"); if (ex is DBConcurrencyException) { _revisionConflict = true; break; } }
         }
         RefreshFiles();
-    }
+    });
 
-    private void FileOpen_Click(object sender, RoutedEventArgs e)
+    private async void FileOpen_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (SelectedFile is not { } f) return;
-        try { OpenPath(_archive.FilePath(f)); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Вложение"); }
-    }
+        try { OpenPath(await Task.Run(() => _archive.FilePath(f))); }
+        catch (Exception ex) { if (ex is DBConcurrencyException) _revisionConflict = true; MessageBox.Show(this, ex.Message, "Вложение"); }
+    }, allowReadOnly: true);
 
-    private void FileRename_Click(object sender, RoutedEventArgs e)
+    private async void FileRename_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (_letter.Sent is not null || SelectedFile is not { } file) return;
         var dialog = new PromptDialog("Название файла", "Название в письме и выдаче", file.Title) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value.Length == 0) return;
         var before = file.Title;
         file.Title = dialog.Value;
-        if (!TrySave()) file.Title = before;
+        if (!await TrySaveAsync()) file.Title = before;
         RefreshFiles();
-    }
+    });
 
-    private void FileToggle_Click(object sender, RoutedEventArgs e)
+    private async void FileToggle_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (_letter.Sent is not null || SelectedFile is not { } file) return;
         file.Included = !file.Included;
-        if (!TrySave()) file.Included = !file.Included;
+        if (!await TrySaveAsync()) file.Included = !file.Included;
         RefreshFiles();
-    }
+    });
 
-    private void FileUp_Click(object sender, RoutedEventArgs e) => Move(-1);
-    private void FileDown_Click(object sender, RoutedEventArgs e) => Move(1);
-    private void Move(int offset)
+    private async void FileUp_Click(object sender, RoutedEventArgs e) => await MoveAsync(-1);
+    private async void FileDown_Click(object sender, RoutedEventArgs e) => await MoveAsync(1);
+    private Task MoveAsync(int offset)
+    => RunAsync(async () =>
     {
         var i = FilesGrid.SelectedIndex;
         var j = i + offset;
         if (_letter.Sent is not null || i < 0 || j < 0 || j >= _letter.Files.Count) return;
         (_letter.Files[i], _letter.Files[j]) = (_letter.Files[j], _letter.Files[i]);
-        if (!TrySave()) (_letter.Files[i], _letter.Files[j]) = (_letter.Files[j], _letter.Files[i]);
+        var saved = await TrySaveAsync();
+        if (!saved) (_letter.Files[i], _letter.Files[j]) = (_letter.Files[j], _letter.Files[i]);
         RefreshFiles();
-        FilesGrid.SelectedIndex = j;
-    }
+        FilesGrid.SelectedIndex = saved ? j : i;
+    });
 
-    private void Releases_DoubleClick(object sender, MouseButtonEventArgs e)
+    private async void Releases_DoubleClick(object sender, MouseButtonEventArgs e)
+    => await RunAsync(async () =>
     {
         var index = ReleasesBox.SelectedIndex;
         if (index < 0 || index >= _letter.Releases.Count) return;
-        try { OpenPath(_archive.ReleasePath(_letter.Releases[index])); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Архивный выпуск"); }
-    }
+        var relative = _letter.Releases[index];
+        try { OpenPath(await Task.Run(() => _archive.ReleasePath(relative))); }
+        catch (Exception ex) { if (ex is DBConcurrencyException) _revisionConflict = true; MessageBox.Show(this, ex.Message, "Архивный выпуск"); }
+    }, allowReadOnly: true);
 
-    private void Save_Click(object sender, RoutedEventArgs e) => TrySave();
+    private async void Save_Click(object sender, RoutedEventArgs e) => await RunAsync(async () => { await TrySaveAsync(); });
 
-    private void Preview_Click(object sender, RoutedEventArgs e)
+    private async void Preview_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
-        if (!TrySave()) return;
-        try { OpenPath(_archive.Preview(_letter)); }
+        if (!await TrySaveAsync()) return;
+        try { OpenPath(await RunStaAsync(() => _archive.Preview(_letter))); }
         catch (LetterCommitUncertainException ex) { MarkCommitUncertain(ex); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Предпросмотр PDF"); }
-    }
+        catch (Exception ex) { if (ex is DBConcurrencyException) _revisionConflict = true; MessageBox.Show(this, ex.Message, "Предпросмотр PDF"); }
+    });
 
-    private string? Build()
+    private async Task<string?> BuildAsync()
     {
-        if (!TrySave()) return null;
+        if (!await TrySaveAsync()) return null;
         try
         {
-            var folder = _archive.Build(_letter, CombineBox.IsChecked == true);
+            var combine = CombineBox.IsChecked == true;
+            var folder = await RunStaAsync(() => _archive.Build(_letter, combine));
             RefreshFiles();
             OpenPath(folder);
             return _letter.Releases.Last();
@@ -354,18 +386,20 @@ public partial class LetterEditorWindow : Window
         }
         catch (Exception ex)
         {
+            if (ex is DBConcurrencyException) _revisionConflict = true;
             MessageBox.Show(this, ex.Message, "Собрать выдачу");
             return null;
         }
     }
 
-    private void Build_Click(object sender, RoutedEventArgs e) => Build();
+    private async void Build_Click(object sender, RoutedEventArgs e) => await RunAsync(async () => { await BuildAsync(); });
 
-    private void Sent_Click(object sender, RoutedEventArgs e)
+    private async void Sent_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         if (_letter.Sent is not null) return;
         // A fresh immutable release prevents sending a stale snapshot.
-        var release = Build();
+        var release = await BuildAsync();
         if (release is null) return;
         var dialog = new Window
         {
@@ -393,20 +427,23 @@ public partial class LetterEditorWindow : Window
         if (dialog.ShowDialog() != true) return;
         try
         {
-            _archive.Sql.MarkSent(_letter, date.Text.Trim(),
-                channel.SelectedItem?.ToString() ?? "", destination.Text.Trim(), release);
+            var sentDate = date.Text.Trim();
+            var sentChannel = channel.SelectedItem?.ToString() ?? "";
+            var sentDestination = destination.Text.Trim();
+            await Task.Run(() => _archive.Sql.MarkSent(_letter, sentDate, sentChannel, sentDestination, release));
             LoadLetter();
         }
         catch (LetterCommitUncertainException ex) { MarkCommitUncertain(ex); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Учёт отправки"); }
-    }
+        catch (Exception ex) { if (ex is DBConcurrencyException) _revisionConflict = true; MessageBox.Show(this, ex.Message, "Учёт отправки"); }
+    });
 
 
-    private void History_Click(object sender, RoutedEventArgs e)
+    private async void History_Click(object sender, RoutedEventArgs e)
+    => await RunAsync(async () =>
     {
         try
         {
-            var history = _archive.Sql.ReadHistory(_letter.Id);
+            var history = await Task.Run(() => _archive.Sql.ReadHistory(_letter.Id));
             var dialog = new Window
             {
                 Owner = this, Title = "История изменений — " + _letter.Number,
@@ -459,12 +496,69 @@ public partial class LetterEditorWindow : Window
         {
             MessageBox.Show(this, ex.Message, "История писем", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-    }
+    }, allowReadOnly: true);
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void Editor_Closing(object? sender, CancelEventArgs e)
+    private async void Editor_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_commitUncertain && !TrySave()) e.Cancel = true;
+        if (_busy) { e.Cancel = true; return; }
+        if (_closeApproved) return;
+        e.Cancel = true;
+        if (_commitUncertain || _revisionConflict)
+        {
+            if (MessageBox.Show(this, "Закрыть без повторной записи? Проверьте историю письма.",
+                "Письмо", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        }
+        else
+        {
+            var saved = false;
+            await RunAsync(async () => { saved = await TrySaveAsync(); });
+            if (!saved) return;
+        }
+        _closeApproved = true;
+        Dispatcher.BeginInvoke(new Action(Close));
+    }
+
+    private async Task RunAsync(Func<Task> action, bool allowReadOnly = false)
+    {
+        if (_busy || _closed) return;
+        if (!allowReadOnly && (_commitUncertain || _revisionConflict))
+        {
+            MessageBox.Show(this, "Запись заблокирована. Откройте письмо заново после проверки истории.", "Письмо");
+            return;
+        }
+        _numberRequest++;
+        _busy = true;
+        LetterTabs.IsEnabled = EditorActions.IsEnabled = false;
+        try { await action(); }
+        catch (LetterCommitUncertainException ex) { MarkCommitUncertain(ex); }
+        catch (DBConcurrencyException ex)
+        {
+            _revisionConflict = true;
+            MessageBox.Show(this, ex.Message, "Письмо", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Письмо", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        finally
+        {
+            _busy = false;
+            if (!_closed) LetterTabs.IsEnabled = EditorActions.IsEnabled = true;
+        }
+    }
+
+    // PDF rendering and image decoding construct WPF objects on a private
+    // STA thread. The live RichTextBox document is never passed to it.
+    private static Task<T> RunStaAsync<T>(Func<T> work)
+    {
+        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try { completion.SetResult(work()); }
+            catch (Exception ex) { completion.SetException(ex); }
+            finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+        }) { IsBackground = true };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
     }
 }

@@ -8,6 +8,10 @@ namespace GmcSmeta.App;
 public sealed class PtoVorWindow : Window
 {
     private readonly string _path;
+    private bool _busy, _closed;
+    private long _generation;
+    private Button _parse = null!, _accept = null!;
+    private Panel _mapping = null!;
     private readonly ComboBox _sheets=new(){Margin=new Thickness(0,2,9,0),MinWidth=130};
     private readonly TextBox _first=new(){Text="2",Width=65,Margin=new Thickness(0,2,8,0)};
     private readonly TextBox _name=new(){Text="2",Width=65,Margin=new Thickness(0,2,8,0)};
@@ -51,6 +55,7 @@ public sealed class PtoVorWindow : Window
             Margin=new Thickness(0,0,0,7)});
         var grid=new WrapPanel{Margin=new Thickness(0,0,0,8)};
         controls.Children.Add(grid);
+        _mapping=grid;
         void Add(string title,Control field)
         {
             var s=new StackPanel{Margin=new Thickness(0,0,14,3)};
@@ -65,7 +70,8 @@ public sealed class PtoVorWindow : Window
         var parse=new Button{Content="Просмотр строк",Padding=new Thickness(12,7,12,7),
             Margin=new Thickness(0,0,8,0)};
         parse.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
-        parse.Click+=(_,_)=>Parse();actions.Children.Add(parse);
+        _parse=parse;
+        parse.Click+=async (_,_)=>await ParseAsync();actions.Children.Add(parse);
         var warningScroll=new ScrollViewer{MaxHeight=95,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=_warnings};
         controls.Children.Add(warningScroll);
@@ -74,10 +80,11 @@ public sealed class PtoVorWindow : Window
         var accept=new Button{Content="Перенести проверенные строки",HorizontalAlignment=HorizontalAlignment.Right,
             Padding=new Thickness(12,8,12,8)};
         accept.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarPrimary");
+        _accept=accept;
         // Python uses text-only verification and dialog actions.
         accept.Click+=(_,_)=>
         {
-            if(Parsed is null||_confirmed.IsChecked!=true)
+            if(_busy||Parsed is null||_confirmed.IsChecked!=true)
             {
                 MessageBox.Show(this,"Сначала просмотрите строки и подтвердите сопоставление.","ВОР");
                 return;
@@ -91,14 +98,37 @@ public sealed class PtoVorWindow : Window
         footer.Children.Add(accept);footer.Children.Add(cancel);bottom.Children.Add(footer);
         dock.Children.Add(_preview);
         Content=dock;
-        _sheets.ItemsSource=PtoVor.Sheets(path);
-        _sheets.SelectedIndex=0;
+        SetBusy(true);
+        Closed+=(_,_)=>{_closed=true;_generation++;};
+        Loaded+=LoadSheetsAsync;
         foreach(var edit in new[]{_first,_name,_qty,_unit,_system})
             edit.TextChanged+=(_,_)=>Invalid();
         _sheets.SelectionChanged+=(_,_)=>Invalid();
     }
+    private async void LoadSheetsAsync(object sender,RoutedEventArgs e)
+    {
+        Loaded-=LoadSheetsAsync;
+        try
+        {
+            var sheets=await Task.Run(()=>PtoVor.Sheets(_path));
+            if(_closed)return;
+            _sheets.ItemsSource=sheets;
+            _sheets.SelectedIndex=0;
+        }
+        catch(Exception ex)
+        {
+            if(!_closed)MessageBox.Show(this,ex.Message,"Листы Excel",MessageBoxButton.OK,MessageBoxImage.Warning);
+        }
+        finally {if(!_closed)SetBusy(false);}
+    }
+    private void SetBusy(bool value)
+    {
+        _busy=value;
+        _mapping.IsEnabled=_parse.IsEnabled=_accept.IsEnabled=_confirmed.IsEnabled=!value;
+    }
     private void Invalid()
     {
+        _generation++;
         Parsed=null;_confirmed.IsChecked=false;
         _preview.ItemsSource=null;
         _warnings.Text="Проверьте сопоставление и нажмите «Просмотр строк».";
@@ -111,15 +141,22 @@ public sealed class PtoVorWindow : Window
             throw new ArgumentException("Неверный номер колонки «"+label+"».");
         return result;
     }
-    private void Parse()
+    private async Task ParseAsync()
     {
+        if(_busy||_closed)return;
+        Invalid();
         try
         {
             if(!int.TryParse(_first.Text.Trim(),out var first)||first<1)
                 throw new ArgumentException("Первая строка должна быть положительным числом.");
             var cols=new PtoVor.Columns(Column(_name,"Имя"),Column(_qty,"Объём"),
                 Column(_unit,"Ед."),Column(_system,"Система"));
-            Parsed=PtoVor.Read(_path,_sheets.SelectedItem?.ToString()??"",first,cols);
+            var sheet=_sheets.SelectedItem?.ToString()??"";
+            var generation=_generation;
+            SetBusy(true);
+            var result=await Task.Run(()=>PtoVor.Read(_path,sheet,first,cols));
+            if(_closed||generation!=_generation)return;
+            Parsed=result;
             _preview.ItemsSource=Parsed.Rows.Take(250).ToArray();
             _warnings.Text="Найдено строк: "+Parsed.Rows.Count+
                 ". Предпросмотр первых 250. Предупреждений: "+Parsed.Warnings.Count+"\n"+
@@ -128,8 +165,12 @@ public sealed class PtoVorWindow : Window
         }
         catch(Exception ex)
         {
-            Invalid();
-            MessageBox.Show(this,ex.Message,"Проверка ВОР",MessageBoxButton.OK,MessageBoxImage.Warning);
+            if(!_closed)
+            {
+                Invalid();
+                MessageBox.Show(this,ex.Message,"Проверка ВОР",MessageBoxButton.OK,MessageBoxImage.Warning);
+            }
         }
+        finally {if(!_closed)SetBusy(false);}
     }
 }
