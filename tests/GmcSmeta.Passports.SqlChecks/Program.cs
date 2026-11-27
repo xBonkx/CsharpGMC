@@ -114,6 +114,7 @@ internal static class Program
             var exportRevision=sql.Get(1,p1.Id).Revision;
             Expect<System.Data.DBConcurrencyException>(()=>sql.RegisterExport(1,export,exportRevision-1));
             Check(sql.Exports(1,p1.Id).Count==0,"Stale PDF export must not be registered");
+            Check(!sql.HasAnyExports(),"Empty archive before first registered PDF");
             sql.RegisterExport(1,export,exportRevision);
             var unchanged=sql.Get(1,p1.Id);
             sql.Save(unchanged);
@@ -121,6 +122,10 @@ internal static class Program
             Check(sql.Exports(1,p1.Id).Count==1 && sql.Exports(2,p1.Id).Count==0,"PDF registry object scope");
             sql.Delete(1,duplicate.Id,duplicate.Revision);
             Check(sql.List(1).All(p=>p.Id!=duplicate.Id),"Delete + revision");
+            Check(sql.HasAnyExports(),"Global archive guard sees a PDF even from another object");
+            sql.Delete(1,p1.Id,exportRevision);
+            Check(sql.List(1).All(p=>p.Id!=p1.Id) && sql.HasAnyExports(),
+                "Deleted passport retains registered PDF; global archive guard remains active");
             Console.WriteLine($"PASSPORTS REAL SQL CHECKS PASSED: {checks}/{checks}");
             return 0;
         }

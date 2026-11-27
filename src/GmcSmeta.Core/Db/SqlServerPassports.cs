@@ -346,6 +346,15 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         }
     }
 
+    /// <summary>The archive root is global; deleted passports retain registered PDFs.</summary>
+    public bool HasAnyExports()
+    {
+        using var conn = Open();
+        using var cmd = new SqlCommand(
+            "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.gmc_passport_exports) THEN 1 ELSE 0 END", conn);
+        return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+    }
+
     public IReadOnlyList<ExportInfo> Exports(long objectId, Guid passportId)
     {
         using var conn = Open();

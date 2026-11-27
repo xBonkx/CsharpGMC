@@ -16,12 +16,13 @@ namespace GmcSmeta.App;
 
 public partial class PassportsWindow : Window
 {
-    private readonly SqlServerPassports _sql;
+    private SqlServerPassports _sql = null!;
+    private readonly string _connectionString;
+    private bool _ready, _busy, _closed, _exportUncertain;
     private readonly long _objectId;
     private readonly string _objectName;
     private readonly string _objectAddress;
-    private readonly List<VentPassport> _rows;
-    private readonly ObservableCollection<PassportListRow> _summaries = new();
+    private readonly List<VentPassport> _rows = new();
     private ObservableCollection<VentParameterRow> _parameters = new();
     private ObservableCollection<VentFlowPoint> _points = new();
     private List<VentEquipment> _equipment = VentPassports.NewEquipment();
@@ -57,25 +58,19 @@ public partial class PassportsWindow : Window
         _objectId = objectId;
         _objectName = objectName;
         _objectAddress = address;
-        _sql = new SqlServerPassports(connectionString);
-        _rows = _sql.List(objectId).ToList();
+        _connectionString = connectionString;
         Title = "Паспорта вентиляции · " + objectName;
-        _root = LoadRoot();
-        ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + _root;
-        PassportList.ItemsSource = _summaries;
+        ArchiveLabel.Text = "Подключение к SQL Server…";
         SectionCombo.ItemsSource = VentPassports.Sections
             .Select((section, i) => $"Е.1.{i + 1} · {section.Title}").ToArray();
         SectionCombo.SelectedIndex = 0;
-        RefreshCatalogue();
-        RefreshList();
-        _loading = false;
-        if (_rows.Count == 0) AddNew();
-        else PassportList.SelectedIndex = 0;
+        SetControls();
+        Loaded += InitializeAsync;
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                SaveCurrent();
+                if (_ready && !_busy) SaveCurrent();
                 e.Handled = true;
             }
             else if (e.Key == Key.Escape)
@@ -84,6 +79,59 @@ public partial class PassportsWindow : Window
                 e.Handled = true;
             }
         };
+    }
+
+    private async void InitializeAsync(object sender, RoutedEventArgs e)
+    {
+        Loaded -= InitializeAsync;
+        // Initial read may be abandoned by closing the window. No passport is
+        // created until the live UI has received the successful result.
+        try
+        {
+            var data = await Task.Run(() =>
+            {
+                var sql = new SqlServerPassports(_connectionString);
+                return (Sql: sql, Rows: sql.List(_objectId), Catalogue: sql.Catalogue(), Root: LoadRoot());
+            });
+            if (_closed) return;
+            _sql = data.Sql;
+            _root = data.Root;
+            _rows.AddRange(data.Rows);
+            SetCatalogue(data.Catalogue);
+            RefreshList();
+            _loading = false;
+            _ready = true;
+            SetControls();
+            ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + _root;
+            if (_rows.Count == 0) AddNew();
+            else PassportList.SelectedIndex = 0;
+        }
+        catch (Exception ex)
+        {
+            if (_closed) return;
+            _ready = false;
+            SetControls();
+            ArchiveLabel.Text = "Не удалось загрузить паспорта. Откройте окно заново: " + ex.Message;
+        }
+    }
+
+    private void SetControls()
+    {
+        HeaderActions.IsEnabled = WorkspaceGrid.IsEnabled = _ready && !_busy;
+        SaveButton.IsEnabled = _ready && !_busy;
+        ExportSelectedButton.IsEnabled = ExportAllButton.IsEnabled = _ready && !_busy && !_exportUncertain;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        SetControls();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        base.OnClosed(e);
     }
 
     private static string LoadRoot()
@@ -104,9 +152,11 @@ public partial class PassportsWindow : Window
             "GMC-Smeta-Next", "Passports");
     }
 
-    private void RefreshCatalogue()
+    private void RefreshCatalogue() => SetCatalogue(_sql.Catalogue());
+
+    private void SetCatalogue(IReadOnlyList<VentEquipmentTemplate> catalogue)
     {
-        _catalogue = _sql.Catalogue().ToList();
+        _catalogue = catalogue.ToList();
         var selected = CatalogueBox.SelectedItem as string;
         CatalogueBox.ItemsSource = _catalogue.Select(x => x.Key).ToArray();
         if (selected is not null) CatalogueBox.SelectedItem = selected;
@@ -114,29 +164,34 @@ public partial class PassportsWindow : Window
 
     private void RefreshList()
     {
+        var wasLoading = _loading;
         _loading = true;
-        var selectedId = _current >= 0 && _current < _rows.Count ? _rows[_current].Id : Guid.Empty;
-        _summaries.Clear();
-        foreach (var p in _rows)
+        try
         {
-            bool done;
-            try { done = !VentPassports.IsDraft(p); }
-            catch (ArgumentException) { done = false; }
-            _summaries.Add(new PassportListRow
+            var selectedId = _current >= 0 && _current < _rows.Count ? _rows[_current].Id : Guid.Empty;
+            var summaries = new List<PassportListRow>(_rows.Count);
+            foreach (var p in _rows)
             {
-                Id = p.Id, System = p.System,
-                Purpose = string.IsNullOrWhiteSpace(p.Purpose)
-                    ? VentPassports.DetectPurpose(p.System) : p.Purpose,
-                PointsCount = p.Points.Count,
-                MeasurementStatus = done ? "Заполнены" : "Не заполнены"
-            });
+                bool done;
+                try { done = !VentPassports.IsDraft(p); }
+                catch (ArgumentException) { done = false; }
+                summaries.Add(new PassportListRow
+                {
+                    Id = p.Id, System = p.System,
+                    Purpose = string.IsNullOrWhiteSpace(p.Purpose)
+                        ? VentPassports.DetectPurpose(p.System) : p.Purpose,
+                    PointsCount = p.Points.Count,
+                    MeasurementStatus = done ? "Заполнены" : "Не заполнены"
+                });
+            }
+            PassportList.ItemsSource = summaries;
+            if (selectedId != Guid.Empty)
+            {
+                var index = summaries.FindIndex(x => x.Id == selectedId);
+                if (index >= 0) PassportList.SelectedIndex = index;
+            }
         }
-        if (selectedId != Guid.Empty)
-        {
-            var index = _summaries.ToList().FindIndex(x => x.Id == selectedId);
-            if (index >= 0) PassportList.SelectedIndex = index;
-        }
-        _loading = false;
+        finally { _loading = wasLoading; }
     }
 
     private void LoadPassport(int index)
@@ -165,7 +220,7 @@ public partial class PassportsWindow : Window
             PointsGrid.ItemsSource = _points;
             _sectionIndex = Math.Max(0, SectionCombo.SelectedIndex);
             ShowSection();
-            UpdateTotals();
+            if (_sectionIndex != 0) UpdateTotals();
             EditorTabs.IsEnabled = true;
         }
         finally { _loading = false; }
@@ -257,7 +312,7 @@ public partial class PassportsWindow : Window
 
     private void PassportList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_loading || PassportList.SelectedItem is not PassportListRow row) return;
+        if (!_ready || _busy || _loading || PassportList.SelectedItem is not PassportListRow row) return;
         var next = _rows.FindIndex(x => x.Id == row.Id);
         if (next < 0 || next == _current) return;
         var previous = _current;
@@ -497,26 +552,34 @@ public partial class PassportsWindow : Window
         UpdateTotals();
     }
 
-    private void Root_Click(object sender, RoutedEventArgs e)
+    private async void Root_Click(object sender, RoutedEventArgs e)
     {
-        if (!SaveCurrent()) return;
+        if (!_ready || _busy || !SaveCurrent()) return;
         var dlg = new OpenFolderDialog { Title = "Общий каталог PDF паспортов" };
         if (dlg.ShowDialog(this) != true) return;
         var root = Path.GetFullPath(dlg.FolderName);
+        var previousRoot = _root;
+        SetBusy(true);
         try
         {
-            if (!string.Equals(root, _root, StringComparison.OrdinalIgnoreCase) &&
-                _rows.Any(p => _sql.Exports(_objectId, p.Id).Count > 0))
-                throw new InvalidOperationException(
-                    "Экспортированные PDF уже привязаны к предыдущему архиву. " +
-                    "Переключение каталога без согласованного переноса файлов запрещено.");
-            Directory.CreateDirectory(root);
-            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new { root }));
+            await Task.Run(() =>
+            {
+                // Root is a global user setting, not a per-object setting.
+                // Include exports of deleted passports and other objects.
+                if (!string.Equals(root, previousRoot, StringComparison.OrdinalIgnoreCase) &&
+                    _sql.HasAnyExports())
+                    throw new InvalidOperationException(
+                        "Экспортированные PDF уже привязаны к предыдущему архиву. " +
+                        "Переключение каталога без согласованного переноса файлов запрещено.");
+                Directory.CreateDirectory(root);
+                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+                File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new { root }));
+            });
             _root = root;
             ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + root;
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Архив паспортов"); }
+        finally { SetBusy(false); }
     }
 
     private static void OpenPath(string path)
@@ -524,12 +587,15 @@ public partial class PassportsWindow : Window
         Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
 
-    private void History_Click(object sender, RoutedEventArgs e)
+    private async void History_Click(object sender, RoutedEventArgs e)
     {
-        if (_current < 0) return;
+        if (!_ready || _busy || _current < 0) return;
+        var id = _rows[_current].Id;
+        var root = _root;
+        SetBusy(true);
         try
         {
-            var entries = _sql.Exports(_objectId, _rows[_current].Id);
+            var entries = await Task.Run(() => _sql.Exports(_objectId, id));
             if (entries.Count == 0)
             {
                 MessageBox.Show(this, "Ранее созданных PDF для паспорта нет.", "Архив");
@@ -547,32 +613,51 @@ public partial class PassportsWindow : Window
                 Margin = new Thickness(12)
             };
             picker.Content = list;
-            list.MouseDoubleClick += (_, _) =>
+            bool opening = false, pickerClosed = false;
+            picker.Closed += (_, _) => pickerClosed = true;
+            list.MouseDoubleClick += async (_, _) =>
             {
-                if (list.SelectedIndex < 0) return;
+                if (opening || pickerClosed || list.SelectedIndex < 0) return;
                 var selected = entries[list.SelectedIndex];
-                var file = PdfFilePath(selected.RelativePath);
-                using (var stream = File.OpenRead(file))
+                opening = true;
+                list.IsEnabled = false;
+                try
                 {
-                    var digest = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-                    if (!digest.Equals(selected.Sha256, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("Контрольная сумма архивного PDF не совпадает.");
+                    var file = await Task.Run(() =>
+                    {
+                        var path = PdfFilePath(root, selected.RelativePath);
+                        using var stream = File.OpenRead(path);
+                        var digest = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+                        if (!digest.Equals(selected.Sha256, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException("Контрольная сумма архивного PDF не совпадает.");
+                        return path;
+                    });
+                    if (!pickerClosed) OpenPath(file);
                 }
-                OpenPath(file);
+                catch (Exception ex)
+                {
+                    if (!pickerClosed) MessageBox.Show(picker, ex.Message, "Архив паспортов");
+                }
+                finally
+                {
+                    opening = false;
+                    if (!pickerClosed) list.IsEnabled = true;
+                }
             };
             picker.ShowDialog();
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "Архив паспортов"); }
+        finally { SetBusy(false); }
     }
 
-    private string PdfFilePath(string relative)
+    private static string PdfFilePath(string root, string relative)
     {
         var parts = relative.Split('/');
         if (parts.Length < 3 || parts[0] != "passports" ||
             parts.Any(x => x is "" or "." or "..") || relative.Contains('\\') ||
             relative.Contains(':') || Path.IsPathRooted(relative))
             throw new InvalidDataException("Недопустимый путь архива паспортов.");
-        var basePath = Path.GetFullPath(_root).TrimEnd(Path.DirectorySeparatorChar);
+        var basePath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
         var path = Path.GetFullPath(Path.Combine(basePath,
             relative.Replace('/', Path.DirectorySeparatorChar)));
         if (!path.StartsWith(basePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
@@ -580,27 +665,52 @@ public partial class PassportsWindow : Window
         return path;
     }
 
-    private void Export(IReadOnlyList<VentPassport> selected)
+    private async Task ExportAsync(IReadOnlyList<VentPassport> selected)
     {
+        if (!_ready || _busy || _exportUncertain) return;
         if (selected.Count == 0) { MessageBox.Show(this, "Выберите паспорта.", "PDF"); return; }
         if (!SaveCurrent()) return;
+        var root = _root;
+        SetBusy(true);
+        try
+        {
+            // The editor is disabled until all rendering and registrations finish.
+            var result = await Task.Run(() => ExportCore(selected, root));
+            _exportUncertain = result.Uncertain;
+            MessageBox.Show(this, $"Создано PDF: {result.Count}" +
+                (result.Errors.Count == 0 ? "" : "\n" + string.Join("\n", result.Errors)) +
+                (result.Uncertain ? "\nПовторный экспорт заблокирован. Сверьте архив и SQL перед повторным открытием." : ""),
+                "Паспорта — экспорт", MessageBoxButton.OK,
+                result.Errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Паспорта — экспорт"); }
+        finally { SetBusy(false); }
+    }
+
+    private (int Count, List<string> Errors, bool Uncertain) ExportCore(
+        IReadOnlyList<VentPassport> selected, string root)
+    {
         var errors = new List<string>();
         var count = 0;
+        var uncertain = false;
         foreach (var p in selected)
         {
             try
             {
-                // Save each individual passport before export, including newly edited fields.
+                // The selected passport snapshot is guarded by expected revision
+                // when the generated PDF is registered.
                 var result = VentPassportPdf.Create(p);
                 var relative = $"passports/{_objectId}/{Sanitize(p.System)}-{p.Id:N}-{DateTime.UtcNow:yyyyMMddHHmmssfffffff}-{Guid.NewGuid():N}.pdf";
-                var path = PdfFilePath(relative);
+                var path = PdfFilePath(root, relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 var temp = path + ".tmp-" + Guid.NewGuid().ToString("N");
                 var published = false;
+                var ownsTemporary = false;
                 try
                 {
                     using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     {
+                        ownsTemporary = true;
                         fs.Write(result.Bytes);
                         fs.Flush(true);
                     }
@@ -620,19 +730,24 @@ public partial class PassportsWindow : Window
                     if (published && File.Exists(path)) File.Delete(path);
                     throw;
                 }
-                finally { if (File.Exists(temp)) File.Delete(temp); }
+                finally
+                {
+                    if (ownsTemporary)
+                    {
+                        try { File.Delete(temp); }
+                        catch { /* Do not hide the registration outcome. */ }
+                    }
+                }
             }
             catch (PassportExportCommitUncertainException ex)
             {
                 errors.Add(p.System + ": " + ex.Message);
+                uncertain = true;
                 break; // do not continue the batch after an unknown registration
             }
             catch (Exception ex) { errors.Add(p.System + ": " + ex.Message); }
         }
-        MessageBox.Show(this, $"Создано PDF: {count}" +
-            (errors.Count == 0 ? "" : "\n" + string.Join("\n", errors)),
-            "Паспорта — экспорт", MessageBoxButton.OK,
-            errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        return (count, errors, uncertain);
     }
 
     private static string Sanitize(string value)
@@ -644,19 +759,23 @@ public partial class PassportsWindow : Window
         return safe.Length > 0 ? safe : "Без обозначения";
     }
 
-    private void ExportSelected_Click(object sender, RoutedEventArgs e)
+    private async void ExportSelected_Click(object sender, RoutedEventArgs e)
     {
         var selected = PassportList.SelectedItems.OfType<PassportListRow>().Select(x => x.Id).ToHashSet();
         if (selected.Count == 0 && _current >= 0) selected.Add(_rows[_current].Id);
-        Export(_rows.Where(x => selected.Contains(x.Id)).ToArray());
+        await ExportAsync(_rows.Where(x => selected.Contains(x.Id)).ToArray());
     }
 
-    private void ExportAll_Click(object sender, RoutedEventArgs e) => Export(_rows.ToArray());
-    private void Save_Click(object sender, RoutedEventArgs e) => SaveCurrent();
+    private async void ExportAll_Click(object sender, RoutedEventArgs e) => await ExportAsync(_rows.ToArray());
+    private void Save_Click(object sender, RoutedEventArgs e)
+    {
+        if (_ready && !_busy) SaveCurrent();
+    }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (!SaveCurrent()) e.Cancel = true;
+        if (_busy) { e.Cancel = true; return; }
+        if (_ready && !SaveCurrent()) e.Cancel = true;
     }
 }
