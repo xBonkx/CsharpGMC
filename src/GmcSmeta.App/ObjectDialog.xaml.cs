@@ -8,12 +8,13 @@ public partial class ObjectDialog : Window
 {
     public ObjectProperties? Values { get; private set; }
     public ObjectDialog(IReadOnlyList<ObjectTag> tags, ObjectProperties? properties = null,
-        AgreementPresentation.Requisites? agreement = null)
+        AgreementPresentation.Requisites? agreement = null, NavigationMode mode = NavigationMode.Contracts)
     {
         InitializeComponent();
-        Heading.Text = properties is null ? "Новый договор" : "Свойства карточки";
+        Heading.Text = properties is null ? NavigationModeCaptions.For(mode).Create : "Свойства карточки";
         Title = Heading.Text;
-        AgreementInfoText.Text = agreement is not null ? agreement.Heading + " · реквизиты из приложений (только просмотр)" :
+        AgreementInfoText.Text = mode == NavigationMode.Kp ? "Укажите общие сведения группы КП. Смету можно добавить после создания карточки." :
+            agreement is not null ? agreement.Heading + " · реквизиты из приложений (только просмотр)" :
             "Номер, дата договора и подрядчик пока задаются в приложениях; общие реквизиты карточки — ниже.";
         var value = properties ?? new ObjectProperties("");
         NameInput.Text = value.Name; CustomerInput.Text = value.Customer; AddressInput.Text = value.Address;

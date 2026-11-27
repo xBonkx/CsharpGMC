@@ -36,7 +36,7 @@ public partial class MainWindow
         var agreement = id is int groupId
             ? AgreementPresentation.Resolve(Workspace.ReadObjectDocumentMetadata(_serverConn, groupId)) : null;
         var dialog = new ObjectDialog(
-            SqlServerWorkspace.ObjectTags(_serverConn, previous?.Form ?? ""), previous, agreement)
+            SqlServerWorkspace.ObjectTags(_serverConn, previous?.Form ?? ""), previous, agreement, CurrentMode)
             { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Values is not { } values) return;
 

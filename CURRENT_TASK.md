@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — AGR-02: подписи режима КП/договоров
+
+27.11.2026 ChatGPT/main (base 11cfe3d) — AGR-02 PARTIAL, owner screenshot v1.0.6: KP tab incorrectly used static «Новый договор» captions. Mode-specific captions on sidebar and empty page, search/accessibility, context menu, ObjectDialog heading/help; updated through RefreshNavigation (startup/restoration, manual and programmatic mode switches). Existing group creation, empty-card membership, document creation commands, schema and icons unchanged. Added 3 mode theory cases and source assertions; not run. Windows smoke check outstanding.
+
 ## 27.11.2026 — отложенная инициатива, не смена текущего приоритета
 
 27.11.2026 — P2 / NOT STARTED: [единый справочник контрагентов](docs/COUNTERPARTIES_TODO_20261127.md), CTR-01…08. Запрос владельца: несрочное улучшение, текущий релиз не блокирует. Сначала аудит AGR/SQL и согласование отдельной модели, затем справочник → договор/КП/КС → закупки → ПТО. Только ТЗ, код/DDL/БД не менялись; задачи не начаты.

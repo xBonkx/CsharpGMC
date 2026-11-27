@@ -298,6 +298,7 @@ public partial class MainWindow : Window
 
     private void RefreshNavigation()
     {
+        UpdateNavigationCaptions();
         _navigationSearchTimer?.Stop();
         // Сохраняем реальное состояние пользователя, а не раскрытые поиском узлы.
         RestoreNavigationSearchExpansion();
@@ -1110,7 +1111,7 @@ public partial class MainWindow : Window
             ? NavigationTree.SelectedItem as TreeViewItem
             : NavigationNodeUnderMouse();
         var menu = new ContextMenu();
-        var create = ContextMenuIcons.Create("Новый договор…", "FolderPlus");
+        var create = ContextMenuIcons.Create(NavigationModeCaptions.For(CurrentMode).Create + "…", "FolderPlus");
         create.Click += (_, _) => EditObjectProperties(null);
         menu.Items.Add(create);
         // Global history and trash already live in the main menu (Python).

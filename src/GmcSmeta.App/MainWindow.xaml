@@ -506,7 +506,7 @@
                                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/>
                                 </Canvas>
                             </Viewbox>
-                            <TextBlock Text="Поиск договора…" Margin="30,0,32,0" Foreground="#64748B"
+                            <TextBlock x:Name="NavigationSearchPlaceholder" Text="Поиск договора…" Margin="30,0,32,0" Foreground="#64748B"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -515,7 +515,7 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="28" Margin="0,0,2,0"
+                            <Button x:Name="ClearNavigationSearchButton" Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="28" Margin="0,0,2,0"
                                     ToolTip="Очистить поиск договора" AutomationProperties.Name="Очистить поиск договора"
                                     Click="ClearObjectSearch_Click">
                                 <Button.Style>
@@ -598,13 +598,13 @@
                                 <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#2563EB"/>
                             </Canvas>
                         </Viewbox>
-                        <TextBlock Text="Выберите договор или КП слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
+                        <TextBlock x:Name="EmptyNavigationHeading" Text="Выберите договор или КП слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
-                        <TextBlock Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
+                        <TextBlock x:Name="EmptyNavigationHint" Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
                                    Foreground="#64748B" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
                             <Button Content="Загрузить КП из Excel" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
-                            <Button Content="Новый договор" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
+                            <Button x:Name="EmptyNewObjectButton" Content="Новый договор" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
