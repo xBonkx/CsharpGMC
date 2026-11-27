@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base a8c7eba) — PERF-022 PARTIAL: prepared all-acts overview search and stable visible selection; tests added, not run. See performance TODO.
+
 28.11.2026 ChatGPT/main (base 0fc090b) — PERF-022/023 PARTIAL: background KS progress XLSX with context guard and atomic publication; workbook/source checks added, not run. See performance TODO.
 
 28.11.2026 ChatGPT/main (base 48b9071) — AGR-08/11 PARTIAL: new PTO packages read active explicit same-object agreement number/date and parties on schema 32; selected annex/DS ID remains the source of quantities, its own number retained in label. Missing/archived/cross-object mapping blocks new package; incomplete legal fields remain blank for manual review, not copied from legacy annex or object profile. Object-only and legacy paths retained; no existing snapshots rewritten, no planned work dates inserted as actual dates. Picker identity revalidated and object/requisites/positions read within one revision fence. Five domain cases and one source guard added, not run; static review only. Remaining: real schema 28/32 SQL, two clients, PTO preview/print and archived snapshots. No DB/schema/financial calculations/icons/release changes.

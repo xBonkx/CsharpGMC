@@ -92,4 +92,19 @@ public sealed class WorkspaceRefreshSourceTests
         Assert.DoesNotContain("SqlServerDatabase.Open", workbook);
     }
 
+
+    [Fact]
+    public void AllActsOverviewPreparesSearchOffUiAndDoesNotRebindEquivalentResults()
+    {
+        var code = Source("AllContractActsWindow.xaml.cs");
+        Assert.Contains("if (!_initialized || _closed || _loading) return;", code);
+        Assert.Contains("new KsOverviewSearchIndex(grouped)", code);
+        Assert.Contains("if (_closed || version != _requestVersion) return;", code);
+        Assert.Contains("_visibleGroups = null;", code);
+        Assert.Contains("SameVisibleGroups(_visibleGroups, groups)", code);
+        Assert.Contains("_visibleRows.ContainsKey(_selectedActId)", code);
+        Assert.Contains("SetSelectedAct(visible?.Info)", code);
+        Assert.Contains("_rowViews.Clear();", code);
+    }
+
 }

@@ -92,20 +92,6 @@ public static class KsWorkspaceProjection
     }
 
     public static IReadOnlyList<Ks3Group> Filter(
-        IReadOnlyList<Ks3Group> source, string? search, bool? signed)
-    {
-        var words = (search ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var result = new List<Ks3Group>();
-        foreach (var group in source)
-        {
-            var matches = group.Acts.Where(a =>
-                (signed is null || a.Signed == signed) &&
-                words.All(w => ($"{group.Title} {a.Number} {a.Date:dd.MM.yyyy} {a.SourceName}")
-                    .Contains(w, StringComparison.OrdinalIgnoreCase))).ToList();
-            if (matches.Count == 0) continue;
-            result.Add(new Ks3Group(group.Key, matches.Count, matches.Sum(a => a.Total),
-                matches.All(a => a.Signed), matches));
-        }
-        return result;
-    }
+        IReadOnlyList<Ks3Group> source, string? search, bool? signed) =>
+        new KsOverviewSearchIndex(source).Filter(search, signed);
 }

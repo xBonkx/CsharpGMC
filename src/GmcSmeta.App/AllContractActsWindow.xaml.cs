@@ -44,6 +44,10 @@ public partial class AllContractActsWindow : Window
     private IReadOnlyList<SqlServerActs.ActInfo> _acts = Array.Empty<SqlServerActs.ActInfo>();
     private IReadOnlyList<KsWorkspaceProjection.Ks3Group> _groups =
         Array.Empty<KsWorkspaceProjection.Ks3Group>();
+    private KsOverviewSearchIndex _searchIndex = new(Array.Empty<KsWorkspaceProjection.Ks3Group>());
+    private Dictionary<long, Ks2RowVm> _rowViews = new();
+    private Dictionary<long, Ks2RowVm> _visibleRows = new();
+    private IReadOnlyList<KsWorkspaceProjection.Ks3Group>? _visibleGroups;
     private int _requestVersion;
     private bool _initialized;
     private bool _updatingSelection;
@@ -63,26 +67,39 @@ public partial class AllContractActsWindow : Window
 
     private async Task RefreshActsAsync()
     {
-        if (!_initialized || _closed) return;
+        if (!_initialized || _closed || _loading) return;
         var version = ++_requestVersion;
         _loading = true;
         UpdateSelectedButtons();
         OverviewStatus.Text = "Загружаю акты из SQL Server…";
         try
         {
-            var scope = await Task.Run(() =>
-                SqlServerKsContractScope.ReadOverview(_connectionString, _contractId));
+            var (scope, groups, search, views, signed, draft) = await Task.Run(() =>
+            {
+                var snapshot = SqlServerKsContractScope.ReadOverview(_connectionString, _contractId);
+                var grouped = KsWorkspaceProjection.Build(snapshot.Acts);
+                var index = new KsOverviewSearchIndex(grouped);
+                var rows = snapshot.Acts.ToDictionary(a => a.Id, a => new Ks2RowVm(a));
+                decimal signedAmount = 0m, draftAmount = 0m;
+                foreach (var act in snapshot.Acts)
+                    if (act.Signed) signedAmount += act.Total;
+                    else draftAmount += act.Total;
+                return (snapshot, grouped, index, rows, signedAmount, draftAmount);
+            });
             if (_closed || version != _requestVersion) return;
             _scope = scope;
             var acts = scope.Acts;
             _acts = acts;
-            _groups = KsWorkspaceProjection.Build(acts);
+            _groups = groups;
+            _searchIndex = search;
+            _rowViews = views;
+            _visibleGroups = null;
             ScopeTitle.Text = "Договор № " + scope.AgreementNumber +
                 " · документов: " + scope.Documents.Count;
             TotalActsText.Text = acts.Count.ToString(Ru);
-            SignedAmountText.Text = Money.Format(acts.Where(x => x.Signed).Sum(x => x.Total));
-            DraftAmountText.Text = Money.Format(acts.Where(x => !x.Signed).Sum(x => x.Total));
-            ActsAmountText.Text = Money.Format(acts.Sum(x => x.Total));
+            SignedAmountText.Text = Money.Format(signed);
+            DraftAmountText.Text = Money.Format(draft);
+            ActsAmountText.Text = Money.Format(signed + draft);
             ApplyActsFilter();
             OverviewStatus.Text = acts.Count == 0
                 ? "Актов по договору и ДС пока нет."
@@ -97,6 +114,9 @@ public partial class AllContractActsWindow : Window
                 _scope = null;
                 _acts = Array.Empty<SqlServerActs.ActInfo>();
                 _groups = Array.Empty<KsWorkspaceProjection.Ks3Group>();
+                _searchIndex = new KsOverviewSearchIndex(_groups);
+                _rowViews.Clear();
+                _visibleGroups = null;
                 _selectedActId = 0;
                 _selectedGroupKey = "";
                 ScopeTitle.Text = "";
@@ -121,21 +141,37 @@ public partial class AllContractActsWindow : Window
         // before ActsTree and ActListGrid have been created.
         if (!_initialized || _closed || _updatingSelection) return;
         bool? signed = ActsStatusFilter.SelectedIndex switch { 1 => false, 2 => true, _ => null };
-        var groups = KsWorkspaceProjection.Filter(_groups, ActsSearch.Text, signed);
+        var groups = _searchIndex.Filter(ActsSearch.Text, signed);
+        // A different search string may still yield precisely the same rows.
+        // Keep the existing tree, scroll and selection in that case.
+        if (_visibleGroups is not null && SameVisibleGroups(_visibleGroups, groups)) return;
         var viewModels = groups.Select(g => new Ks3GroupVm(g,
-            g.Acts.Select(a => new Ks2RowVm(a)).ToList())).ToList();
+            g.Acts.Select(a => _rowViews[a.Id]).ToList())).ToList();
         var rows = viewModels.SelectMany(g => g.Acts).ToList();
-        var selected = KsWorkspaceProjection.VisibleAct(rows.Select(r => r.Info), _selectedActId);
+        _visibleRows = rows.ToDictionary(r => r.Id);
+        _visibleGroups = groups;
+        var selected = _visibleRows.GetValueOrDefault(_selectedActId);
         _updatingSelection = true;
         try
         {
             ActsTree.ItemsSource = viewModels;
             ActListGrid.ItemsSource = rows;
-            ActListGrid.SelectedItem = selected is null ? null : rows.FirstOrDefault(r => r.Id == selected.Id);
-            SetSelectedAct(selected);
+            ActListGrid.SelectedItem = selected;
+            SetSelectedAct(selected?.Info);
         }
         finally { _updatingSelection = false; }
         UpdateSelectedButtons();
+    }
+
+    private static bool SameVisibleGroups(IReadOnlyList<KsWorkspaceProjection.Ks3Group> a,
+        IReadOnlyList<KsWorkspaceProjection.Ks3Group> b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++)
+            if (!ReferenceEquals(a[i], b[i]) &&
+                (a[i].Key != b[i].Key || !a[i].Acts.SequenceEqual(b[i].Acts))) return false;
+        return true;
     }
 
     private void ActsSearch_Changed(object sender, TextChangedEventArgs e) => ApplyActsFilter();
@@ -159,9 +195,9 @@ public partial class AllContractActsWindow : Window
         _updatingSelection = true;
         try
         {
-            ActListGrid.SelectedItem = row is null ? null :
-                ActListGrid.Items.OfType<Ks2RowVm>().FirstOrDefault(x => x.Id == row.Id);
-            SetSelectedAct(row?.Info);
+            var visible = row is null ? null : _visibleRows.GetValueOrDefault(row.Id);
+            ActListGrid.SelectedItem = visible;
+            SetSelectedAct(visible?.Info);
         }
         finally { _updatingSelection = false; }
         UpdateSelectedButtons();
@@ -178,7 +214,7 @@ public partial class AllContractActsWindow : Window
     {
         if (!_initialized || _closed) return;
         OpenSelectedButton.IsEnabled = !_loading && _scope is not null && _selectedActId != 0 &&
-            ActListGrid.Items.OfType<Ks2RowVm>().Any(a => a.Id == _selectedActId);
+            _visibleRows.ContainsKey(_selectedActId);
         OpenKs3Button.IsEnabled = OpenSelectedButton.IsEnabled && _scope is not null &&
             !string.IsNullOrWhiteSpace(_selectedGroupKey) &&
             _groups.Any(g => g.Key == _selectedGroupKey);
@@ -193,7 +229,7 @@ public partial class AllContractActsWindow : Window
     private void OpenSelected()
     {
         if (_loading || _scope is null) return;
-        var act = _acts.FirstOrDefault(a => a.Id == _selectedActId);
+        var act = _visibleRows.GetValueOrDefault(_selectedActId)?.Info;
         if (act is null) return;
         try
         {

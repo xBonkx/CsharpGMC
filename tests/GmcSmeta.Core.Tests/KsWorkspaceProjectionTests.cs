@@ -164,4 +164,40 @@ public sealed class KsWorkspaceProjectionTests
         Assert.Empty(KsWorkspaceProjection.VisibleSummaryGroups(summary, true));
     }
 
+
+    [Theory]
+    [InlineData("", null)]
+    [InlineData("", true)]
+    [InlineData("КС-3 ДС", false)]
+    [InlineData("дс 2026", null)]
+    [InlineData("не найдено", null)]
+    public void PreparedOverviewSearchMatchesLegacyFilterOnLargeList(string search, bool? signed)
+    {
+        var acts = Enumerable.Range(1, 5000).Select(i => Sample[i % 3] with
+        {
+            Id = i, Number = $"{i / 10}.{i % 10}",
+            SourceName = i % 2 == 0 ? "ДС № 2" : "Приложение 1",
+            Total = i * 0.13m,
+            Signed = i % 3 == 0
+        }).ToArray();
+        var groups = KsWorkspaceProjection.Build(acts);
+        var index = new KsOverviewSearchIndex(groups);
+        var words = search.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var expected = groups.Select(g => (g.Key, Acts: g.Acts.Where(a =>
+            (signed is null || a.Signed == signed) &&
+            words.All(w => ($"{g.Title} {a.Number} {a.Date:dd.MM.yyyy} {a.SourceName}")
+                .Contains(w, StringComparison.OrdinalIgnoreCase))).ToArray()))
+            .Where(g => g.Acts.Length != 0).ToArray();
+        var actual = index.Filter(search, signed);
+        Assert.Equal(expected.Select(g => g.Key), actual.Select(g => g.Key));
+        for (var i = 0; i < actual.Count; i++)
+        {
+            Assert.Equal(expected[i].Acts.Select(a => a.Id), actual[i].Acts.Select(a => a.Id));
+            Assert.Equal(expected[i].Acts.Sum(a => a.Total), actual[i].Total);
+            Assert.Equal(expected[i].Acts.All(a => a.Signed), actual[i].Signed);
+        }
+        Assert.Same(groups, index.Filter("", null));
+        Assert.Equal(acts.Sum(a => a.Total), groups.Sum(g => g.Total));
+    }
+
 }
