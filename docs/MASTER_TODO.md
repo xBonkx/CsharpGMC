@@ -1,5 +1,24 @@
 # Единый реестр замечаний GMC-Смета C#
 
+## Приоритет владельца 27.11.2026 — договор, приложения и ДС
+
+[Подробный TODO](AGREEMENT_ANNEX_TODO_20261127.md). 11 задач NOT STARTED; отдельная очередь изменения продукта, не новые дефекты четырёх основных списков. Сначала аудит AGR-01 и минимальный визуал; условная миграция только по результатам аудита и отдельному согласованию. КС и готовые вкладки сохраняются; не добавлять реестр КС на главный экран.
+
+| ID | P | Задача | Статус |
+|---|---|---|---|
+| [AGR-01](AGREEMENT_ANNEX_TODO_20261127.md#agr-01) | P0 | Аудит существующей группировки и юридических реквизитов | NOT STARTED |
+| [AGR-02](AGREEMENT_ANNEX_TODO_20261127.md#agr-02) | P1 | Главное окно: минимальная терминология | NOT STARTED |
+| [AGR-03](AGREEMENT_ANNEX_TODO_20261127.md#agr-03) | P1 | Дерево, карточки и заголовки приложений | NOT STARTED |
+| [AGR-04](AGREEMENT_ANNEX_TODO_20261127.md#agr-04) | P1 | Шапка и свойства договора | NOT STARTED |
+| [AGR-05](AGREEMENT_ANNEX_TODO_20261127.md#agr-05) | P1 | Создание и импорт | NOT STARTED |
+| [AGR-06](AGREEMENT_ANNEX_TODO_20261127.md#agr-06) | P1 | Файлы договора и приложения | NOT STARTED |
+| [AGR-07](AGREEMENT_ANNEX_TODO_20261127.md#agr-07) | P0 | Существующие вкладки и КС — регрессионный контроль | NOT STARTED |
+| [AGR-08](AGREEMENT_ANNEX_TODO_20261127.md#agr-08) | P1 | Смежные модули и юридические тексты | NOT STARTED |
+| [AGR-09](AGREEMENT_ANNEX_TODO_20261127.md#agr-09) | P1 | Приёмка визуального блока | NOT STARTED |
+| [AGR-10](AGREEMENT_ANNEX_TODO_20261127.md#agr-10) | P0 | Решение по структуре данных и миграции (условный этап) | NOT STARTED |
+| [AGR-11](AGREEMENT_ANNEX_TODO_20261127.md#agr-11) | P0 | Интеграционная приёмка и выпуск | NOT STARTED |
+
+
 27.11.2026 ChatGPT/main (base ca572cd) — WIN-17 PARTIAL, запрос владельца: общий справочник «Люди и автомобили» открывается вкладкой главного окна. PeopleView (общая реализация) выделен из Window; существующий PeopleWindow — совместимый host объектного допуска, без изменений SQL/документов. Две поверхности главного окна остаются в дереве, PageHost не переносится при переключении; повторное меню активирует единственный экземпляр; закрытие вкладки отменяет чтения, незавершённая запись/редактирование блокируют уход/закрытие/автоперезапуск. Существующий inline editor сохранён. Объектный допуск и вложенные диалоги оставлены отдельными. Source tests only, Windows build/xUnit/GUI/SQL Pilot not run; verify tab switch with estimate cache/active edit, resizing, main close/restart, initialization failure, history, import and modal owners. No production DB/release/DONE.
 
 27.11.2026 ChatGPT/main (base b7268bf) — WIN-17 PARTIAL, запрос владельца: inline editing existing People/Cars rows. Nine text columns use unbound editors; WPF cell commit builds detached record, validates changed field, defers SQL save through existing exclusive operation/revision guard and reloads by ID; Esc cancels, manual genitive is edited as raw override (empty = auto). Modal edit commands removed; add dialogs deliberately retained for collecting new-record required fields. Search/filter/close/competing commands guarded during pending cell save; access checkboxes retained. No icons, SQL schema, production DB, release changes. Five domain cases plus updated lifecycle source assertion; Windows build/xUnit, WPF focus/Tab/selection, slow LAN, conflict, failed/uncertain commit, filter and access mode still require acceptance. No DONE.

@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — договор → приложения и ДС (ТЗ владельца)
+
+ChatGPT/main, base `49b25e57a848874d5259add7e8d8a6d96b9e3e55`: [AGR-01…AGR-11](docs/AGREEMENT_ANNEX_TODO_20261127.md), все NOT STARTED. Ближайший блок — аудит реквизитов/группировки и минимальная UI-терминология. Сохранить дизайн, пять плиток, карточки и готовые вкладки, не добавлять КС на главный экран. Проверить неоднозначные договоры; изменение SQL-схемы и юридических связей только после отдельного решения. Документация, код/БД/релиз не изменены; тесты не запускались.
+
 ## 27.11.2026 — SQL-синтаксис истории допусков и приказов
 
 27.11.2026 ChatGPT/main (base 31954ce) — BUG-F58 CODE READY. Скрин владельца: «Неправильный синтаксис около ключевого слова 'file'» при открытии списка на допуск. SqlServerPeopleAccess.History: a.file → a.[file], a.[data]; согласовано с уже экранированным INSERT и WasRegistered; JSON lookup также использует [data]. Один метод обслуживает историю списков и приказов. Проверены обращения к access_lists в PeopleAccess, Trash, TrashRestore, Workspace и CLI, а также [file] в SpecUpdate; других неэкранированных file в этих проверенных SQL не обнаружено. Добавлен source regression и SQL Pilot smoke (list/order до записей, file/JSON roundtrip после экспорта). Static only, Windows build/xUnit/SQL Pilot not run. No schema or DB changes; no release/DONE.
