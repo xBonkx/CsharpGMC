@@ -1,5 +1,7 @@
 # Договор → приложения и ДС — TODO от 27.11.2026
 
+28.11.2026 ChatGPT/main (base 16b13c0) — AGR-07/11 PARTIAL: schema-32 KS print guard validates selected legal ID, current acts, all previous groups contributing to grouped KS-3 and ambiguous legacy opening-balance ownership; validates every report in batch export (including grouped R4), not just first. Ordinary single report and legacy schema paths retain existing grouping and amounts. Missing/archived legal mappings are rejected when relevant rather than failing on unrelated documents. Added 10 regression cases; source inspection only, no .NET/Windows/SQL/Pilot execution. No database, financial formula, schema, layout, icon or release changes. Remaining: real Excel/PDF all forms, distinct legal IDs sharing a number, grouped and single history/opening, batch and WPF/SQL Pilot acceptance.
+
 ## 27.11.2026 — результат согласованного блока
 
 27.11.2026 Codex/main — AGR-04/05/06/07/10/11 CODE READY/PARTIAL: самостоятельное

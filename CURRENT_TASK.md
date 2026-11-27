@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 16b13c0) — AGR-07/11 PARTIAL: schema-32 KS print guard validates selected legal ID, current acts, all previous groups contributing to grouped KS-3 and ambiguous legacy opening-balance ownership; validates every report in batch export (including grouped R4), not just first. Ordinary single report and legacy schema paths retain existing grouping and amounts. Missing/archived legal mappings are rejected when relevant rather than failing on unrelated documents. Added 10 regression cases; source inspection only, no .NET/Windows/SQL/Pilot execution. No database, financial formula, schema, layout, icon or release changes. Remaining: real Excel/PDF all forms, distinct legal IDs sharing a number, grouped and single history/opening, batch and WPF/SQL Pilot acceptance.
+
 27.11.2026 ChatGPT/main (base bec9817) — PERF-021/022 PARTIAL: cached KS progress views/columns and single-pass indexed Excel export; tests added, not run. See performance TODO.
 
 27.11.2026 ChatGPT/main (base b2964c9) — PERF-019/020 PARTIAL: sparse KS quantity presentation readback and concurrent edit guard; tests added, not run. See performance TODO.

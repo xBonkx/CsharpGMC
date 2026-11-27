@@ -70,6 +70,99 @@ public sealed class KsLegalRequisitesTests
         Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.ForDocument(p, 2));
     }
 
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    public void PreviousForeignOrUnlinkedGroupBlocksOnlyGroupedPrint(
+        bool grouped, bool missingLink, bool allowed)
+    {
+        var p = Fixture();
+        var current = p.Report.Acts[0] with { Number = "2" };
+        var previous = current with { Id = 9, ContractId = 1, Number = "1", Date = current.Date.AddDays(-1) };
+        var scope = p.Scope with { Acts = new[] { previous, current } };
+        var legal = PrintAgreements(p);
+        if (missingLink) legal.Remove(1);
+        var report = grouped ? KsGroupReport.Calculate(scope, "2") : KsGroupReport.CalculateSingle(scope, current.Id);
+        if (allowed)
+            Assert.Equal(102L, KsLegalRequisites.RequirePrintAgreement(scope, report, legal, grouped));
+        else
+            Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(scope, report, legal, grouped));
+    }
+
+    [Fact]
+    public void GroupedPrintAllowsPriorAnnexOfSameLegalAgreement()
+    {
+        var p = Fixture();
+        var current = p.Report.Acts[0] with { Number = "2" };
+        var previous = current with { Id = 9, ContractId = 1, Number = "1", Date = current.Date.AddDays(-1) };
+        var scope = p.Scope with { Acts = new[] { previous, current } };
+        var legal = PrintAgreements(p);
+        legal[1] = legal[1] with { SourceId = legal[2].SourceId };
+        var report = KsGroupReport.Calculate(scope, "2", selectedDocumentOnly: true);
+        Assert.Equal(102L, KsLegalRequisites.RequirePrintAgreement(scope, report, legal, true));
+        Assert.Single(report.Previous);
+    }
+
+    [Fact]
+    public void GroupedPrintAllowsFutureForeignActButRejectsItsOwnGroup()
+    {
+        var p = Fixture();
+        var current = p.Report.Acts[0];
+        var future = current with { Id = 9, ContractId = 1, Number = "2", Date = current.Date.AddDays(1) };
+        var scope = p.Scope with { Acts = new[] { current, future } };
+        var legal = PrintAgreements(p);
+        Assert.Equal(102L, KsLegalRequisites.RequirePrintAgreement(scope,
+            KsGroupReport.Calculate(scope, "1"), legal, true));
+        Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(scope,
+            KsGroupReport.Calculate(scope, "2"), legal, true));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ImportedOpeningRejectsAmbiguousLegalOwnership(bool grouped)
+    {
+        var p = Fixture();
+        var current = p.Report.Acts[0];
+        var scope = p.Scope with { Opening = new Ks3OpeningBalance(current.Date.AddDays(-1), 100m) };
+        var legal = PrintAgreements(p);
+        var report = grouped ? KsGroupReport.Calculate(scope, "1") : KsGroupReport.CalculateSingle(scope, current.Id);
+        Assert.True(report.GrossCumulative);
+        Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(scope, report, legal, grouped));
+        legal[1] = legal[1] with { SourceId = legal[2].SourceId };
+        Assert.Equal(102L, KsLegalRequisites.RequirePrintAgreement(scope, report, legal, grouped));
+        Assert.Equal(100m, report.SinceStartNet - report.PeriodGross);
+    }
+
+    [Fact]
+    public void OpeningBeforeItsEffectiveDateDoesNotBlockNormalSingleReport()
+    {
+        var p = Fixture();
+        var current = p.Report.Acts[0];
+        var scope = p.Scope with { Opening = new Ks3OpeningBalance(current.Date, 100m) };
+        var report = KsGroupReport.CalculateSingle(scope, current.Id);
+        Assert.False(report.GrossCumulative);
+        Assert.Equal(102L, KsLegalRequisites.RequirePrintAgreement(scope, report, PrintAgreements(p), false));
+    }
+
+    [Fact]
+    public void MissingSelectedLinkBlocksPrintEvenWhenCurrentActHasLegalRequisites()
+    {
+        var p = Fixture();
+        var legal = PrintAgreements(p);
+        legal.Remove(2);
+        Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(p.Scope, p.Report, legal, true));
+    }
+
+    private static Dictionary<long, KsLegalRequisites.Agreement> PrintAgreements(SqlServerKsPrintData.Package p) =>
+        new()
+        {
+            [1] = new(101, "Д-42", "23.01.2025", p.Contractors[1]),
+            [2] = new(102, "Д-42", "23.01.2025", p.Contractors[1])
+        };
+
     private static SqlServerKsPrintData.Package Fixture()
     {
         var main = new SqlServerKsContractScope.Document(1, 10, "main", "Д-42", "Приложение", null, "dns", 22m, "");

@@ -57,7 +57,7 @@ public static class SqlServerKsPrintData
         {
             var before = SqlServerDatabase.Revision(conn);
             var scope = SqlServerKsContractScope.Read(conn, contractId);
-            var package = ReadPackage(conn, contractId, scope, KsGroupReport.Calculate(scope, groupKey));
+            var package = ReadPackage(conn, contractId, scope, KsGroupReport.Calculate(scope, groupKey), groupReport: true);
             if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
                 return package;
         }
@@ -98,10 +98,15 @@ public static class SqlServerKsPrintData
         var objectName = snapshot.Requisites.ObjectName.Trim().ToLowerInvariant();
         var grouped = document.Form.Trim().Equals("r4", StringComparison.OrdinalIgnoreCase) &&
             objectName is ("р4" or "p4" or "r4");
-        var reports = grouped
+        var reports = (grouped
             ? local.GroupBy(KsWorkspaceProjection.GroupKey)
                 .Select(g => KsGroupReport.Calculate(scope, g.Key, selectedDocumentOnly: true))
-            : local.Select(a => KsGroupReport.CalculateSingle(scope, a.Id));
+            : local.Select(a => KsGroupReport.CalculateSingle(scope, a.Id))).ToArray();
+        // The first package's guard is not sufficient for later reports in a
+        // batch: their previous groups and opening-balance usage can differ.
+        if (snapshot.LegalAgreements.Count != 0)
+            foreach (var report in reports)
+                KsLegalRequisites.RequirePrintAgreement(scope, report, snapshot.LegalAgreements, grouped);
         var packages = ScopeReports(snapshot, reports);
         if (before != SqlServerDatabase.Revision(conn))
             throw new InvalidOperationException("КС изменились во время подготовки экспорта. Обновите акт.");
@@ -130,7 +135,7 @@ public static class SqlServerKsPrintData
 
     private static Package ReadPackage(SqlConnection conn, long contractId,
         SqlServerKsContractScope.Scope scope, KsGroupReport report,
-        IReadOnlyList<SqlServerActs.ActInfo>? readActs = null)
+        IReadOnlyList<SqlServerActs.ActInfo>? readActs = null, bool groupReport = false)
     {
         var requisites = SqlServerKsRequisites.Read(conn, contractId);
         if (requisites.ObjectId != scope.Documents[0].ObjectId)
@@ -228,16 +233,15 @@ public static class SqlServerKsPrintData
                 {
                     var id = Convert.ToInt64(reader.GetValue(0));
                     if (!documentIds.Contains(id)) continue;
-                    var legal = cards[Convert.ToInt64(reader.GetValue(1))];
+                    // Missing/archived cards are rejected by the guard only when relevant to this report.
+                    if (!cards.TryGetValue(Convert.ToInt64(reader.GetValue(1)), out var legal)) continue;
                     var companyName = legal.CompanyId is long companyId ? companies.GetValueOrDefault(companyId) ?? "" : "";
                     var co = new Contractor(id, legal.Date, companyName, legal.ContractorFull, legal.ContractorPosition, legal.ContractorName);
                     legalSources[id] = new(legal.Id, legal.Number, legal.Date, co);
                 }
             }
-            var activeLegalIds = report.Acts.Select(a => legalSources.TryGetValue(a.ContractId, out var legal) ? legal.SourceId : 0).Distinct().ToArray();
-            if (activeLegalIds.Length != 1 || activeLegalIds[0] == 0)
-                throw new InvalidOperationException("Общая КС-3 содержит документы разных договоров или без привязки. Проверьте реквизиты приложений.");
-            requisites = cards[activeLegalIds[0]].Print with { SitePart = requisites.SitePart };
+            var legalId = KsLegalRequisites.RequirePrintAgreement(scope, report, legalSources, groupReport);
+            requisites = cards[legalId].Print with { SitePart = requisites.SitePart };
         }
         return new Package(scope,report,requisites,lines,contractors){Sections=sections, LegalAgreements=legalSources};
     }
