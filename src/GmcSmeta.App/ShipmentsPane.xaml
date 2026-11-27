@@ -446,8 +446,7 @@
                       DisplayMemberPath="Title" SelectionChanged="RowFilter_Changed"
                       ToolTip="Показать позиции одного договора или дополнительного соглашения" Visibility="Collapsed"/>
             <Grid Width="190" Margin="0,0,0,4">
-                <TextBox x:Name="RowSearch" Style="{StaticResource PythonSearch}" Height="32"
-                         Padding="30,5,32,5" VerticalContentAlignment="Center" TextChanged="RowSearch_Changed"
+                <TextBox x:Name="RowSearch" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="RowSearch_Changed"
                          ToolTip="Поиск по названию позиции или системы"/>
                 <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center"
                          Margin="9,0,0,0" IsHitTestVisible="False">
@@ -456,7 +455,7 @@
                     </Canvas>
                 </Viewbox>
                 <TextBlock Text="Найти…" Foreground="#94A3B8" Margin="30,0,32,0"
-                           VerticalAlignment="Center" IsHitTestVisible="False">
+                           VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
