@@ -124,6 +124,8 @@ public static class Workspace
 
     public static List<DocRow> Documents(DbConnection conn) => ReadDocuments(conn, null, true);
 
+    public static List<DocRow> ReadAllDocumentMetadata(DbConnection conn) => ReadDocuments(conn, null, false);
+
     public static List<DocRow> ReadObjectDocumentMetadata(DbConnection conn, int objectId) =>
         ReadDocuments(conn, objectId, false);
 

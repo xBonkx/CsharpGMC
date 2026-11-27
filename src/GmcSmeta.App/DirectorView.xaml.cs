@@ -103,7 +103,7 @@ public partial class DirectorView : UserControl
         TileTotalValue.Text = TileClosedValue.Text = TileExtraValue.Text = TileEarnedValue.Text = "—";
         var mode = (ModeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "contracts";
         var kp = mode == "kp";
-        HeadingText.Text = kp ? "КП — предварительные просчёты" : "Договоры — объекты в работе";
+        HeadingText.Text = kp ? "КП — предварительные просчёты" : "Договоры и группы — в работе";
         TileTotalCaption.Text = kp ? "КП всего, с НДС" : "Договоры всего, с НДС";
         TileEarnedCaption.Text = kp ? "Расчётная прибыль" : "Заработано (материалы + монтаж)";
         TileClosed.Visibility = kp ? Visibility.Collapsed : Visibility.Visible;
@@ -115,7 +115,7 @@ public partial class DirectorView : UserControl
         // Python keeps purchase coverage visible in KP mode.
         CoverageColumn.Visibility = Visibility.Visible;
         UpdateDirectorTileColumns();
-        TotalColumn.Header = kp ? "КП, ₽" : "Договор,\n₽";
+        TotalColumn.Header = kp ? "КП, ₽" : "Итого,\n₽";
         EarnedColumn.Header = kp ? "Расчётная\nприбыль" : "Заработано";
 
         await _readGate.WaitAsync();

@@ -710,7 +710,7 @@ public partial class MainWindow : Window
             "\n\nЕсли работы завершены — лучше «Завершить карточку (в архив)».";
         if (MessageBox.Show(this, question, "Удаление карточки", MessageBoxButton.YesNo,
                 MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        if (new ConfirmDeleteDialog(info.Name, info.Details) { Owner = this }.ShowDialog() != true) return;
+        if (new ConfirmDeleteDialog(info.Name, info.Details, "карточка") { Owner = this }.ShowDialog() != true) return;
         try
         {
             SqlServerWorkspace.DeleteObject(
@@ -879,7 +879,7 @@ public partial class MainWindow : Window
                 if (ValidTarget()) await AttachmentWindow.OpenSignedAsync(this, connection!, doc.Id, doc.Title, ValidTarget);
             };
             menu.Items.Add(signed);
-            var select = ContextMenuIcons.Create("Добавить / выбрать подписанный PDF…", "File");
+            var select = ContextMenuIcons.Create("Добавить / выбрать PDF документа…", "File");
             select.Click += (_, _) =>
             {
                 if (ValidTarget()) new AttachmentWindow(connection!, doc.Id, doc.Title, signedOnly: true)
@@ -895,12 +895,12 @@ public partial class MainWindow : Window
         menu.Items.Add(attachments);
         if (doc.Kind is "main" or "dop")
         {
-            var letters = ContextMenuIcons.Create("Письма договора…", "File", SqlWritesEnabled);
+            var letters = ContextMenuIcons.Create("Письма документа…", "File", SqlWritesEnabled);
             letters.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, false); };
             menu.Items.Add(letters);
             if (PtoUserSettings.Enabled)
             {
-                var pto = ContextMenuIcons.Create("АОСР договора…", "File", SqlWritesEnabled);
+                var pto = ContextMenuIcons.Create("АОСР документа…", "File", SqlWritesEnabled);
                 pto.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, true); };
                 menu.Items.Add(pto);
             }
@@ -914,7 +914,7 @@ public partial class MainWindow : Window
         var doc = _docs.FirstOrDefault(d => d.Id == target.Id && d.ObjectId == target.ObjectId &&
             d.Kind == target.Kind && (d.Kind is "main" or "dop"));
         if (doc is null || _objects.FirstOrDefault(o => o.Id == doc.ObjectId) is not { } obj) return;
-        RunNavigationAction(pto ? "АОСР договора" : "Письма договора", () =>
+        RunNavigationAction(pto ? "АОСР документа" : "Письма документа", () =>
         {
             Window dialog = pto ? new PtoWindow(connection, obj.Id, doc.Id) :
                 new LettersWindow(connection, obj, contractContext: doc);
@@ -953,7 +953,7 @@ public partial class MainWindow : Window
             _sqlConnectionString is not { } connection) return;
         var menu = new ContextMenu { PlacementTarget = button,
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        var select = ContextMenuIcons.Create("Добавить / выбрать подписанный PDF…", "File");
+        var select = ContextMenuIcons.Create("Добавить / выбрать PDF документа…", "File");
         select.Click += (_, _) =>
         {
             if (connection == _sqlConnectionString && _docs.Any(current => current.Id == doc.Id && current.Kind == doc.Kind))

@@ -14,19 +14,19 @@ public partial class MainWindow
         {
             var snapshot=SqlServerWorkspace.DescribeContractTransfer(_sqlConnectionString,doc.Id);
             if(snapshot.SourceId!=doc.ObjectId)
-                throw new InvalidOperationException("Объект договора изменился. Обновите список.");
+                throw new InvalidOperationException("Карточка приложения изменилась. Обновите список.");
             var candidates=_objects.Where(o=>!o.Archived&&o.Id!=doc.ObjectId).OrderBy(o=>o.Name).ToList();
-            if(candidates.Count==0) throw new InvalidOperationException("Нет другого действующего объекта.");
-            var dialog=new Window{Owner=this,Title="Перенос договора",Width=530,SizeToContent=SizeToContent.Height,
+            if(candidates.Count==0) throw new InvalidOperationException("Нет другой действующей карточки.");
+            var dialog=new Window{Owner=this,Title="Перенос приложения",Width=530,SizeToContent=SizeToContent.Height,
                 ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
             var panel=new StackPanel{Margin=new Thickness(20)};
-            panel.Children.Add(new TextBlock{Text=doc.Title,FontSize=17,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
-            panel.Children.Add(new TextBlock{Text=$"Из объекта «{snapshot.SourceName}». Документов к переносу: {snapshot.DocumentIds.Count}.",
+            panel.Children.Add(new TextBlock{Text=AgreementPresentation.FullAnnexTitle(doc),FontSize=17,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
+            panel.Children.Add(new TextBlock{Text=$"Из карточки «{snapshot.SourceName}». Документов к переносу: {snapshot.DocumentIds.Count}.",
                 Margin=new Thickness(0,8,0,12),TextWrapping=TextWrapping.Wrap});
-            panel.Children.Add(new TextBlock{Text="Новый объект",Margin=new Thickness(0,0,0,4)});
+            panel.Children.Add(new TextBlock{Text="Карточка назначения",Margin=new Thickness(0,0,0,4)});
             var picker=new ComboBox{ItemsSource=candidates,DisplayMemberPath="Name",SelectedIndex=-1,MinHeight=34};
             panel.Children.Add(picker);
-            panel.Children.Add(new TextBlock{Text="КС, сметы, вложения и идентификаторы сохраняются. При наличии связанных этапов или ведомостей выдачи перенос будет отклонён.",
+            panel.Children.Add(new TextBlock{Text="Переносятся только выбранное приложение и связанные с ним ДС. Другие приложения останутся в прежней карточке. КС, сметы, вложения и идентификаторы переносятся вместе с документами, но состав общей КС-3 может измениться: он зависит от карточки и номера договора. При наличии связанных этапов или ведомостей выдачи перенос будет отклонён.",
                 TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,10,0,12)});
             var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100,Margin=new Thickness(0,0,8,0)};
@@ -43,12 +43,12 @@ public partial class MainWindow
             ReloadAndSelect(target.Id);
             // The revision changed; no obsolete cached view may be reused after transfer.
             OpenEstimate(doc.Id);
-            StatusText.Text=$"Договор перенесён в «{target.Name}».";
+            StatusText.Text=$"Приложение перенесено в «{target.Name}».";
         }
         catch(Exception ex)
         {
             LogError(ex);
-            MessageBox.Show(this,ex.Message,"Перенос договора",MessageBoxButton.OK,MessageBoxImage.Warning);
+            MessageBox.Show(this,ex.Message,"Перенос приложения",MessageBoxButton.OK,MessageBoxImage.Warning);
         }
     }
 }

@@ -23,7 +23,7 @@ public static class SqlLive
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("Использование: sql <status|smoke|schema31|trash|trash-obj|restore> <строка подключения> [id]");
+            Console.WriteLine("Использование: sql <status|smoke|schema31|trash|trash-obj|restore|agreement-audit> <строка подключения> [id]");
             return 2;
         }
         var sub = args[0];
@@ -36,6 +36,7 @@ public static class SqlLive
         return sub switch
         {
             "status" => Status(connectionString),
+            "agreement-audit" => AgreementAuditCommand.Run(connectionString),
             "smoke" => Smoke(connectionString),
             "schema31" => Schema31Acceptance(connectionString),
             "trash" => TrashRoundtrip(connectionString, long.Parse(args[2], CultureInfo.InvariantCulture)),

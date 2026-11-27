@@ -9,7 +9,7 @@
         <DockPanel>
             <UniformGrid DockPanel.Dock="Bottom" Columns="2" Rows="1" Margin="0,16,0,0">
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" Click="Cancel_Click" HorizontalAlignment="Right" Margin="0,0,8,0"/>
-                <Button x:Name="DeleteButton" Content="Удалить навсегда" HorizontalAlignment="Left" IsEnabled="False" Click="Delete_Click">
+                <Button x:Name="DeleteButton" Content="Удалить" HorizontalAlignment="Left" IsEnabled="False" Click="Delete_Click">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Border" Background="#DC2626" CornerRadius="8" Padding="14,7">
@@ -29,7 +29,7 @@
                 <TextBlock x:Name="HeadingText" Text="Удалить объект навсегда?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Foreground="#DC2626"/>
                 <TextBlock x:Name="NameText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
                 <TextBlock x:Name="DetailsText" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                <TextBlock Text="Если удалили по ошибке — его можно вернуть 30 дней: меню «☰ → Корзина»."
+                <TextBlock Text="Если удалили по ошибке, запись можно вернуть из корзины в течение 30 дней: меню «☰ → Корзина»."
                            Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,0"/>
                 <TextBlock Text="Чтобы подтвердить, ответьте на вопрос:" Foreground="#64748B" Margin="0,10,0,0"/>
                 <TextBlock x:Name="QuestionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Foreground="#B91C1C" Margin="0,10,0,0"/>

@@ -133,14 +133,14 @@
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="Главная" Foreground="#64748B" FontSize="{StaticResource UiBodySize}" Margin="0,0,0,2" VerticalAlignment="Center"/>
-                <TextBlock x:Name="HeadingText" Text="Договоры — объекты в работе" FontWeight="Bold" FontSize="{StaticResource UiH1Size}" TextWrapping="Wrap"/>
+                <TextBlock x:Name="HeadingText" Text="Договоры и группы — в работе" FontWeight="Bold" FontSize="{StaticResource UiH1Size}" TextWrapping="Wrap"/>
             </StackPanel>
             <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" Click="Export_Click"
                     VerticalAlignment="Bottom" Style="{StaticResource DirectorExportButton}" ContentTemplate="{StaticResource IconLabelDownload}" ToolTip="Сохранить сводку в Excel"/>
         </Grid>
         <ComboBox x:Name="ModeCombo" Grid.Row="1" Margin="{StaticResource LayoutDirectorSectionGap}" HorizontalAlignment="Stretch" SelectionChanged="Mode_Changed">
             <ComboBoxItem Content="Договоры — в работе" Tag="contracts" IsSelected="True"/>
-            <ComboBoxItem Content="КП — просчёты (последнее КП по объекту)" Tag="kp"/>
+            <ComboBoxItem Content="КП — просчёты (последнее КП по карточке)" Tag="kp"/>
         </ComboBox>
         <UniformGrid x:Name="DirectorTiles" Grid.Row="2" Columns="4" Margin="{StaticResource LayoutDirectorTilesInset}" SizeChanged="DirectorTiles_SizeChanged">
             <Border Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}">
@@ -169,7 +169,7 @@
             </Border>
         </UniformGrid>
         <Border Grid.Row="3" Margin="{StaticResource LayoutDirectorSectionGap}" Style="{StaticResource DirectorTableFrame}">
-            <DataGrid local:TableColumnMenu.Key="director" local:TableColumnMenu.Exclude="Сдано по КС|Докуплено вне сметы|Выдано на объект|Просрочено поставок|Закуп известен" local:TableColumnMenu.Protect="Объект" x:Name="DirectorGrid" CellStyle="{StaticResource DirectorCell}" ColumnHeaderStyle="{StaticResource DirectorHeader}"
+            <DataGrid local:TableColumnMenu.Key="director" local:TableColumnMenu.Exclude="Сдано по КС|Докуплено вне сметы|Выдано на объект|Просрочено поставок|Закуп известен" local:TableColumnMenu.Protect="Карточка" x:Name="DirectorGrid" CellStyle="{StaticResource DirectorCell}" ColumnHeaderStyle="{StaticResource DirectorHeader}"
                       RowStyle="{StaticResource DirectorRow}" MinRowHeight="40" AlternationCount="2" Background="White" BorderThickness="0"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
                       HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
@@ -179,7 +179,7 @@
                       ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                       VirtualizingPanel.VirtualizationMode="Recycling">
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Объект" Width="3*" MinWidth="180" HeaderStyle="{StaticResource DirectorObjectHeader}" SortMemberPath="DisplayObject">
+                    <DataGridTemplateColumn Header="Карточка" Width="3*" MinWidth="180" HeaderStyle="{StaticResource DirectorObjectHeader}" SortMemberPath="DisplayObject">
                         <DataGridTemplateColumn.CellTemplate><DataTemplate>
                             <DockPanel LastChildFill="True" ToolTip="{Binding WarningTip}">
                                 <!-- director_view.py uses the literal warning character, not an SVG. -->
@@ -190,7 +190,7 @@
                             </DockPanel>
                         </DataTemplate></DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Договор,&#10;₽" Binding="{Binding Total}" Width="1.3*" MinWidth="114" ElementStyle="{StaticResource DirectorMoney}" SortMemberPath="TotalValue" x:Name="TotalColumn"/>
+                    <DataGridTextColumn Header="Итого,&#10;₽" Binding="{Binding Total}" Width="1.3*" MinWidth="114" ElementStyle="{StaticResource DirectorMoney}" SortMemberPath="TotalValue" x:Name="TotalColumn"/>
                     <DataGridTemplateColumn x:Name="ClosedColumn" Header="Сдано&#10;по КС" Width="1.5*" MinWidth="137" SortMemberPath="ClosedValue">
                         <DataGridTemplateColumn.CellTemplate><DataTemplate>
                             <StackPanel VerticalAlignment="Center">
@@ -231,7 +231,7 @@
                 <TextBlock x:Name="LoadStatus" Foreground="#64748B" TextWrapping="Wrap"/>
             </DockPanel>
             <TextBlock Foreground="#64748B" TextWrapping="Wrap" FontSize="{StaticResource UiBodySize}"
-                       Text="Двойной щелчок — открыть объект. ⚠ — данные неполные: закуп известен не по всем позициям или не внесены затраты на монтаж (вкладка «Себестоимость» в КП). Суммы с НДС."/>
+                       Text="Двойной щелчок — открыть карточку. ⚠ — данные неполные: закуп известен не по всем позициям или не внесены затраты на монтаж (вкладка «Себестоимость» в КП). Суммы с НДС."/>
         </StackPanel>
     </Grid>
 </UserControl>

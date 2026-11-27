@@ -269,7 +269,7 @@
                             <Style.Triggers><DataTrigger Binding="{Binding IsProposal}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
                         </Style></WrapPanel.Style>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Подписанный PDF" ContentTemplate="{StaticResource IconLabelCheck}"
-                                Tag="{Binding Id}" Click="CardSignedPdf_Click" Margin="0,0,0,4" ToolTip="Открыть основной подписанный PDF"/>
+                                Tag="{Binding Id}" Click="CardSignedPdf_Click" Margin="0,0,0,4" ToolTip="Открыть основной подписанный PDF этого документа"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Tag="{Binding Id}" Click="CardSignedPdfMenu_Click"
                                 Padding="6,4" Margin="0,0,6,4" ToolTip="Добавить / выбрать подписанный PDF"
                                 AutomationProperties.Name="Меню подписанного PDF">
@@ -280,9 +280,9 @@
                         <Button Style="{StaticResource PythonToolbarButton}" Content="АОСР" ContentTemplate="{StaticResource IconLabelFile}"
                                 Tag="{Binding Id}" Click="CardPto_Click" Margin="0,0,6,4"
                                 Visibility="{Binding PtoModeVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
-                                ToolTip="Исполнительная документация этого договора"/>
+                                ToolTip="Исполнительная документация этого документа"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Письма" ContentTemplate="{StaticResource IconLabelFile}"
-                                Tag="{Binding Id}" Click="CardLetters_Click" Margin="0,0,0,4" ToolTip="Письма этого договора"/>
+                                Tag="{Binding Id}" Click="CardLetters_Click" Margin="0,0,0,4" ToolTip="Письма в контексте этого документа"/>
                     </WrapPanel>
                     <TextBlock Text="Предложение — ещё не договор" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold" Margin="0,6,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsProposal}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
@@ -472,7 +472,7 @@
                                     <MenuItem x:Name="PtoMenuItem" Header="Исполнительная документация (АОСР / ПТО)" Click="Pto_Click" Visibility="Collapsed"/>
                                 </MenuItem>
                             </Menu>
-                            <Button Style="{StaticResource SidebarHomeButton}" Click="Home_Click" ToolTip="На главную: сводка по объектам">
+                            <Button Style="{StaticResource SidebarHomeButton}" Click="Home_Click" ToolTip="На главную: сводка по договорам и группам">
                                 <StackPanel Orientation="Horizontal">
                                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" Margin="0,0,6,0" VerticalAlignment="Center">
                                         <Canvas Width="24" Height="24">

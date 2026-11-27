@@ -14,12 +14,12 @@ public partial class ConfirmDeleteDialog : Window
     public ConfirmDeleteDialog(string name, IReadOnlyList<string> details, string what = "объект")
     {
         InitializeComponent();
-        Title = what == "объект" ? "Удаление объекта" : "Удаление документа";
-        HeadingText.Text = $"Удалить {what} навсегда?";
+        Title = what switch { "карточка" => "Удаление карточки", "объект" => "Удаление объекта", _ => "Удаление документа" };
+        HeadingText.Text = what == "карточка" ? "Удалить карточку и все её документы?" : $"Удалить {what}?";
         NameText.Text = "«" + name.Trim() + "»";
         DetailsText.Text = details.Count > 0
             ? "Вместе с ним удалится:\n• " + string.Join("\n• ", details)
-            : "Объект пустой.";
+            : what == "карточка" ? "Карточка пуста." : "Нет дополнительных связанных записей.";
         var (question, answer) = Challenge();
         QuestionText.Text = question;
         _answer = answer;

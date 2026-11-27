@@ -39,7 +39,7 @@
     </Window.Resources>
     <Border Padding="{StaticResource LayoutFormDialogMargin}">
         <StackPanel>
-            <TextBlock Text="В какой год архива отнести объект?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
+            <TextBlock Text="В какой год архива отнести карточку?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
             <TextBlock x:Name="ObjectName" Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,0"/>
             <UniformGrid x:Name="YearGrid" Columns="4" Margin="0,10,0,0"/>
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">

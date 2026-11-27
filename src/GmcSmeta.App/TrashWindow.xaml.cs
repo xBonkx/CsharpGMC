@@ -158,7 +158,7 @@ public partial class TrashWindow : Window
     private sealed record Row(SqlServerTrash.TrashEntry Entry)
     {
         public long Id => Entry.Id;
-        public string KindText => Entry.Kind == "object" ? "Объект" : "Документ";
+        public string KindText => Entry.Kind == "object" ? "Карточка" : "Документ";
         public string Title => Entry.Title;
         public string ObjectName => Entry.ObjectName;
         public string RowsText => Entry.Rows.ToString(CultureInfo.InvariantCulture);
