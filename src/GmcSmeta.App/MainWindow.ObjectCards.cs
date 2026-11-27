@@ -137,6 +137,7 @@ public partial class MainWindow
         ObjectNewKpButton.Visibility = ObjectPropertiesButton.Visibility =
             ObjectMoreButton.Visibility = ObjectRenameButton.Visibility = ObjectCrumb.Visibility = Visibility.Visible;
         ObjectNewKpButton.IsEnabled = SqlWritesEnabled && !o.Archived;
+        ObjectPropertiesButton.Content = mode == NavigationMode.Kp ? "Свойства" : "Реквизиты";
         ObjectPropertiesButton.IsEnabled = SqlWritesEnabled && !o.Archived;
         ObjectMoreButton.IsEnabled = SqlWritesEnabled;
         ObjectRenameButton.IsEnabled = SqlWritesEnabled && !o.Archived;

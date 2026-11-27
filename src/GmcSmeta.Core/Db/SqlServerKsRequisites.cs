@@ -51,6 +51,22 @@ public static class SqlServerKsRequisites
             S(10), S(11), S(12), S(13));
     }
 
+    // Card-level editor does not require an arbitrary annex to exist.
+    internal static Values ReadShared(SqlConnection conn, long objectId)
+    {
+        using var command = new SqlCommand(
+            "SELECT id,name,customer_full,site_full,cust_org,cust_post,cust_name," +
+            "second_role,second_org,second_post,second_name,work_title,works_start " +
+            "FROM dbo.objects WHERE id=@id", conn);
+        command.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
+        using var reader = command.ExecuteReader();
+        if (!reader.Read()) throw new InvalidOperationException("Карточка договора не найдена.");
+        string S(int i) => reader.IsDBNull(i) ? "" :
+            Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? "";
+        return new Values(SqlInteger.ReadInt64(reader, 0), S(1), S(2), S(3), S(4), S(5), S(6),
+            S(7), S(8), S(9), S(10), S(11), S(12), "");
+    }
+
     public static SqlServerDatabase.SaveResult Save(
         string connectionString, long contractId, Values data, string expectedRevision)
     {

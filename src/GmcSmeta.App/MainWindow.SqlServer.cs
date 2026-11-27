@@ -18,6 +18,14 @@ public partial class MainWindow
         if (!SqlWritesEnabled)
             throw new InvalidOperationException("Изменения разрешены только в GmcSmetaPilot_*.");
 
+        if (id is int cardId && CurrentMode != NavigationMode.Kp)
+        {
+            if (_objects.FirstOrDefault(o => o.Id == cardId && !o.Archived) is not { } target)
+                throw new InvalidOperationException("Карточка недоступна для редактирования.");
+            OpenAgreementCard(target);
+            return;
+        }
+
         // Read revision before opening the dialog to detect concurrent writes during editing.
         var revision = SqlServerDatabase.Revision(_serverConn);
         var previous = id is int objectId
