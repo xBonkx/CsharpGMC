@@ -182,11 +182,17 @@ public partial class EstimateView
             Add("Развернуть эту строку м² обратно", () => ExpandArea(selected.Id), canWrite, glyph: "Undo");
         menu.Items.Add(new Separator());
         if (realSelected)
-            Add("Удалить",
-                selected is { IsSystem: true }
+        {
+            var bulkPositions = nSel > 1 && selection.All(r =>
+                !r.IsSystem && !r.IsVirtual && !r.IsAreaSummary);
+            var singleRow = nSel == 1;
+            Add(bulkPositions ? $"Удалить выделенные ({nSel})…" : "Удалить",
+                singleRow && selected is { IsSystem: true }
                     ? () => DeleteSection_Click(this, new RoutedEventArgs())
                     : () => DeletePosition_Click(this, new RoutedEventArgs()),
-                canWrite && nSel == 1, "Del", glyph: "Trash", danger: true);
+                canWrite && (singleRow || bulkPositions), "Del",
+                needsAnchor: !bulkPositions, glyph: "Trash", danger: true);
+        }
         // Python: висячий разделитель в конце меню не рисуется.
         while (menu.Items.Count > 0 && menu.Items[^1] is Separator)
             menu.Items.RemoveAt(menu.Items.Count - 1);
