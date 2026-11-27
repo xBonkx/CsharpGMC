@@ -236,10 +236,17 @@
                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                             </Border>
+                            <!-- Draw the normal grid inside the cell. Native DataGrid gridlines reserve
+                                 a strip outside the selection background and split the blue fill. -->
+                            <Border x:Name="EstimateCellGridLines" BorderBrush="#E4E8EF"
+                                    BorderThickness="0,0,1,1" IsHitTestVisible="False"/>
                             <Rectangle Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1" IsHitTestVisible="False"/>
                             <Rectangle x:Name="EstimateFocusFrame" Stroke="Transparent" StrokeThickness="2" Margin="1" IsHitTestVisible="False"/>
                         </Grid>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="EstimateCellGridLines" Property="BorderBrush" Value="Transparent"/>
+                            </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="EstimateFocusFrame" Property="Stroke" Value="{StaticResource GridFocusBrush}"/>
                             </Trigger>
@@ -254,13 +261,17 @@
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/>
                     <Setter Property="Foreground" Value="#0F172A"/>
-                    <Setter Property="BorderBrush" Value="#93B4E9"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
                 <!-- Python GridDelegate.paint: the cell under the mouse gets a light blue frame
                      (QPen(QColor(37, 99, 235, 140), 1)); the whole row is lit by the stylesheet. -->
-                <Trigger Property="IsMouseOver" Value="True">
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="True"/>
+                        <Condition Property="IsSelected" Value="False"/>
+                    </MultiTrigger.Conditions>
                     <Setter Property="BorderBrush" Value="#87A9F4"/>
-                </Trigger>
+                </MultiTrigger>
                 <!-- Python: the current cell — a firm blue frame, like Excel's cell cursor
                      (QPen(QColor(C["accent"]), 2), r.adjusted(1, 1, -1, -1)). No fill. -->
                 <Trigger Property="IsKeyboardFocusWithin" Value="True">
@@ -775,8 +786,8 @@
                       BeginningEdit="EstimateGrid_BeginningEdit"
                       PreparingCellForEdit="EstimateGrid_PreparingCellForEdit"
                       CellEditEnding="EstimateGrid_CellEditEnding"
-                      HeadersVisibility="Column" GridLinesVisibility="All"
-                       HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
+                      HeadersVisibility="Column" GridLinesVisibility="None"
+                       UseLayoutRounding="True" SnapsToDevicePixels="True"
                       EnableColumnVirtualization="True"
                       CanUserAddRows="False" CanUserDeleteRows="False"
                       RowHeaderWidth="0" SelectionMode="Extended" SelectionUnit="FullRow"
