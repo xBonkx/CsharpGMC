@@ -28,6 +28,7 @@ internal static class PilotCases
         p.RunCase("stage-public-api-and-reopen", () => Stage(p));
         p.RunCase("stage-linked-price-writers", () => StageLinkedPrices(p));
         p.RunCase("parent-kp-stage-excel-name-only-paste", () => StageExcelPaste(p));
+        p.RunCase("large-parent-kp-single-and-batch-delete", () => LargeParentDelete(p));
         p.RunCase("batch-120-work-prices-public-api", () => WorkPrices(p));
         p.RunCase("restart-as-fresh-dotnet-process", p.VerifyViaNewProcess);
         p.RunCase("20-public-save-cell-latencies", () => WriteLatencies(p));
@@ -504,6 +505,64 @@ internal static class PilotCases
         PilotRunner.Check(PilotRunner.Long(conn,
             "SELECT COUNT_BIG(*) FROM dbo.positions WHERE system_id=@system",
             ("@system", system)) == 9, "Stale clipboard retry duplicated rows");
+    }
+
+    private static void LargeParentDelete(PilotRunner p)
+    {
+        var cs = p.PilotConnection;
+        var full = SqlServerWorkspace.CreateEmptyContract(cs, p.ObjectId,
+            new SqlServerWorkspace.NewContractData("kp", "QA-DELETE", "", "QA large deletion",
+                null, null), p.Revision());
+        var section = SqlServerDatabase.AddSection(cs, full, "QA delete", false, null, p.Revision());
+        PilotRunner.Check(section.Saved && section.SystemId.HasValue, "Could not create section");
+        var system = section.SystemId!.Value;
+        var anchor = SqlServerDatabase.AddPosition(cs, full, system, null, null, p.Revision());
+        PilotRunner.Check(anchor.Saved && anchor.PositionId.HasValue, "Could not create anchor");
+        var source = anchor.PositionId!.Value;
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, source, "qty", "4", p.Revision()).Saved,
+            "Could not set anchor quantity");
+        var stage = SqlServerStages.CreateStage(cs, full, p.Revision());
+        PilotRunner.Check(SqlServerStages.SetStageQty(cs, stage, source, 1, p.Revision()).Saved,
+            "Could not allocate stage anchor");
+        var rows = Enumerable.Range(1, 2500)
+            .Select(i => new PastedPosition("QA delete item", "шт", 1m, 0m, null, ""))
+            .ToArray();
+        var pasted = SqlServerDatabase.PastePositions(cs, full, system, source, rows, p.Revision());
+        PilotRunner.Check(pasted.Saved, "Could not seed large parent: " + pasted.Error);
+        using var conn = p.Conn();
+        long Count() => PilotRunner.Long(conn,
+            "SELECT COUNT_BIG(*) FROM dbo.positions WHERE system_id=@id", ("@id", system));
+        var ids = new List<long>();
+        using (var cmd = new SqlCommand(
+            "SELECT TOP(3) id FROM dbo.positions WHERE system_id=@system AND id<>@source ORDER BY [order],id", conn))
+        {
+            cmd.Parameters.Add("@system", SqlDbType.BigInt).Value = system;
+            cmd.Parameters.Add("@source", SqlDbType.BigInt).Value = source;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) ids.Add(reader.GetInt64(0));
+        }
+        PilotRunner.Check(ids.Count == 3 && Count() == 2501, "Unexpected delete fixture");
+        var single = SqlServerDatabase.DeletePositions(cs, full, new[] { ids[0] }, p.Revision());
+        PilotRunner.Check(single.Saved && Count() == 2500, "Single delete failed: " + single.Error);
+        var batch = SqlServerDatabase.DeletePositions(cs, full, ids.Skip(1).ToArray(), single.Revision);
+        PilotRunner.Check(batch.Saved && Count() == 2498, "Batch delete failed: " + batch.Error);
+        var stale = SqlServerDatabase.DeletePositions(cs, full, new[] { source }, single.Revision);
+        PilotRunner.Check(!stale.Saved && Count() == 2498 && p.Revision() == batch.Revision,
+            "Stale deletion modified the document");
+        PilotRunner.Check(PilotRunner.Long(conn,
+            "SELECT COUNT_BIG(*) FROM dbo.positions WHERE system_id=@id AND id=@source",
+            ("@id", system), ("@source", source)) == 1, "Unselected stage anchor disappeared");
+        var qty = Convert.ToDecimal(PilotRunner.Scalar(conn, """
+            SELECT p.qty FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id
+            WHERE s.contract_id=@stage AND p.stage_src=@source
+            """, ("@stage", stage), ("@source", source)), CultureInfo.InvariantCulture);
+        PilotRunner.Check(qty == 1m, "Deletion changed unrelated stage allocation");
+        PilotRunner.Check(PilotRunner.Long(conn, """
+            SELECT COUNT_BIG(*) FROM (
+                SELECT [order],ROW_NUMBER() OVER(ORDER BY [order],id)-1 AS expected
+                FROM dbo.positions WHERE system_id=@system
+            ) q WHERE q.[order]<>q.expected
+            """, ("@system", system)) == 0, "Remaining order was not compacted");
     }
 
     private static void WorkPrices(PilotRunner p)
