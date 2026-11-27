@@ -54,9 +54,7 @@ public static class EstimateGroups
     {
         if (mode is not (Same or Type))
             throw new ArgumentOutOfRangeException(nameof(mode));
-        if (sort is not (EstimateViewProjection.DocumentOrder or EstimateViewProjection.ByName
-            or EstimateViewProjection.ByAmount or EstimateViewProjection.ByPrice
-            or EstimateViewProjection.ByQuantity))
+        if (!EstimateViewProjection.IsValidSort(sort))
             throw new ArgumentOutOfRangeException(nameof(sort));
 
         var allowed = string.IsNullOrWhiteSpace(query) ? null
@@ -102,15 +100,25 @@ public static class EstimateGroups
                 ranks.TryGetValue(b.Key, out var bi) && ai != bi)
                 return ai.CompareTo(bi);
 
-            var value = key switch
+            var value = EstimateViewProjection.SortField(key) switch
             {
                 EstimateViewProjection.ByName => EstimateViewProjection.NaturalCompare(a.Name, b.Name),
-                EstimateViewProjection.ByAmount => b.Amount.CompareTo(a.Amount),
-                EstimateViewProjection.ByPrice => (b.CommonPrice ?? 0).CompareTo(a.CommonPrice ?? 0),
-                EstimateViewProjection.ByQuantity => b.Quantity.CompareTo(a.Quantity),
+                EstimateViewProjection.ByNumber => EstimateViewProjection.NaturalCompare(a.Members[0].Num, b.Members[0].Num),
+                EstimateViewProjection.ByUnit => EstimateViewProjection.NaturalCompare(a.Unit, b.Unit),
+                EstimateViewProjection.ByBasis => EstimateViewProjection.NaturalCompare(a.Members[0].Basis, b.Members[0].Basis),
+                EstimateViewProjection.ByNote => EstimateViewProjection.NaturalCompare(a.Members[0].Note, b.Members[0].Note),
+                EstimateViewProjection.ByAmount => a.Amount.CompareTo(b.Amount),
+                EstimateViewProjection.ByPrice => (a.CommonPrice ?? 0).CompareTo(b.CommonPrice ?? 0),
+                EstimateViewProjection.ByQuantity => a.Quantity.CompareTo(b.Quantity),
+                EstimateViewProjection.ByPurchase => Nullable.Compare(a.CommonPurchase, b.CommonPurchase),
+                EstimateViewProjection.ByWork => Nullable.Compare(a.CommonWork, b.CommonWork),
+                EstimateViewProjection.ByWorkTotal => Nullable.Compare(a.CommonWork * a.Quantity, b.CommonWork * b.Quantity),
+                EstimateViewProjection.ByAreaUnit => Nullable.Compare(EstimateViewProjection.AreaValue(a.Members[0], false), EstimateViewProjection.AreaValue(b.Members[0], false)),
+                EstimateViewProjection.ByAreaTotal => Nullable.Compare(EstimateViewProjection.AreaValue(a.Members[0], true), EstimateViewProjection.AreaValue(b.Members[0], true)),
                 _ => a.FirstSortKey.CompareTo(b.FirstSortKey)
             };
-            return value != 0 ? value : a.FirstSortKey.CompareTo(b.FirstSortKey);
+            return value != 0 ? (EstimateViewProjection.IsDescending(key) ? -Math.Sign(value) : value)
+                : a.FirstSortKey.CompareTo(b.FirstSortKey);
         }
 
         if (mode == Same)
@@ -132,22 +140,24 @@ public static class EstimateGroups
                 return new Section(type, $"{title} — {g.Sum(x => x.Members.Count)} строк",
                     g.Sum(x => x.Amount), g.Min(x => x.FirstSortKey), ordered);
             }).ToArray();
-        var numericKeys = sort is EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice
-            ? sections.ToDictionary(section => section.TypeKey, section => sort == EstimateViewProjection.ByQuantity
+        var field = EstimateViewProjection.SortField(sort);
+        var numericKeys = field is EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice
+            ? sections.ToDictionary(section => section.TypeKey, section => field == EstimateViewProjection.ByQuantity
                 ? section.Groups.Sum(x => x.Quantity)
                 : section.Groups.Max(x => x.CommonPrice ?? 0), StringComparer.Ordinal)
             : null;
         return sections.OrderBy(group => group, Comparer<Section>.Create((a, b) =>
             {
-                var result = sort switch
+                var result = field switch
                 {
                     EstimateViewProjection.ByName => EstimateViewProjection.NaturalCompare(a.Title, b.Title),
-                    EstimateViewProjection.ByAmount => b.Amount.CompareTo(a.Amount),
+                    EstimateViewProjection.ByAmount => a.Amount.CompareTo(b.Amount),
                     EstimateViewProjection.ByQuantity or EstimateViewProjection.ByPrice =>
-                        numericKeys![b.TypeKey].CompareTo(numericKeys[a.TypeKey]),
-                    _ => a.FirstSortKey.CompareTo(b.FirstSortKey)
+                        numericKeys![a.TypeKey].CompareTo(numericKeys[b.TypeKey]),
+                    _ => 0
                 };
-                return result != 0 ? result : a.FirstSortKey.CompareTo(b.FirstSortKey);
+                return result != 0 ? (EstimateViewProjection.IsDescending(sort) ? -Math.Sign(result) : result)
+                    : a.FirstSortKey.CompareTo(b.FirstSortKey);
             })).ToArray();
     }
 

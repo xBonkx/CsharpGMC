@@ -760,7 +760,7 @@
                     </StackPanel>
                 </Border>
                 <DataGrid x:Name="EstimateGrid" MinRowHeight="27" RowHeight="{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}" MinColumnWidth="36" BorderThickness="0" Background="White"
-                          ContextMenuOpening="EstimateGrid_ContextMenuOpening"
+                          ContextMenuOpening="EstimateGrid_ContextMenuOpening" Sorting="EstimateGrid_Sorting"
                        AllowDrop="True"
                        PreviewMouseLeftButtonDown="EstimateGrid_DragMouseDown"
                        PreviewMouseLeftButtonUp="EstimateGrid_DragMouseUp"
@@ -791,7 +791,7 @@
                     <Style TargetType="TextBox" BasedOn="{StaticResource EstimateGridEditor}"/>
                 </DataGrid.Resources>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn x:Name="NumberColumn" Header="№" Width="64" IsReadOnly="True" CanUserReorder="False">
+                    <DataGridTemplateColumn x:Name="NumberColumn" Header="№" SortMemberPath="number" Width="64" IsReadOnly="True" CanUserReorder="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -840,7 +840,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn x:Name="NameColumn" Header="Наименование" Width="460" MinWidth="190">
+                    <DataGridTemplateColumn x:Name="NameColumn" Header="Наименование" SortMemberPath="name" Width="460" MinWidth="190">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock VerticalAlignment="Center"
@@ -854,14 +854,14 @@
                                                    TextWrapping="{Binding EditorWrapping, Source={x:Static local:NameWrapPreference.Current}}" AcceptsReturn="False"/></DataTemplate>
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn x:Name="BasisColumn" Header="Обоснование"
+                    <DataGridTextColumn x:Name="BasisColumn" Header="Обоснование" SortMemberPath="basis"
                                         Binding="{Binding Basis, Mode=TwoWay}" Width="150"
                                         ElementStyle="{StaticResource EstimateTextCell}" EditingElementStyle="{StaticResource EstimateGridEditor}"
                                         Visibility="Collapsed"/>
-                    <DataGridTextColumn Header="Ед." Binding="{Binding Unit, Mode=TwoWay}" Width="64" ElementStyle="{StaticResource CenterCell}" EditingElementStyle="{StaticResource EstimateCenteredEditor}"/>
-                    <DataGridTextColumn Header="Кол-во" Binding="{Binding QtyText, Mode=TwoWay}"
+                    <DataGridTextColumn Header="Ед." SortMemberPath="unit" Binding="{Binding Unit, Mode=TwoWay}" Width="64" ElementStyle="{StaticResource CenterCell}" EditingElementStyle="{StaticResource EstimateCenteredEditor}"/>
+                    <DataGridTextColumn Header="Кол-во" SortMemberPath="qty" Binding="{Binding QtyText, Mode=TwoWay}"
                                         Width="80" ElementStyle="{StaticResource CenterCell}" EditingElementStyle="{StaticResource EstimateCenteredEditor}"/>
-                    <DataGridTemplateColumn Header="Цена" Width="118" CellStyle="{StaticResource EstimatePriceCell}">
+                    <DataGridTemplateColumn Header="Цена" SortMemberPath="price" Width="118" CellStyle="{StaticResource EstimatePriceCell}">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding DisplayPriceText}" Style="{StaticResource Price}"/>
@@ -875,11 +875,11 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Сумма" Binding="{Binding DisplayAmountText}"
+                    <DataGridTextColumn Header="Сумма" SortMemberPath="sum" Binding="{Binding DisplayAmountText}"
                                         Width="130" ElementStyle="{StaticResource Money}" IsReadOnly="True"/>
-                    <DataGridTextColumn x:Name="PurchaseColumn" Header="Закупка" Binding="{Binding PurchaseText, Mode=TwoWay}"
+                    <DataGridTextColumn x:Name="PurchaseColumn" Header="Закупка" SortMemberPath="purchase" Binding="{Binding PurchaseText, Mode=TwoWay}"
                                         Width="110" ElementStyle="{StaticResource Money}" EditingElementStyle="{StaticResource EstimateMoneyEditor}" Visibility="Collapsed"/>
-                    <DataGridTemplateColumn x:Name="WorkColumn" Header="Работа за ед." Width="118" Visibility="Collapsed" CellStyle="{StaticResource EstimateWorkPriceCell}">
+                    <DataGridTemplateColumn x:Name="WorkColumn" Header="Работа за ед." SortMemberPath="work" Width="118" Visibility="Collapsed" CellStyle="{StaticResource EstimateWorkPriceCell}">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding WorkDisplayText}" Style="{StaticResource WorkPrice}"/>
@@ -893,11 +893,11 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn x:Name="WorkTotalColumn" Header="Работа всего"
+                    <DataGridTextColumn x:Name="WorkTotalColumn" Header="Работа всего" SortMemberPath="workTotal"
                                         Binding="{Binding DisplayWorkAmount, StringFormat={}{0:N2}}"
                                         Width="130" ElementStyle="{StaticResource Money}"
                                         IsReadOnly="True" Visibility="Collapsed"/>
-                    <DataGridTemplateColumn x:Name="NoteColumn" Header="Примечание" Width="170">
+                    <DataGridTemplateColumn x:Name="NoteColumn" Header="Примечание" SortMemberPath="note" Width="170">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Note}" Foreground="#64748B"
@@ -909,7 +909,7 @@
                             <DataTemplate><TextBox Text="{Binding Note, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/></DataTemplate>
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn x:Name="AreaUnitColumn" Header="м² за ед."
+                    <DataGridTemplateColumn x:Name="AreaUnitColumn" Header="м² за ед." SortMemberPath="areaUnit"
                                             Width="90" Visibility="Collapsed">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -941,7 +941,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellEditingTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn x:Name="AreaTotalColumn" Header="м² всего"
+                    <DataGridTextColumn x:Name="AreaTotalColumn" Header="м² всего" SortMemberPath="areaTotal"
                                         Binding="{Binding AreaTotalDisplay}" Width="90"
                                         ElementStyle="{StaticResource Money}"
                                         IsReadOnly="True" Visibility="Collapsed"/>

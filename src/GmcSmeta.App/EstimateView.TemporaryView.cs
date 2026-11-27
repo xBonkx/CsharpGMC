@@ -272,7 +272,8 @@ public partial class EstimateView
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
         foreach (var (key, label) in new[]
         {
-            (EstimateViewProjection.DocumentOrder, "Как в КП"),
+            (EstimateViewProjection.DocumentOrder, "Исходный порядок (как в КП)"),
+            (EstimateViewProjection.ByNumber, "По номеру позиции (по возрастанию)"),
             (EstimateViewProjection.ByName, "По названию (А → Я)"),
             (EstimateViewProjection.ByAmount, "По сумме — дорогие сверху"),
             (EstimateViewProjection.ByPrice, "По цене — дорогие сверху"),
@@ -280,18 +281,14 @@ public partial class EstimateView
         })
         {
             var sortKey = key;
-            AddViewOption(menu, label, _temporarySort == sortKey, () =>
-            {
-                _temporarySort = sortKey;
-                _frozenTemporaryOrder.Clear();
-                _frozenGroupedOrder.Clear();
-                ApplyFilter();
-            });
+            AddViewOption(menu, label, _temporarySort == sortKey, () => SetTemporarySort(sortKey));
         }
         menu.Items.Add(new Separator());
+        AddViewOption(menu, "Сбросить сортировку", false,
+            () => SetTemporarySort(EstimateViewProjection.DocumentOrder));
         menu.Items.Add(new MenuItem
         {
-            Header = "Сортировка — один раз, как в Excel: изменённая строка остаётся на месте. Чтобы пересортировать, выберите режим снова.",
+            Header = "Сортировка только на экране. Нажатия на заголовок: по возрастанию → по убыванию → исходный порядок.",
             IsEnabled = false
         });
         menu.IsOpen = true;
@@ -346,13 +343,14 @@ public partial class EstimateView
         var groupOn = _flatTemporaryView ||
             _temporaryGroupMode != EstimateViewProjection.DocumentOrder;
         var sortOn = _temporarySort != EstimateViewProjection.DocumentOrder;
+        RefreshEstimateSortIndicators();
         var active = groupOn || sortOn || _noPriceTemporaryView;
         ResetViewButton.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         // Python sync_view_button: подпись кнопки постоянна, активный вид подсвечен синим.
         StyleBlue(GroupButton, groupOn);
         StyleBlue(SortButton, sortOn);
         SortButton.ToolTip = sortOn
-            ? $"Сортировка (временная): {_temporarySort}. Вернуть — «Как в КП»"
+            ? "Сортировка временная. Вернуть — «Исходный порядок»"
             : "Порядок строк на экране";
         GroupButton.ToolTip = groupOn
             ? "Временная группировка. Порядок строк в КП, Excel и печати не меняется"

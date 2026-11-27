@@ -41,7 +41,8 @@ public partial class EstimateView
         void ShowPosition(EstimateRow source, int depth)
         {
             var original = byId[source.Id];
-            original.DisplayNum = index.SectionName(source.SystemId, original.Num);
+            original.DisplayNum = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber
+                ? original.Num : index.SectionName(source.SystemId, original.Num);
             original.DisplayIndentLevel = depth;
             projected.Add(original);
         }

@@ -730,7 +730,8 @@ public partial class EstimateView : UserControl
                 continue;
             // Prepare only rows surviving search and folds. Stage filtering
             // below needs their current presentation depth to find ancestors.
-            index.PrepareDocumentRow(row, _flatTemporaryView);
+            index.PrepareDocumentRow(row, _flatTemporaryView,
+                EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber);
             visible.Add(row);
         }
 

@@ -203,6 +203,37 @@ public sealed class EstimateViewProjectionTests
     }
 
     [Fact]
+    public void HeaderNumberCycle_RestoresExactDocumentOrderAndPreservesHierarchy()
+    {
+        var rows = new[] { Section(0, 10, "П1"), Pos(1, 1007, 10, "А", 1),
+            Pos(2, 1008, 10, "Комплект", 0, parent: 1007), Pos(3, 463, 10, "Б", 1),
+            Pos(4, 10, 10, "В", 1), Section(5, 20, "В1"), Pos(6, 2, 20, "Г", 1) };
+        var original = rows.ToArray();
+        var asc = EstimateViewProjection.NextSort(EstimateViewProjection.DocumentOrder, EstimateViewProjection.ByNumber);
+        var desc = EstimateViewProjection.NextSort(asc, EstimateViewProjection.ByNumber);
+        var reset = EstimateViewProjection.NextSort(desc, EstimateViewProjection.ByNumber);
+        Assert.Equal(new[] { 0, 4, 3, 1, 2, 5, 6 }, EstimateViewProjection.Apply(rows, sort: asc).Select(r => r.SortKey));
+        Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 6 }, EstimateViewProjection.Apply(rows, sort: desc).Select(r => r.SortKey));
+        Assert.Equal(new[] { 6, 4, 3, 1, 2 }, EstimateViewProjection.Apply(rows, sort: asc, flat: true).Select(r => r.SortKey));
+        Assert.Same(rows, EstimateViewProjection.Apply(rows, sort: reset));
+        Assert.Equal(original, rows);
+    }
+
+    [Fact]
+    public void HeaderQuantityCycle_UsesNumericValuesAndStableTies()
+    {
+        var rows = new[] { Pos(0, 1, 10, "А", 1, 10), Pos(1, 2, 10, "Б", 1, 2),
+            Pos(2, 3, 10, "В", 1, 10) };
+        var asc = EstimateViewProjection.NextSort(EstimateViewProjection.DocumentOrder, EstimateViewProjection.ByQuantity);
+        var desc = EstimateViewProjection.NextSort(asc, EstimateViewProjection.ByQuantity);
+        Assert.Equal(new[] { 1, 0, 2 }, EstimateViewProjection.Apply(rows, sort: asc).Select(r => r.SortKey));
+        Assert.Equal(new[] { 0, 2, 1 }, EstimateViewProjection.Apply(rows, sort: desc).Select(r => r.SortKey));
+        Assert.Equal(EstimateViewProjection.DocumentOrder, EstimateViewProjection.NextSort(desc, EstimateViewProjection.ByQuantity));
+        var grouped = EstimateGroups.Build(rows, EstimateGroups.Same, asc);
+        Assert.Equal(new[] { 1, 0, 2 }, grouped[0].Groups.Select(g => g.FirstSortKey));
+    }
+
+    [Fact]
     public void UnknownSortIsRejectedWithoutDataMutation() =>
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             EstimateViewProjection.Apply(Example(), sort: "sql-order-by"));

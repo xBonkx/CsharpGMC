@@ -93,9 +93,9 @@ internal sealed class EstimateRowViewIndex(IReadOnlyList<EditableEstimateRow> ro
     // Call before publishing each visible row, even if it is reused from a
     // different grouping. Hidden rows need no presentation update until they
     // return. Structural Level/Num remain authoritative for all rows.
-    public void PrepareDocumentRow(EditableEstimateRow row, bool flat)
+    public void PrepareDocumentRow(EditableEstimateRow row, bool flat, bool showPositionNumbers = false)
     {
-        var number = flat && !row.IsSystem
+        var number = flat && !showPositionNumbers && !row.IsSystem
             ? SectionName(row.Source.SystemId, row.Num)
             : row.Num;
         var depth = flat ? (row.IsSub ? 1 : 0) : row.Level;

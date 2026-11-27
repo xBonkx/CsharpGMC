@@ -15,6 +15,48 @@ public static class EstimateViewProjection
     public const string ByAmount = "sum";
     public const string ByPrice = "price";
     public const string ByQuantity = "qty";
+    public const string ByNumber = "number";
+    public const string ByUnit = "unit";
+    public const string ByBasis = "basis";
+    public const string ByPurchase = "purchase";
+    public const string ByWork = "work";
+    public const string ByWorkTotal = "workTotal";
+    public const string ByNote = "note";
+    public const string ByAreaUnit = "areaUnit";
+    public const string ByAreaTotal = "areaTotal";
+    private const string ReverseSuffix = ":reverse";
+
+    public static string SortField(string sort) =>
+        sort.EndsWith(ReverseSuffix, StringComparison.Ordinal) ? sort[..^ReverseSuffix.Length] : sort;
+
+    public static bool IsValidSort(string sort) =>
+        sort == DocumentOrder || SortField(sort) is ByName or ByAmount or ByPrice or ByQuantity
+            or ByNumber or ByUnit or ByBasis or ByPurchase or ByWork or ByWorkTotal
+            or ByNote or ByAreaUnit or ByAreaTotal;
+
+    public static bool IsDescending(string sort)
+    {
+        var field = SortField(sort);
+        var defaultDescending = field is ByAmount or ByPrice or ByQuantity;
+        return defaultDescending != (field != sort);
+    }
+
+    public static string WithDirection(string field, bool descending)
+    {
+        if (field == DocumentOrder) return field;
+        return IsDescending(field) == descending ? field : field + ReverseSuffix;
+    }
+
+    public static string NextSort(string current, string field) =>
+        SortField(current) != field ? WithDirection(field, false) :
+        IsDescending(current) ? DocumentOrder : WithDirection(field, true);
+
+    internal static decimal? AreaValue(EstimateRow row, bool total)
+    {
+        var area = AreaCellPresentation.For(row.Name, row.Unit, row.Qty, row.AreaManual, row.IsAreaSummary);
+        return decimal.TryParse(total ? area.Total : area.Unit, NumberStyles.Number,
+            CultureInfo.GetCultureInfo("ru-RU"), out var value) ? value : null;
+    }
 
     public static IReadOnlyList<EstimateRow> Apply(
         IReadOnlyList<EstimateRow> rows, string? query = null,
@@ -22,7 +64,7 @@ public static class EstimateViewProjection
         IReadOnlyDictionary<int, int>? frozenOrder = null)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        if (sort is not (DocumentOrder or ByName or ByAmount or ByPrice or ByQuantity))
+        if (!IsValidSort(sort))
             throw new ArgumentOutOfRangeException(nameof(sort));
 
         // Most opens use document order without a search or missing-price
@@ -134,15 +176,25 @@ public static class EstimateViewProjection
             var existing = leftRank.CompareTo(rightRank);
             if (existing != 0) return existing;
         }
-        var compared = sort switch
+        var compared = SortField(sort) switch
         {
             ByName => NaturalCompare(left.Name, right.Name),
-            ByAmount => right.Amount.CompareTo(left.Amount),
-            ByPrice => right.Price.CompareTo(left.Price),
-            ByQuantity => right.Qty.CompareTo(left.Qty),
+            ByNumber => NaturalCompare(left.Num, right.Num),
+            ByUnit => NaturalCompare(left.Unit, right.Unit),
+            ByBasis => NaturalCompare(left.Basis, right.Basis),
+            ByNote => NaturalCompare(left.Note, right.Note),
+            ByAmount => left.Amount.CompareTo(right.Amount),
+            ByPrice => left.Price.CompareTo(right.Price),
+            ByQuantity => left.Qty.CompareTo(right.Qty),
+            ByPurchase => Nullable.Compare(left.PurchasePrice, right.PurchasePrice),
+            ByWork => Nullable.Compare(left.WorkPrice, right.WorkPrice),
+            ByWorkTotal => Nullable.Compare(left.WorkPrice * left.Qty, right.WorkPrice * right.Qty),
+            ByAreaUnit => Nullable.Compare(AreaValue(left, false), AreaValue(right, false)),
+            ByAreaTotal => Nullable.Compare(AreaValue(left, true), AreaValue(right, true)),
             _ => left.SortKey.CompareTo(right.SortKey)
         };
-        return compared != 0 ? compared : left.SortKey.CompareTo(right.SortKey);
+        return compared != 0 ? (IsDescending(sort) ? -Math.Sign(compared) : compared)
+            : left.SortKey.CompareTo(right.SortKey);
     }
 
     /// <summary>Natural Cyrillic/Latin title sort: В2 precedes В10.</summary>
