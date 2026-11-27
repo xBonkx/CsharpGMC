@@ -18,6 +18,7 @@ public partial class EstimateView
         public int? ServerId { get; set; }
         public bool Failed { get; set; }
         public Dictionary<string, string> BufferedEdits { get; } = new();
+        public Dictionary<string, string> EnteredEdits { get; } = new();
     }
 
     private PendingEstimateInsert? _pendingEstimateInsert;
@@ -48,7 +49,7 @@ public partial class EstimateView
         }) { IsPendingInsert = true };
 
         var pending = new PendingEstimateInsert(draft, rootId);
-        var index = PendingInsertIndex(visible, pending);
+        var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
         if (index < 0) return null;
         _pendingEstimateInsert = pending;
         // One collection Add, not ItemsSource reassignment: keep the scroll,
@@ -69,15 +70,16 @@ public partial class EstimateView
         return pending;
     }
 
-    private static int PendingInsertIndex(IEnumerable<EditableEstimateRow> visible, PendingEstimateInsert pending)
+    internal static int PendingInsertIndex(IEnumerable<EditableEstimateRow> visible,
+        int systemId, int? afterRootId)
     {
         var index = 0;
         var last = -1;
         foreach (var row in visible)
         {
-            if (row.Source.SystemId == pending.Row.Source.SystemId &&
+            if (row.Source.SystemId == systemId &&
                 !row.IsVirtual &&
-                (pending.AfterRootId is not int root ||
+                (afterRootId is not int root ||
                     !row.IsSystem && (row.Id == root || row.Source.ParentPositionId == root)))
                 last = index;
             index++;
@@ -90,7 +92,7 @@ public partial class EstimateView
         if (_pendingEstimateInsert is not { } pending || !CanShowPendingInsert ||
             !visible.Any(row => row.IsSystem && row.Source.SystemId == pending.Row.Source.SystemId &&
                 !row.IsCollapsed)) return;
-        var index = PendingInsertIndex(visible, pending);
+        var index = PendingInsertIndex(visible, pending.Row.Source.SystemId, pending.AfterRootId);
         if (index >= 0) visible.Insert(index, pending.Row);
     }
 
@@ -113,6 +115,7 @@ public partial class EstimateView
             SetStatus("Формулы доступны после сверки новой позиции с сервером.", true);
             return false;
         }
+        pending.EnteredEdits[field] = input;
         if (pending.Failed || pending.ServerId is null)
             pending.BufferedEdits[field] = input;
         else
@@ -122,6 +125,13 @@ public partial class EstimateView
 
     // Only the accepted SQL snapshot may replace the local draft. Transfer
     // focus by the real identity; don't steal focus if the user moved away.
+    private static string PendingFieldLabel(string field) => field switch
+    {
+        "name" => "Наименование", "unit" => "Ед.", "qty" => "Кол-во",
+        "price" => "Цена", "purchase_price" => "Закупка", "work_price" => "Работа за ед.",
+        "note" => "Примечание", _ => field
+    };
+
     private void ReconcilePendingInsert(EstimateDocument document)
     {
         if (_pendingEstimateInsert is not { } pending) return;
@@ -134,11 +144,11 @@ public partial class EstimateView
                 _editAfterReload = false;
             }
         }
-        else if (pending.Failed && pending.BufferedEdits.Count > 0)
-        {
-            _saveError = (_saveError ?? "Новая позиция не подтверждена") +
-                ". Введённые данные: " + string.Join("; ", pending.BufferedEdits.Select(x => x.Key + ": " + x.Value));
-        }
+        else
+            _saveError ??= "Новая позиция не найдена в подтверждённой смете.";
+        if (_saveError is not null && pending.EnteredEdits.Count > 0)
+            _saveError += ". Введённые данные: " + string.Join("; ",
+                pending.EnteredEdits.Select(x => PendingFieldLabel(x.Key) + ": " + x.Value));
         _pendingEstimateInsert = null;
     }
 }

@@ -178,14 +178,15 @@ public partial class EstimateView
             SetStatus("Сначала обнови смету: есть неподтверждённые правки.", true);
             return;
         }
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         if (_pendingEstimateInsert is not null)
         {
+            // Commit the active draft first, so repeated Add never leaves the
+            // WPF row in edit mode and prevents mandatory readback forever.
             SetStatus("Предыдущая новая позиция ещё сверяется с сервером.", false);
             return;
         }
-
-        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
-            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
         selected ??= _rows.FirstOrDefault(r => r.IsSystem);
         if (selected?.IsVirtual == true)
