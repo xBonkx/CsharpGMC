@@ -123,8 +123,7 @@ public partial class ShipmentsPane : UserControl
                     current = row;
             }
         }
-        LinesGrid.SelectedItems.Clear();
-        foreach (var row in selected) LinesGrid.SelectedItems.Add(row);
+        GridSelectionDelta.Restore(LinesGrid.SelectedItems, selected);
         if (current is not null && state.Column is not null)
             LinesGrid.CurrentCell = new DataGridCellInfo(current, state.Column);
         var generation = ++_viewportGeneration;
@@ -642,8 +641,7 @@ public partial class ShipmentsPane : UserControl
         if (_building || _quantityBusy || sender is not Button { DataContext: CollectionViewGroup group }) return;
         var rows = group.Items.OfType<ShipmentPreviewRow>().Where(RowVisible).ToList();
         if (rows.Count == 0) return;
-        LinesGrid.SelectedItems.Clear();
-        foreach (var row in rows) LinesGrid.SelectedItems.Add(row);
+        GridSelectionDelta.Restore(LinesGrid.SelectedItems, rows);
         SetStatus($"Выбрана система: {rows.Count} поз. Можно добавить или убрать выбранные строки.");
     }
 
@@ -670,9 +668,13 @@ public partial class ShipmentsPane : UserControl
     private async Task AddVisibleRows(bool onlyStock)
     {
         if (!CanStartWrite || !IsEditable || !RequireSavedHeader() || Current is not { } current) return;
-        var visible = (LinesGrid.ItemsSource as ListCollectionView)?.OfType<ShipmentPreviewRow>().ToList() ?? new();
         var selected = LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>().Where(RowVisible).ToList();
-        var source = selected.Count > 0 ? selected : visible;
+        // Do not enumerate/copy the entire view when the user selected rows.
+        // Recheck the live predicate on the all-visible path as well, because
+        // a search change may have been deferred during an active edit.
+        IEnumerable<ShipmentPreviewRow> source = selected.Count > 0 ? selected :
+            (LinesGrid.ItemsSource as ListCollectionView)?.OfType<ShipmentPreviewRow>().Where(RowVisible)
+                ?? Enumerable.Empty<ShipmentPreviewRow>();
         var entries = source.Where(r => r.CanChange && !r.InShipment)
             .Select(r => (PositionId: r.PositionId,
                 Qty: onlyStock ? Math.Min(r.Stock, r.Remaining) : r.Suggested))

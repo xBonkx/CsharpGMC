@@ -67,6 +67,7 @@ internal static class EstimateRowIndexReadbackChecks
             }
         }
         CheckSelectionIdentity();
+        CheckSelectionDelta();
         Console.WriteLine("Estimate row index incremental readback OK (0–25000 positions).");
     }
 
@@ -95,6 +96,30 @@ internal static class EstimateRowIndexReadbackChecks
         if (!result.Selected.SequenceEqual(new[] { nextPosition, nextSystem, nextGroup }) ||
             !ReferenceEquals(result.Primary, nextGroup) || !ReferenceEquals(result.Current, nextPosition))
             throw new Exception("Full estimate rebind lost or misidentified the selected rows.");
+    }
+
+
+    private static void CheckSelectionDelta()
+    {
+        var a = new object();
+        var b = new object();
+        var c = new object();
+        var d = new object();
+        var selected = new System.Collections.ObjectModel.ObservableCollection<object> { a, b, c };
+        var events = new List<System.Collections.Specialized.NotifyCollectionChangedAction>();
+        selected.CollectionChanged += (_, e) => events.Add(e.Action);
+        GridSelectionDelta.Restore(selected, new[] { a, b, c });
+        if (events.Count != 0) throw new Exception("Unchanged selection must not notify.");
+        GridSelectionDelta.Restore(selected, new[] { b, c, d, d });
+        if (!selected.SequenceEqual(new[] { b, c, d }) || events.Count != 2 ||
+            events.Contains(System.Collections.Specialized.NotifyCollectionChangedAction.Reset))
+            throw new Exception("Selection delta must preserve surviving row instances.");
+        events.Clear();
+        GridSelectionDelta.Restore(selected, new[] { a });
+        if (!selected.SequenceEqual(new[] { a }) || events.Count != 2)
+            throw new Exception("Disjoint selection must clear once and add the target.");
+        GridSelectionDelta.Restore(selected, Array.Empty<object>());
+        if (selected.Count != 0) throw new Exception("Empty selection must clear.");
     }
 
 }

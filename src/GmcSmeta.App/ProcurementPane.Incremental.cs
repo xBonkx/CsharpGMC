@@ -81,16 +81,14 @@ public partial class ProcurementPane
                 BuyGrid.ItemsSource = view;
             }
             _buyDisplayKeys = keys;
-            BuyGrid.SelectedItems.Clear();
-            foreach (var row in display.Where(r => selected.Contains(r.PositionId)))
-                BuyGrid.SelectedItems.Add(row);
+            GridSelectionDelta.Restore(BuyGrid.SelectedItems,
+                display.Where(r => selected.Contains(r.PositionId)));
             if (column is not null && BuyGrid.Columns.Contains(column) &&
                 display.FirstOrDefault(r => r.PositionId == currentId) is { } current)
                 BuyGrid.CurrentCell = new DataGridCellInfo(current, column);
         }
         finally { _restoringBuySelection = false; }
-        BuyGrid_SelectionChanged(BuyGrid, new SelectionChangedEventArgs(Selector.SelectionChangedEvent,
-            Array.Empty<object>(), Array.Empty<object>()));
+        PublishBuySelection();
         var generation = ++_buyViewportGeneration;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
@@ -100,6 +98,10 @@ public partial class ProcurementPane
             viewer.ScrollToHorizontalOffset(horizontal);
         }));
     }
+
+    private void PublishBuySelection() =>
+        BuyGrid_SelectionChanged(BuyGrid, new SelectionChangedEventArgs(Selector.SelectionChangedEvent,
+            Array.Empty<object>(), Array.Empty<object>()));
 
     private async Task<bool> TryPatchCommittedBuyRowsAsync(IReadOnlyList<long> ids, string revision)
     {

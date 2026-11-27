@@ -37,6 +37,10 @@ public static class ProcurementViewPlanner
         "part_issued", "issued",
     ];
 
+    private static readonly IReadOnlyDictionary<string, int> StatusRanks =
+        StatusOrder.Select((status, rank) => (status, rank))
+            .ToDictionary(x => x.status, x => x.rank, StringComparer.Ordinal);
+
     public static IReadOnlyList<ProcurementViewEntry> Build(
         IReadOnlyList<ProcurementViewSource> rows, string mode, string sort)
     {
@@ -81,7 +85,7 @@ public static class ProcurementViewPlanner
                     .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => x.OriginalIndex),
                 "status" => source.OrderBy(x =>
-                        Array.IndexOf(StatusOrder, x.Status) is var k && k >= 0 ? k : 99)
+                        x.Status is not null && StatusRanks.TryGetValue(x.Status, out var rank) ? rank : 99)
                     .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(x => x.OriginalIndex),
                 // Every source is either all or a stable subsequence of all.

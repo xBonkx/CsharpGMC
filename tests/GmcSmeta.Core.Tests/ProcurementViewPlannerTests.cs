@@ -97,6 +97,21 @@ public sealed class ProcurementViewPlannerTests
     }
 
     [Fact]
+    public void LargeStatusSortKeepsLegacyRankAndOriginalIndex()
+    {
+        string[] ranks = ["none", "skip", "zero", "fact", "ordered", "shop_queued",
+            "shop_work", "invoice", "paid", "part_stock", "stock", "part_issued", "issued"];
+        var rows = Enumerable.Range(1, 25000).Select(i =>
+            Row(i, i, "П1", "Позиция " + i % 23,
+                status: i % 17 < ranks.Length ? ranks[i % 17] : "unknown")).ToArray();
+        var expected = rows.OrderBy(r =>
+                Array.IndexOf(ranks, r.Status) is var rank && rank >= 0 ? rank : 99)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(r => r.OriginalIndex).Select(r => r.PositionId);
+        Assert.Equal(expected, ProcurementViewPlanner.Build(rows, "kp", "status").Select(r => r.PositionId));
+    }
+
+    [Fact]
     public void InvalidModeOrSort_ThrowsWithoutMutation()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ProcurementViewPlanner.Build([], "unknown", "kp"));

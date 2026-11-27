@@ -523,9 +523,16 @@ public partial class ProcurementPane : UserControl
     private void ProcurementSelectGroup_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: CollectionViewGroup group }) return;
-        BuyGrid.SelectedItems.Clear();
-        foreach (var row in group.Items.OfType<ProcurementPreviewRow>())
-            BuyGrid.SelectedItems.Add(row);
+        // A group can contain thousands of positions. Publish history and
+        // selection controls once, not for each individual SelectedItems event.
+        _restoringBuySelection = true;
+        try
+        {
+            GridSelectionDelta.Restore(BuyGrid.SelectedItems,
+                group.Items.OfType<ProcurementPreviewRow>());
+        }
+        finally { _restoringBuySelection = false; }
+        PublishBuySelection();
         SetStatus("");
     }
 
