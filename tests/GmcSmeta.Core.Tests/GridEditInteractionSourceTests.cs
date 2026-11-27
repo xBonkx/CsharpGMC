@@ -44,6 +44,22 @@ public sealed class GridEditInteractionSourceTests
     }
 
     [Fact]
+    public void EstimateFocusesTemplateEditorAndRoutesPasteBeforeStructuralImport()
+    {
+        var cells = Source("EstimateView.Cells.cs");
+        Assert.Contains("GridEditInteraction.FocusTextEditor(EstimateGrid, e);", cells);
+        var shared = Source("GridEditInteraction.cs");
+        Assert.Contains("presenter.ApplyTemplate();", shared);
+        Assert.Contains("if (FocusCurrentEditor()) return;", shared);
+        Assert.Contains("ApplicationCommands.Paste.Execute(null, editor);", shared);
+        Assert.Contains("e.EditingEventArgs is not TextCompositionEventArgs", shared);
+        var shortcuts = Source("EstimateView.Undo.cs");
+        var cellPaste = shortcuts.IndexOf("GridEditInteraction.TryPasteInEditingCell(EstimateGrid)", StringComparison.Ordinal);
+        var rowPaste = shortcuts.IndexOf("PasteRows_Click(sender, e)", StringComparison.Ordinal);
+        Assert.True(cellPaste >= 0 && rowPaste > cellPaste);
+    }
+
+    [Fact]
     public void UnchangedFinancialEditorsDoNotWriteAndCacheDoesNotResetMaterialEdit()
     {
         var materials = Source("EstimateView.Materials.cs");
