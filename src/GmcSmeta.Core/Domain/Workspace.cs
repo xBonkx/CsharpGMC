@@ -50,6 +50,12 @@ public sealed record ObjectDocumentCard(DocRow Document, EstimateCardData Estima
     public int Id => Document.Id;
     public string KindTitle => Document.KindTitle;
     public string Title => Document.Title;
+    public string DisplayKind => Document.Kind == "main" ? "Приложение" : KindTitle;
+    public string DisplayTitle => ShortAgreementTitle ? AgreementPresentation.AnnexTitle(Document) :
+        Document.Kind == "main" ? AgreementPresentation.FullAnnexTitle(Document) : Title;
+    public bool ShortAgreementTitle { get; init; }
+    public string BaseCaption => string.IsNullOrWhiteSpace(BaseTitle) ? "" : BasePrefix + BaseTitle;
+    public string BasePrefix { get; init; } = "к документу: ";
     public string Meta => $"{Estimate.Systems} сист. · {Estimate.Positions} поз." +
         (Estimate.Company.Length > 0 ? " · " + Estimate.Company : "");
     public decimal Total => Estimate.Totals.Total;
@@ -66,6 +72,7 @@ public sealed record ObjectDocuments(IReadOnlyList<ObjectDocumentCard> Cards,
     decimal Total, decimal Materials, decimal Smr, decimal VatTop)
 {
     public ContractFinance Finance { get; init; } = new();
+    public string? AgreementHeading { get; init; }
     public bool ShowProgress { get; init; }
     public ContractProgress Progress => new(Total, Finance.Signed, Finance.Pending);
     public string EarnedText => Finance.Earned(Smr) is decimal value ? Money.Format(value) : "нет данных";
@@ -263,13 +270,19 @@ public static class Workspace
             var baseDoc = doc.BaseContractId is int baseId ? docsById.GetValueOrDefault(baseId) : null;
             var baseTitle = baseDoc is null ? "" : baseDoc.Title.Split(" — ", 2)[^1];
             cards.Add(new ObjectDocumentCard(doc, estimate, doc.Kind == "dop" ? baseTitle : "",
-                tags.GetValueOrDefault(estimate.Form, estimate.Form)) { Finance = finances[doc.Id] });
+                tags.GetValueOrDefault(estimate.Form, estimate.Form)) { Finance = finances[doc.Id],
+                    BasePrefix = baseDoc?.Kind == "main" ? "к приложению: " : "к документу: " });
         }
+        var heading = mode == NavigationMode.Kp ? null : AgreementPresentation.Heading(
+            cards.Select(c => (c.Document, c.Estimate.Company)));
+        if (heading is not null)
+            cards = cards.Select(c => c with { ShortAgreementTitle = c.Document.Kind == "main" }).ToList();
         var totals = cards.Where(c => counted.Contains(c.Id)).ToList();
         return new ObjectDocuments(cards, totals.Sum(c => c.Total), totals.Sum(c => c.Estimate.Statistics.Materials),
             totals.Sum(c => c.Estimate.Statistics.Smr), totals.Where(c => c.Estimate.VatTop).Sum(c => c.Estimate.Totals.Vat))
         {
             Finance = ContractFinance.Sum(totals.Select(c => c.Finance)),
+            AgreementHeading = heading,
             ShowProgress = mode != NavigationMode.Kp && all.Any(d => d.Kind is "main" or "dop")
         };
     }

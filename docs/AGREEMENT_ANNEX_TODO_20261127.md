@@ -18,25 +18,25 @@
 
 <a id="agr-01"></a>
 
-### AGR-01 — P0 — NOT STARTED: Аудит существующей группировки и юридических реквизитов
+### AGR-01 — P0 — PARTIAL: Аудит существующей группировки и юридических реквизитов
 
 - [ ] Проверить objects/contracts, Kind, Number, Date, Company, BaseContractId, StageOf, связи, отчёты, архив. Выделить случаи нескольких номеров/дат/контрагентов внутри одного объекта, пустых номеров, неоднозначных ДС и КП без договора. Проверять только исходники и отдельную Pilot-копию, без изменения данных. Составить таблицу фактических полей и сценариев; не объявлять каждый объект одним юридическим договором без проверки.
 
 <a id="agr-02"></a>
 
-### AGR-02 — P1 — NOT STARTED: Главное окно: минимальная терминология
+### AGR-02 — P1 — PARTIAL: Главное окно: минимальная терминология
 
 - [ ] MainWindow.xaml, MainWindow.xaml.cs, MainWindow.ObjectCards.cs, MainWindow.Navigation.cs: Новый объект → Новый договор, Поиск объекта → Поиск договора, Объект → Договор, Итого по объекту → Итого по договору, Документы → Приложения и ДС, Документы объекта → Документы договора. Применять с учётом режима КП/архива и неоднозначности AGR-01. Оставить пять плиток, сетку, цвета, размеры, иконки, кнопки, прогресс и нижнюю панель. Не добавлять реестр КС или новые вкладки на главном экране.
 
 <a id="agr-03"></a>
 
-### AGR-03 — P1 — NOT STARTED: Дерево, карточки и заголовки приложений
+### AGR-03 — P1 — PARTIAL: Дерево, карточки и заголовки приложений
 
 - [ ] Workspace.cs, Navigation.cs, MainWindow.xaml, EstimateView.xaml/cs: kind=main показывать как «Приложение», короткое название брать из Name (fallback с идентификатором/существующим номером без выдуманного номера приложения). ДС сохраняет номер и дату и связь «к приложению», если BaseContractId задан. Номер юридического договора не повторять в каждом заголовке при однозначном контексте. Поиск по старому полному названию, номеру договора, названию приложения и ДС остаётся доступен; сохранить идентификаторы, порядок, этапы, архив, раскрытие и выбор. Не менять глобально DocRow.Title, если его используют экспорт/бизнес-логика; выделить UI-проекцию.
 
 <a id="agr-04"></a>
 
-### AGR-04 — P1 — NOT STARTED: Шапка и свойства договора
+### AGR-04 — P1 — PARTIAL: Шапка и свойства договора
 
 - [ ] ObjectDialog.xaml/cs, ObjectRow и чтение реквизитов: короткое рабочее название, номер и дата договора, заказчик, подрядчик, адрес стройки, папка документов, тег, примечание. На первом этапе отображать только однозначно подтверждённые реквизиты существующих документов, конфликт отмечать явно; не выбирать первый/последний номер наугад. Редактируемые поля нового уровня, наследование, пустые значения и правила обновления после решения AGR-01/AGR-10; не менять подписанные документы при редактировании карточки.
 
@@ -66,7 +66,7 @@
 
 <a id="agr-09"></a>
 
-### AGR-09 — P1 — NOT STARTED: Приёмка визуального блока
+### AGR-09 — P1 — PARTIAL: Приёмка визуального блока
 
 - [ ] Сравнить с текущим экраном Днепровский и ДНС 12.2: те же пять плиток, суммы, прогресс, сетка, отступы, расположение команд; отличаются только согласованные подписи и однозначная шапка. Длинные названия, пустые/разные номера, ДС с/без базы, КП, этапы/остаток, архив, 100/125/150% DPI, узкое окно, поиск и возврат к смете. Добавить тесты UI-проекции и исходников, реальную WPF-проверку. Никаких новых иконок по аналогии.
 
@@ -85,3 +85,5 @@
 ## Журнал
 
 - 27.11.2026 — ChatGPT/main, base `49b25e57a848874d5259add7e8d8a6d96b9e3e55`: оформлено ТЗ по указанию владельца; 11 новых задач. Только документация. Код, БД, расчёты и релиз не менялись. Все задачи открыты, статусы уточнять после фактического аудита. Отдельный профильный счётчик, не прибавлять к четырём историческим спискам как новые дефекты; пересечения фиксировать как алиасы при проверке.
+
+- 27.11.2026 ChatGPT/main (base 9090218) — AGR-01/02/03/04 PARTIAL, AGR-09 PARTIAL: source audit + first visual block. SidebarSearch local template, zero TextBox padding, a single 30/32 inset on centered PART_ContentHost, min34 without fixed height, short placeholder, Ctrl+P in tooltip, 3:2 button columns. Existing icons unchanged. Main/card/tree display projections: main badge «Приложение», name first, legal number retained in tree and ambiguous cards; show short card title and header only for matching nonempty number/date/company display strings and explicitly linked DS within current object; this is conservative presentation, not legal identity proof. KP/archives distinct, unresolved group labels rather than fictitious contract. Creation dialog labels only; same handlers and kind codes, no autofill or data migrations. Existing totals, KS, tabs, document IDs/search tips and SQL untouched. Source review confirms objects name/customer/address/folder and contracts number/date/company/base/stage; separate legal ID absent in current projection; group conflicts and real data must be checked on Pilot. Added two domain tests and one XAML source test; not run. Remaining full terminology/form/export audit, explicit identity/number-date normalization and true company ID check, Windows build/xUnit, WPF narrow sidebar/DPI/large font, SQL Pilot. No release/DONE.

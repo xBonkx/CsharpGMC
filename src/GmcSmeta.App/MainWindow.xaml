@@ -13,6 +13,38 @@
              позиционирует развёрнутое окно с 8px «нахлёстом» за края — так он заполняет рабочую
              область ровно; ограничивать размер руками не нужно. -->
     <Window.Resources>
+        <!-- Local single-line search: reserve icon space once, and let the text
+             host measure its line at the current font scale instead of clipping it. -->
+        <Style x:Key="SidebarSearch" TargetType="TextBox" BasedOn="{StaticResource PythonSearch}">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Chrome" CornerRadius="8" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
+                                          Margin="30,0,32,0" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#94A3B8"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="SidebarIconButton" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -202,14 +234,14 @@
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Top">
                     <WrapPanel Margin="0,0,0,4">
-                        <Border Background="#E8F0FE" CornerRadius="9" Padding="9,2"><TextBlock Text="{Binding KindTitle}" Foreground="#1E40AF" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/></Border>
+                        <Border Background="#E8F0FE" CornerRadius="9" Padding="9,2"><TextBlock Text="{Binding DisplayKind}" Foreground="#1E40AF" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/></Border>
                         <Border Background="#F1F4F9" CornerRadius="9" Padding="9,2" Margin="6,0,0,0">
                             <Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding TagName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Border.Style>
                             <TextBlock Text="{Binding TagName}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" MaxWidth="220" ToolTip="{Binding TagName}"/>
                         </Border>
                     </WrapPanel>
-                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip="{Binding Title}"/>
-                    <TextBlock Text="{Binding BaseTitle, StringFormat=к договору: {0}}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
+                    <TextBlock Text="{Binding DisplayTitle}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip="{Binding Title}"/>
+                    <TextBlock Text="{Binding BaseCaption}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding BaseTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
                     <TextBlock Text="{Binding Meta}" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
@@ -301,16 +333,16 @@
         <DataTemplate x:Key="NewDocumentCardTemplate">
             <Button Style="{StaticResource NewContractCardButton}" Click="ObjectNewContract_Click"
                     IsEnabled="{Binding CanCreate}"
-                    AutomationProperties.Name="Новое КП"
+                    AutomationProperties.Name="{Binding Caption}"
                     Width="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=Window}}"
-                    ToolTip="Создать пустое КП или копию существующего">
+                    ToolTip="Создать документ или копию существующего">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" HorizontalAlignment="Center">
                         <Canvas Width="24" Height="24">
                             <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphPlus}" Stroke="#2563EB"/>
                         </Canvas>
                     </Viewbox>
-                    <TextBlock Text="Новое КП" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding Caption}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
                                Foreground="#2563EB" TextAlignment="Center" Margin="0,8,0,0"/>
                     <TextBlock Text="пустое или копия существующего"
                                Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
@@ -342,7 +374,7 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="#2563EB" x:Name="DocumentIcon"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Grid.Column="1" Text="{Binding Document.NavigationName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="6,0,4,0"/>
                 <!-- Python NavDelegate: 10pt body × 0.88 = 8.8pt (11.733 DIP). -->
                 <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" Width="17" Height="17"
                         Padding="0" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -453,11 +485,11 @@
                         </DockPanel>
                         <Grid Margin="{StaticResource LayoutSidebarSectionGap}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="3*"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="2*"/>
                             </Grid.ColumnDefinitions>
-                            <Button x:Name="NewObjectButton" Content="Новый объект" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewObject_Click" ToolTip="Создать объект (Ctrl+N)"
+                            <Button x:Name="NewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewObject_Click" ToolTip="Создать карточку договора (Ctrl+N)"
                                     Style="{StaticResource PrimaryButton}" Padding="5,4" MinHeight="32"/>
                             <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Padding="5,4"
                                     Content="Из Excel" ContentTemplate="{StaticResource IconLabelUpload}"
@@ -465,17 +497,16 @@
                                     ToolTip="Загрузить КП из Excel (Ctrl+I)" Click="ImportExcelFromObject_Click"/>
                         </Grid>
                         <Grid Margin="{StaticResource LayoutSidebarSectionGap}">
-                            <TextBox x:Name="ObjectSearch" Style="{StaticResource PythonSearch}"
-                                     Padding="30,6,32,6" Height="34" VerticalContentAlignment="Center"
-                                     AutomationProperties.Name="Поиск объекта"
-                                     ToolTip="Объект и документ: несколько слов в любом порядке. Esc — очистить; Ctrl+P — поиск по всей базе."
+                            <TextBox x:Name="ObjectSearch" Style="{StaticResource SidebarSearch}"
+                                     AutomationProperties.Name="Поиск договора"
+                                     ToolTip="Договор, приложение или КП: несколько слов в любом порядке. Esc — очистить; Ctrl+P — поиск по всей базе."
                                      TextChanged="ObjectSearch_TextChanged" KeyDown="ObjectSearch_KeyDown"/>
                             <Viewbox Width="14" Height="14" Stretch="Uniform" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0">
                                 <Canvas Width="24" Height="24">
                                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/>
                                 </Canvas>
                             </Viewbox>
-                            <TextBlock Text="Поиск объекта… (Ctrl+P — везде)" Margin="30,0,10,0" Foreground="#64748B"
+                            <TextBlock Text="Поиск договора…" Margin="30,0,32,0" Foreground="#64748B"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -484,8 +515,8 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="28"
-                                    ToolTip="Очистить поиск объекта" AutomationProperties.Name="Очистить поиск объекта"
+                            <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="28" Margin="0,0,2,0"
+                                    ToolTip="Очистить поиск договора" AutomationProperties.Name="Очистить поиск договора"
                                     Click="ClearObjectSearch_Click">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
@@ -548,7 +579,7 @@
                             <TabPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
                         </ControlTemplate>
                     </TabControl.Template>
-                    <TabItem x:Name="DocumentsWorkspaceTab" Header="Объекты и договоры"/>
+                    <TabItem x:Name="DocumentsWorkspaceTab" Header="Договоры и КП"/>
                     <TabItem x:Name="PeopleWorkspaceTab" Header="Люди и автомобили"/>
                 </TabControl>
                 <Grid x:Name="DocumentsWorkspaceSurface" Grid.Row="1">
@@ -567,13 +598,13 @@
                                 <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#2563EB"/>
                             </Canvas>
                         </Viewbox>
-                        <TextBlock Text="Выберите объект слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
+                        <TextBlock Text="Выберите договор или КП слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
                         <TextBlock Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
                                    Foreground="#64748B" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
                             <Button Content="Загрузить КП из Excel" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
-                            <Button Content="Новый объект" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
+                            <Button Content="Новый договор" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -623,7 +654,7 @@
                                 <Border x:Name="ObjectTotalCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0">
                                     <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#2563EB" Offset="0"/><GradientStop Color="#4F46E5" Offset="1"/></LinearGradientBrush></Border.Background>
                                     <StackPanel>
-                                    <TextBlock Text="Итого по объекту" Foreground="White" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="ObjectTotalCaption" Text="Итого по группе" Foreground="White" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                                     <TextBlock x:Name="ObjectTotalValue" Foreground="White" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                     <TextBlock x:Name="ObjectTotalSub" Foreground="#DBEAFE" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
                                 </StackPanel></Border>
@@ -646,7 +677,7 @@
                                     <TextBlock Text="{Binding EarnedText}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel></Border>
                             </Grid>
-                            <TextBlock Text="ДОКУМЕНТЫ" Foreground="#64748B" FontSize="{StaticResource UiSectionSize}" FontWeight="Bold" Grid.Row="2" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="ObjectDocumentsCaption" Text="ДОКУМЕНТЫ" Foreground="#64748B" FontSize="{StaticResource UiSectionSize}" FontWeight="Bold" Grid.Row="2" Margin="0,0,0,10"/>
                             <TextBlock x:Name="ObjectCardsStatus" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="ObjectCardsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed" SizeChanged="ObjectCards_SizeChanged" ScrollChanged="ObjectCards_ScrollChanged">
                                 <ItemsControl x:Name="DocumentCards" ItemTemplateSelector="{StaticResource ObjectCardSelector}">
@@ -657,7 +688,7 @@
                                     Padding="16,10" Margin="0,10,12,0" Visibility="Collapsed"
                                     IsEnabled="{Binding IsEnabled, ElementName=ObjectMoreButton}">
                                 <StackPanel>
-                                    <TextBlock Text="Документы объекта" Style="{StaticResource UiCaption}" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <TextBlock x:Name="ObjectToolsCaption" Text="Документы группы" Style="{StaticResource UiCaption}" FontWeight="SemiBold" Margin="0,0,0,6"/>
                                     <WrapPanel>
                                         <Button Content="АОСР" Style="{StaticResource PythonToolbarButton}" Click="ObjectPto_Click" Margin="0,0,8,3"
                                                 Visibility="{Binding Visibility, ElementName=PtoMenuItem}" ToolTip="Исполнительная документация по объекту"/>

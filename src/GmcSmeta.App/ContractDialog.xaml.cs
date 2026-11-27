@@ -33,7 +33,7 @@ public partial class ContractDialog : Window
 
     private static readonly KindItem[] Kinds =
     {
-        new("kp", "КП"), new("main", "Договор"), new("dop", "Допсоглашение"),
+        new("kp", "КП"), new("main", "Приложение"), new("dop", "Допсоглашение"),
     };
 
     private readonly bool _isNew;
@@ -76,7 +76,7 @@ public partial class ContractDialog : Window
         InitializeComponent();
         _isNew = true;
         ImportExcelButton.Visibility = allowExcelImport ? Visibility.Visible : Visibility.Collapsed;
-        Title = kind == "dop" ? "Новое допсоглашение" : "Новое КП";
+        Title = kind == "dop" ? "Новое допсоглашение" : kind == "main" ? "Новое приложение" : "Добавить документ";
         CaptionText.Text = "Новое КП / допсоглашение";
         OkButton.Content = "Создать";
         ObjectText.Text = objectName;

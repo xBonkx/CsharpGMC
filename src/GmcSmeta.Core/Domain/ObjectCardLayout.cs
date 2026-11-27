@@ -4,7 +4,7 @@ namespace GmcSmeta.Core.Domain;
 /// Last visual item in the object document grid, matching Python ObjectPage.NewCard.
 /// This is presentation-only; document lists and financial totals stay unchanged.
 /// </summary>
-public sealed record NewContractCardItem(bool CanCreate);
+public sealed record NewContractCardItem(bool CanCreate, string Caption = "Новое КП");
 
 public static class ObjectCardLayout
 {
@@ -12,7 +12,7 @@ public static class ObjectCardLayout
     /// Copy real document cards in their existing order and append exactly one
     /// creation item, including for an empty list. Does not mutate SQL data.
     /// </summary>
-    public static IReadOnlyList<object> AppendNewContract<T>(IReadOnlyList<T> cards, bool canCreate)
+    public static IReadOnlyList<object> AppendNewContract<T>(IReadOnlyList<T> cards, bool canCreate, string caption = "Новое КП")
         where T : class
     {
         ArgumentNullException.ThrowIfNull(cards);
@@ -22,7 +22,7 @@ public static class ObjectCardLayout
             presentation[index] = cards[index] ?? throw new ArgumentException(
                 "Document cards must not contain null.", nameof(cards));
 
-        presentation[^1] = new NewContractCardItem(canCreate);
+        presentation[^1] = new NewContractCardItem(canCreate, caption);
         return Array.AsReadOnly(presentation);
     }
 }

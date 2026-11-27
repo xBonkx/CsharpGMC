@@ -94,14 +94,15 @@ public partial class MainWindow
         // Prepare the header, totals and cards on this dispatcher turn, with
         // no await or visibility gap before publication.
         var resetScroll = !ReferenceEquals(PageHost.Content, ObjectPage) || _displayedObjectId != o.Id;
-        PrepareObjectHeader(o, mode);
+        PrepareObjectHeader(o, mode, documents.AgreementHeading);
         ObjectTotals.DataContext = documents;
         _objectTileLayout = null;
         ObjectProgressCard.Visibility = documents.ShowProgress ? Visibility.Visible : Visibility.Collapsed;
         // The final tile is the real Python "Новое КП" action. Financial
         // totals and document count intentionally use documents.Cards only.
         DocumentCards.ItemsSource = ObjectCardLayout.AppendNewContract(
-            documents.Cards, SqlWritesEnabled && !o.Archived);
+            documents.Cards, SqlWritesEnabled && !o.Archived,
+            mode == NavigationMode.Kp ? "Новое КП" : "Добавить документ");
         ObjectCardsStatus.Visibility = Visibility.Collapsed;
         ObjectTotals.Visibility = ObjectCardsScroll.Visibility = Visibility.Visible;
         ObjectTotalValue.Text = Money.Format(documents.Total);
@@ -118,12 +119,21 @@ public partial class MainWindow
         StatusText.Text = $"{o.Name}  ·  документов: {documents.Cards.Count}  ·  SQL Server";
     }
 
-    private void PrepareObjectHeader(ObjectRow o, NavigationMode mode)
+    private void PrepareObjectHeader(ObjectRow o, NavigationMode mode, string? agreementHeading = null)
     {
         var truncated = o.Name.Length > 110;
         var name = truncated ? o.Name[..105].TrimEnd(' ', ',', '.') + "…" : o.Name;
         ObjectTitle.Text = name + (o.Archived ? "   (архив" + (o.ArchivedOn.Length >= 4 ? " " + o.ArchivedOn[..4] : "") + ")" : "");
-        ObjectTitle.ToolTip = truncated ? o.Name : "Двойной щелчок — переименовать объект";
+        var singleAgreement = mode != NavigationMode.Kp && !string.IsNullOrWhiteSpace(agreementHeading);
+        ObjectCrumb.Text = mode == NavigationMode.Kp ? "КП" : singleAgreement ? "Договор" : "Группа документов";
+        ObjectTotalCaption.Text = mode == NavigationMode.Kp ? "Итого по КП" : singleAgreement ? "Итого по договору" : "Итого по группе";
+        ObjectDocumentsCaption.Text = mode == NavigationMode.Kp ? "КОММЕРЧЕСКИЕ ПРЕДЛОЖЕНИЯ" :
+            mode == NavigationMode.Archive ? "ДОКУМЕНТЫ" : "ПРИЛОЖЕНИЯ И ДС";
+        ObjectToolsCaption.Text = singleAgreement ? "Документы договора" : "Документы группы";
+        ObjectNewKpButton.Content = mode == NavigationMode.Kp ? "Новое КП" : "Добавить документ";
+        ObjectNewKpButton.ToolTip = mode == NavigationMode.Kp ? "Создать КП: пустое или копию существующего" :
+            "Создать приложение, ДС или КП";
+        ObjectTitle.ToolTip = truncated ? o.Name : "Двойной щелчок — переименовать карточку";
         ObjectNewKpButton.Visibility = ObjectPropertiesButton.Visibility =
             ObjectMoreButton.Visibility = ObjectRenameButton.Visibility = ObjectCrumb.Visibility = Visibility.Visible;
         ObjectNewKpButton.IsEnabled = SqlWritesEnabled && !o.Archived;
@@ -131,8 +141,10 @@ public partial class MainWindow
         ObjectMoreButton.IsEnabled = SqlWritesEnabled;
         ObjectRenameButton.IsEnabled = SqlWritesEnabled && !o.Archived;
         ObjectTitle.TextWrapping = TextWrapping.Wrap;
-        var parts = new[] { o.Customer.Length > 0 ? "заказчик: " + o.Customer : "", o.Address,
+        var parts = new[] { agreementHeading ?? "", o.Customer.Length > 0 ? "заказчик: " + o.Customer : "", o.Address,
             o.Folder.Length > 0 ? "папка: " + o.Folder : "" }.Where(p => p.Length > 0).ToList();
+        if (mode == NavigationMode.Contracts && !singleAgreement)
+            parts.Insert(0, "Реквизиты договора не определены однозначно");
         ObjectSubtitle.Text = parts.Count > 0 ? string.Join(" · ", parts) : "Заказчик, адрес и папку документов можно указать в «Свойствах».";
         ObjectSubtitle.TextWrapping = TextWrapping.Wrap;
         ObjectDocumentTools.Visibility = mode == NavigationMode.Contracts ? Visibility.Visible : Visibility.Collapsed;

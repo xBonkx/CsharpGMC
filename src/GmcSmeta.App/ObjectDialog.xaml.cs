@@ -10,7 +10,8 @@ public partial class ObjectDialog : Window
     public ObjectDialog(IReadOnlyList<ObjectTag> tags, ObjectProperties? properties = null)
     {
         InitializeComponent();
-        Heading.Text = properties is null ? "Новый объект" : "Объект";
+        Heading.Text = properties is null ? "Новый договор" : "Свойства карточки";
+        Title = Heading.Text;
         var value = properties ?? new ObjectProperties("");
         NameInput.Text = value.Name; CustomerInput.Text = value.Customer; AddressInput.Text = value.Address;
         FolderInput.Text = value.Folder; NoteInput.Text = value.Note;
