@@ -13,12 +13,15 @@ public partial class MainWindow
         IReadOnlyDictionary<int, decimal> SystemSmr, SqlServerKpRequisites.Values Requisites,
         decimal SmrPercent, bool ManualNumbering);
 
-    private KpSnapshot LoadKpPrintData(int contractId)
+    private bool _kpExportInProgress;
+
+    private static KpSnapshot LoadKpPrintData(string connectionString, int contractId)
     {
-        if (_sqlConnectionString is null) throw new InvalidOperationException("Нет подключения к SQL Server.");
-        using var conn = SqlServerDatabase.Open(_sqlConnectionString);
+        using var conn = SqlServerDatabase.Open(connectionString);
         var startRevision = SqlServerDatabase.Revision(conn);
-        var header = Workspace.Documents(conn).FirstOrDefault(x => x.Id == contractId)
+        if (string.IsNullOrWhiteSpace(startRevision))
+            throw new InvalidOperationException("Не удалось прочитать ревизию SQL Server.");
+        var header = Workspace.ReadDocumentMetadata(conn, contractId)
             ?? throw new InvalidOperationException("Документ для экспорта не найден.");
         var estimate = EstimateReader.Load(conn, contractId);
 
@@ -75,6 +78,7 @@ public partial class MainWindow
     private async void ExportKpDocumentCore(DocRow doc, bool internalPrices = false,
         bool positional = false, bool pdf = false, bool vatLine = false)
     {
+        if (_kpExportInProgress || _sqlConnectionString is not { } connectionString) return;
         // Python kp_export._default_file: object-based name, number and date.
         var prefix = doc.Kind switch
         {
@@ -88,13 +92,14 @@ public partial class MainWindow
             + (doc.Kind != "kp" && !string.IsNullOrWhiteSpace(doc.Number) ? " № " + doc.Number : "")
             + (string.IsNullOrWhiteSpace(doc.Date) ? "" : " " + doc.Date);
         if (internalPrices) fileName += " (закуп-розница)";
+        _kpExportInProgress = true;
         try
         {
             if (pdf)
             {
                 await ContractDocumentSave.PdfAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(doc.Id);
+                    var snapshot = LoadKpPrintData(connectionString, doc.Id);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
@@ -108,7 +113,7 @@ public partial class MainWindow
             {
                 await ContractDocumentSave.XlsxAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(doc.Id);
+                    var snapshot = LoadKpPrintData(connectionString, doc.Id);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
@@ -126,5 +131,6 @@ public partial class MainWindow
             MessageBox.Show(this, ex.Message, "Экспорт КП",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { _kpExportInProgress = false; }
     }
 }

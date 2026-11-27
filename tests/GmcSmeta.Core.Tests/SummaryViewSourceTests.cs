@@ -48,8 +48,10 @@ public sealed class SummaryViewSourceTests
         var source = SummarySource("EstimateView.SummaryExcel.cs");
         Assert.Contains("if (!SummarySnapshotReady ||", source);
         Assert.True(source.IndexOf("var snapshot = rows.ToArray();", StringComparison.Ordinal) <
-            source.IndexOf("XlsxExport.Save(", StringComparison.Ordinal));
-        Assert.Contains("SummaryDisplayedExcel.Fill(sheet, snapshot)", source);
+            source.IndexOf("await ContractDocumentSave.XlsxAsync", StringComparison.Ordinal));
+        Assert.Contains("SummaryDisplayedExcel.Create(snapshot, token)", source);
+        Assert.Contains("if (_summaryExcelCancellation is not null) return;", source);
+        Assert.Contains("token.ThrowIfCancellationRequested();", source);
         Assert.DoesNotContain("NumberText.Parse", source);
         Assert.DoesNotContain("FormulaA1 =", source);
     }

@@ -35,6 +35,22 @@ internal static class SummaryExcelChecks
         Require(saved.Cell("H4").IsEmpty(), "Missing value must remain blank.");
         Require(saved.Cell("N3").GetDouble() == -15 && saved.Cell("P3").GetDouble() == 50, "Margin/markup.");
         Require(saved.Cell("L5").GetDouble() == 1543.12 && saved.Cell("A5").Style.Font.Bold, "Total or style lost.");
+        using (var created = SummaryDisplayedExcel.Create(new[] { new Row { Name = "Контроль", QtyText = "1,25" } },
+                   CancellationToken.None))
+        {
+            Require(created.Worksheet(1).Name == "Лист1" && created.Worksheet(1).Cell("C2").GetDouble() == 1.25,
+                "Background workbook preserves sheet and quantity.");
+        }
+        using (var cancelled = new CancellationTokenSource())
+        {
+            cancelled.Cancel();
+            try
+            {
+                using var unused = SummaryDisplayedExcel.Create(Array.Empty<Row>(), cancelled.Token);
+                throw new Exception("Cancelled summary export must not create workbook.");
+            }
+            catch (OperationCanceledException) { }
+        }
         Console.WriteLine("Summary displayed XLSX numeric cells and missing markers OK.");
         CheckKsProgress();
     }

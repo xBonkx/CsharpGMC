@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 4cc7ed1) — PERF-023/047/050 PARTIAL: scoped KP print header, captured connection and single-flight export, background displayed cost summary workbook, coherent procurement-control export. Tests added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 129e66a) — PERF-047 PARTIAL: asynchronous guarded trash mutations, debounced/pre-tokenized history filter, cached immutable Excel import report and no-op safe-choice refresh. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 7a1fb49) — PERF-016/041/044 PARTIAL: linear clipboard copy projection, indexed large replacement guard, allocation-light formula references and frozen adorner palette. Tests added, not run; see performance TODO.

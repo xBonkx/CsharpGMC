@@ -130,9 +130,25 @@ public static class Workspace
     public static List<DocRow> ReadObjectDocumentMetadata(DbConnection conn, int objectId) =>
         ReadDocuments(conn, objectId, false);
 
-    private static string DocumentQuery(int? objectId) =>
+    /// <summary>Single print header, without unrelated contract totals.</summary>
+    public static DocRow? ReadDocumentMetadata(DbConnection conn, int contractId)
+    {
+        if (contractId <= 0) throw new ArgumentOutOfRangeException(nameof(contractId));
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = DocumentQuery(null, contractId);
+        var parameter = cmd.CreateParameter();
+        parameter.ParameterName = "@contract";
+        parameter.DbType = System.Data.DbType.Int32;
+        parameter.Value = contractId;
+        cmd.Parameters.Add(parameter);
+        using var reader = cmd.ExecuteReader();
+        return ReadDocumentRows(reader, null).SingleOrDefault();
+    }
+
+    private static string DocumentQuery(int? objectId, int? contractId = null) =>
         "SELECT id, object_id, kind, number, [date], name, locked, stage_of, stage_no, stage_rest, kp_phase, base_contract_id, \"order\", company_id FROM contracts " +
-        (objectId.HasValue ? "WHERE object_id=@object " : "") + "ORDER BY object_id, \"order\", id";
+        (contractId.HasValue ? "WHERE id=@contract " : objectId.HasValue ? "WHERE object_id=@object " : "") +
+        "ORDER BY object_id, \"order\", id";
 
     private static List<DocRow> ReadDocuments(DbConnection conn, int? objectId, bool includeTotals)
     {

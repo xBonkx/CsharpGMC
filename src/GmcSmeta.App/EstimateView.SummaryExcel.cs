@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using ClosedXML.Excel;
 
@@ -7,8 +8,11 @@ namespace GmcSmeta.App;
 
 public partial class EstimateView
 {
-    internal void SummaryExcel_Click(object sender, RoutedEventArgs e)
+    private CancellationTokenSource? _summaryExcelCancellation;
+
+    internal async void SummaryExcel_Click(object sender, RoutedEventArgs e)
     {
+        if (_summaryExcelCancellation is not null) return;
         if (!SummarySnapshotReady ||
             SummaryGrid?.ItemsSource is not ObservableCollection<SummaryRow> rows)
         {
@@ -19,8 +23,21 @@ public partial class EstimateView
         // refresh cannot mix rows, totals or title from a different view.
         var snapshot = rows.ToArray();
         var title = "Сводная — " + (_estimate?.Title ?? _contractId.ToString());
-        XlsxExport.Save(Window.GetWindow(this), title,
-            sheet => SummaryDisplayedExcel.Fill(sheet, snapshot));
+        using var cancellation = new CancellationTokenSource();
+        _summaryExcelCancellation = cancellation;
+        var token = cancellation.Token;
+        if (SummaryExcelButton is { } button) button.IsEnabled = false;
+        try
+        {
+            await ContractDocumentSave.XlsxAsync(Window.GetWindow(this), title,
+                () => SummaryDisplayedExcel.Create(snapshot, token), token);
+        }
+        finally
+        {
+            _summaryExcelCancellation = null;
+            if (!_detached && SummaryExcelButton is { } current)
+                current.IsEnabled = SummarySnapshotReady;
+        }
     }
 }
 
@@ -29,7 +46,27 @@ internal static class SummaryDisplayedExcel
 {
     private static readonly CultureInfo Ru = CultureInfo.GetCultureInfo("ru-RU");
 
-    internal static void Fill(IXLWorksheet sheet, IReadOnlyList<EstimateView.SummaryRow> rows)
+    internal static XLWorkbook Create(IReadOnlyList<EstimateView.SummaryRow> rows, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var book = new XLWorkbook();
+        try
+        {
+            var sheet = book.Worksheets.Add("Лист1");
+            Fill(sheet, rows, token);
+            token.ThrowIfCancellationRequested();
+            sheet.Columns().AdjustToContents(1, Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 1, 200));
+            return book;
+        }
+        catch
+        {
+            book.Dispose();
+            throw;
+        }
+    }
+
+    internal static void Fill(IXLWorksheet sheet, IReadOnlyList<EstimateView.SummaryRow> rows,
+        CancellationToken token = default)
     {
         XlsxExport.Header(sheet, 1, new[]
         {
@@ -44,6 +81,7 @@ internal static class SummaryDisplayedExcel
         var index = 2;
         foreach (var r in rows)
         {
+            token.ThrowIfCancellationRequested();
             sheet.Cell(index, 1).Value = r.Name;
             sheet.Cell(index, 2).Value = r.Unit;
             var values = new[]

@@ -171,6 +171,7 @@ public partial class EstimateView
 
     private void InvalidateCostSummary()
     {
+        _summaryExcelCancellation?.Cancel();
         CancelSummaryRead();
         _summaryRevision = "";
         _costSummaryData = null;
@@ -236,7 +237,7 @@ public partial class EstimateView
             _summarySearchIndex = snapshot.Search;
             if (SummaryTransferSmrButton is not null)
                 SummaryTransferSmrButton.IsEnabled = !_estimate.Locked;
-            if (SummaryExcelButton is not null) SummaryExcelButton.IsEnabled = true;
+            if (SummaryExcelButton is not null) SummaryExcelButton.IsEnabled = _summaryExcelCancellation is null;
             SummaryFillSystemFilter();
             SummaryRebuild();
             _summaryRevision = snapshot.Revision;

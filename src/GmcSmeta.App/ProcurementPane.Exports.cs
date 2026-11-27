@@ -11,50 +11,55 @@ namespace GmcSmeta.App;
 /// <summary>Procurement control XLSX/PDF exports and workshop PDF from SQL contract scope.</summary>
 public partial class ProcurementPane
 {
+    private bool _controlExportBusy;
+
     private async void ProcurementExport_Click(object sender, RoutedEventArgs e)
     {
+        if (_controlExportBusy || !IsLoaded) return;
+        _controlExportBusy = true;
+        var attachment = _attachmentGeneration;
+        bool IsCurrent() => IsLoaded && IsVisible && attachment == _attachmentGeneration;
         SetStatus("Подготовка выгрузки контроля…");
-        ProcurementControlExport.Snapshot snapshot;
         try
         {
-            snapshot = await Task.Run(() => ProcurementControlExport.Read(_connectionString, _contractId));
-        }
-        catch (Exception ex)
-        {
-            SetStatus("Ошибка чтения данных контроля: " + ex.Message);
-            return;
-        }
-        var dialog = new SaveFileDialog
-        {
-            Title = "Выгрузка контроля оборудования",
-            Filter = "Excel (*.xlsx)|*.xlsx|PDF (*.pdf)|*.pdf",
-            FileName = $"Контроль оборудования — {snapshot.Document.ObjectName} — {DateTime.Today:dd.MM.yyyy}.xlsx",
-            AddExtension = true, OverwritePrompt = true
-        };
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        var path = dialog.FileName;
-        try
-        {
-            if (dialog.FilterIndex == 2)
+            var snapshot = await Task.Run(() => ProcurementControlExport.Read(_connectionString, _contractId));
+            if (!IsCurrent()) return;
+            var dialog = new SaveFileDialog
             {
-                await Task.Run(() =>
+                Title = "Выгрузка контроля оборудования",
+                Filter = "Excel (*.xlsx)|*.xlsx|PDF (*.pdf)|*.pdf",
+                FileName = $"Контроль оборудования — {snapshot.Document.ObjectName} — {DateTime.Today:dd.MM.yyyy}.xlsx",
+                AddExtension = true, OverwritePrompt = true
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true || !IsCurrent()) return;
+            var path = dialog.FileName;
+            var pdf = dialog.FilterIndex == 2;
+            // Once the user confirms a destination, finish this captured
+            // report independently of later view switches, using atomic save.
+            await Task.Run(() =>
+            {
+                if (pdf)
                 {
                     var data = ProcurementPdfExport.CreateControl(snapshot, withMoney: false);
                     ExportFilePublication.WriteBytes(path, data);
-                });
-            }
-            else
-            {
-                await Task.Run(() =>
+                }
+                else
                 {
                     using var workbook = ProcurementControlExport.CreateWorkbook(snapshot, withMoney: false);
                     ExportFilePublication.Write(path, stream => workbook.SaveAs(stream));
-                });
+                }
+            });
+            if (IsCurrent())
+            {
+                SetStatus("Контроль оборудования сохранён: " + path);
+                TryOpenExport(path);
             }
-            SetStatus("Контроль оборудования сохранён: " + path);
-            TryOpenExport(path);
         }
-        catch (Exception ex) { SetStatus("Экспорт не выполнен: " + ex.Message); }
+        catch (Exception ex)
+        {
+            if (IsCurrent()) SetStatus("Экспорт не выполнен: " + ex.Message);
+        }
+        finally { _controlExportBusy = false; }
     }
 
     private async void ProcurementShopOrder_Click(object sender, RoutedEventArgs e)
