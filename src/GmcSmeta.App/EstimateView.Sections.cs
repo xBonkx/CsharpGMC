@@ -667,35 +667,243 @@ public partial class EstimateView
     private async void PasteExcel_Click(object sender, RoutedEventArgs e)
     {
         if (_estimate?.Locked != false) return;
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
-        if (_serverConflict) { SetStatus("Сначала обнови смету.", true); return; }
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true))
+        {
+            SetStatus("Заверши редактирование перед вставкой.", true);
+            return;
+        }
+        var revision = _serverRevision;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites)
+        {
+            SetStatus("Заверши сохранение и обнови смету перед вставкой.", true);
+            return;
+        }
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow ?? _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected?.IsVirtual == true)
+        if (selected is null || selected.IsVirtual || selected.IsAreaSummary || selected.Source.SystemId <= 0)
         {
             SetStatus("Выбери конкретный раздел или позицию для вставки Excel.", true);
             return;
         }
-        if (selected is null) { SetStatus("Сначала создай раздел для вставки.", true); return; }
         IReadOnlyList<PastedPosition> parsed;
         try
         {
             var clipboard = Clipboard.ContainsText() ? Clipboard.GetText() : "";
             parsed = PastedPositions.Parse(clipboard);
         }
-        catch (Exception ex) { SetStatus("Ошибка вставки: " + ex.Message, true); return; }
-        var name = _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == selected.Source.SystemId)?.Name ?? "";
-        var confirm = $"Вставить {parsed.Count} строк из Excel в «{name}»?\n\n" +
-            "Порядок колонок: Название | Ед. | Кол-во | Цена | Закупка | Примечание.\n" +
-            "Вставка добавит новые позиции; существующие строки не заменит.";
-        if (MessageBox.Show(Window.GetWindow(this), confirm, "Импорт из Excel",
-            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        catch (Exception ex) { ShowExcelPasteError(ex.Message); return; }
+        if (parsed.Count == 0) { ShowExcelPasteError("В буфере нет позиций."); return; }
+
         var section = selected.Source.SystemId;
         long? after = selected.IsSystem ? null : selected.Source.ParentPositionId ?? selected.Id;
-        await RunSectionCommandAsync(rev => SqlServerDatabase.PastePositions(
-            _sqlConnectionString, _contractId, section, after, parsed, rev),
-            $"Вставка {parsed.Count} строк", $"Вставлено {parsed.Count} строк",
-            () => { _focusAfterReload = null; _focusSystemAfterReload = section;
-                if (!string.IsNullOrWhiteSpace(EstimateSearch.Text)) EstimateSearch.Clear(); });
+        var name = _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == section)?.Name ?? "Без названия";
+        if (!ConfirmExcelPaste(parsed, name)) return;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites || !_rows.Contains(selected))
+        {
+            ShowExcelPasteError("Смета или выбранная строка изменились. Обнови смету и повтори вставку.");
+            return;
+        }
+
+        // Use the same guarded write/readback lifecycle as the other clipboard
+        // operations. Capture the target and revision BEFORE the modal dialog.
+        _reloadTimer.Stop();
+        AttachSaveCloseGuard();
+        Interlocked.Increment(ref _pendingWrites);
+        SetStatus($"Вставка из Excel: {parsed.Count} строк…", false);
+        string? error = null;
+        var saved = false;
+        await _writeLock.WaitAsync();
+        try
+        {
+            if (_serverConflict || _detached || revision != _serverRevision || _estimate?.Locked != false)
+                throw new InvalidOperationException("Смета изменилась до записи.");
+            var result = await Task.Run(() => SqlServerDatabase.PastePositions(
+                _sqlConnectionString, _contractId, section, after, parsed, revision));
+            if (!result.Saved)
+            {
+                _serverConflict = result.Revision != _serverRevision;
+                error = result.Error ?? "SQL Server отклонил вставку.";
+            }
+            else
+            {
+                _serverRevision = result.Revision;
+                _saveAwaitingReadback = true;
+                saved = true;
+                // Keep the anchor in view, not the top of a long section.
+                _focusAfterReload = after is long id ? checked((int)id) : null;
+                _focusSystemAfterReload = after is null ? section : null;
+                if (!string.IsNullOrWhiteSpace(EstimateSearch.Text)) EstimateSearch.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
+            error = "Запись не подтверждена SQL Server. Не повторяй вставку до обновления.\n" + ex.Message;
+        }
+        finally
+        {
+            if (error is not null) _saveError = error;
+            _writeLock.Release();
+            Interlocked.Decrement(ref _pendingWrites);
+            _reloadTimer.Stop();
+            _reloadTimer.Start();
+        }
+        // Refresh the actual document immediately, including its stage snapshot.
+        // Never replay an insert after an uncertain COMMIT.
+        if (Volatile.Read(ref _pendingWrites) == 0)
+        {
+            _reloadTimer.Stop();
+            await ReloadDocumentAsync();
+        }
+        if (error is not null)
+            ShowExcelPasteError(error);
+        else if (saved && !_saveAwaitingReadback && !_serverConflict &&
+                 _publishedEstimateRevision == _serverRevision)
+            SetStatus($"Вставлено из Excel: {parsed.Count} строк ✓", false);
     }
+
+    private bool ConfirmExcelPaste(IReadOnlyList<PastedPosition> rows, string sectionName, string? source = null)
+    {
+        var window = CreateExcelPasteWindow("Импорт из Excel", out var body);
+        var heading = new TextBlock
+        {
+            Text = $"Вставить строки из Excel?",
+            FontSize = 20, FontWeight = FontWeights.SemiBold,
+            Foreground = Brush("#0F172A")
+        };
+        body.Children.Add(heading);
+        body.Children.Add(new TextBlock
+        {
+            Text = source is null ? "Из буфера обмена" : source,
+            Foreground = Brush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 16)
+        });
+        var preview = new StackPanel();
+        preview.Children.Add(new TextBlock
+        {
+            Text = $"Раздел: {sectionName}", FontWeight = FontWeights.SemiBold,
+            TextWrapping = TextWrapping.Wrap, Foreground = Brush("#1E40AF")
+        });
+        preview.Children.Add(new TextBlock
+        {
+            Text = $"Новых позиций: {rows.Count}", Margin = new Thickness(0, 6, 0, 9),
+            Foreground = Brush("#334155")
+        });
+        foreach (var row in rows.Take(5))
+            preview.Children.Add(new TextBlock
+            {
+                Text = "•  " + row.Name.Replace('\r', ' ').Replace('\n', ' '),
+                TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = row.Name,
+                Margin = new Thickness(0, 2, 0, 2), Foreground = Brush("#334155")
+            });
+        if (rows.Count > 5)
+            preview.Children.Add(new TextBlock
+            {
+                Text = $"…и ещё {rows.Count - 5}", Margin = new Thickness(0, 6, 0, 0),
+                Foreground = Brush("#64748B")
+            });
+        body.Children.Add(new Border
+        {
+            Background = Brush("#F8FAFC"), BorderBrush = Brush("#E2E8F0"),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(14), Child = preview
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = "Колонки: название · ед. · количество · цена · закупка · примечание",
+            Foreground = Brush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 13, 0, 8)
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = "Будут добавлены новые строки. Существующие позиции и объёмы этапов не заменяются.",
+            Foreground = Brush("#334155"), TextWrapping = TextWrapping.Wrap
+        });
+        AddExcelPasteButtons(window, body, $"Вставить ({rows.Count})", true);
+        return window.ShowDialog() == true;
+    }
+
+    private void ShowExcelPasteError(string message)
+    {
+        SetStatus("Ошибка вставки: " + message, true);
+        var window = CreateExcelPasteWindow("Ошибка вставки", out var body);
+        body.Children.Add(new TextBlock
+        {
+            Text = "Не удалось подтвердить вставку", FontSize = 19,
+            FontWeight = FontWeights.SemiBold, Foreground = Brush("#991B1B")
+        });
+        body.Children.Add(new ScrollViewer
+        {
+            MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(0, 12, 0, 0),
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }
+        });
+        AddExcelPasteButtons(window, body, "Закрыть", false);
+        window.ShowDialog();
+    }
+
+    private Window CreateExcelPasteWindow(string title, out StackPanel body)
+    {
+        var owner = Window.GetWindow(this);
+        var window = new Window
+        {
+            Title = title, Width = 560, SizeToContent = SizeToContent.Height,
+            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            AllowsTransparency = true, Background = Brushes.Transparent,
+            ShowInTaskbar = false, Owner = owner,
+            WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+            FontFamily = (FontFamily)FindResource("UiFontFamily"),
+            FontSize = (double)FindResource("UiBodySize"),
+            Foreground = Brush("#0F172A"), UseLayoutRounding = true
+        };
+        body = new StackPanel();
+        var chrome = new Border
+        {
+            Margin = new Thickness(15), Padding = new Thickness(24),
+            Background = Brushes.White, BorderBrush = Brush("#E2E8F0"),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Color.FromRgb(15, 23, 42), BlurRadius = 24, ShadowDepth = 7, Opacity = 0.2
+            },
+            Child = body
+        };
+        chrome.MouseLeftButtonDown += (_, args) =>
+        {
+            if (args.ChangedButton == MouseButton.Left && args.ButtonState == MouseButtonState.Pressed)
+                window.DragMove();
+        };
+        window.Content = chrome;
+        return window;
+    }
+
+    private static void AddExcelPasteButtons(Window window, StackPanel body, string action, bool confirmation)
+    {
+        var footer = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 20, 0, 0)
+        };
+        if (confirmation)
+        {
+            var cancel = new Button
+            {
+                Content = "Отмена", IsCancel = true, MinWidth = 100,
+                Padding = new Thickness(16, 8, 16, 8), Margin = new Thickness(0, 0, 10, 0)
+            };
+            footer.Children.Add(cancel);
+        }
+        var accept = new Button
+        {
+            Content = action, Style = (Style)window.FindResource("PrimaryButton"),
+            MinWidth = 128, Padding = new Thickness(16, 8, 16, 8), IsDefault = true
+        };
+        accept.Click += (_, _) => window.DialogResult = true;
+        footer.Children.Add(accept);
+        body.Children.Add(footer);
+    }
+
+    private static SolidColorBrush Brush(string hex) =>
+        (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
 }
