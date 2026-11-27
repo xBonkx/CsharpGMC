@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — GRID-27/QA-15: видимость текста редактора
+
+27.11.2026 ChatGPT/main (base da2b863) — GRID-27/QA-15 PARTIAL, owner screenshot v1.0.6: selected supplier text invisible inside Materials editor. Shared TextBox/PasswordBox styles forced SelectionOpacity=1; Microsoft WPF docs warn opaque adorner can hide underlying glyphs. Remove forced opacity (renderer-specific default), set runtime host switch Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering=false before WPF initialization; white selected text on blue editor selection, separate light-blue row/dark text palette unchanged. Covers PythonGridEditor/CompactCostEditor inheritance. No edit/save/SQL/geometry/icons changes. Expanded SharedControlStates source regression; Windows build/test/render not run. Verify published runtimeconfig, selected supplier/name/cost/note in Materials, estimate, KS, procurement and ordinary text/combobox/password fields at focus/blur, 100/125/150% DPI. Root cause plausible, not reproduced on Windows; no DONE.
+
 ## 27.11.2026 — AGR-02: подписи режима КП/договоров
 
 27.11.2026 ChatGPT/main (base 11cfe3d) — AGR-02 PARTIAL, owner screenshot v1.0.6: KP tab incorrectly used static «Новый договор» captions. Mode-specific captions on sidebar and empty page, search/accessibility, context menu, ObjectDialog heading/help; updated through RefreshNavigation (startup/restoration, manual and programmatic mode switches). Existing group creation, empty-card membership, document creation commands, schema and icons unchanged. Added 3 mode theory cases and source assertions; not run. Windows smoke check outstanding.

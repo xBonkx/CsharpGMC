@@ -61,6 +61,19 @@ public sealed class SharedControlStatesTests
             (string?)e.Attribute("Value") == "White");
         Assert.Contains(textBox.Elements(), e => (string?)e.Attribute("Property") == "SelectionBrush" &&
             (string?)e.Attribute("Value") == "#2563EB");
+        // Full opacity in legacy adorner mode hides the text underneath.
+        // Leave opacity to WPF and explicitly select the glyph-aware renderer at host startup.
+        Assert.DoesNotContain(app.Descendants(), e => e.Name.LocalName == "Setter" &&
+            (string?)e.Attribute("Property") == "SelectionOpacity");
+        var project = Source("GmcSmeta.App.csproj");
+        var selectionSwitch = Assert.Single(project.Descendants().Where(e =>
+            e.Name.LocalName == "RuntimeHostConfigurationOption" &&
+            (string?)e.Attribute("Include") == "Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering"));
+        Assert.Equal("false", (string?)selectionSwitch.Attribute("Value"));
+        var password = app.Descendants().Single(e => e.Name.LocalName == "Style" &&
+            (string?)e.Attribute("TargetType") == "PasswordBox" && e.Attribute(x + "Key") is null);
+        Assert.Contains(password.Elements(), e => (string?)e.Attribute("Property") == "SelectionTextBrush" &&
+            (string?)e.Attribute("Value") == "White");
         Assert.Equal("#C9DBFB", (string?)app.Descendants().Single(e => (string?)e.Attribute(x + "Key") == "GridSelectionBrush").Attribute("Color"));
         Assert.Equal("#0F172A", (string?)app.Descendants().Single(e => (string?)e.Attribute(x + "Key") == "GridSelectionTextBrush").Attribute("Color"));
     }

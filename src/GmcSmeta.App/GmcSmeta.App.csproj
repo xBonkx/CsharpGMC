@@ -13,6 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Set before WPF initializes TextBox metadata; paint selected glyphs over the fill. -->
+    <RuntimeHostConfigurationOption Include="Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering" Value="false" />
     <Resource Include="Assets\app.ico" Link="Assets\app.ico" />
     <InternalsVisibleTo Include="GmcSmeta.App.Checks" />
     <EmbeddedResource Include="Assets\templates\ks_dns_template.xlsx" LogicalName="GmcSmeta.App.Templates.ks_dns_template.xlsx" />

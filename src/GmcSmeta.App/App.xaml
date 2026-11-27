@@ -139,7 +139,8 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="CaretBrush" Value="#0F172A"/>
             <Setter Property="SelectionBrush" Value="#2563EB"/>
-            <Setter Property="SelectionOpacity" Value="1"/>
+            <Setter Property="SelectionTextBrush" Value="White"/>
+            <!-- Use WPF renderer-specific opacity: legacy adorner must not cover glyphs. -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="PasswordBox">
@@ -642,7 +643,7 @@
             <Setter Property="CaretBrush" Value="#0F172A"/>
             <Setter Property="SelectionBrush" Value="#2563EB"/>
             <Setter Property="SelectionTextBrush" Value="White"/>
-            <Setter Property="SelectionOpacity" Value="1"/>
+            <!-- WPF chooses opacity for its actual text selection renderer. -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
