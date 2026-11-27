@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — отложенная инициатива, не смена текущего приоритета
+
+27.11.2026 — P2 / NOT STARTED: [единый справочник контрагентов](docs/COUNTERPARTIES_TODO_20261127.md), CTR-01…08. Запрос владельца: несрочное улучшение, текущий релиз не блокирует. Сначала аудит AGR/SQL и согласование отдельной модели, затем справочник → договор/КП/КС → закупки → ПТО. Только ТЗ, код/DDL/БД не менялись; задачи не начаты.
+
 ## 27.11.2026 — AGR: встроенная страница реквизитов договора
 
 27.11.2026 ChatGPT/main (base 4916823) — AGR-04/07/09 PARTIAL. Owner requests embedded agreement requisites instead of cramped modal and shared KS requisites. Existing contract/group properties command opens AgreementCardView in PageHost; new-card and KP dialogs preserved. Uses existing WPF tile/toolbar styles, no new icons, no changes to main card layout. Number/date/company shown read-only from consistent annex metadata (not new legal identity); normal properties plus common KS customer/site/signers/work title/start date editable, one Pilot-only Serializable transaction on dbo.objects with archive/ownership/revision checks and change log. Works for empty cards; existing KS exports already read shared fields through c.object_id; local ks_site_part untouched. Back confirms unsaved edits; switching tree discards edits with visible notice; SQL save result never navigates away from a different page. Shared data is card-scoped, not separate legal entity; multiple legal agreements in one legacy card need audit. Actual print date/DS fields audit identified standard KS Excel uses own document date and DNS has missing date fields; separate correction still pending. Added 3 facts + 2 theory cases, not run; Windows layout/build/xUnit/SQL Pilot and actual export not verified. No DB/schema/release/DONE.
