@@ -96,6 +96,10 @@ public partial class ContractActsWorkspace : UserControl
     private List<SqlServerActs.ActInfo> _acts = new();
     private List<SqlServerActs.ActInfo> _summaryActs = new();
     private SqlServerActs.SummaryData? _summary;
+    private List<KsSummaryVm>? _summaryAllRows;
+    private List<KsSummaryVm>? _summaryRestRows;
+    private readonly Dictionary<long, KsSummaryVm> _summaryPositionViews = new();
+    private (long Id, string Number)[] _summaryColumnKeys = Array.Empty<(long, string)>();
 
     public ContractActsWorkspace()
     {
@@ -286,6 +290,9 @@ public partial class ContractActsWorkspace : UserControl
         _totals = null;
         _extras = Array.Empty<SqlServerActs.ExtraRow>();
         _summaryActs.Clear();
+        _summaryAllRows = null;
+        _summaryRestRows = null;
+        _summaryPositionViews.Clear();
         if (SummaryGrid is not null) SummaryGrid.ItemsSource = null;
         if (ExtraGrid is not null) ExtraGrid.ItemsSource = null;
         if (ExtraBox is not null) ExtraBox.Visibility = Visibility.Collapsed;
@@ -293,7 +300,8 @@ public partial class ContractActsWorkspace : UserControl
 
     private async Task RefreshSummaryAsync()
     {
-        if (!_bound || !IsLoaded || !IsVisible || SummaryPage.Visibility != Visibility.Visible) return;
+        if (!_bound || !IsLoaded || !IsVisible || SummaryPage.Visibility != Visibility.Visible ||
+            _summaryCancellation is not null) return;
         InvalidateSummary();
         var version = _summaryVersion;
         using var cancellation = new CancellationTokenSource();
@@ -350,9 +358,14 @@ public partial class ContractActsWorkspace : UserControl
 
     private void BuildSummaryColumns()
     {
+        var ordered = _summaryActs.OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
+        var keys = ordered.Select(a => (a.Id, a.Number)).ToArray();
+        if (SummaryGrid.Columns.Count == keys.Length + 8 && _summaryColumnKeys.SequenceEqual(keys))
+            return;
+
         while (SummaryGrid.Columns.Count > 4)
             SummaryGrid.Columns.RemoveAt(4);
-        foreach (var act in _summaryActs.OrderBy(a => a.Date).ThenBy(a => a.Id))
+        foreach (var act in ordered)
         {
             // заголовок столбца — только номер акта (дата — в заголовке листа сводной)
             SummaryGrid.Columns.Add(new DataGridTextColumn
@@ -373,6 +386,7 @@ public partial class ContractActsWorkspace : UserControl
         AddTextColumn("Остаток", nameof(KsSummaryVm.Left), 84);
         AddTextColumn("Остаток, ₽", nameof(KsSummaryVm.LeftSum), 110, right: true);
         AddTextColumn("Выдано на объект", nameof(KsSummaryVm.Issued), 110);
+        _summaryColumnKeys = keys;
     }
 
     private void AddTextColumn(string header, string property, double width, bool right = false)
@@ -413,21 +427,26 @@ public partial class ContractActsWorkspace : UserControl
             });
             foreach (var p in positions)
             {
-                rows.Add(new KsSummaryVm
+                if (!_summaryPositionViews.TryGetValue(p.PositionId, out var item))
                 {
-                    PositionId = p.PositionId,
-                    Num = p.NumText,
-                    Name = p.Name,
-                    Unit = p.Unit,
-                    Qty = QtyText(p.QtyByKp),
-                    Done = p.Done == 0m ? "" : QtyText(p.Done),
-                    Left = Math.Abs(p.Left) > 0.000000001m ? QtyText(p.Left) : "—",
-                    LeftSum = Math.Abs(p.LeftSum) > 0.005m ? Money.Format(p.LeftSum) : "",
-                    Issued = p.Issued == 0m ? "" : QtyText(p.Issued),
-                    FullyClosed = Math.Abs(p.Left) <= 0.000001m,
-                    LeftRaw = p.Left,
-                    PerAct = p.PerAct,
-                });
+                    item = new KsSummaryVm
+                    {
+                        PositionId = p.PositionId,
+                        Num = p.NumText,
+                        Name = p.Name,
+                        Unit = p.Unit,
+                        Qty = QtyText(p.QtyByKp),
+                        Done = p.Done == 0m ? "" : QtyText(p.Done),
+                        Left = Math.Abs(p.Left) > 0.000000001m ? QtyText(p.Left) : "—",
+                        LeftSum = Math.Abs(p.LeftSum) > 0.005m ? Money.Format(p.LeftSum) : "",
+                        Issued = p.Issued == 0m ? "" : QtyText(p.Issued),
+                        FullyClosed = Math.Abs(p.Left) <= 0.000001m,
+                        LeftRaw = p.Left,
+                        PerAct = p.PerAct,
+                    };
+                    _summaryPositionViews.Add(p.PositionId, item);
+                }
+                rows.Add(item);
             }
         }
         return rows;
@@ -435,8 +454,12 @@ public partial class ContractActsWorkspace : UserControl
 
     private void ApplySummaryFilter()
     {
-        if (SummaryGrid is null) return;
-        SummaryGrid.ItemsSource = BuildSummaryRows(SummaryRestOnly.IsChecked == true);
+        if (SummaryGrid is null || _summary is null) return;
+        var rows = SummaryRestOnly.IsChecked == true
+            ? (_summaryRestRows ??= BuildSummaryRows(true))
+            : (_summaryAllRows ??= BuildSummaryRows(false));
+        if (!ReferenceEquals(SummaryGrid.ItemsSource, rows))
+            SummaryGrid.ItemsSource = rows;
     }
 
     private void SummaryRest_Changed(object sender, RoutedEventArgs e) => ApplySummaryFilter();
@@ -574,8 +597,9 @@ public partial class ContractActsWorkspace : UserControl
                 $"{Money.Format(signed)} из {Money.Format(totals.Total)} ({PctOf(signed, totals.Total):0.0}%)";
             XlsxExport.Header(sheet, 5, headers);
             int index = 6;
-            var first = index;
-            var doneSumByAct = new Dictionary<long, decimal>();
+            var actColumns = acts.Select((act, i) => (act.Id, Column: 7 + i))
+                .ToDictionary(a => a.Id, a => a.Column);
+            decimal estimateSum = 0m, doneSum = 0m, leftSum = 0m;
             foreach (var row in VisibleSummaryRows(summary))
             {
                 if (row.IsSection)
@@ -592,10 +616,14 @@ public partial class ContractActsWorkspace : UserControl
                 sheet.Cell(index, 3).Value = row.Unit;
                 sheet.Cell(index, 4).Value = (double)row.QtyRaw;
                 sheet.Cell(index, 5).Value = (double)row.PriceRaw;
-                sheet.Cell(index, 6).Value = (double)(row.QtyRaw * row.PriceRaw);
-                for (var i = 0; i < acts.Count; i++)
-                    if (row.PerAct.TryGetValue(acts[i].Id, out var q) && q != 0m)
-                        sheet.Cell(index, 7 + i).Value = (double)q;
+                var amount = row.QtyRaw * row.PriceRaw;
+                estimateSum += amount;
+                doneSum += row.DoneSumRaw;
+                leftSum += row.LeftSumRaw;
+                sheet.Cell(index, 6).Value = (double)amount;
+                foreach (var (actId, quantity) in row.PerAct)
+                    if (quantity != 0m && actColumns.TryGetValue(actId, out var column))
+                        sheet.Cell(index, column).Value = (double)quantity;
                 var offset = 7 + acts.Count;
                 sheet.Cell(index, offset).Value = (double)row.DoneRaw;
                 sheet.Cell(index, offset + 1).Value = (double)row.DoneSumRaw;
@@ -610,20 +638,13 @@ public partial class ContractActsWorkspace : UserControl
                 if (row.FullyClosed)
                     sheet.Range(index, 1, index, headers.Count).Style.Fill.BackgroundColor =
                         ClosedXML.Excel.XLColor.FromHtml("#DCFCE7");
-                foreach (var act in acts)
-                    if (row.PerAct.TryGetValue(act.Id, out var q))
-                        doneSumByAct[act.Id] = doneSumByAct.GetValueOrDefault(act.Id) + q * row.PriceRaw;
                 index++;
             }
-            var last = index - 1;
             // как в Python export_summary_excel: Сдано, руб. = 8+n, Остаток, руб. = 10+n
             sheet.Cell(index, 2).Value = "ИТОГО материалы";
-            sheet.Cell(index, 6).Value = (double)VisibleSummaryRows(summary)
-                .Where(r => !r.IsSection).Sum(r => r.QtyRaw * r.PriceRaw);
-            sheet.Cell(index, 8 + acts.Count).Value = (double)VisibleSummaryRows(summary)
-                .Where(r => !r.IsSection).Sum(r => r.DoneSumRaw);
-            sheet.Cell(index, 10 + acts.Count).Value = (double)VisibleSummaryRows(summary)
-                .Where(r => !r.IsSection).Sum(r => r.LeftSumRaw);
+            sheet.Cell(index, 6).Value = (double)estimateSum;
+            sheet.Cell(index, 8 + acts.Count).Value = (double)doneSum;
+            sheet.Cell(index, 10 + acts.Count).Value = (double)leftSum;
             sheet.Range(index, 2, index, headers.Count).Style.Font.Bold = true;
             sheet.Range(index, 6, index, 6).Style.NumberFormat.Format = "#,##0.00";
             sheet.Cell(index, 8 + acts.Count).Style.NumberFormat.Format = "#,##0.00";
@@ -664,12 +685,12 @@ public partial class ContractActsWorkspace : UserControl
 
     private IEnumerable<SummaryExportRow> VisibleSummaryRows(SqlServerActs.SummaryData summary)
     {
-        foreach (var (system, sectionHeader) in summary.Systems)
+        foreach (var (system, sectionHeader, positions) in KsWorkspaceProjection.ExportSummaryGroups(summary))
         {
             yield return new SummaryExportRow(true, "", sectionHeader
                 ? system.Name : (system.IsSub ? "      ↳  " : "") + system.Name, "", 0m, 0m, 0m, 0m, 0m, 0m, 0m,
                 false, new Dictionary<long, decimal>());
-            foreach (var p in summary.Positions.Where(p => p.SystemId == system.SystemId))
+            foreach (var p in positions)
                 yield return new SummaryExportRow(false, p.NumText, p.Name, p.Unit,
                     p.QtyByKp, p.Price, p.Done, p.DoneSum, p.Left, p.LeftSum, p.Issued,
                     Math.Abs(p.Left) <= 0.000001m, p.PerAct);

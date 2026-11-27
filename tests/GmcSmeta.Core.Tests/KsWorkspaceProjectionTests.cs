@@ -136,4 +136,32 @@ public sealed class KsWorkspaceProjectionTests
         Assert.Equal(200m, original.Single(x=>x.Key=="8").Total);
         Assert.Empty(KsWorkspaceProjection.Filter(original, "does-not-exist", false));
     }
+
+    [Fact]
+    public void ExportSummaryGroupsRetainEmptyHeadersAndEveryPositionInSourceOrder()
+    {
+        var systems = new List<(SqlServerActs.SummarySystem System, bool SectionHeader)>();
+        for (var i = 1; i <= 500; i++)
+            systems.Add((new(i, "Система " + i, false), false));
+        systems.Insert(0, (new(1000, "Пустая группа", false), true));
+        systems.Add((new(1001, "Пустая система", false), false));
+        var perAct = new Dictionary<long, decimal> { [101] = 2m, [102] = 3m };
+        var rows = Enumerable.Range(1, 25000).Select(i =>
+            new SqlServerActs.SummaryRow(i, i % 500 + 1, i.ToString(), "Позиция", "шт",
+                5m, 10m, 5m, 50m, 0m, 0m, 1m, perAct)).Reverse().ToArray();
+        var summary = new SqlServerActs.SummaryData(Sample, systems, rows);
+        var groups = KsWorkspaceProjection.ExportSummaryGroups(summary).ToArray();
+        Assert.Equal(systems.Count, groups.Length);
+        Assert.Equal(systems.Select(s => (s.System, s.SectionHeader)),
+            groups.Select(g => (g.System, g.SectionHeader)));
+        Assert.Empty(groups[0].Positions);
+        Assert.Empty(groups[^1].Positions);
+        Assert.Equal(rows.Length, groups.Sum(g => g.Positions.Count));
+        foreach (var group in groups)
+            Assert.Equal(rows.Where(r => r.SystemId == group.System.SystemId), group.Positions);
+        Assert.Equal(rows.Sum(r => r.QtyByKp * r.Price),
+            groups.SelectMany(g => g.Positions).Sum(r => r.QtyByKp * r.Price));
+        Assert.Empty(KsWorkspaceProjection.VisibleSummaryGroups(summary, true));
+    }
+
 }

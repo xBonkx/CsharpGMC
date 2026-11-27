@@ -46,4 +46,27 @@ public sealed class WorkspaceRefreshSourceTests
         Assert.Contains("++_navigationDataGeneration", code);
         Assert.Contains("Workspace.ReadNavigation(reader)", code);
     }
+
+    [Fact]
+    public void KsSummaryReusesViewsAndColumnsAndExportsTotalsInOnePass()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ContractActsWorkspace.xaml.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "ContractActsWorkspace.xaml.cs"));
+        Assert.Contains("_summaryAllRows = null;", code);
+        Assert.Contains("_summaryRestRows = null;", code);
+        Assert.Contains("_summaryPositionViews.Clear();", code);
+        Assert.Contains("_summaryRestRows ??= BuildSummaryRows(true)", code);
+        Assert.Contains("_summaryAllRows ??= BuildSummaryRows(false)", code);
+        Assert.Contains("_summaryColumnKeys.SequenceEqual(keys)", code);
+        Assert.Contains("KsWorkspaceProjection.ExportSummaryGroups(summary)", code);
+        Assert.Contains("foreach (var (actId, quantity) in row.PerAct)", code);
+        Assert.Contains("estimateSum += amount;", code);
+        Assert.Contains("doneSum += row.DoneSumRaw;", code);
+        Assert.Contains("leftSum += row.LeftSumRaw;", code);
+        Assert.DoesNotContain("doneSumByAct", code);
+    }
+
 }

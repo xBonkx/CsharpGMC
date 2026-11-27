@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+27.11.2026 ChatGPT/main (base bec9817) — PERF-021/022 PARTIAL: cached KS progress views/columns and single-pass indexed Excel export; tests added, not run. See performance TODO.
+
 27.11.2026 ChatGPT/main (base b2964c9) — PERF-019/020 PARTIAL: sparse KS quantity presentation readback and concurrent edit guard; tests added, not run. See performance TODO.
 
 27.11.2026 ChatGPT/main (base 3364692) — PERF-019/020 PARTIAL: KS search cache, shared section totals on quantity readback, structural fallback and row-step optimization; tests added, not run. See performance TODO.

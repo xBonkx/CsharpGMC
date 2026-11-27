@@ -47,6 +47,16 @@ public static class KsWorkspaceProjection
         }
     }
 
+    /// <summary>Excel intentionally includes all source headers (even empty)
+    /// and ignores the screen's remaining-only filter. Preserve the previous
+    /// per-system export order and membership with a single lookup.</summary>
+    public static IEnumerable<SummaryGroup> ExportSummaryGroups(SqlServerActs.SummaryData summary)
+    {
+        var bySystem = summary.Positions.ToLookup(p => p.SystemId);
+        foreach (var (system, sectionHeader) in summary.Systems)
+            yield return new SummaryGroup(system, sectionHeader, bySystem[system.SystemId].ToArray());
+    }
+
     // Filtering the overview must never keep an invisible act selected.
     public static SqlServerActs.ActInfo? VisibleAct(
         IEnumerable<SqlServerActs.ActInfo> visible, long selectedId) =>
