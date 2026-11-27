@@ -27,6 +27,7 @@ internal static class PilotCases
         p.RunCase("unknown-commit-ack-reconciliation-simulation", () => UnknownCommit(p));
         p.RunCase("stage-public-api-and-reopen", () => Stage(p));
         p.RunCase("stage-linked-price-writers", () => StageLinkedPrices(p));
+        p.RunCase("parent-kp-stage-excel-name-only-paste", () => StageExcelPaste(p));
         p.RunCase("batch-120-work-prices-public-api", () => WorkPrices(p));
         p.RunCase("restart-as-fresh-dotnet-process", p.VerifyViaNewProcess);
         p.RunCase("20-public-save-cell-latencies", () => WriteLatencies(p));
@@ -451,6 +452,58 @@ internal static class PilotCases
             "Editor price save failed with legacy KS attached to rest");
         PilotRunner.Check(Price(open, first) == 180m && Price(rest, first) == 150m,
             "A rest document with a legacy KS must keep its price");
+    }
+
+    private static void StageExcelPaste(PilotRunner p)
+    {
+        var cs = p.PilotConnection;
+        var full = SqlServerWorkspace.CreateEmptyContract(cs, p.ObjectId,
+            new SqlServerWorkspace.NewContractData("kp", "QA-PASTE", "", "QA stage clipboard",
+                null, null), p.Revision());
+        var section = SqlServerDatabase.AddSection(cs, full, "В1.5", false, null, p.Revision());
+        PilotRunner.Check(section.Saved && section.SystemId.HasValue, "Could not create section");
+        var system = section.SystemId!.Value;
+        var first = SqlServerDatabase.AddPosition(cs, full, system, null, null, p.Revision());
+        PilotRunner.Check(first.Saved && first.PositionId.HasValue, "Could not create anchor");
+        var anchor = first.PositionId!.Value;
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, anchor, "name", "Исходная позиция", p.Revision()).Saved,
+            "Could not name anchor");
+        PilotRunner.Check(SqlServerDatabase.SaveCell(cs, anchor, "qty", "4", p.Revision()).Saved,
+            "Could not set anchor quantity");
+        var stage = SqlServerStages.CreateStage(cs, full, p.Revision());
+        PilotRunner.Check(SqlServerStages.SetStageQty(cs, stage, anchor, 1, p.Revision()).Saved,
+            "Could not allocate stage position");
+        var names = Enumerable.Range(1, 8).Select(i => $"Вентиляция — QA {i}").ToArray();
+        var rows = PastedPositions.Parse(string.Join("\r\n", names));
+        var revision = p.Revision();
+        var result = SqlServerDatabase.PastePositions(cs, full, system, anchor, rows, revision);
+        PilotRunner.Check(result.Saved, "Parent KP clipboard paste failed: " + result.Error);
+        using var conn = p.Conn();
+        var actual = new List<string>();
+        using (var cmd = new SqlCommand(
+            "SELECT name FROM dbo.positions WHERE system_id=@system ORDER BY [order],id", conn))
+        {
+            cmd.Parameters.Add("@system", SqlDbType.BigInt).Value = system;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) actual.Add(reader.GetString(0));
+        }
+        PilotRunner.Check(actual.SequenceEqual(new[] { "Исходная позиция" }.Concat(names)),
+            "Parent KP clipboard order or count is incorrect");
+        var allocated = Convert.ToDecimal(PilotRunner.Scalar(conn, """
+            SELECT p.qty FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id
+            WHERE s.contract_id=@stage AND p.stage_src=@anchor
+            """, ("@stage", stage), ("@anchor", anchor)), CultureInfo.InvariantCulture);
+        PilotRunner.Check(allocated == 1m, "Paste changed an existing stage allocation");
+        PilotRunner.Check(PilotRunner.Long(conn, """
+            SELECT COUNT_BIG(*) FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id
+            WHERE s.contract_id=@stage
+            """, ("@stage", stage)) == 1, "Paste unexpectedly inserted positions into the stage");
+        var stale = SqlServerDatabase.PastePositions(cs, full, system, anchor, rows, revision);
+        PilotRunner.Check(!stale.Saved && p.Revision() == result.Revision,
+            "Stale clipboard retry changed revision");
+        PilotRunner.Check(PilotRunner.Long(conn,
+            "SELECT COUNT_BIG(*) FROM dbo.positions WHERE system_id=@system",
+            ("@system", system)) == 9, "Stale clipboard retry duplicated rows");
     }
 
     private static void WorkPrices(PilotRunner p)
