@@ -140,10 +140,12 @@ public sealed class ExcelExistingUpdatePlan
         var source = _sourceRows.SingleOrDefault(r => r.Ordinal == sourceOrdinal);
         if (source is null || source.ParentOrdinal is not null) return Array.Empty<ExcelExistingDbRow>();
         var key = Key(source.SectionPath, source.ParentName, source.Name, source.Unit);
+        var reserved = _manualMappings.Where(m => m.Key != sourceOrdinal)
+            .Select(m => m.Value).ToHashSet();
         return _originalRows.Where(old =>
                 Key(old.SectionPath, old.ParentName, MatchName(old), old.Unit) == key &&
                 (source.StableId is null || source.StableId == old.Id) &&
-                !_manualMappings.Any(m => m.Key != sourceOrdinal && m.Value == old.Id))
+                !reserved.Contains(old.Id))
             .OrderBy(old => old.Id).ToArray();
     }
 
@@ -212,8 +214,10 @@ public sealed class ExcelExistingUpdatePlan
             throw new ArgumentException("Нет корректного договора, ревизии или SHA-256 Excel.");
         if (incoming.Count > 100_000 || incoming.Count == 0)
             throw new ArgumentException("Выбери непустой Excel до 100 000 позиций.");
-        if (incoming.Select(x => x.Ordinal).Distinct().Count() != incoming.Count)
-            throw new ArgumentException("Повторяющиеся идентификаторы исходных строк.");
+        var sourceByOrdinal = new Dictionary<int, ExcelExistingSourceRow>(incoming.Count);
+        foreach (var source in incoming)
+            if (!sourceByOrdinal.TryAdd(source.Ordinal, source))
+                throw new ArgumentException("Повторяющиеся идентификаторы исходных строк.");
         var mappings = explicitMappings is null
             ? new Dictionary<int, long>() : new Dictionary<int, long>(explicitMappings);
         if (mappings.Values.Distinct().Count() != mappings.Count)
@@ -221,7 +225,7 @@ public sealed class ExcelExistingUpdatePlan
         var byId = existing.ToDictionary(r => r.Id);
         foreach (var mapping in mappings)
         {
-            var source = incoming.SingleOrDefault(row => row.Ordinal == mapping.Key);
+            var source = sourceByOrdinal.GetValueOrDefault(mapping.Key);
             if (source is null || source.ParentOrdinal is not null ||
                 !byId.TryGetValue(mapping.Value, out var current) ||
                 source.StableId is long stable && stable != current.Id ||

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -50,7 +49,8 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     {
         TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8)
     };
-    private readonly ObservableCollection<ExcelExistingDifference> _rows = new();
+    private bool _busy;
+    private bool _closed;
     private readonly DataGrid _grid = new()
     {
         AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false,
@@ -145,7 +145,6 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         footer.Children.Add(_confirm);
         footer.Children.Add(cancel);
 
-        _grid.ItemsSource = _rows;
         _grid.Columns.Add(new DataGridTextColumn
         {
             Header = "Статус", Binding = new Binding(nameof(ExcelExistingDifference.Kind))
@@ -217,43 +216,42 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         _blocks.SelectionChanged += (_, _) => ResetPlan();
         _compare.Click += async (_, _) =>
         {
-            if (_contracts.SelectedItem is not ContractChoice contract ||
+            if (_closed || _busy || _contracts.SelectedItem is not ContractChoice contract ||
                 _blocks.SelectedItem is not BlockChoice block) return;
-            _compare.IsEnabled = false;
-            _contracts.IsEnabled = false;
-            _blocks.IsEnabled = false;
             ResetPlan();
+            SetBusy(true);
             _summary.Text = "Сравнение…";
             try
             {
-                var plan = await Task.Run(() => SqlServerExcelExistingUpdate.Prepare(
-                    _connectionString, contract.Id, _filePath, new[] { block.Block }));
-                if (!string.Equals(plan.FileSha256, _parsedFingerprint, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("Файл Excel изменён после первоначального разбора.");
-                Plan = plan;
-                _resolve.IsEnabled = true;
-                foreach (var row in plan.Differences) _rows.Add(row);
-                var groups = plan.Differences.GroupBy(x => x.Kind)
-                    .Select(g => g.Key + ": " + g.Count());
-                _summary.Text = string.Join("  |  ", groups) +
+                var result = await Task.Run(() =>
+                {
+                    var plan = SqlServerExcelExistingUpdate.Prepare(
+                        _connectionString, contract.Id, _filePath, new[] { block.Block });
+                    if (!string.Equals(plan.FileSha256, _parsedFingerprint, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Файл Excel изменён после первоначального разбора.");
+                    var groups = plan.Differences.GroupBy(x => x.Kind)
+                        .Select(g => g.Key + ": " + g.Count());
+                    return (Plan: plan, Summary: string.Join("  |  ", groups),
+                        HasSafe: plan.Differences.Any(x => x.SafeToApply));
+                });
+                if (_closed) return;
+                PublishPlan(result.Plan, result.HasSafe);
+                _summary.Text = result.Summary +
                     ". Отсутствующие в Excel строки останутся на месте. " +
                     "Конфликты пропускаются; без подтверждённого исходного объёма нужен выбор каждой строки вручную.";
-                _confirm.IsEnabled = plan.Differences.Any(x => x.SafeToApply) &&
-                    !_hasMissingFormulaCache;
                 if (_hasMissingFormulaCache)
                     _summary.Text += " Запись заблокирована: есть формулы без сохранённых результатов.";
             }
             catch (Exception ex)
             {
+                if (_closed) return;
                 MessageBox.Show(this, ex.Message, "Не удалось сравнить смету",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 _summary.Text = "Сравнение не выполнено. SQL не изменён.";
             }
             finally
             {
-                _compare.IsEnabled = true;
-                _contracts.IsEnabled = true;
-                _blocks.IsEnabled = true;
+                if (!_closed) SetBusy(false);
             }
         };
     }
@@ -268,17 +266,43 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         Margin = new Thickness(10, 0, 6, 0)
     };
 
+    private bool _hasSafeChanges;
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        _compare.IsEnabled = _contracts.IsEnabled = _blocks.IsEnabled = _grid.IsEnabled = !busy;
+        _resolve.IsEnabled = !busy && Plan is not null;
+        _confirm.IsEnabled = !busy && _hasSafeChanges && !_hasMissingFormulaCache;
+    }
+
+    private void PublishPlan(ExcelExistingUpdatePlan plan, bool hasSafe)
+    {
+        Plan = plan;
+        _hasSafeChanges = hasSafe;
+        // One binding update, not a notification for every difference.
+        _grid.ItemsSource = plan.Differences;
+    }
+
     private void ResetPlan()
     {
         Plan = null;
-        _rows.Clear();
+        _hasSafeChanges = false;
+        _grid.ItemsSource = null;
         _confirm.IsEnabled = false;
         _resolve.IsEnabled = false;
     }
 
-    private void ResolveAmbiguous(object sender, RoutedEventArgs e)
+    protected override void OnClosed(EventArgs e)
     {
-        if (Plan is null || _grid.SelectedItem is not ExcelExistingDifference target ||
+        _closed = true;
+        base.OnClosed(e);
+    }
+
+    private async void ResolveAmbiguous(object sender, RoutedEventArgs e)
+    {
+        if (_closed || _busy) return;
+        if (Plan is not { } plan || _grid.SelectedItem is not ExcelExistingDifference target ||
             target.Kind != ExcelExistingChangeKind.Ambiguous || target.Source is null)
         {
             MessageBox.Show(this, "Выбери неоднозначную строку Excel в таблице.",
@@ -286,8 +310,30 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             return;
         }
 
+        if (!CommitGrid()) return;
         var source = target.Source;
-        var candidates = Plan.MappingCandidates(source.Ordinal);
+        SetBusy(true);
+        try
+        {
+            var candidates = await Task.Run(() => plan.MappingCandidates(source.Ordinal));
+            if (_closed || !ReferenceEquals(Plan, plan)) return;
+            ShowMappingDialog(plan, source, candidates);
+        }
+        catch (Exception error)
+        {
+            if (!_closed)
+                MessageBox.Show(this, error.Message, "Соответствие отклонено",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (!_closed) SetBusy(false);
+        }
+    }
+
+    private void ShowMappingDialog(ExcelExistingUpdatePlan plan, ExcelExistingSourceRow source,
+        IReadOnlyList<ExcelExistingDbRow> candidates)
+    {
         if (candidates.Count == 0)
         {
             MessageBox.Show(this,
@@ -348,9 +394,12 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         choices.ItemTemplate = itemTemplate;
         choices.SelectedIndex = -1;
         panel.Children.Add(choices);
-        accept.Click += (_, _) =>
+        bool dialogClosed = false;
+        bool mapping = false;
+        dialog.Closed += (_, _) => dialogClosed = true;
+        accept.Click += async (_, _) =>
         {
-            if (choices.SelectedItem is not MappingChoice chosen) return;
+            if (mapping || dialogClosed || _closed || choices.SelectedItem is not MappingChoice chosen) return;
             var old = chosen.Row;
             if (MessageBox.Show(dialog,
                     "Excel: " + source.Name + " / " + source.Unit + " / " + source.Quantity +
@@ -359,15 +408,17 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
                     "Все действия останутся SKIP до отдельного подтверждения.",
                     "Ручное соответствие", MessageBoxButton.YesNo, MessageBoxImage.Warning) !=
                 MessageBoxResult.Yes) return;
+            mapping = true;
+            accept.IsEnabled = choices.IsEnabled = false;
             try
             {
-                var mapped = Plan!.WithExplicitMapping(source.Ordinal, old.Id);
-                Plan = mapped;
-                _rows.Clear();
-                foreach (var difference in mapped.Differences) _rows.Add(difference);
-                _grid.Items.Refresh();
-                _confirm.IsEnabled = mapped.Differences.Any(x => x.SafeToApply) &&
-                    !_hasMissingFormulaCache;
+                var result = await Task.Run(() =>
+                {
+                    var mapped = plan.WithExplicitMapping(source.Ordinal, old.Id);
+                    return (Plan: mapped, HasSafe: mapped.Differences.Any(x => x.SafeToApply));
+                });
+                if (dialogClosed || _closed || !ReferenceEquals(Plan, plan)) return;
+                PublishPlan(result.Plan, result.HasSafe);
                 _summary.Text = "Ручное 1:1 сопоставление сохранено только в плане предпросмотра. " +
                     "Выбор изменений сброшен: отметь нужную строку отдельно. " +
                     "Ни одна SQL-запись ещё не изменена.";
@@ -375,8 +426,14 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             }
             catch (Exception error)
             {
-                MessageBox.Show(dialog, error.Message, "Соответствие отклонено",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                if (!dialogClosed && !_closed)
+                    MessageBox.Show(dialog, error.Message, "Соответствие отклонено",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                mapping = false;
+                if (!dialogClosed && !_closed) accept.IsEnabled = choices.IsEnabled = true;
             }
         };
         dialog.ShowDialog();
@@ -384,19 +441,22 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
 
     private void ChooseSafe(bool selected)
     {
-        if (Plan is null) return;
-        foreach (var row in Plan.Differences)
+        if (_closed || _busy || Plan is not { } plan || !CommitGrid()) return;
+        foreach (var row in plan.Differences)
             row.Apply = selected && row.SafeForBulk;
         _grid.Items.Refresh();
     }
 
+    private bool CommitGrid() =>
+        _grid.CommitEdit(DataGridEditingUnit.Cell, true) &&
+        _grid.CommitEdit(DataGridEditingUnit.Row, true);
+
     private void Confirm(object sender, RoutedEventArgs e)
     {
-        if (Plan is null) return;
-        _grid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (_closed || _busy || _hasMissingFormulaCache || Plan is not { } plan || !CommitGrid()) return;
         try
         {
-            var selected = Plan.Selected();
+            var selected = plan.Selected();
             if (selected.Any(x => !x.SafeToApply)) throw new InvalidOperationException("Есть неразрешённый конфликт.");
             var confirmed = MessageBox.Show(this,
                 "Применить " + selected.Count + " изменений в существующее КП?\n" +

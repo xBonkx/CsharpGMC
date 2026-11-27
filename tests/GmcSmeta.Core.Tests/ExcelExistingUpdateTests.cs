@@ -246,6 +246,21 @@ public sealed class ExcelExistingUpdateTests
     }
 
     [Fact]
+    public void LargeManualMappingKeepsReservedIdsOutOfOtherCandidates()
+    {
+        const int count = 2500;
+        var old = Enumerable.Range(1, count).Select(i => Old(i)).ToArray();
+        var incoming = Enumerable.Range(1, count).Select(i => Incoming(i)).ToArray();
+        var mappings = Enumerable.Range(1, count - 2).ToDictionary(i => i, i => (long)i);
+        var plan = ExcelExistingUpdatePlan.Build(123, "rev-123", Hash, old, incoming,
+            new[] { "П1" }, explicitMappings: mappings);
+        Assert.Equal(new long[] { count - 1, count }, plan.MappingCandidates(count).Select(x => x.Id));
+        var resolved = plan.WithExplicitMapping(count, count);
+        Assert.Equal(new long[] { count - 1 }, resolved.MappingCandidates(count - 1).Select(x => x.Id));
+        Assert.All(resolved.Differences, x => Assert.False(x.Apply));
+    }
+
+    [Fact]
     public void ManualMappingRefusesManyToOneAndForeignOrInconsistentStableId()
     {
         var source = new[] { Incoming(1), Incoming(2) };

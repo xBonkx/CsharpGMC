@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -65,7 +64,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         MinHeight = 150, MinRowHeight = 27, AlternationCount = 0,
         SelectionUnit = DataGridSelectionUnit.FullRow
     };
-    private readonly ObservableCollection<PreviewRow> _rows = new();
+    private readonly List<PreviewRow> _rows = new();
     private readonly Button _confirm = new() { Content = "Импортировать", MinWidth = 145, MinHeight = 32, Margin = new Thickness(8, 0, 0, 0) };
 
     public long? ObjectId => (_objects.SelectedItem as Target)?.Id;
@@ -158,7 +157,6 @@ internal sealed class ExcelImportPreviewWindow : Window
         _table.Columns.OfType<DataGridTextColumn>().Single(c => Equals(c.Header, "Название")).MinWidth = 160;
         TableColumnMenu.SetProtect(_table, "✓|Лист|Позиций|Итого|Проверка|Тип|Название");
         TableColumnMenu.SetKey(_table, "excel-import-preview");
-        _table.ItemsSource = _rows;
         _table.SelectionChanged += (_, _) => ShowReport();
         Grid.SetRow(_table, 2); layout.Children.Add(_table);
 
@@ -170,7 +168,7 @@ internal sealed class ExcelImportPreviewWindow : Window
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 12, 0, 0) };
         var cancel = new Button { Content = "Отмена", Width = 105, Height = 32 };
-        cancel.Click += (_, _) => { DialogResult = false; Close(); };
+        cancel.Click += (_, _) => DialogResult = false;
         WorkspaceWindowUi.StyleButton(cancel);
         WorkspaceWindowUi.StyleButton(_confirm, primary: true);
         actions.Children.Add(cancel);
@@ -187,6 +185,7 @@ internal sealed class ExcelImportPreviewWindow : Window
                 Kind = b.Kind, Number = b.Number, Date = b.Date,
                 Name = b.Title.Length > 0 ? b.Title : many ? b.Sheet : ""
             });
+        _table.ItemsSource = _rows;
         _objects.SelectionChanged += (_, _) => { UpdateTarget(); ShowReport(); };
         UpdateTarget();
         if (_rows.Count > 0) _table.SelectedIndex = 0;
@@ -254,8 +253,8 @@ internal sealed class ExcelImportPreviewWindow : Window
 
     private void Confirm()
     {
-        _table.CommitEdit(DataGridEditingUnit.Cell, true);
-        _table.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!_table.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !_table.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var selections = Choices;
         if (selections.Count == 0)
         {
@@ -285,6 +284,5 @@ internal sealed class ExcelImportPreviewWindow : Window
                 "Импортировать выбранные блоки?", "Проверка сумм", MessageBoxButton.YesNo,
                 MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         DialogResult = true;
-        Close();
     }
 }

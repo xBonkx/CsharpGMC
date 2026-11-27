@@ -38,8 +38,34 @@ public sealed class ExcelPreviewVisualTests
         Assert.Contains("row.Apply = selected && row.SafeForBulk", source);
         Assert.Contains("!_hasMissingFormulaCache", source);
         Assert.Contains("WithExplicitMapping(source.Ordinal, old.Id)", source);
+        Assert.Contains("if (_closed || _busy || _hasMissingFormulaCache", source);
+        Assert.Contains("!CommitGrid()", source);
         Assert.Contains("selected.Any(x => !x.SafeToApply)", source);
         Assert.Contains("plan.FileSha256, _parsedFingerprint", source);
+    }
+
+    [Fact]
+    public void PreviewPublishesOnceAndRejectsLateMappingAndCompareResults()
+    {
+        var source = Source("ExcelExistingUpdatePreviewWindow.cs");
+        Assert.DoesNotContain("ObservableCollection<ExcelExistingDifference>", source);
+        Assert.Contains("_grid.ItemsSource = plan.Differences;", source);
+        Assert.Contains("await Task.Run(() => plan.MappingCandidates(source.Ordinal))", source);
+        Assert.Contains("var mapped = plan.WithExplicitMapping(source.Ordinal, old.Id);", source);
+        Assert.Contains("if (dialogClosed || _closed || !ReferenceEquals(Plan, plan)) return;", source);
+        Assert.Contains("if (_closed) return;", source);
+        Assert.Contains("if (!_closed) SetBusy(false);", source);
+    }
+
+    [Fact]
+    public void ImportBindsAfterPopulationAndRequiresCommittedEdits()
+    {
+        var source = Source("ExcelImportPreviewWindow.cs");
+        Assert.True(source.IndexOf("_rows.Add(new PreviewRow", StringComparison.Ordinal) <
+            source.IndexOf("_table.ItemsSource = _rows;", StringComparison.Ordinal));
+        Assert.Contains("if (!_table.CommitEdit(DataGridEditingUnit.Cell, true) ||", source);
+        Assert.Contains("!_table.CommitEdit(DataGridEditingUnit.Row, true)) return;", source);
+        Assert.DoesNotContain("ObservableCollection<PreviewRow>", source);
     }
 
     [Fact]
