@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -18,7 +17,7 @@ public partial class PassportsWindow : Window
 {
     private SqlServerPassports _sql = null!;
     private readonly string _connectionString;
-    private bool _ready, _busy, _closed, _exportUncertain;
+    private bool _ready, _busy, _closed, _exportUncertain, _writeBlocked, _closeApproved;
     private readonly long _objectId;
     private readonly string _objectName;
     private readonly string _objectAddress;
@@ -66,12 +65,12 @@ public partial class PassportsWindow : Window
         SectionCombo.SelectedIndex = 0;
         SetControls();
         Loaded += InitializeAsync;
-        PreviewKeyDown += (_, e) =>
+        PreviewKeyDown += async (_, e) =>
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                if (_ready && !_busy) SaveCurrent();
                 e.Handled = true;
+                await SaveAsync();
             }
             else if (e.Key == Key.Escape)
             {
@@ -103,8 +102,8 @@ public partial class PassportsWindow : Window
             _ready = true;
             SetControls();
             ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + _root;
-            if (_rows.Count == 0) AddNew();
-            else PassportList.SelectedIndex = 0;
+            if (_rows.Count == 0) await AddNewAsync();
+            else SelectPassport(0);
         }
         catch (Exception ex)
         {
@@ -118,8 +117,9 @@ public partial class PassportsWindow : Window
     private void SetControls()
     {
         HeaderActions.IsEnabled = WorkspaceGrid.IsEnabled = _ready && !_busy;
-        SaveButton.IsEnabled = _ready && !_busy;
-        ExportSelectedButton.IsEnabled = ExportAllButton.IsEnabled = _ready && !_busy && !_exportUncertain;
+        EditorTabs.IsEnabled = _current >= 0;
+        SaveButton.IsEnabled = _ready && !_busy && !_writeBlocked;
+        ExportSelectedButton.IsEnabled = ExportAllButton.IsEnabled = _ready && !_busy && !_exportUncertain && !_writeBlocked;
     }
 
     private void SetBusy(bool busy)
@@ -152,8 +152,6 @@ public partial class PassportsWindow : Window
             "GMC-Smeta-Next", "Passports");
     }
 
-    private void RefreshCatalogue() => SetCatalogue(_sql.Catalogue());
-
     private void SetCatalogue(IReadOnlyList<VentEquipmentTemplate> catalogue)
     {
         _catalogue = catalogue.ToList();
@@ -162,13 +160,14 @@ public partial class PassportsWindow : Window
         if (selected is not null) CatalogueBox.SelectedItem = selected;
     }
 
-    private void RefreshList()
+    private void RefreshList(IReadOnlySet<Guid>? selection = null)
     {
         var wasLoading = _loading;
         _loading = true;
         try
         {
             var selectedId = _current >= 0 && _current < _rows.Count ? _rows[_current].Id : Guid.Empty;
+            var selected = selection ?? PassportList.SelectedItems.OfType<PassportListRow>().Select(x => x.Id).ToHashSet();
             var summaries = new List<PassportListRow>(_rows.Count);
             foreach (var p in _rows)
             {
@@ -189,6 +188,8 @@ public partial class PassportsWindow : Window
             {
                 var index = summaries.FindIndex(x => x.Id == selectedId);
                 if (index >= 0) PassportList.SelectedIndex = index;
+                foreach (var summary in summaries)
+                    if (summary.Id != selectedId && selected.Contains(summary.Id)) PassportList.SelectedItems.Add(summary);
             }
         }
         finally { _loading = wasLoading; }
@@ -291,124 +292,6 @@ public partial class PassportsWindow : Window
         VentPassports.Validate(p);
     }
 
-    private bool SaveCurrent(bool refresh = true)
-    {
-        if (_current < 0 || _current >= _rows.Count) return true;
-        try
-        {
-            Collect();
-            _sql.Save(_rows[_current]);
-            if (refresh) RefreshList();
-            RefreshCatalogue();
-            return true;
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Паспорта — сохранение",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return false;
-        }
-    }
-
-    private void PassportList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_ready || _busy || _loading || PassportList.SelectedItem is not PassportListRow row) return;
-        var next = _rows.FindIndex(x => x.Id == row.Id);
-        if (next < 0 || next == _current) return;
-        var previous = _current;
-        if (previous >= 0 && !SaveCurrent(refresh: false))
-        {
-            _loading = true;
-            PassportList.SelectedIndex = previous;
-            _loading = false;
-            return;
-        }
-        LoadPassport(next);
-        RefreshList();
-    }
-
-    private void AddNew()
-    {
-        try
-        {
-            if (_current >= 0 && !SaveCurrent()) return;
-            var p = VentPassports.Create(_objectId, _objectName, _objectAddress);
-            _sql.Save(p);
-            _rows.Add(p);
-            RefreshList();
-            PassportList.SelectedIndex = _rows.Count - 1;
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Добавить паспорт"); }
-    }
-
-    private void Add_Click(object sender, RoutedEventArgs e) => AddNew();
-
-    private void Batch_Click(object sender, RoutedEventArgs e)
-    {
-        if (!SaveCurrent()) return;
-        var window = new Window
-        {
-            Title = "Добавить системы", Owner = this, Width = 550, Height = 420,
-            MinWidth = 380, MinHeight = 260, WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-        var panel = new DockPanel { Margin = new Thickness(16) };
-        var label = new TextBlock { Text = "По одной системе на строку (можно вставить столбец Excel)",
-            Margin = new Thickness(0, 0, 0, 9) };
-        DockPanel.SetDock(label, Dock.Top); panel.Children.Add(label);
-        var ok = new Button { Content = "Добавить", Padding = new Thickness(12, 7, 12, 7),
-            HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-        DockPanel.SetDock(ok, Dock.Bottom); panel.Children.Add(ok);
-        var multiline = new TextBox { AcceptsReturn = true, AcceptsTab = true,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.Wrap };
-        panel.Children.Add(multiline);
-        ok.Click += (_, _) => window.DialogResult = true;
-        window.Content = panel;
-        if (window.ShowDialog() != true || _current < 0) return;
-        var batch = VentPassports.BatchCreate(_rows[_current], multiline.Text).ToList();
-        if (batch.Count == 0) return;
-        try
-        {
-            _sql.SaveBatch(_objectId, batch);
-            _rows.AddRange(batch);
-            RefreshList();
-            PassportList.SelectedIndex = _rows.Count - 1;
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Добавить системы"); }
-    }
-
-    private void Duplicate_Click(object sender, RoutedEventArgs e)
-    {
-        if (_current < 0 || !SaveCurrent()) return;
-        try
-        {
-            var p = VentPassports.Duplicate(_rows[_current]);
-            _sql.Save(p);
-            _rows.Add(p);
-            RefreshList();
-            PassportList.SelectedIndex = _rows.Count - 1;
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Копирование паспорта"); }
-    }
-
-    private void Delete_Click(object sender, RoutedEventArgs e)
-    {
-        if (_current < 0) return;
-        if (MessageBox.Show(this, "Удалить выбранный паспорт? Ранее выпущенные PDF сохранятся в архиве.",
-                "Удаление паспорта", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-            return;
-        try
-        {
-            var p = _rows[_current];
-            _sql.Delete(_objectId, p.Id, p.Revision);
-            _rows.RemoveAt(_current);
-            _current = -1;
-            RefreshList();
-            if (_rows.Count > 0) PassportList.SelectedIndex = 0;
-            else AddNew();
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Удаление паспорта"); }
-    }
-
     private void System_Changed(object sender, TextChangedEventArgs e)
     {
         if (_loading) return;
@@ -452,20 +335,6 @@ public partial class PassportsWindow : Window
         FilterCheck.IsChecked = data.Filter;
         ShowSection();
         UpdateTotals();
-    }
-
-    private void ApplyCommon_Click(object sender, RoutedEventArgs e)
-    {
-        if (_current < 0) return;
-        try
-        {
-            Collect();
-            VentPassports.ApplyCommon(_rows[_current], _rows);
-            _sql.SaveBatch(_objectId, _rows);
-            RefreshList();
-            MessageBox.Show(this, $"Общие реквизиты применены к {_rows.Count} системам.", "Паспорта");
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Общие реквизиты"); }
     }
 
     private void UpdateTotals()
@@ -552,35 +421,29 @@ public partial class PassportsWindow : Window
         UpdateTotals();
     }
 
-    private async void Root_Click(object sender, RoutedEventArgs e)
+    private async void Root_Click(object sender, RoutedEventArgs e) => await RunWriteAsync(async () =>
     {
-        if (!_ready || _busy || !SaveCurrent()) return;
+        await SaveCurrentCoreAsync();
         var dlg = new OpenFolderDialog { Title = "Общий каталог PDF паспортов" };
         if (dlg.ShowDialog(this) != true) return;
         var root = Path.GetFullPath(dlg.FolderName);
         var previousRoot = _root;
-        SetBusy(true);
-        try
+        await Task.Run(() =>
         {
-            await Task.Run(() =>
-            {
-                // Root is a global user setting, not a per-object setting.
-                // Include exports of deleted passports and other objects.
-                if (!string.Equals(root, previousRoot, StringComparison.OrdinalIgnoreCase) &&
-                    _sql.HasAnyExports())
-                    throw new InvalidOperationException(
-                        "Экспортированные PDF уже привязаны к предыдущему архиву. " +
-                        "Переключение каталога без согласованного переноса файлов запрещено.");
-                Directory.CreateDirectory(root);
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-                File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new { root }));
-            });
-            _root = root;
-            ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + root;
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Архив паспортов"); }
-        finally { SetBusy(false); }
-    }
+            // Root is a global user setting, not a per-object setting.
+            // Include exports of deleted passports and other objects.
+            if (!string.Equals(root, previousRoot, StringComparison.OrdinalIgnoreCase) &&
+                _sql.HasAnyExports())
+                throw new InvalidOperationException(
+                    "Экспортированные PDF уже привязаны к предыдущему архиву. " +
+                    "Переключение каталога без согласованного переноса файлов запрещено.");
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new { root }));
+        });
+        _root = root;
+        ArchiveLabel.Text = "Архив PDF (рекомендуется общий сетевой каталог): " + root;
+    }, "Архив паспортов");
 
     private static void OpenPath(string path)
     {
@@ -669,11 +532,10 @@ public partial class PassportsWindow : Window
     {
         if (!_ready || _busy || _exportUncertain) return;
         if (selected.Count == 0) { MessageBox.Show(this, "Выберите паспорта.", "PDF"); return; }
-        if (!SaveCurrent()) return;
-        var root = _root;
-        SetBusy(true);
-        try
+        await RunWriteAsync(async () =>
         {
+            await SaveCurrentCoreAsync();
+            var root = _root;
             // The editor is disabled until all rendering and registrations finish.
             var result = await Task.Run(() => ExportCore(selected, root));
             _exportUncertain = result.Uncertain;
@@ -682,9 +544,7 @@ public partial class PassportsWindow : Window
                 (result.Uncertain ? "\nПовторный экспорт заблокирован. Сверьте архив и SQL перед повторным открытием." : ""),
                 "Паспорта — экспорт", MessageBoxButton.OK,
                 result.Errors.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Паспорта — экспорт"); }
-        finally { SetBusy(false); }
+        }, "Паспорта — экспорт");
     }
 
     private (int Count, List<string> Errors, bool Uncertain) ExportCore(
@@ -767,15 +627,6 @@ public partial class PassportsWindow : Window
     }
 
     private async void ExportAll_Click(object sender, RoutedEventArgs e) => await ExportAsync(_rows.ToArray());
-    private void Save_Click(object sender, RoutedEventArgs e)
-    {
-        if (_ready && !_busy) SaveCurrent();
-    }
+    private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync();
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
-
-    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
-    {
-        if (_busy) { e.Cancel = true; return; }
-        if (_ready && !SaveCurrent()) e.Cancel = true;
-    }
 }

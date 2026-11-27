@@ -8,6 +8,9 @@ namespace GmcSmeta.Core.Db;
 public sealed class PassportExportCommitUncertainException(string message, Exception inner)
     : InvalidOperationException(message, inner) { }
 
+public sealed class PassportWriteCommitUncertainException(string message, Exception inner)
+    : InvalidOperationException(message, inner) { }
+
 /// <summary>
 /// Pilot-only ventilation passports; unrelated to financial tables and SQLite archives.
 /// Per-passport optimistic revisions, atomic multi-passport transactions and equipment catalog.
@@ -268,7 +271,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
             }
             updated.Add((p, nextRevision));
         }
-        tx.Commit();
+        CommitWrite(tx);
         foreach (var (p, newRevision) in updated) p.Revision = newRevision;
     }
 
@@ -298,7 +301,17 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
             history.Parameters.AddWithValue("@rev", expectedRevision + 1);
             history.ExecuteNonQuery();
         }
-        tx.Commit();
+        CommitWrite(tx);
+    }
+
+    private static void CommitWrite(SqlTransaction tx)
+    {
+        try { tx.Commit(); }
+        catch (Exception ex)
+        {
+            throw new PassportWriteCommitUncertainException(
+                "Исход записи паспорта неизвестен. Проверьте сохранённые данные перед повтором.", ex);
+        }
     }
 
     public sealed record ExportInfo(Guid PassportId, string RelativePath, string Sha256,
