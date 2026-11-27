@@ -2,6 +2,9 @@ using System.Data;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
+using System.ComponentModel;
+using GmcSmeta.Core.Domain;
 using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 
@@ -23,7 +26,10 @@ public partial class StagesDialog : Window
     private bool _quantityWriteBusy;
     private SqlServerStages.StageInfo? _restDocument;
     private List<SqlServerStages.StageInfo> _cachedStages = new();
-    private List<SqlServerStages.StageTableRow> _cachedRows = new();
+    private DataTable? _table;
+    private bool _closed;
+    private readonly DispatcherTimer _searchTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    internal event Action? InitialSnapshotReady;
 
     public StagesDialog(string connectionString, int fullId, string fullTitle)
     {
@@ -32,28 +38,67 @@ public partial class StagesDialog : Window
         _fullTitle = fullTitle;
         InitializeComponent();
         CaptionText.Text = $"Этапы: {fullTitle}";
-        Reload();
+        _searchTimer.Tick += SearchTimer_Tick;
+        Loaded += InitialLoadAsync;
+        SetReadControls(false);
+        SetStatus("Загрузка этапов…");
     }
 
-    private void Reload()
+    private async void InitialLoadAsync(object sender, RoutedEventArgs e)
     {
+        Loaded -= InitialLoadAsync;
+        try
+        {
+            await ReloadAsync();
+            if (!_closed && !string.IsNullOrWhiteSpace(_revision))
+            {
+                SetStatus("");
+                InitialSnapshotReady?.Invoke();
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!_closed) SetStatus("Не удалось загрузить этапы: " + ex.Message);
+        }
+    }
+
+    private void SetReadControls(bool enabled)
+    {
+        StagesGrid.IsEnabled = SearchBox.IsEnabled = AddStageButton.IsEnabled = CreateRestButton.IsEnabled = enabled;
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_closed) return;
         _revision = "";
         _restDocument = null;
-        List<SqlServerStages.StageInfo> stages;
-        List<SqlServerStages.StageTableRow> rows;
-        string revision;
-        using (var conn = SqlServerDatabase.Open(_connectionString))
-        {
-            revision = SqlServerDatabase.Revision(conn);
-            (stages, rows) = SqlServerStages.StageTable(conn, _fullId);
-            var restDocument = SqlServerStages.StagesOf(conn, _fullId).FirstOrDefault(stage => stage.Rest);
-            if (string.IsNullOrWhiteSpace(revision) ||
-                revision != SqlServerDatabase.Revision(conn))
-                throw new InvalidOperationException("Данные изменились при загрузке этапов. Откройте окно снова.");
-            _restDocument = restDocument;
-        }
-
+        _searchTimer.Stop();
         _building = true;
+        SetReadControls(false);
+        try
+        {
+            var data = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(_connectionString);
+                var revision = SqlServerDatabase.Revision(conn);
+                var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, _fullId);
+                if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
+                    throw new InvalidOperationException("Данные изменились при загрузке этапов. Откройте окно снова.");
+                return (Stages: stages, Rest: rest, Revision: revision, Table: BuildTable(stages, rows));
+            });
+            if (_closed) return;
+            PublishSnapshot(data.Stages, data.Rest, data.Table, data.Revision);
+        }
+        finally
+        {
+            _building = false;
+            if (!_closed) SetReadControls(!string.IsNullOrWhiteSpace(_revision));
+        }
+    }
+
+    private void PublishSnapshot(List<SqlServerStages.StageInfo> stages,
+        SqlServerStages.StageInfo? rest, DataTable table, string revision)
+    {
         _columnStages.Clear();
         StagesGrid.Columns.Clear();
         StagesGrid.Columns.Add(MakeColumn("Раздел", "SystemName", 150, readOnly: true));
@@ -76,21 +121,20 @@ public partial class StagesDialog : Window
         StagesGrid.Columns.Add(restColumn);
 
         _cachedStages = stages;
-        _cachedRows = rows;
-        FilterCachedRows();
-        _revision = revision;
+        _restDocument = rest;
+        _table = table;
+        table.DefaultView.RowFilter = StageTableSearch.Expression(SearchBox.Text);
+        StagesGrid.ItemsSource = table.DefaultView;
         TableColumnMenu.SetProtect(StagesGrid, "Раздел|Наименование|Всего|Остаток");
         TableColumnMenu.RefreshDynamic(StagesGrid, "stage-distribution-" + _fullId.ToString(CultureInfo.InvariantCulture), ownHeaderMenu: false);
+        _revision = revision;
     }
 
-    /// <summary>Local search on the last loaded SQL snapshot (no DB roundtrip per key).</summary>
-    private void FilterCachedRows()
+    // Build the detached table on the worker; publish once on the dispatcher.
+    private static DataTable BuildTable(IReadOnlyList<SqlServerStages.StageInfo> stages,
+        IReadOnlyList<SqlServerStages.StageTableRow> rows)
     {
-        if (StagesGrid is null) return;
-        _building = true;
-        var stages = _cachedStages;
-        var rows = _cachedRows;
-        var table = new DataTable();
+        var table = new DataTable { Locale = CultureInfo.InvariantCulture, CaseSensitive = true };
         table.Columns.Add("SrcId", typeof(long));
         table.Columns.Add("SystemName", typeof(string));
         table.Columns.Add("Name", typeof(string));
@@ -104,13 +148,12 @@ public partial class StagesDialog : Window
         }
         table.Columns.Add("Rest", typeof(string));
         table.Columns.Add("__RestExact", typeof(decimal));
-
-        var words = SearchBox.Text.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        table.Columns.Add(StageTableSearch.Column, typeof(string));
+        table.BeginLoadData();
         foreach (var row in rows)
         {
-            var name = $"{row.SystemName} · {row.Name} · {row.Unit}";
-            if (words.Length > 0 && !words.All(w => name.ToLowerInvariant().Contains(w))) continue;
             var record = table.NewRow();
+            record[StageTableSearch.Column] = $"{row.SystemName} · {row.Name} · {row.Unit}".ToLowerInvariant();
             record["SrcId"] = row.SrcId;
             record["SystemName"] = row.SystemName;
             record["Name"] = row.Name;
@@ -126,8 +169,8 @@ public partial class StagesDialog : Window
             record["__RestExact"] = row.Rest;
             table.Rows.Add(record);
         }
-        StagesGrid.ItemsSource = table.DefaultView;
-        _building = false;
+        table.EndLoadData();
+        return table;
     }
 
     private static string QtyText(decimal v) => v == decimal.Truncate(v)
@@ -159,7 +202,61 @@ public partial class StagesDialog : Window
         };
     }
 
-    private void Search_Changed(object sender, TextChangedEventArgs e) => FilterCachedRows();
+    private void Search_Changed(object sender, TextChangedEventArgs e) => QueueSearch();
+
+    private void ClearStageSearch_Click(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        SearchBox.Focus();
+    }
+
+    private void QueueSearch()
+    {
+        if (_closed || _building || _quantityWriteBusy || _table is null) return;
+        _searchTimer.Stop();
+        _searchTimer.Start();
+    }
+
+    private void SearchTimer_Tick(object? sender, EventArgs e)
+    {
+        _searchTimer.Stop();
+        if (_closed || _building || _quantityWriteBusy || _table is null ||
+            System.Windows.Data.CollectionViewSource.GetDefaultView(StagesGrid.ItemsSource)
+                is IEditableCollectionView { IsEditingItem: true }) return;
+        try
+        {
+            var expression = StageTableSearch.Expression(SearchBox.Text);
+            if (_table.DefaultView.RowFilter != expression)
+                _table.DefaultView.RowFilter = expression;
+        }
+        catch (InvalidExpressionException ex)
+        {
+            SetStatus("Не удалось применить поиск: " + ex.Message);
+        }
+    }
+
+    private void StagesGrid_RowEditEnding(object sender, DataGridRowEditEndingEventArgs e) => QueueSearch();
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_quantityWriteBusy) e.Cancel = true;
+        base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        _searchTimer.Stop();
+        _searchTimer.Tick -= SearchTimer_Tick;
+        InitialSnapshotReady = null;
+        base.OnClosed(e);
+    }
+
+    private void EndWrite()
+    {
+        _quantityWriteBusy = false;
+        QueueSearch();
+    }
 
     private void StagesGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
     {
@@ -171,6 +268,7 @@ public partial class StagesDialog : Window
     private async void StagesGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
     {
         if (e.EditAction != DataGridEditAction.Commit || _building) return;
+        if (string.IsNullOrWhiteSpace(_revision)) { e.Cancel = true; return; }
         if (_quantityWriteBusy) { e.Cancel = true; return; }
         if (!_columnStages.TryGetValue(StagesGrid.Columns.IndexOf(e.Column), out var stageId)) return;
         if (e.Row.Item is not DataRowView row) return;
@@ -211,6 +309,7 @@ public partial class StagesDialog : Window
                 return;
             }
         }
+        var revision = ServerRevision();
         _quantityWriteBusy = true;
         SetStatus("Сохранение…");
         try
@@ -219,7 +318,7 @@ public partial class StagesDialog : Window
                 ? allocations[columnIndex] : (decimal?)null;
             var snapshotRest = (decimal)row.Row["__RestExact"];
             var result = await Task.Run(() => SqlServerStages.SetStageQty(
-                _connectionString, stageId, srcId, value, ServerRevision(),
+                _connectionString, stageId, srcId, value, revision,
                 snapshotStageQty, snapshotRest));
             if (!result.Saved) SetStatus("Ошибка: " + result.Error);
             else
@@ -232,13 +331,13 @@ public partial class StagesDialog : Window
         {
             SetStatus("Ошибка: " + ex.Message);
         }
-        try { Reload(); }
+        try { await ReloadAsync(); }
         catch (Exception ex)
         {
             _revision = "";
             SetStatus("Не удалось обновить этапы: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private void StagesGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -392,14 +491,14 @@ public partial class StagesDialog : Window
             else
                 SetStatus(count == 0 ? "Нет строк для изменения." :
                     $"Изменено строк этапа: {count}.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
             _revision = "";
             SetStatus("Результат операции не подтверждён: " + ex.Message +
                 ". Обновите окно перед повтором.");
-            try { Reload(); }
+            try { await ReloadAsync(); }
             catch (Exception reloadError)
             {
                 _revision = "";
@@ -410,129 +509,148 @@ public partial class StagesDialog : Window
         finally
         {
             IsEnabled = true;
-            _quantityWriteBusy = false;
+            EndWrite();
         }
     }
 
     private async void AddStage_Click(object sender, RoutedEventArgs e)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        var revision = ServerRevision();
+        _quantityWriteBusy = true;
         try
         {
-            var stageId = await Task.Run(() => SqlServerStages.CreateStage(
-                _connectionString, _fullId, ServerRevision()));
-            _revision = null;
+            await Task.Run(() => SqlServerStages.CreateStage(
+                _connectionString, _fullId, revision));
+            _revision = "";
             SetStatus("Этап создан. Количество строк — в таблице; цены — в открывшемся КП этапа.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
+        finally { EndWrite(); }
     }
 
     private async void CreateRest_Click(object sender, RoutedEventArgs e)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        var revision = ServerRevision();
+        _quantityWriteBusy = true;
         try
         {
-            await Task.Run(() => SqlServerStages.CreateRest(_connectionString, _fullId, ServerRevision()));
-            _revision = null;
+            await Task.Run(() => SqlServerStages.CreateRest(_connectionString, _fullId, revision));
+            _revision = "";
             SetStatus("«Остаток» создан/обновлён: количества = полное КП − этапы.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
+        finally { EndWrite(); }
     }
 
     private async void ShowLinks()
     {
         try
         {
+            var revision = _revision;
             var links = await Task.Run(() =>
                 SqlServerStages.ReadStageDocumentLinks(_connectionString, _fullId));
+            if (_closed || _building || _quantityWriteBusy || revision != _revision) return;
             new StageLinksDialog(links) { Owner = this }.ShowDialog();
         }
         catch (Exception ex)
         {
-            SetStatus("Ошибка чтения связей документов: " + ex.Message);
+            if (!_closed) SetStatus("Ошибка чтения связей документов: " + ex.Message);
         }
     }
 
     private async void EditMoney(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         _quantityWriteBusy = true;
         try
         {
-            using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
-            if (SqlServerDatabase.Revision(snapshotConnection) != revision)
-                throw new InvalidOperationException("Этапы изменились. Обновите окно.");
             var stage = await Task.Run(() =>
-                SqlServerStages.ReadStageMoney(_connectionString, stageId));
-            if (SqlServerDatabase.Revision(snapshotConnection) != revision)
-                throw new InvalidOperationException("Данные этапа изменились при чтении.");
+            {
+                using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
+                if (SqlServerDatabase.Revision(snapshotConnection) != revision)
+                    throw new InvalidOperationException("Этапы изменились. Обновите окно.");
+                var data = SqlServerStages.ReadStageMoney(_connectionString, stageId);
+                if (SqlServerDatabase.Revision(snapshotConnection) != revision)
+                    throw new InvalidOperationException("Данные этапа изменились при чтении.");
+                return data;
+            });
             var dialog = new StageMoneyDialog(stage) { Owner = this };
             if (dialog.ShowDialog() != true || _revision != revision) return;
+            var (smr, transport, target) = (dialog.Smr, dialog.Transport, dialog.ContractTarget);
             await Task.Run(() => SqlServerStages.SaveStageMoney(
-                _connectionString, _fullId, stageId,
-                dialog.Smr, dialog.Transport, dialog.ContractTarget, revision));
+                _connectionString, _fullId, stageId, smr, transport, target, revision));
             SetStatus("СМР, транспорт и сумма по договору сохранены.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка сохранения денег этапа: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void EditSystemsMoney(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         _quantityWriteBusy = true;
         try
         {
-            using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
-            if (SqlServerDatabase.Revision(snapshotConnection) != revision)
-                throw new InvalidOperationException("Этапы изменились. Обновите окно.");
-            var stage = await Task.Run(() =>
-                SqlServerStages.ReadStageMoney(_connectionString, stageId));
+            var data = await Task.Run(() =>
+            {
+                using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
+                if (SqlServerDatabase.Revision(snapshotConnection) != revision)
+                    throw new InvalidOperationException("Этапы изменились. Обновите окно.");
+                var stage = SqlServerStages.ReadStageMoney(_connectionString, stageId);
+                var systems = SqlServerStages.ReadStageSystems(_connectionString, stageId);
+                if (SqlServerDatabase.Revision(snapshotConnection) != revision)
+                    throw new InvalidOperationException("Данные этапа изменились при чтении.");
+                return (Stage: stage, Systems: systems);
+            });
+            var (stage, systems) = data;
             if (!stage.CanEdit || !stage.SignedStageExists)
             {
                 SetStatus("Для СМР по системам нужен свободный этап и хотя бы один подписанный этап КП.");
                 return;
             }
-            var systems = await Task.Run(() =>
-                SqlServerStages.ReadStageSystems(_connectionString, stageId));
             if (systems.Count == 0)
             {
                 SetStatus("Сначала распределите в этап позиции и системы.");
                 return;
             }
-            if (SqlServerDatabase.Revision(snapshotConnection) != revision)
-                throw new InvalidOperationException("Данные этапа изменились при чтении.");
             var dialog = new StageSystemsMoneyDialog(stage.Name, systems) { Owner = this };
             if (dialog.ShowDialog() != true || _revision != revision) return;
+            var amounts = dialog.Amounts;
             await Task.Run(() => SqlServerStages.SaveStageSystems(
-                _connectionString, _fullId, stageId, dialog.Amounts, revision));
+                _connectionString, _fullId, stageId, amounts, revision));
             SetStatus("СМР систем этапа сохранено.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка СМР по системам: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void PutRest(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, "Перенести весь положительный остаток полного КП в этот этап?",
                 "Распределение этапов", MessageBoxButton.YesNo, MessageBoxImage.Question,
@@ -549,18 +667,19 @@ public partial class StagesDialog : Window
             }
             _revision = saved.Revision;
             SetStatus($"Весь остаток перенесён: {rowsCount} строк(и).");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void ClearStage(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, "Убрать из этапа все строки? Само КП этапа останется пустым.",
                 "Очистить этап", MessageBoxButton.YesNo, MessageBoxImage.Warning,
@@ -577,18 +696,19 @@ public partial class StagesDialog : Window
             }
             _revision = saved.Revision;
             SetStatus("Этап очищен.");
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void RenameStage(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
         if (stage is null || stage.Locked || stage.StageSum is not null) return;
         var revision = _revision;
@@ -597,21 +717,23 @@ public partial class StagesDialog : Window
         _quantityWriteBusy = true;
         try
         {
+            var name = dialog.Value;
             await Task.Run(() => SqlServerStages.RenameStage(
-                _connectionString, _fullId, stageId, dialog.Value, revision));
+                _connectionString, _fullId, stageId, name, revision));
             _revision = "";
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void SetTarget(long stageId)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
         if (stage is null) return;
@@ -634,18 +756,19 @@ public partial class StagesDialog : Window
             await Task.Run(() => SqlServerStages.SetStageTarget(
                 _connectionString, stageId, sum, revision));
             _revision = "";
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     private async void DeleteStage(long stageId, string name)
     {
-        if (_quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, $"Удалить «{name}»? Копия сохранится в корзине (30 дней).",
                 "Удаление этапа", MessageBoxButton.YesNo, MessageBoxImage.Question,
@@ -655,13 +778,14 @@ public partial class StagesDialog : Window
         {
             await Task.Run(() => SqlServerStages.DeleteStage(_connectionString, stageId, revision));
             _revision = "";
-            Reload();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
+            _revision = "";
             SetStatus("Ошибка: " + ex.Message);
         }
-        finally { _quantityWriteBusy = false; }
+        finally { EndWrite(); }
     }
 
     // Same operation handlers as the management table; inline menus must not
@@ -693,6 +817,7 @@ public partial class StagesDialog : Window
 
     private void OpenStage(long stageId)
     {
+        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         // Открытие КП этапа — через главное окно (оно перечитает список и откроет смету).
         OpenStageRequested?.Invoke((int)stageId);
         Close();

@@ -607,10 +607,51 @@ public static partial class SqlServerStages
         SqlConnection conn, long fullId, SqlTransaction? tx = null)
     {
         var stages = StagesOf(conn, fullId, rest: false, tx: tx);
-        var maps = new List<Dictionary<long, decimal>>();
-        foreach (var stage in stages)
+        return (stages, ReadStageTableRows(conn, fullId, stages, tx, batchRead: false));
+    }
+
+    /// <summary>Read-only distribution; caller verifies the revision before/after.</summary>
+    public static (List<StageInfo> Stages, List<StageTableRow> Rows, StageInfo? Rest) ReadStageDistribution(
+        SqlConnection conn, long fullId)
+    {
+        var all = StagesOf(conn, fullId);
+        var stages = all.Where(stage => !stage.Rest).ToList();
+        return (stages, ReadStageTableRows(conn, fullId, stages, null, batchRead: true),
+            all.FirstOrDefault(stage => stage.Rest));
+    }
+
+    private static List<StageTableRow> ReadStageTableRows(SqlConnection conn, long fullId,
+        List<StageInfo> stages, SqlTransaction? tx, bool batchRead)
+    {
+        var maps = stages.Select(_ => new Dictionary<long, decimal>()).ToList();
+        if (batchRead && stages.Count > 0)
         {
-            var map = new Dictionary<long, decimal>();
+            var byId = stages.Select((stage, index) => (stage.Id, Index: index))
+                .ToDictionary(x => x.Id, x => maps[x.Index]);
+            using var read = new SqlCommand(
+                "SELECT sy.contract_id, p.stage_src, p.qty FROM dbo.positions p " +
+                "JOIN dbo.systems sy ON sy.id=p.system_id JOIN dbo.contracts c ON c.id=sy.contract_id " +
+                "WHERE c.stage_of=@full AND ISNULL(c.stage_rest,0)=0 " +
+                "AND p.stage_src IS NOT NULL AND p.parent_id IS NULL AND p.out_of_kp=0 " +
+                "ORDER BY sy.contract_id,p.id", conn);
+            read.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
+            using var r = read.ExecuteReader();
+            while (r.Read())
+            {
+                var stageId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                if (!byId.TryGetValue(stageId, out var map)) continue;
+                var srcId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                var qty = r.IsDBNull(2) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(2), CultureInfo.InvariantCulture));
+                // Multiple physical rows for one stage/source are ambiguous.
+                // Do not publish a potentially different allocation from the write path.
+                if (!map.TryAdd(srcId, qty))
+                    throw new InvalidOperationException("Повторяющаяся исходная позиция в этапе. Проверьте распределение.");
+            }
+        }
+        else for (var index = 0; index < stages.Count; index++)
+        {
+            var stage = stages[index];
+            var map = maps[index];
             using var read = new SqlCommand(
                 "SELECT stage_src, qty FROM dbo.positions p " +
                 "JOIN dbo.systems sy ON sy.id=p.system_id " +
@@ -620,7 +661,6 @@ public static partial class SqlServerStages
             while (r.Read())
                 map[Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture)] =
                     r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
-            maps.Add(map);
         }
         var rows = new List<StageTableRow>();
         using (var read = new SqlCommand(
@@ -653,7 +693,7 @@ public static partial class SqlServerStages
                     perStage, qty - taken));
             }
         }
-        return (stages, rows);
+        return rows;
     }
 
     /// <summary>«Остаток» как документ (stages.create_rest): создаётся при первом обращении,

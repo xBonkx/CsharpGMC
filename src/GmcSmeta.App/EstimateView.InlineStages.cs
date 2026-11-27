@@ -106,9 +106,7 @@ public partial class EstimateView
                 var full = SqlServerStages.FullOf(conn, _contractId);
                 if (full != _contractId)
                     throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
-                var (stages, rows) = SqlServerStages.StageTable(conn, full);
-                var rest = SqlServerStages.StagesOf(conn, full)
-                    .FirstOrDefault(s => s.Rest);
+                var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full);
 
                 // Totals.ReadOne scans all contracts and positions. Running it
                 // for each stage caused N full-DB scans on every cell edit.
@@ -359,13 +357,8 @@ public partial class EstimateView
             var dialog = new StagesDialog(_sqlConnectionString, _contractId, _estimate.Title) { Owner = owner };
             if (owner is MainWindow main)
                 dialog.OpenStageRequested += stageId => main.NavigateToStageEstimate(stageId, _objectId);
-            RoutedEventHandler? loaded = null;
-            loaded = (_, _) =>
-            {
-                dialog.Loaded -= loaded;
+            dialog.InitialSnapshotReady += () =>
                 dialog.InvokeInlineMenuAction(id, action, snapshot.Revision);
-            };
-            dialog.Loaded += loaded;
             dialog.ShowDialog();
             if (!_detached && IsLoaded && _inlineStagesOn)
             {
