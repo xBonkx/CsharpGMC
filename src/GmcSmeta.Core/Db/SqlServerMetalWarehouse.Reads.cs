@@ -10,6 +10,24 @@ public sealed record MetalStockView(long MaterialId, string Category, string Mat
     long RemainingDemand, long Reserved, long Available, long Surplus, long Deficit);
 
 public sealed record MetalPlaceView(long MaterialId, string Place, long Area, long Pieces);
+
+public readonly record struct MetalPlaceTotals(long Ours, long OursPieces, long Supplier, long SupplierPieces)
+{
+    public static IReadOnlyDictionary<long, MetalPlaceTotals> Aggregate(IEnumerable<MetalPlaceView> places)
+    {
+        var result = new Dictionary<long, MetalPlaceTotals>();
+        foreach (var place in places)
+        {
+            var prior = result.GetValueOrDefault(place.MaterialId);
+            result[place.MaterialId] = place.Place == MetalWarehouseRules.SupplierPlace
+                ? prior with { Supplier = checked(prior.Supplier + place.Area),
+                    SupplierPieces = checked(prior.SupplierPieces + place.Pieces) }
+                : prior with { Ours = checked(prior.Ours + place.Area),
+                    OursPieces = checked(prior.OursPieces + place.Pieces) };
+        }
+        return result;
+    }
+}
 public sealed record MetalObjectView(long MaterialId, long? ObjectId, string ObjectName,
     string Category, string Material, long Demand, long Reserved, long Issued, long Remaining);
 public sealed record MetalLotView(long Id, long MaterialId, string Material, string Supplier, string Invoice,
@@ -125,14 +143,13 @@ WHERE reservation_milli<>0 GROUP BY material_id
         using (var r = cmd.ExecuteReader())
             while (r.Read()) allReserved[r.GetInt64(0)] = r.GetInt64(1);
 
+        var placeTotals = MetalPlaceTotals.Aggregate(places);
         var stock = new List<MetalStockView>();
         foreach (var pair in materials)
         {
             var id = pair.Key;
-            var ourArea = places.Where(p => p.MaterialId == id && p.Place != MetalWarehouseRules.SupplierPlace).Sum(p => p.Area);
-            var ourPieces = places.Where(p => p.MaterialId == id && p.Place != MetalWarehouseRules.SupplierPlace).Sum(p => p.Pieces);
-            var supplier = places.Where(p => p.MaterialId == id && p.Place == MetalWarehouseRules.SupplierPlace).Sum(p => p.Area);
-            var supplierPieces = places.Where(p => p.MaterialId == id && p.Place == MetalWarehouseRules.SupplierPlace).Sum(p => p.Pieces);
+            var totals = placeTotals.GetValueOrDefault(id);
+            var (ourArea, ourPieces, supplier, supplierPieces) = totals;
             var needed = byMaterial.GetValueOrDefault(id).Need;
             var reserved = allReserved.GetValueOrDefault(id);
             var balance = ourArea + supplier - needed;
@@ -169,7 +186,22 @@ ORDER BY l.created_utc DESC,l.id DESC
     }
 
     public IReadOnlyList<MetalMovement> ReadJournal(int page = 0, int pageSize = 200,
-        string search = "", string category = "")
+        string search = "", string category = "") =>
+        ReadJournalCore(page, pageSize, search, category, lookAhead: false, beforeId: null);
+
+    public (IReadOnlyList<MetalMovement> Rows, bool HasNext) ReadJournalPage(
+        int page, int pageSize, string search = "", string category = "")
+    {
+        var rows = ReadJournalCore(page, pageSize, search, category, lookAhead: true, beforeId: null);
+        return (rows.Take(pageSize).ToArray(), rows.Count > pageSize);
+    }
+
+    /// <summary>Descending keyset paging for full exports, independent of OFFSET depth.</summary>
+    public IReadOnlyList<MetalMovement> ReadJournalBefore(long? beforeId, int pageSize = 1000) =>
+        ReadJournalCore(0, pageSize, "", "", lookAhead: false, beforeId: beforeId);
+
+    private IReadOnlyList<MetalMovement> ReadJournalCore(int page, int pageSize,
+        string search, string category, bool lookAhead, long? beforeId)
     {
         if (page < 0 || pageSize is < 1 or > 1000)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
@@ -181,16 +213,18 @@ SELECT e.id,e.material_id,m.category,m.material,e.kind,e.area_milli,e.pieces,
 FROM dbo.gmc_metal_movements e
 JOIN dbo.gmc_metal_materials m ON m.id=e.material_id
 WHERE (@cat=N'' OR m.category=@cat)
+  AND (@before IS NULL OR e.id<@before)
   AND (@search=N'' OR m.material LIKE @pattern OR e.object_name LIKE @pattern OR
        e.invoice LIKE @pattern OR e.note LIKE @pattern OR e.kind LIKE @pattern)
 ORDER BY e.id DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
 """, conn);
         cmd.Parameters.Add("@cat", SqlDbType.NVarChar, 32).Value = category;
+        cmd.Parameters.Add("@before", SqlDbType.BigInt).Value = beforeId.HasValue ? (object)beforeId.Value : DBNull.Value;
         cmd.Parameters.Add("@search", SqlDbType.NVarChar, 100).Value = search.Trim()[..Math.Min(100, search.Trim().Length)];
-        cmd.Parameters.Add("@pattern", SqlDbType.NVarChar, 205).Value =
+        cmd.Parameters.Add("@pattern", SqlDbType.NVarChar, 302).Value =
             "%" + search.Trim()[..Math.Min(100, search.Trim().Length)].Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]") + "%";
         cmd.Parameters.Add("@offset", SqlDbType.Int).Value = checked(page * pageSize);
-        cmd.Parameters.Add("@size", SqlDbType.Int).Value = pageSize;
+        cmd.Parameters.Add("@size", SqlDbType.Int).Value = pageSize + (lookAhead ? 1 : 0);
         using var r = cmd.ExecuteReader();
         var result = new List<MetalMovement>();
         while (r.Read())

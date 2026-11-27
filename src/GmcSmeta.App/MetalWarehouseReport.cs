@@ -74,11 +74,13 @@ internal static class MetalWarehouseReport
                 Area(x.Reserved),Area(x.Issued),Area(x.Remaining)]),[4,5,6,7]);
 
         var movements = new List<MetalMovement>();
+        long? beforeId = null;
         for(var page=0;page<100000;page++)
         {
-            var batch=source.ReadJournal(page,1000);
+            var batch=source.ReadJournalBefore(beforeId,1000);
             movements.AddRange(batch);
             if(batch.Count<1000) break;
+            beforeId = batch[^1].Id;
             if(page==99999) throw new InvalidOperationException("Слишком большой журнал.");
         }
         Sheet("Движения",
@@ -119,7 +121,9 @@ internal static class MetalWarehouseReport
                 new object?[] {"Движений всего",movements.Count,"шт."}
             },[2]);
         RequireSameRevision(source, snapshot);
-        ExportFilePublication.Write(path, stream => book.SaveAs(stream));
+        using var prepared = ExportFilePublication.Stage(path, stream => book.SaveAs(stream));
+        RequireSameRevision(source, snapshot);
+        prepared.Publish();
     }
 
     private static void RequireSameRevision(SqlServerMetalWarehouse source, MetalSnapshot snapshot)

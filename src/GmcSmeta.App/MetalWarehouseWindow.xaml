@@ -195,7 +195,7 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
-            <TabItem Header="Операции">
+            <TabItem x:Name="JournalTab" Header="Операции">
                 <DockPanel Margin="9">
                     <WrapPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,7">
                         <Grid Width="330">
@@ -212,9 +212,9 @@
                                 </Style></TextBlock.Style>
                             </TextBlock>
                         </Grid>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Найти" ContentTemplate="{StaticResource IconLabelSearch}" Click="JournalSearch_Click" Margin="8,0,0,0" Padding="12,5"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Назад" ContentTemplate="{StaticResource IconLabelArrowBack}" ToolTip="Назад" Click="JournalPrevious_Click" Margin="16,0,7,0" Padding="12,5"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Далее" ContentTemplate="{StaticResource IconLabelArrowForward}" ToolTip="Далее" Click="JournalNext_Click" Padding="12,5"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Найти" ContentTemplate="{StaticResource IconLabelSearch}" x:Name="JournalSearchButton" IsEnabled="False" Click="JournalSearch_Click" Margin="8,0,0,0" Padding="12,5"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Назад" ContentTemplate="{StaticResource IconLabelArrowBack}" ToolTip="Назад" x:Name="JournalPreviousButton" IsEnabled="False" Click="JournalPrevious_Click" Margin="16,0,7,0" Padding="12,5"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Далее" ContentTemplate="{StaticResource IconLabelArrowForward}" ToolTip="Далее" x:Name="JournalNextButton" IsEnabled="False" Click="JournalNext_Click" Padding="12,5"/>
                         <TextBlock x:Name="JournalPage" VerticalAlignment="Center" Margin="15,0,0,0"/>
                     </WrapPanel>
                     <DataGrid local:TableColumnMenu.Key="metal-journal" x:Name="JournalGrid">

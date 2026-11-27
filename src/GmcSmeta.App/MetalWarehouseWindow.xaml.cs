@@ -35,6 +35,11 @@ public partial class MetalWarehouseWindow : Window
     private bool _busy;
     private int _reloadVersion;
     private int _journalVersion;
+    private bool _journalLoading, _journalDirty = true, _journalHasNext, _publishingStock;
+    private string _journalSearch = "";
+    private int _publishedJournalPage;
+    private ILookup<long, MetalPlaceView>? _placesByMaterial;
+    private ILookup<long, MetalObjectView>? _objectsByMaterial;
     private bool _writeUncertain;
     private bool CanWrite => IsLoaded && !_busy && !_writeUncertain && _snapshot is not null && _store is not null;
     private const int JournalSize = 200;
@@ -54,6 +59,8 @@ public partial class MetalWarehouseWindow : Window
         _connection = connectionString;
         InitializeComponent();
         Loaded += async (_, _) => await Reload();
+        Tabs.SelectionChanged += Tabs_SelectionChanged;
+        UpdateJournalControls();
         Closing += (_, args) =>
         {
             if (_busy)
@@ -71,23 +78,29 @@ public partial class MetalWarehouseWindow : Window
         var version = ++_reloadVersion;
         ++_journalVersion;
         _snapshot = null; // An unsuccessful read must not leave a writable stale dashboard.
+        _journalDirty = true;
+        UpdateJournalControls();
         StatusText.Text = "Обновление склада…";
         try
         {
             var data = await Task.Run(() =>
             {
                 var store = _store ?? new SqlServerMetalWarehouse(_connection);
-                return (Store: store, Snapshot: store.ReadSnapshot());
+                var snapshot = store.ReadSnapshot();
+                return (Store: store, Snapshot: snapshot,
+                    Places: snapshot.Places.Where(x => x.Area != 0 || x.Pieces != 0).ToLookup(x => x.MaterialId),
+                    Objects: snapshot.Objects.ToLookup(x => x.MaterialId));
             });
             if (version != _reloadVersion) return;
             _store = data.Store;
             _snapshot = data.Snapshot;
+            _placesByMaterial = data.Places;
+            _objectsByMaterial = data.Objects;
             OpeningButton.Visibility = !_snapshot.Initialized && _snapshot.Stock.Count == 0
                 ? Visibility.Visible : Visibility.Collapsed;
             ObjectsGrid.ItemsSource = _snapshot.Objects;
             LotsGrid.ItemsSource = _snapshot.Lots;
             FilterStock();
-            await LoadJournal();
             StatusText.Text = _writeUncertain
                 ? "Запись не подтверждена. Проверьте журнал перед повторным открытием склада."
                 : $"Материалов: {_snapshot.Stock.Count} · Объектов с потребностью: {_snapshot.Objects.Count} " +
@@ -99,7 +112,12 @@ public partial class MetalWarehouseWindow : Window
             StatusText.Text = "Ошибка чтения склада: " + ex.Message;
             MessageBox.Show(this, ex.Message, "Склад металла", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        finally { _busy = false; }
+        finally
+        {
+            _busy = false;
+            UpdateJournalControls();
+            if (_snapshot is not null && JournalVisible) _ = LoadJournal();
+        }
     }
 
     private void StockFilter_Changed(object sender, RoutedEventArgs e) => FilterStock();
@@ -115,16 +133,22 @@ public partial class MetalWarehouseWindow : Window
             (category.Length == 0 || category == s.Category) &&
             (s.Category + " " + s.Material).Replace(',', '.')
                 .Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
-        StockGrid.ItemsSource = rows;
-        StockGrid.SelectedItem = rows.FirstOrDefault(x => x.MaterialId == selected) ?? rows.FirstOrDefault();
-        var totals = new[]
+        _publishingStock = true;
+        try
         {
-            rows.Sum(x => x.Ours + x.Supplier),
-            rows.Sum(x => x.Ours),
-            rows.Sum(x => x.Supplier),
-            rows.Sum(x => x.RemainingDemand),
-            rows.Sum(x => x.Deficit)
-        };
+            StockGrid.ItemsSource = rows;
+            StockGrid.SelectedItem = rows.FirstOrDefault(x => x.MaterialId == selected) ?? rows.FirstOrDefault();
+        }
+        finally { _publishingStock = false; }
+        var totals = new long[5];
+        foreach (var row in rows)
+        {
+            totals[0] = checked(totals[0] + row.Ours + row.Supplier);
+            totals[1] = checked(totals[1] + row.Ours);
+            totals[2] = checked(totals[2] + row.Supplier);
+            totals[3] = checked(totals[3] + row.RemainingDemand);
+            totals[4] = checked(totals[4] + row.Deficit);
+        }
         var fields = new[] { TotalOwned, TotalOurs, TotalSupplier, TotalNeed, TotalDeficit };
         for (var i = 0; i < 5; i++)
             fields[i].Text = MetalWarehouseRules.SqmText(totals[i]) + " м²";
@@ -132,7 +156,10 @@ public partial class MetalWarehouseWindow : Window
         FillSelectedMaterial();
     }
 
-    private void StockGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) => FillSelectedMaterial();
+    private void StockGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_publishingStock) FillSelectedMaterial();
+    }
 
     private void FillSelectedMaterial()
     {
@@ -146,30 +173,62 @@ public partial class MetalWarehouseWindow : Window
             return;
         }
         DetailTitle.Text = selected.Category + " · " + selected.Material;
-        PlaceGrid.ItemsSource = _snapshot.Places.Where(x =>
-            x.MaterialId == selected.MaterialId && (x.Area != 0 || x.Pieces != 0)).ToList();
-        MaterialObjectsGrid.ItemsSource = _snapshot.Objects.Where(x =>
-            x.MaterialId == selected.MaterialId).ToList();
+        PlaceGrid.ItemsSource = _placesByMaterial?[selected.MaterialId];
+        MaterialObjectsGrid.ItemsSource = _objectsByMaterial?[selected.MaterialId];
+    }
+
+    private bool JournalVisible => ReferenceEquals(Tabs.SelectedItem, JournalTab);
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, Tabs) || !JournalVisible || !_journalDirty) return;
+        _ = LoadJournal();
+    }
+
+    private void UpdateJournalControls()
+    {
+        var ready = !_busy && !_journalLoading && _snapshot is not null;
+        JournalSearchButton.IsEnabled = ready;
+        JournalPreviousButton.IsEnabled = ready && !_journalDirty && _publishedJournalPage > 0;
+        JournalNextButton.IsEnabled = ready && !_journalDirty && _journalHasNext;
     }
 
     private async Task LoadJournal()
     {
-        if (_store is not { } store) return;
+        if (!IsLoaded || !JournalVisible || _busy || _journalLoading || !_journalDirty ||
+            _snapshot is null || _store is not { } store) return;
+        _journalLoading = true;
+        _journalDirty = false;
+        UpdateJournalControls();
         var page = _page;
-        var search = HistorySearch.Text;
+        var search = _journalSearch;
         var version = ++_journalVersion;
+        JournalPage.Text = "Загрузка журнала…";
         try
         {
-            var rows = await Task.Run(() => store.ReadJournal(page, JournalSize, search));
+            var rows = await Task.Run(() => store.ReadJournalPage(page, JournalSize, search));
             if (!IsLoaded || version != _journalVersion) return;
-            JournalGrid.ItemsSource = rows;
-            JournalPage.Text = $"Страница {page + 1} · {rows.Count} операций";
+            JournalGrid.ItemsSource = rows.Rows;
+            _publishedJournalPage = page;
+            _journalHasNext = rows.HasNext;
+            JournalPage.Text = $"Страница {page + 1} · {rows.Rows.Count} операций";
         }
         catch (Exception ex)
         {
             if (!IsLoaded || version != _journalVersion) return;
             JournalGrid.ItemsSource = null;
+            _journalHasNext = false;
+            _journalDirty = true;
             JournalPage.Text = "Ошибка чтения журнала: " + ex.Message;
+        }
+        finally
+        {
+            _journalLoading = false;
+            UpdateJournalControls();
+            // A reload invalidated this page while its query was running.
+            // Start the replacement only when the new snapshot is ready.
+            if (version != _journalVersion && _journalDirty && JournalVisible)
+                _ = LoadJournal();
         }
     }
 
@@ -181,6 +240,7 @@ public partial class MetalWarehouseWindow : Window
             return;
         }
         _busy = true;
+        UpdateJournalControls();
         StatusText.Text = "Складская запись…";
         try
         {
@@ -211,7 +271,11 @@ public partial class MetalWarehouseWindow : Window
         var selected = StockGrid.SelectedItem as MetalStockView;
         try
         {
-            var sites = await Task.Run(store.Objects);
+            IReadOnlyList<(long Id, string Name)> sites;
+            _busy = true;
+            UpdateJournalControls();
+            try { sites = await Task.Run(store.Objects); }
+            finally { EndReadBusy(); }
             if (!CanWrite || !ReferenceEquals(snapshot, _snapshot)) return;
             var dialog = new MetalOperationDialog(snapshot.Stock, sites, selected, preset) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
@@ -234,7 +298,11 @@ public partial class MetalWarehouseWindow : Window
         if (picker.ShowDialog(this) != true) return;
         try
         {
+            _busy = true;
+            UpdateJournalControls();
             var preview = await Task.Run(() => MetalOpeningReader.Read(picker.FileName));
+            EndReadBusy();
+            if (!CanWrite || !ReferenceEquals(snapshot, _snapshot)) return;
             if (new MetalOpeningPreviewDialog(preview) { Owner = this }.ShowDialog() != true) return;
             if (MessageBox.Show(this, "Перенести начальные остатки и потребности? " +
                 "Операцию можно выполнить только один раз.",
@@ -245,6 +313,7 @@ public partial class MetalWarehouseWindow : Window
         }
         catch (Exception ex)
         {
+            EndReadBusy();
             MessageBox.Show(this, ex.Message, "Первоначальный импорт", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -258,40 +327,59 @@ public partial class MetalWarehouseWindow : Window
 
     private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (_snapshot is null || _store is null) return;
+        if (_busy || _snapshot is not { } snapshot || _store is not { } store) return;
         var picker = new SaveFileDialog
         {
             Title = "Выгрузить складской отчёт", FileName = "Склад металла.xlsx",
             DefaultExt = ".xlsx", Filter = "Excel (*.xlsx)|*.xlsx"
         };
         if (picker.ShowDialog(this) != true) return;
+        if (!ReferenceEquals(snapshot, _snapshot) || _busy) return;
+        var path = picker.FileName;
+        _busy = true;
+        UpdateJournalControls();
         try
         {
-            var snapshot = _snapshot;
-            var store = _store;
             StatusText.Text = "Формирование Excel…";
-            await Task.Run(() => MetalWarehouseReport.Export(store, snapshot, picker.FileName));
+            await Task.Run(() => MetalWarehouseReport.Export(store, snapshot, path));
             StatusText.Text = "Отчёт сохранён: " + picker.FileName;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Экспорт склада", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { EndReadBusy(); }
+    }
+
+    private void EndReadBusy()
+    {
+        _busy = false;
+        UpdateJournalControls();
+        if (_snapshot is not null && JournalVisible && _journalDirty) _ = LoadJournal();
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await Reload();
     private async void JournalSearch_Click(object sender, RoutedEventArgs e)
     {
-        _page = 0; await LoadJournal();
+        if (_busy || _journalLoading) return;
+        _page = 0;
+        _journalSearch = HistorySearch.Text;
+        _journalDirty = true;
+        await LoadJournal();
     }
     private async void JournalPrevious_Click(object sender, RoutedEventArgs e)
     {
-        _page = Math.Max(0,_page - 1); await LoadJournal();
+        if (_busy || _journalLoading || _journalDirty || _publishedJournalPage == 0) return;
+        _page = _publishedJournalPage - 1;
+        _journalDirty = true;
+        await LoadJournal();
     }
     private async void JournalNext_Click(object sender, RoutedEventArgs e)
     {
-        if (JournalGrid.Items.Count < JournalSize) return;
-        _page++; await LoadJournal();
+        if (_busy || _journalLoading || _journalDirty || !_journalHasNext) return;
+        _page = checked(_publishedJournalPage + 1);
+        _journalDirty = true;
+        await LoadJournal();
     }
 
     private async void LotAdd_Click(object sender, RoutedEventArgs e)
