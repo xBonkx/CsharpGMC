@@ -93,7 +93,8 @@ public static class EstimateGroups
                 g.Components.Any(r => allowed.Contains(r.SortKey)))
             .ToArray();
 
-        static int Compare(Group a, Group b, string key,
+        var areaKeys = new EstimateAreaSortKeys(EstimateViewProjection.SortField(sort));
+        int Compare(Group a, Group b, string key,
             IReadOnlyDictionary<string, int>? ranks)
         {
             if (ranks is not null && ranks.TryGetValue(a.Key, out var ai) &&
@@ -113,8 +114,8 @@ public static class EstimateGroups
                 EstimateViewProjection.ByPurchase => Nullable.Compare(a.CommonPurchase, b.CommonPurchase),
                 EstimateViewProjection.ByWork => Nullable.Compare(a.CommonWork, b.CommonWork),
                 EstimateViewProjection.ByWorkTotal => Nullable.Compare(a.CommonWork * a.Quantity, b.CommonWork * b.Quantity),
-                EstimateViewProjection.ByAreaUnit => Nullable.Compare(EstimateViewProjection.AreaValue(a.Members[0], false), EstimateViewProjection.AreaValue(b.Members[0], false)),
-                EstimateViewProjection.ByAreaTotal => Nullable.Compare(EstimateViewProjection.AreaValue(a.Members[0], true), EstimateViewProjection.AreaValue(b.Members[0], true)),
+                EstimateViewProjection.ByAreaUnit or EstimateViewProjection.ByAreaTotal =>
+                    Nullable.Compare(areaKeys.Get(a.Members[0]), areaKeys.Get(b.Members[0])),
                 _ => a.FirstSortKey.CompareTo(b.FirstSortKey)
             };
             return value != 0 ? (EstimateViewProjection.IsDescending(key) ? -Math.Sign(value) : value)

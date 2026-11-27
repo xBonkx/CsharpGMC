@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 
 namespace GmcSmeta.Core.Domain;
 
@@ -80,10 +79,12 @@ public static class EstimateViewProjection
         if (!noPriceOnly && sort == DocumentOrder && !flat)
             return searchResult;
 
-        var allowed = searchResult.Select(row => row.SortKey).ToHashSet();
-
+        // Sorting alone can consume the already ordered filter result.
+        // Only the missing-price intersection needs a membership set.
+        IReadOnlyList<EstimateRow> filtered = searchResult;
         if (noPriceOnly)
         {
+            var allowed = searchResult.Select(row => row.SortKey).ToHashSet();
             // Display an empty-price top-level position together with its
             // components and section ancestors, but do not show other priced
             // positions from the same section.
@@ -114,9 +115,8 @@ public static class EstimateViewProjection
                     requested.Add(row.SortKey);
             }
             allowed.IntersectWith(requested);
+            filtered = rows.Where(row => allowed.Contains(row.SortKey)).ToList();
         }
-
-        var filtered = rows.Where(row => allowed.Contains(row.SortKey)).ToList();
         if (sort == DocumentOrder && !flat) return filtered;
 
         // Split into atomic position blocks (parent + its child components).
@@ -124,6 +124,8 @@ public static class EstimateViewProjection
         var result = new List<EstimateRow>(filtered.Count);
         var blocks = new List<List<EstimateRow>>();
         List<EstimateRow>? block = null;
+        var field = SortField(sort);
+        var areaKeys = new EstimateAreaSortKeys(field);
 
         void Flush()
         {
@@ -135,7 +137,7 @@ public static class EstimateViewProjection
         {
             Flush();
             if (sort != DocumentOrder)
-                blocks.Sort((a, b) => Compare(a[0], b[0], sort, frozenOrder));
+                blocks.Sort((a, b) => Compare(a[0], b[0], sort, frozenOrder, areaKeys));
             foreach (var group in blocks) result.AddRange(group);
             blocks.Clear();
         }
@@ -165,7 +167,7 @@ public static class EstimateViewProjection
     }
 
     private static int Compare(EstimateRow left, EstimateRow right, string sort,
-        IReadOnlyDictionary<int, int>? frozenOrder)
+        IReadOnlyDictionary<int, int>? frozenOrder, EstimateAreaSortKeys areaKeys)
     {
         // Python kp_editor._view_key: keep the result of the first sort
         // stable while a row's price/quantity is being edited.
@@ -189,8 +191,7 @@ public static class EstimateViewProjection
             ByPurchase => Nullable.Compare(left.PurchasePrice, right.PurchasePrice),
             ByWork => Nullable.Compare(left.WorkPrice, right.WorkPrice),
             ByWorkTotal => Nullable.Compare(left.WorkPrice * left.Qty, right.WorkPrice * right.Qty),
-            ByAreaUnit => Nullable.Compare(AreaValue(left, false), AreaValue(right, false)),
-            ByAreaTotal => Nullable.Compare(AreaValue(left, true), AreaValue(right, true)),
+            ByAreaUnit or ByAreaTotal => Nullable.Compare(areaKeys.Get(left), areaKeys.Get(right)),
             _ => left.SortKey.CompareTo(right.SortKey)
         };
         return compared != 0 ? (IsDescending(sort) ? -Math.Sign(compared) : compared)
@@ -212,10 +213,14 @@ public static class EstimateViewProjection
                 var startI = i; var startJ = j;
                 while (i < a.Length && char.IsDigit(a[i])) i++;
                 while (j < b.Length && char.IsDigit(b[j])) j++;
-                var aa = a[startI..i].TrimStart('0');
-                var bb = b[startJ..j].TrimStart('0');
+                // Compare numeric runs in place; preserve zero trimming,
+                // arbitrary length and the original ordinal digit semantics.
+                while (startI < i && a[startI] == '0') startI++;
+                while (startJ < j && b[startJ] == '0') startJ++;
+                var aa = a.AsSpan(startI, i - startI);
+                var bb = b.AsSpan(startJ, j - startJ);
                 var cmp = aa.Length.CompareTo(bb.Length);
-                if (cmp == 0) cmp = string.CompareOrdinal(aa, bb);
+                if (cmp == 0) cmp = aa.SequenceCompareTo(bb);
                 if (cmp != 0) return cmp;
             }
             else

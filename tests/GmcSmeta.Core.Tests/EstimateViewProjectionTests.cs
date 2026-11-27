@@ -110,6 +110,90 @@ public sealed class EstimateViewProjectionTests
     public void NaturalComparison_OrdersNumbersAsNumbers(string left, string right) =>
         Assert.True(EstimateViewProjection.NaturalCompare(left, right) < 0);
 
+    [Theory]
+    [InlineData("000", "0")]
+    [InlineData("В0002", "В2")]
+    [InlineData("В999999999999999999999", "В1000000000000000000000")]
+    [InlineData("В02-10", "В2-9")]
+    [InlineData("А٠٢", "А02")]
+    [InlineData("", "0")]
+    public void NaturalComparison_PreservesLegacyDigitRunSemantics(string left, string right)
+    {
+        static int Legacy(string a, string b)
+        {
+            var ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU").CompareInfo;
+            int i = 0, j = 0;
+            while (i < a.Length && j < b.Length)
+            {
+                bool da = char.IsDigit(a[i]), db = char.IsDigit(b[j]);
+                int si = i, sj = j;
+                if (da && db)
+                {
+                    while (i < a.Length && char.IsDigit(a[i])) i++;
+                    while (j < b.Length && char.IsDigit(b[j])) j++;
+                    var aa = a[si..i].TrimStart('0');
+                    var bb = b[sj..j].TrimStart('0');
+                    var cmp = aa.Length.CompareTo(bb.Length);
+                    if (cmp == 0) cmp = string.CompareOrdinal(aa, bb);
+                    if (cmp != 0) return cmp;
+                }
+                else
+                {
+                    while (i < a.Length && !char.IsDigit(a[i])) i++;
+                    while (j < b.Length && !char.IsDigit(b[j])) j++;
+                    if (i == si || j == sj) return da ? -1 : 1;
+                    var cmp = ru.Compare(a, si, i - si, b, sj, j - sj,
+                        System.Globalization.CompareOptions.IgnoreCase);
+                    if (cmp != 0) return cmp;
+                }
+            }
+            return (a.Length - i).CompareTo(b.Length - j);
+        }
+        Assert.Equal(Math.Sign(Legacy(left, right)),
+            Math.Sign(EstimateViewProjection.NaturalCompare(left, right)));
+        Assert.Equal(Math.Sign(Legacy(right, left)),
+            Math.Sign(EstimateViewProjection.NaturalCompare(right, left)));
+    }
+
+    [Theory]
+    [InlineData(EstimateViewProjection.ByAreaUnit, false)]
+    [InlineData(EstimateViewProjection.ByAreaUnit, true)]
+    [InlineData(EstimateViewProjection.ByAreaTotal, false)]
+    [InlineData(EstimateViewProjection.ByAreaTotal, true)]
+    public void AreaSort_MatchesDisplayedValuesAndRefreshesAfterEdit(string field, bool descending)
+    {
+        var rows = new[]
+        {
+            Pos(0, 1, 10, "Материал А", 1, 4) with { AreaManual = 1.125 },
+            Pos(1, 2, 10, "Материал Б", 1, 2) with { AreaManual = 2.25 },
+            Pos(2, 3, 10, "Материал В", 1, 1) with { AreaManual = 0.125 },
+            Pos(3, 4, 10, "Позиция без площади", 1, 1)
+        };
+        var sort = EstimateViewProjection.WithDirection(field, descending);
+        int[] Expected(EstimateRow[] items)
+        {
+            decimal? Key(EstimateRow row)
+            {
+                var cell = AreaCellPresentation.For(row.Name, row.Unit, row.Qty,
+                    row.AreaManual, row.IsAreaSummary);
+                return decimal.TryParse(field == EstimateViewProjection.ByAreaTotal ? cell.Total : cell.Unit,
+                    System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.GetCultureInfo("ru-RU"), out var value)
+                    ? value : null;
+            }
+            var ordered = descending ? items.OrderByDescending(Key) : items.OrderBy(Key);
+            return ordered.ThenBy(r => r.SortKey).Select(r => r.SortKey).ToArray();
+        }
+        foreach (var snapshot in new[] { rows, rows.Select(r => r.Id == 1
+                     ? r with { AreaManual = 10.0 } : r).ToArray() })
+        {
+            var expected = Expected(snapshot);
+            Assert.Equal(expected, EstimateViewProjection.Apply(snapshot, sort: sort).Select(r => r.SortKey));
+            Assert.Equal(expected, EstimateGroups.Build(snapshot, EstimateGroups.Same, sort)[0]
+                .Groups.Select(g => g.FirstSortKey));
+        }
+    }
+
     [Fact]
     public void FrozenRanks_PreserveOrderAfterPriceChanges()
     {
