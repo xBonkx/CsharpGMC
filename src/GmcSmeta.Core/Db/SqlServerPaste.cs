@@ -93,7 +93,7 @@ public static partial class SqlServerDatabase
             shift.ExecuteNonQuery();
         }
         using (var create = new SqlCommand(
-            "CREATE TABLE #copy_rows (idx INT PRIMARY KEY, parent_idx INT NULL, [key] NVARCHAR(600) NOT NULL, " +
+            "CREATE TABLE #copy_rows (idx INT PRIMARY KEY, parent_idx INT NULL, [key] NVARCHAR(600) COLLATE DATABASE_DEFAULT NOT NULL, " +
             "name NVARCHAR(MAX) NOT NULL, unit NVARCHAR(32) NOT NULL, qty FLOAT NOT NULL, price FLOAT NOT NULL, " +
             "purchase_price FLOAT NULL, note NVARCHAR(MAX) NOT NULL, formulas NVARCHAR(MAX) NOT NULL, work_price FLOAT NULL); " +
             "CREATE TABLE #made (idx INT PRIMARY KEY, id BIGINT NOT NULL)", conn, tx))
@@ -593,7 +593,7 @@ public static partial class SqlServerDatabase
             shift.ExecuteNonQuery();
         }
         using (var create = new SqlCommand(
-            "CREATE TABLE #paste_rows (idx INT PRIMARY KEY, [key] NVARCHAR(600) NOT NULL, " +
+            "CREATE TABLE #paste_rows (idx INT PRIMARY KEY, [key] NVARCHAR(600) COLLATE DATABASE_DEFAULT NOT NULL, " +
             "name NVARCHAR(MAX) NOT NULL, unit NVARCHAR(32) NOT NULL, " +
             "qty FLOAT NOT NULL, price FLOAT NOT NULL, purchase_price FLOAT NULL, note NVARCHAR(MAX) NOT NULL)", conn, tx))
             create.ExecuteNonQuery();
