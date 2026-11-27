@@ -491,7 +491,7 @@ public partial class EstimateView
         // Removing a root includes its components, but explicitly selected components
         // must not be double-counted in the preview.
         var extraComponents = _rows.Count(row => !row.IsSystem && !row.IsVirtual &&
-            row.Source.ParentPositionId is long parent && selectedIds.Contains(parent) &&
+            row.Source.ParentPositionId is int parent && selectedIds.Contains(parent) &&
             !selectedIds.Contains(row.Id));
         var revision = _serverRevision;
         var dialog = new DeletePositionsDialog(selected.Select(row => row.Name).ToArray(), extraComponents)
