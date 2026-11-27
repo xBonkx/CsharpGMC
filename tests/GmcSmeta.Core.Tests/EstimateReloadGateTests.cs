@@ -29,7 +29,9 @@ public sealed class EstimateReloadGateTests
         var gate = new EstimateReloadGate();
         var ticket = gate.NextRequest();
         Assert.False(gate.CanApply(ticket, 0, "rev-old", "rev-new", "rev-old"));
-        Assert.True(gate.CanApply(ticket, 0, "rev-old", "rev-new", "rev-new"));
+        Assert.False(gate.CanApply(ticket, 0, "rev-old", "rev-new", "rev-new"));
+        var retry = gate.NextRequest();
+        Assert.True(gate.CanApply(retry, 0, "rev-new", "rev-new", "rev-new"));
     }
 
     [Fact]

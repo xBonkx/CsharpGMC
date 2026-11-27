@@ -770,7 +770,13 @@ public partial class EstimateView : UserControl
     {
         _reloadTimer.Stop();
         if (_detached && !HasUnsettledCacheWrites) { _reloadAfterAttach = true; return; }
-        if (_refreshing || Volatile.Read(ref _pendingWrites) > 0) return;
+        if (_refreshing || Volatile.Read(ref _pendingWrites) > 0)
+        {
+            // Keep a refresh requested during an existing read/write pending.
+            // Do not start another SQL read while that operation is active.
+            _reloadTimer.Start();
+            return;
+        }
         if (Keyboard.FocusedElement is TextBox editor && IsInside(editor, EstimateGrid))
         {
             _reloadTimer.Start();
@@ -787,6 +793,13 @@ public partial class EstimateView : UserControl
     private async Task ReloadDocumentAsync(bool allowUnchanged = false)
     {
         if (_detached && !HasUnsettledCacheWrites) { _reloadAfterAttach = true; return; }
+        // A direct reload also satisfies an earlier timer request. Consume
+        // that request now, but do not turn mandatory readback into a cache hit.
+        if (_reloadTimer.IsEnabled)
+        {
+            allowUnchanged = false;
+            _reloadTimer.Stop();
+        }
         var request = _reloadGate.NextRequest();
         var previous = _reloadCancellation;
         using var cancellation = new CancellationTokenSource();

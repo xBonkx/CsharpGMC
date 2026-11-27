@@ -32,7 +32,9 @@ public sealed class EstimateReloadGate
         string localRevisionAtStart, string localRevisionNow, string loadedRevision)
     {
         if (!IsLatest(request) || pendingWrites != 0) return false;
-        return string.Equals(localRevisionAtStart, localRevisionNow, StringComparison.Ordinal) ||
-               string.Equals(loadedRevision, localRevisionNow, StringComparison.Ordinal);
+        // Even a matching loaded revision cannot prove that ancillary data
+        // (for example the lazy Undo checkpoint) was requested after the write.
+        // Re-read once using the latest local state rather than settling it early.
+        return string.Equals(localRevisionAtStart, localRevisionNow, StringComparison.Ordinal);
     }
 }
