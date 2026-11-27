@@ -24,6 +24,7 @@ public partial class EstimateView
 
     private bool _inlineStagesOn;
     private bool _requestInlineStages;
+    private bool _revealInlineStageColumns;
     private bool _inlineStageCommandBusy;
     private bool _inlineStagesLoading;
     private int _inlineStagesVersion;
@@ -34,50 +35,46 @@ public partial class EstimateView
     private StageColumnKey[] _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
     private IReadOnlyList<string> _blankStageLabels = Array.Empty<string>();
 
-    private async void EstimateView_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (_isKp && !_inlineStagesOn &&
-            (_uiSettings.StageModeKp ?? new List<int>()).Contains(_contractId))
-            await EnableInlineStagesAsync();
-    }
-
-    private async void ToggleInlineStages_Click(object sender, RoutedEventArgs e)
+    private void ToggleInlineStages_Click(object sender, RoutedEventArgs e)
     {
         if (_inlineStageCommandBusy) return;
         if (_inlineStagesOn) { DisableInlineStages(); return; }
-        await EnableInlineStagesAsync();
+        RequestInlineStages();
     }
 
     internal void RequestInlineStages()
     {
         if (!_isKp || _detached) return;
         _requestInlineStages = true;
+        _revealInlineStageColumns = true;
         if (_estimate is not null) ApplyRequestedInlineStages();
     }
 
     private void ApplyRequestedInlineStages()
     {
-        if (!_requestInlineStages || _estimate is null) return;
+        if (!_isKp || _estimate is null || _detached) return;
+        var requested = _requestInlineStages;
+        var remembered = (_uiSettings.StageModeKp ?? new List<int>()).Contains(_contractId);
+        if (!requested && !remembered) return;
         _requestInlineStages = false;
-        EstimateModeTab.IsChecked = true;
+        if (requested) EstimateModeTab.IsChecked = true;
         if (!_inlineStagesOn) _ = EnableInlineStagesAsync();
+        else if (requested && _inlineStagesData is { } snapshot)
+            RevealInlineStageColumns(snapshot);
     }
 
     private async Task EnableInlineStagesAsync()
     {
-        if (!_isKp || _inlineStagesOn) return;
+        if (!_isKp || _inlineStagesOn || _estimate is null || _detached) return;
         _inlineStagesOn = true;
         InlineStagesBar.Visibility = Visibility.Visible;
-        var loaded = await RefreshInlineStagesAsync();
-        if (!loaded)
-        {
-            DisableInlineStages();
-            return;
-        }
+        // A superseded or failed read must not turn off a newer mode request.
+        // Leave the visible error and allow F5 or an explicit off/on retry.
         var stored = _uiSettings.StageModeKp ?? new List<int>();
         if (!stored.Contains(_contractId)) stored.Add(_contractId);
         _uiSettings.StageModeKp = stored;
         SaveEstimateUiSettings();
+        await RefreshInlineStagesAsync();
     }
 
     private void CloseInlineStages_Click(object sender, RoutedEventArgs e)
@@ -88,6 +85,9 @@ public partial class EstimateView
     private void DisableInlineStages()
     {
         _inlineStagesOn = false;
+        _requestInlineStages = false;
+        _revealInlineStageColumns = false;
+        _inlineStagesLoading = false;
         _inlineStagesVersion++; // discard any read finishing after exit
         _inlineStagesData = null;
         _inlineStagesFilter = StageAllocationPresentation.All;
@@ -112,7 +112,7 @@ public partial class EstimateView
 
     private async Task<bool> RefreshInlineStagesAsync()
     {
-        if (!_inlineStagesOn) return false;
+        if (!_inlineStagesOn || _estimate is null || _detached) return false;
         var version = ++_inlineStagesVersion;
         _inlineStagesLoading = true;
         _inlineStagesData = null; // No stale allocation may remain writable after a failed read.
@@ -148,12 +148,19 @@ public partial class EstimateView
                     rest, totals, revisionBefore);
             });
             if (!_inlineStagesOn || _detached || version != _inlineStagesVersion) return false;
+            if (data.Revision != _serverRevision)
+            {
+                InlineStagesSummary.Text = "Смета изменилась, обновляем распределение…";
+                RequestRefresh();
+                return false;
+            }
             _inlineStagesData = data;
             _blankStageLabels = Array.AsReadOnly(
                 Enumerable.Repeat("", data.Stages.Count + 1).ToArray());
             RebuildInlineStageColumns();
             DrawInlineStageCards();
             ApplyFilter();
+            if (_revealInlineStageColumns) RevealInlineStageColumns(data);
             return true;
         }
         catch (Exception ex)
@@ -223,6 +230,7 @@ public partial class EstimateView
             var column = new DataGridTextColumn
             {
                 Header = title,
+                Visibility = Visibility.Visible,
                 Binding = new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay },
                 ElementStyle = style,
                 EditingElementStyle = (Style)FindResource("EstimateMoneyEditor"),
@@ -246,8 +254,28 @@ public partial class EstimateView
                 new RoutedEventHandler(InlineStageHeader_Click)));
             _inlineStageColumns.Add(column);
             EstimateGrid.Columns.Add(column);
+            column.DisplayIndex = EstimateGrid.Columns.Count - 1;
         }
         RequestEstimateColumnFit();
+    }
+
+    private void RevealInlineStageColumns(InlineStagesSnapshot snapshot)
+    {
+        // Do not change selection, current cell or the vertical scroll position.
+        // Bring the first stage just inside the right edge, even with no rows.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!_inlineStagesOn || _detached || !ReferenceEquals(snapshot, _inlineStagesData) ||
+                !EstimateGrid.IsVisible || _inlineStageColumns.Count == 0 ||
+                EstimateScrollViewer() is not { } scroll || scroll.ViewportWidth <= 0) return;
+            var first = _inlineStageColumns[0];
+            var right = EstimateGrid.Columns
+                .Where(c => c.Visibility == Visibility.Visible && c.DisplayIndex <= first.DisplayIndex)
+                .Sum(c => c.ActualWidth);
+            if (right > scroll.HorizontalOffset + scroll.ViewportWidth)
+                scroll.ScrollToHorizontalOffset(Math.Max(0, right - scroll.ViewportWidth + 4));
+            _revealInlineStageColumns = false;
+        }), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     private void DrawInlineStageCards()
@@ -288,7 +316,8 @@ public partial class EstimateView
 
         InlineStagesSummary.Text =
             $"Не распределено строк: {metrics.UnassignedCount} · на {N2(metrics.RemainingAmount)} ₽" +
-            (metrics.OverrunCount > 0 ? $" · Перебор: {metrics.OverrunCount}" : "");
+            (metrics.OverrunCount > 0 ? $" · Перебор: {metrics.OverrunCount}" : "") +
+            " · Столбцы этапов справа";
     }
 
     private void AddCard(long id, string name, string secondLine, string tint, bool warning)

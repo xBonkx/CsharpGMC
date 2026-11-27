@@ -51,6 +51,27 @@ public sealed class StagesDialogLifecycleTests
     }
 
     [Fact]
+    public void InlineColumnsAreVisibleAndAppendedAfterCoherentDocumentLoad()
+    {
+        var code = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
+        Assert.Contains("if (!_isKp || _inlineStagesOn || _estimate is null || _detached) return;", code);
+        Assert.Contains("data.Revision != _serverRevision", code);
+        Assert.Contains("i <= data.Stages.Count", code);
+        Assert.Contains("Visibility = Visibility.Visible", code);
+        Assert.Contains("EstimateGrid.Columns.Add(column);", code);
+        Assert.Contains("column.DisplayIndex = EstimateGrid.Columns.Count - 1;", code);
+        Assert.Contains("IsReadOnly = rest || data.Stages[i].Locked", code);
+        Assert.Contains("RevealInlineStageColumns(data)", code);
+        Assert.Contains("scroll.ScrollToHorizontalOffset", code);
+        Assert.Contains("EstimateGrid.Columns.Remove(column)", code);
+        Assert.DoesNotContain("if (!loaded)", code);
+        var xaml = Source("GmcSmeta.App/EstimateView.xaml");
+        Assert.DoesNotContain("Loaded=\"EstimateView_Loaded\"", xaml);
+        var estimate = Source("GmcSmeta.App/EstimateView.xaml.cs");
+        Assert.Contains("ApplyRequestedInlineStages();", estimate);
+    }
+
+    [Fact]
     public void SearchUsesLocalViewAndRetainsExactValues()
     {
         var code = Source("GmcSmeta.App/StagesDialog.xaml.cs");

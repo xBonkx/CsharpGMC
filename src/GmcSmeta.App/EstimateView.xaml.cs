@@ -167,6 +167,8 @@ public partial class EstimateView : UserControl
         Loaded += (_, _) =>
         {
             _detached = false;
+            if (_inlineStagesOn && (_inlineStagesData is null || _inlineStagesLoading))
+                _reloadAfterAttach = true;
             if (_searchPending) _estimateSearchTimer.Start();
             if (_reloadAfterAttach)
             {

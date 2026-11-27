@@ -7,8 +7,7 @@
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True" PreviewKeyDown="EstimateView_PreviewKeyDown"
          SizeChanged="EstimateView_SizeChanged" Unloaded="EstimateView_Unloaded"
-         PreviewMouseWheel="EstimateView_PreviewMouseWheel"
-         Loaded="EstimateView_Loaded">
+         PreviewMouseWheel="EstimateView_PreviewMouseWheel">
 
     <UserControl.Resources>
         <local:SingleLineNameConverter x:Key="SingleLineName"/>
