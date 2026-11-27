@@ -73,15 +73,11 @@ public partial class ProcurementPane
         {
             var snapshot = await Task.Run(() =>
             {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                var revision = SqlServerDatabase.Revision(conn);
-                var info = ProcurementRequestPlanner.ReadDocumentInfo(_connectionString, _contractId);
-                var rows = SqlServerProcurement.BuyRows(_connectionString, _contractId);
-                if (SqlServerDatabase.Revision(conn) != revision)
-                    throw new InvalidOperationException("Закупки изменились во время чтения. Повторите формирование заявки.");
-                var positions = ProcurementRequestPlanner.SelectShopRows(rows, selectedIds);
+                var report = ProcurementRequestPlanner.ReadReport(_connectionString, _contractId,
+                    ProcurementRequestPlanner.ReportKind.Shop, operation.Revision);
+                var positions = ProcurementRequestPlanner.SelectShopRows(report.Rows, selectedIds);
                 var selectedOnly = positions.Any(p => selectedIds.Contains(p.PositionId));
-                return (info, positions, selectedOnly);
+                return (info: report.Document, positions, selectedOnly);
             });
             if (snapshot.positions.Count == 0)
             {

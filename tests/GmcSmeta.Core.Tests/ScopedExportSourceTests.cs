@@ -25,9 +25,8 @@ public sealed class ScopedExportSourceTests
     public void ControlReportChecksRevisionAfterReaderDisposalAndGuardsLateDialog()
     {
         var source = Source("ProcurementControlExport.cs");
-        Assert.Contains("var revision = SqlServerDatabase.Revision(conn);", source);
-        Assert.Contains("using (var reader = cmd.ExecuteReader())", source);
-        Assert.Contains("if (SqlServerDatabase.Revision(conn) != revision)", source);
+        Assert.Contains("ProcurementRequestPlanner.ReadReport(connectionString, contractId,", source);
+        Assert.Contains("ProcurementRequestPlanner.ReportKind.Control", source);
         var pane = Source("ProcurementPane.Exports.cs");
         Assert.Contains("if (_controlExportBusy || !IsLoaded) return;", pane);
         Assert.Contains("if (!IsCurrent()) return;", pane);

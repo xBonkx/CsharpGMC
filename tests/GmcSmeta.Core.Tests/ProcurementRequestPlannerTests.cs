@@ -13,6 +13,21 @@ public sealed class ProcurementRequestPlannerTests
             work, extra, Array.Empty<string>());
 
     [Fact]
+    public void ReportChildrenUseAlreadyReadParentIdsIncludingWorkAndExtra()
+    {
+        var data = new[]
+        {
+            Row(1, "Родитель", 1, null),
+            Row(2, "Комплект", 1, null) with { ParentPositionId = 1 },
+            Row(3, "Работа", 1, null, work: true) with { ParentPositionId = 1 },
+            Row(4, "Вне КП", 1, null, extra: true) with { ParentPositionId = 1 }
+        };
+        var children = ProcurementRequestPlanner.ChildPositionIds(data);
+        Assert.True(children.SetEquals(new long[] { 2, 3, 4 }));
+        Assert.Single(ProcurementRequestPlanner.CreateRows(data, children, "Поставщик"));
+    }
+
+    [Fact]
     public void ShopOrder_SelectedShopRowsOverrideFullQueue()
     {
         var data = new[]

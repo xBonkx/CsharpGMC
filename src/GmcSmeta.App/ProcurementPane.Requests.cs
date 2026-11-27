@@ -14,23 +14,12 @@ public partial class ProcurementPane
         SetStatus("Подготовка заявки поставщику…");
         try
         {
-            var snapshot = await Task.Run(() =>
-            {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                var revision = SqlServerDatabase.Revision(conn);
-                if (revision != operation.Revision) throw new InvalidOperationException("Закупки изменились. Обновите таблицу.");
-                var rows = SqlServerProcurement.BuyRows(_connectionString, _contractId);
-                var children = ProcurementRequestPlanner.ChildPositionIds(_connectionString, _contractId);
-                var info = ProcurementRequestPlanner.ReadDocumentInfo(_connectionString, _contractId);
-                var number = ProcurementRequestPlanner.NextNumber(_connectionString);
-                if (SqlServerDatabase.Revision(conn) != revision)
-                    throw new InvalidOperationException("Данные изменились во время подготовки заявки.");
-                return (revision, rows, children, info, number);
-            });
+            var snapshot = await Task.Run(() => ProcurementRequestPlanner.ReadReport(
+                _connectionString, _contractId, ProcurementRequestPlanner.ReportKind.Supplier, operation.Revision));
             var selectedSupplier = (BuyGrid.SelectedItem as ProcurementPreviewRow)?.Supplier ?? "";
             var dialog = new ProcurementRequestDialog(
-                snapshot.info, snapshot.rows, snapshot.children,
-                snapshot.number, selectedSupplier)
+                snapshot.Document, snapshot.Rows, snapshot.Children,
+                snapshot.Number, selectedSupplier)
             { Owner = Window.GetWindow(this) };
             if (dialog.ShowDialog() != true || !dialog.FileSaved)
             {

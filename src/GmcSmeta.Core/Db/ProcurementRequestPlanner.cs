@@ -9,7 +9,7 @@ namespace GmcSmeta.Core.Db;
 /// Python export_request.request_rows: supplier-scoped, status-aware request projection.
 /// This is NOT the visible/filtered grid: it always uses the contract's full SQL snapshot.
 /// </summary>
-public static class ProcurementRequestPlanner
+public static partial class ProcurementRequestPlanner
 {
     public sealed class RequestRow
     {
@@ -136,18 +136,27 @@ public static class ProcurementRequestPlanner
         .ToArray();
 
     /// <summary>Find next number across all contracts, matching Python's "Заявка №N".</summary>
+    private const string RequestNumberQuery =
+        "SELECT order_ref FROM dbo.procurement WHERE order_ref LIKE N'%аявка №%'";
+    private static readonly Regex RequestNumberPattern =
+        new(@"аявка №\s*(\d+)", RegexOptions.CultureInvariant);
+
     public static string NextNumber(string connectionString)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
-        using var cmd = new SqlCommand(
-            "SELECT order_ref FROM dbo.procurement WHERE order_ref LIKE N'%аявка №%'", conn);
+        using var cmd = new SqlCommand(RequestNumberQuery, conn);
         using var reader = cmd.ExecuteReader();
+        return ReadNextNumber(reader);
+    }
+
+    private static string ReadNextNumber(IDataReader reader, CancellationToken token = default)
+    {
         long max = 0;
-        var regex = new Regex(@"аявка №\s*(\d+)", RegexOptions.CultureInvariant);
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var text = reader.IsDBNull(0) ? "" : reader.GetString(0);
-            foreach (Match match in regex.Matches(text))
+            foreach (Match match in RequestNumberPattern.Matches(text))
                 if (long.TryParse(match.Groups[1].Value, NumberStyles.None,
                         CultureInfo.InvariantCulture, out var number) && number > max)
                     max = number;
@@ -157,17 +166,24 @@ public static class ProcurementRequestPlanner
 
     public sealed record DocumentInfo(string ObjectName, string Address, string Title, string CompanyHeader);
 
+    private const string DocumentInfoQuery =
+        "SELECT o.name,ISNULL(o.address,N''),ISNULL(c.name,N'')," +
+        "ISNULL(co.name,N''),ISNULL(co.legal_full,N'') " +
+        "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
+        "LEFT JOIN dbo.companies co ON co.id=c.company_id WHERE c.id=@id";
+
     /// <summary>Contract-scoped requisites for the Excel header, read-only.</summary>
     public static DocumentInfo ReadDocumentInfo(string connectionString, int contractId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
-        using var cmd = new SqlCommand(
-            "SELECT o.name,ISNULL(o.address,N''),ISNULL(c.name,N'')," +
-            "ISNULL(co.name,N''),ISNULL(co.legal_full,N'') " +
-            "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
-            "LEFT JOIN dbo.companies co ON co.id=c.company_id WHERE c.id=@contract", conn);
-        cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
+        using var cmd = new SqlCommand(DocumentInfoQuery, conn);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         using var reader = cmd.ExecuteReader();
+        return ReadDocumentInfo(reader);
+    }
+
+    private static DocumentInfo ReadDocumentInfo(IDataReader reader)
+    {
         if (!reader.Read()) throw new InvalidOperationException("Договор не найден.");
         var company = reader.GetString(4);
         if (company.Length == 0) company = reader.GetString(3);

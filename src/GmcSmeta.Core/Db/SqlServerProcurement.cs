@@ -194,7 +194,7 @@ public static partial class SqlServerProcurement
         return ReadSystemChoices(reader);
     }
 
-    private static IReadOnlyList<BuyRow> ReadBuyRows(IDataReader reader, DateTime today, CancellationToken token = default)
+    internal static IReadOnlyList<BuyRow> ReadBuyRows(IDataReader reader, DateTime today, CancellationToken token = default)
     {
         var rows = new List<BuyRow>();
         while (reader.Read())

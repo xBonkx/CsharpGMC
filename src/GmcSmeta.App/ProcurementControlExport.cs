@@ -1,8 +1,6 @@
-using System.Data;
 using System.Globalization;
 using ClosedXML.Excel;
 using GmcSmeta.Core.Db;
-using Microsoft.Data.SqlClient;
 
 namespace GmcSmeta.App;
 
@@ -18,38 +16,9 @@ public static class ProcurementControlExport
 
     public static Snapshot Read(string connectionString, int contractId)
     {
-        // All three reads must refer to the same committed revision.
-        using var conn = SqlServerDatabase.Open(connectionString);
-        var revision = SqlServerDatabase.Revision(conn);
-        if (string.IsNullOrWhiteSpace(revision))
-            throw new InvalidOperationException("Не удалось прочитать ревизию SQL Server.");
-        var document = ProcurementRequestPlanner.ReadDocumentInfo(connectionString, contractId);
-        var positions = SqlServerProcurement.BuyRows(connectionString, contractId);
-        var issues = new Dictionary<long, List<string>>();
-        using var cmd = new SqlCommand(
-            "SELECT m.position_id,m.qty,m.[date] FROM dbo.movements m " +
-            "JOIN dbo.positions p ON p.id=m.position_id " +
-            "JOIN dbo.systems sy ON sy.id=p.system_id " +
-            "WHERE sy.contract_id=@contract AND m.kind=N'out' " +
-            "ORDER BY m.position_id,m.[date],m.id", conn);
-        cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-        using (var reader = cmd.ExecuteReader())
-        {
-            while (reader.Read())
-            {
-                var id = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
-                var qty = Convert.ToDecimal(reader.GetValue(1), CultureInfo.InvariantCulture);
-                var date = reader.IsDBNull(2) ? "б/д" :
-                    reader.GetDateTime(2).ToString("dd.MM.yy", Ru);
-                if (!issues.TryGetValue(id, out var parts))
-                    issues[id] = parts = new List<string>();
-                parts.Add(qty.ToString("0.######", Ru) + " (" + date + ")");
-            }
-        }
-        if (SqlServerDatabase.Revision(conn) != revision)
-            throw new InvalidOperationException("Закупки изменились во время чтения. Повторите выгрузку контроля.");
-        return new Snapshot(document, positions,
-            issues.ToDictionary(kv => kv.Key, kv => string.Join(", ", kv.Value)));
+        var report = ProcurementRequestPlanner.ReadReport(connectionString, contractId,
+            ProcurementRequestPlanner.ReportKind.Control);
+        return new Snapshot(report.Document, report.Rows, report.IssueDates);
     }
 
     public static XLWorkbook CreateWorkbook(Snapshot snapshot, bool withMoney = false)
