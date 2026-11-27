@@ -17,7 +17,21 @@ internal static class GridEditingChecks
         var row = new Row();
         var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false };
         grid.Columns.Add(new DataGridTextColumn { Binding = new Binding(nameof(Row.Value)), Width = 240 });
-        grid.Columns.Add(new DataGridTextColumn { Binding = new Binding(nameof(Row.Value)), Width = 240 });
+        // Estimate Name/Price are template columns, unlike the default WPF
+        // text column. Editing must focus their inner TextBox as well.
+        var display = new FrameworkElementFactory(typeof(TextBlock));
+        display.SetBinding(TextBlock.TextProperty, new Binding(nameof(Row.Value)));
+        var input = new FrameworkElementFactory(typeof(TextBox));
+        input.SetBinding(TextBox.TextProperty, new Binding(nameof(Row.Value))
+        {
+            Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
+        });
+        grid.Columns.Add(new DataGridTemplateColumn
+        {
+            Width = 240,
+            CellTemplate = new DataTemplate { VisualTree = display },
+            CellEditingTemplate = new DataTemplate { VisualTree = input }
+        });
         grid.ItemsSource = new[] { row };
         grid.PreparingCellForEdit += (_, e) => GridEditInteraction.FocusTextEditor(grid, e);
         var host = new Window { Content = grid, Width = 600, Height = 240, ShowInTaskbar = false, ShowActivated = false };
@@ -36,6 +50,8 @@ internal static class GridEditingChecks
                 Pump();
                 Require(cell.IsEditing, "Second click did not open the current cell editor.");
                 var editor = GridEditInteraction.FindTextEditor(cell)!;
+                Require(editor is not null && editor.IsKeyboardFocusWithin,
+                    "The visible editor did not own keyboard focus after edit activation.");
                 Require(editor is not null && editor.SelectionLength == editor.Text.Length,
                     "Editor did not select the original text.");
                 editor!.Text = "Новый ввод";
