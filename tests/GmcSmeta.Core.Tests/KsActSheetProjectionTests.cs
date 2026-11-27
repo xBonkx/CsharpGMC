@@ -153,4 +153,48 @@ public sealed class KsActSheetProjectionTests
             original with { Positions = original.Positions.Select(r => r with { NumText = "9" }).ToArray() }));
     }
 
+
+    [Fact]
+    public void QuantityPatchFormatsOnlyChangedRowsAndAlwaysRestoresEditedCell()
+    {
+        var original = Sheet(Enumerable.Range(1, 25000)
+            .Select(i => Row(i, i % 2 + 1, i.ToString())).ToArray());
+        var next = original with { Positions = original.Positions.Select(r =>
+            r.PositionId == 500 ? r with { LineQty = 3m } :
+            r.PositionId == 1500 ? r with { LineFormula = "@500*2", LineQty = 6m } : r with { }).ToArray() };
+        var patch = Assert.IsAssignableFrom<IReadOnlyDictionary<long, SqlServerActs.ActSheetRow>>(
+            KsActSheetProjection.QuantityPatch(original, next, 200));
+        Assert.Equal(new long[] { 200, 500, 1500 }, patch.Keys.OrderBy(id => id));
+        Assert.Equal(6m, patch[1500].LineQty);
+        Assert.Equal("@500*2", patch[1500].LineFormula);
+        var noop = Assert.IsAssignableFrom<IReadOnlyDictionary<long, SqlServerActs.ActSheetRow>>(
+            KsActSheetProjection.QuantityPatch(next, next, 200));
+        Assert.Equal(200L, Assert.Single(noop).Key);
+    }
+
+    [Fact]
+    public void QuantityPatchReformatsUnchangedFormulasWhenReferenceMapChanges()
+    {
+        var original = Sheet(Row(1, 1, "1"), Row(2, 1, "2") with { LineFormula = "@1" },
+            Row(3, 1, "3")) with { RefDisplay = new Dictionary<long, string> { [1] = "1" } };
+        var sameMap = original with { RefDisplay = new Dictionary<long, string> { [1] = "1" } };
+        Assert.Single(KsActSheetProjection.QuantityPatch(original, sameMap, 3)!);
+        var newMap = original with { RefDisplay = new Dictionary<long, string>() };
+        var patch = KsActSheetProjection.QuantityPatch(original, newMap, 3)!;
+        Assert.Equal(new long[] { 2, 3 }, patch.Keys.OrderBy(id => id));
+    }
+
+    [Fact]
+    public void QuantityPatchRejectsStructuralChangesBeforePublishingAnyDelta()
+    {
+        var original = Sheet(Row(1, 1, "1"), Row(2, 2, "2"));
+        Assert.Null(KsActSheetProjection.QuantityPatch(null, original, 1));
+        Assert.Null(KsActSheetProjection.QuantityPatch(original,
+            original with { Positions = original.Positions.Reverse().ToArray() }, 1));
+        Assert.Null(KsActSheetProjection.QuantityPatch(original,
+            original with { Positions = new[] { original.Positions[0] } }, 1));
+        Assert.Null(KsActSheetProjection.QuantityPatch(original,
+            original with { Form = "dns" }, 1));
+    }
+
 }

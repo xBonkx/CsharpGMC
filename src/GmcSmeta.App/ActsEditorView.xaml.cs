@@ -641,7 +641,7 @@ public partial class ActsEditorView : UserControl
     private void ActGrid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
     {
         if (_building || _loadingAct || _loadFailed || string.IsNullOrEmpty(_revision) ||
-            e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
+            ActWritePending || e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
             || _signed || _contractLocked || row.IsSection)
         {
             e.Cancel = true;
@@ -683,7 +683,8 @@ public partial class ActsEditorView : UserControl
             _moveAfter=0;
             return;
         }
-        if (_building || _inSave) return;
+        if (_building) return;
+        if (ActWritePending) { e.Cancel = true; return; }
         if (e.Row.Item is not KsRowVm row || e.Column.Header?.ToString() != "В этом акте"
             || e.EditingElement is not TextBox editor) return;
         if (_signed || _contractLocked) return;
@@ -710,6 +711,7 @@ public partial class ActsEditorView : UserControl
     private async Task SaveQtyAsync(long positionId, decimal qty, string formula, int step,
         bool allowOver = false, string? positionName = null)
     {
+        var advance = false;
         _inSave = true;
         try
         {
@@ -736,7 +738,7 @@ public partial class ActsEditorView : UserControl
             }
             _revision = saved.Revision;
             SetStatus(formula.Contains('@') ? "Формула объёма применена." : "Количество сохранено.");
-            if (await RefreshChangedRowsAsync() && step != 0) StepRow(positionId, step);
+            advance = await RefreshChangedRowsAsync(positionId) && step != 0;
         }
         catch (Exception ex)
         {
@@ -747,6 +749,9 @@ public partial class ActsEditorView : UserControl
         {
             _inSave = false;
         }
+        // BeginningEdit refuses concurrent writes. Advance only after the
+        // readback and save guard have both finished.
+        if (advance) StepRow(positionId, step);
     }
 
     private decimal RemainingOf(long positionId)
@@ -757,17 +762,24 @@ public partial class ActsEditorView : UserControl
 
     /// <summary>Обновление одной строки (ks_view._refresh_rows): перечитать лист и поправить
     /// только изменившиеся ячейки, суммы разделов, плитки и список актов — без пересборки грида.</summary>
-    private async Task<bool> RefreshChangedRowsAsync()
+    private async Task<bool> RefreshChangedRowsAsync(long editedPositionId)
     {
         var connectionString = _connectionString;
         var contractId = _contractId;
         var actId = _actId;
         var revision = _revision;
+        var previousSheet = _sheet;
         ActLoadSnapshot loaded;
+        IReadOnlyDictionary<long, SqlServerActs.ActSheetRow>? patch;
         try
         {
-            loaded = await Task.Run(() => ReadActSnapshot(connectionString, contractId,
-                actId, null, ""));
+            (loaded, patch) = await Task.Run(() =>
+            {
+                var snapshot = ReadActSnapshot(connectionString, contractId, actId, null, "");
+                var changes = snapshot.Sheet is null ? null :
+                    KsActSheetProjection.QuantityPatch(previousSheet, snapshot.Sheet, editedPositionId);
+                return (snapshot, changes);
+            });
             if (loaded.ActId != actId || loaded.Revision != revision || loaded.Sheet is null ||
                 loaded.Details is null || loaded.Totals is null)
                 throw new InvalidOperationException("Данные изменились после записи. Перечитайте КС-2.");
@@ -782,7 +794,6 @@ public partial class ActsEditorView : UserControl
         if (_actId != actId || _contractId != contractId || _connectionString != connectionString ||
             _revision != revision) return false;
         var sheet = loaded.Sheet!;
-        var sameLayout = _sheet is not null && KsActSheetProjection.SameRowLayout(_sheet, sheet);
         _sheet = sheet;
         _acts = loaded.Acts;
         _actsRevision = loaded.Revision;
@@ -791,7 +802,7 @@ public partial class ActsEditorView : UserControl
         _sharedExtraIds = loaded.SharedExtraIds;
         var sections = ProjectActSections(sheet);
         var existingSections = _rows?.Where(r => r.IsSection).ToArray();
-        if (!sameLayout || _rows is null || existingSections is null ||
+        if (patch is null || _rows is null || existingSections is null ||
             !existingSections.Select(r => r.SystemId).SequenceEqual(sections.Select(r => r.SystemId)))
         {
             // A quantity change can add/remove an extra row or allocation header.
@@ -800,14 +811,12 @@ public partial class ActsEditorView : UserControl
         }
         else
         {
-            var byPosition = sheet.Positions.ToDictionary(p => p.PositionId);
             var filterChanged = false;
             foreach (var vm in _rows)
             {
                 if (vm.IsSection)
                     continue;
-                var p = byPosition.GetValueOrDefault(vm.PositionId);
-                if (p is null)
+                if (!patch.TryGetValue(vm.PositionId, out var p))
                     continue;
                 var displayed = ActQuantityFormulas.Display(p.LineFormula ?? "", RefNumbers());
                 var left = p.OutOfKp ? 0m : p.QtyByKp - p.ClosedByOthers - p.LineQty;

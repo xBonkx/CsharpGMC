@@ -52,4 +52,24 @@ public sealed class KsActTransitionSourceTests
         Assert.Equal("Collapsed", (string?)Named("EmptyPanel").Attribute("Visibility"));
         Assert.NotEqual("Collapsed", (string?)Named("ActLoadingPanel").Attribute("Visibility"));
     }
+
+    [Fact]
+    public void QuantityWriteBlocksAnotherEditAndAdvancesAfterReadbackGuard()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ActsEditorView.xaml.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var editor = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "ActsEditorView.xaml.cs"));
+        Assert.Contains("ActWritePending || e.Row.Item is not KsRowVm row", editor);
+        Assert.Contains("if (ActWritePending) { e.Cancel = true; return; }", editor);
+        var save = editor[editor.IndexOf("private async Task SaveQtyAsync", StringComparison.Ordinal)..
+            editor.IndexOf("private decimal RemainingOf", StringComparison.Ordinal)];
+        Assert.Contains("advance = await RefreshChangedRowsAsync(positionId)", save);
+        Assert.True(save.LastIndexOf("_inSave = false;", StringComparison.Ordinal) <
+            save.IndexOf("if (advance) StepRow(positionId, step);", StringComparison.Ordinal));
+        Assert.Contains("KsActSheetProjection.QuantityPatch(previousSheet, snapshot.Sheet, editedPositionId)", editor);
+        Assert.Contains("if (!patch.TryGetValue(vm.PositionId, out var p))", editor);
+    }
+
 }

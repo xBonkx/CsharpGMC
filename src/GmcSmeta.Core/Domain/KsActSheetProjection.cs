@@ -143,11 +143,41 @@ public static class KsActSheetProjection
         {
             var a = previous.Positions[i];
             var b = next.Positions[i];
-            if (a.PositionId != b.PositionId || a.SystemId != b.SystemId || a.NumText != b.NumText ||
-                a.Name != b.Name || a.Unit != b.Unit || a.QtyByKp != b.QtyByKp ||
-                a.OutOfKp != b.OutOfKp || a.WorkCode != b.WorkCode) return false;
+            if (!SamePositionLayout(a, b)) return false;
         }
         return true;
+    }
+
+    private static bool SamePositionLayout(SqlServerActs.ActSheetRow a, SqlServerActs.ActSheetRow b) =>
+        a.PositionId == b.PositionId && a.SystemId == b.SystemId && a.NumText == b.NumText &&
+        a.Name == b.Name && a.Unit == b.Unit && a.QtyByKp == b.QtyByKp &&
+        a.OutOfKp == b.OutOfKp && a.WorkCode == b.WorkCode;
+
+    /// <summary>Null requires a full grid rebuild. Otherwise only changed
+    /// authoritative rows, the edited row (even for a no-op save), and formulas
+    /// affected by a changed reference map need presentation work.</summary>
+    public static IReadOnlyDictionary<long, SqlServerActs.ActSheetRow>? QuantityPatch(
+        SqlServerActs.ActSheetData? previous, SqlServerActs.ActSheetData next, long editedPositionId)
+    {
+        if (previous is null || previous.Form != next.Form || previous.NumManual != next.NumManual ||
+            previous.Positions.Count != next.Positions.Count || !previous.Systems.SequenceEqual(next.Systems))
+            return null;
+
+        var sameReferences = ReferenceEquals(previous.RefDisplay, next.RefDisplay) ||
+            (previous.RefDisplay.Count == next.RefDisplay.Count &&
+             previous.RefDisplay.All(pair => next.RefDisplay.TryGetValue(pair.Key, out var value) &&
+                string.Equals(pair.Value, value, StringComparison.Ordinal)));
+        var changed = new Dictionary<long, SqlServerActs.ActSheetRow>();
+        for (var i = 0; i < next.Positions.Count; i++)
+        {
+            var a = previous.Positions[i];
+            var b = next.Positions[i];
+            if (!SamePositionLayout(a, b)) return null;
+            if (b.PositionId == editedPositionId || a != b ||
+                (!sameReferences && !string.IsNullOrEmpty(b.LineFormula)))
+                changed.Add(b.PositionId, b);
+        }
+        return changed;
     }
 
 }
