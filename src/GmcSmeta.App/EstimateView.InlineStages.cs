@@ -429,7 +429,14 @@ public partial class EstimateView
         }
         var stage = snapshot.Stages[index];
         var old = source.PerStage[index];
-        if (Math.Abs(old - qty) <= StageAllocationPresentation.Epsilon) return;
+        var formula = NumberText.FormulaText(input);
+        if (formula is not null && decimal.Round(qty, 6) <= StageAllocationPresentation.Epsilon)
+        {
+            SetStatus("Нулевое количество удаляет строку этапа. Для удаления введите 0 без формулы.", true);
+            return;
+        }
+        var previousFormula = source.StageFormulas.ElementAtOrDefault(index) ?? "";
+        if (Math.Abs(old - qty) <= StageAllocationPresentation.Epsilon && previousFormula == (formula ?? "")) return;
 
         if (StageAllocationPresentation.NeedsOverrunConfirmation(
             source.Qty, source.PerStage, index, qty))
@@ -472,7 +479,7 @@ public partial class EstimateView
                 throw new InvalidOperationException("Распределение изменилось до записи.");
             var result = await Task.Run(() => SqlServerStages.SetStageQty(
                 _sqlConnectionString, stage.Id, source.SrcId, qty,
-                revision, old, source.Rest));
+                revision, old, source.Rest, formula));
             if (!result.Saved)
             {
                 _saveError = "Этап не сохранён: " + result.Error;

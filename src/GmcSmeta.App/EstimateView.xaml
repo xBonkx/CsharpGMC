@@ -6,6 +6,7 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True" PreviewKeyDown="EstimateView_PreviewKeyDown"
+         PreviewMouseLeftButtonDown="EstimateFormula_PreviewMouseDown" PreviewTextInput="EstimateFormula_PreviewTextInput"
          SizeChanged="EstimateView_SizeChanged" Unloaded="EstimateView_Unloaded"
          PreviewMouseWheel="EstimateView_PreviewMouseWheel">
 

@@ -160,11 +160,15 @@ public static partial class SqlServerStages
     /// </summary>
     public static SqlServerDatabase.SaveResult SetStageQty(string connectionString, long stageId,
         long srcPositionId, decimal qty, string expectedRevision,
-        decimal? expectedStageQty = null, decimal? expectedRest = null)
+        decimal? expectedStageQty = null, decimal? expectedRest = null, string? qtyFormula = null)
     {
         if (stageId <= 0 || srcPositionId <= 0 || qty < 0m || qty > NumberText.MaxNumber)
             return SqlServerDatabase.SaveResult.Fail("Недопустимый этап, позиция или количество.", expectedRevision);
         qty = decimal.Round(qty, 6);
+        if (!string.IsNullOrEmpty(qtyFormula) &&
+            (qty <= (decimal)Eps || NumberText.Parse(qtyFormula) is not decimal calculated ||
+             decimal.Round(calculated, 6) != qty || NumberText.FormulaText(qtyFormula) != qtyFormula))
+            return SqlServerDatabase.SaveResult.Fail("Формула этапа должна давать указанное положительное количество.", expectedRevision);
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
@@ -270,6 +274,13 @@ public static partial class SqlServerStages
         {
             var stageSystemId = StageSystemFor(conn, tx, stageId, srcSystemId, srcSystemPath);
             currentId = CopyStageRow(conn, tx, stageId, stageSystemId, srcPositionId, qty, null);
+            if (!string.IsNullOrEmpty(qtyFormula))
+            {
+                using var formula = new SqlCommand("UPDATE dbo.positions SET formulas=@f WHERE id=@id", conn, tx);
+                formula.Parameters.Add("@f", SqlDbType.NVarChar, -1).Value = StageQtyFormulas(conn, tx, currentId.Value, qtyFormula);
+                formula.Parameters.Add("@id", SqlDbType.BigInt).Value = currentId.Value;
+                formula.ExecuteNonQuery();
+            }
             SyncStageChildren(conn, tx, stageId, srcPositionId, currentId.Value,
                 stageSystemId, srcQty, qty);
         }
@@ -278,7 +289,7 @@ public static partial class SqlServerStages
             using var update = new SqlCommand(
                 "UPDATE dbo.positions SET qty=@q, formulas=@formulas WHERE id=@id", conn, tx);
             update.Parameters.Add("@q", SqlDbType.Float).Value = (double)qty;
-            update.Parameters.AddWithValue("@formulas", RemoveQtyFormula(conn, tx, currentId.Value));
+            update.Parameters.AddWithValue("@formulas", StageQtyFormulas(conn, tx, currentId.Value, qtyFormula));
             update.Parameters.Add("@id", SqlDbType.BigInt).Value = currentId.Value;
             update.ExecuteNonQuery();
             var parentSystem = StageSystemFor(conn, tx, stageId, srcSystemId, srcSystemPath);
@@ -318,7 +329,10 @@ public static partial class SqlServerStages
 
     // ---------------------------------------------------------------- внутреннее
 
-    private static string RemoveQtyFormula(SqlConnection conn, SqlTransaction tx, long positionId)
+    private static string RemoveQtyFormula(SqlConnection conn, SqlTransaction tx, long positionId) =>
+        StageQtyFormulas(conn, tx, positionId, null);
+
+    private static string StageQtyFormulas(SqlConnection conn, SqlTransaction tx, long positionId, string? formula)
     {
         using var read = new SqlCommand(
             "SELECT formulas FROM dbo.positions WHERE id=@id", conn, tx);
@@ -335,7 +349,8 @@ public static partial class SqlServerStages
         {
             throw new InvalidOperationException("Нельзя безопасно обновить формулы позиции: " + ex.Message);
         }
-        node.Remove("qty");
+        if (string.IsNullOrEmpty(formula)) node.Remove("qty");
+        else node["qty"] = formula;
         return node.ToJsonString();
     }
 
@@ -601,7 +616,10 @@ public static partial class SqlServerStages
 
     /// <summary>Строка таблицы распределения (stages.table): строка полного КП и количества по этапам.</summary>
     public sealed record StageTableRow(long SystemId, string SystemName, long SrcId, string Name,
-        string Unit, decimal Qty, decimal Price, decimal[] PerStage, decimal Rest);
+        string Unit, decimal Qty, decimal Price, decimal[] PerStage, decimal Rest)
+    {
+        public IReadOnlyList<string> StageFormulas { get; init; } = Array.Empty<string>();
+    }
 
     /// <summary>Таблица «строка × этапы»: количества в каждом этапе и остаток (stages.table).</summary>
     public static (List<StageInfo> Stages, List<StageTableRow> Rows) StageTable(
@@ -625,12 +643,13 @@ public static partial class SqlServerStages
         List<StageInfo> stages, SqlTransaction? tx, bool batchRead)
     {
         var maps = stages.Select(_ => new Dictionary<long, decimal>()).ToList();
+        var formulas = stages.ToDictionary(s => s.Id, _ => new Dictionary<long, string>());
         if (batchRead && stages.Count > 0)
         {
             var byId = stages.Select((stage, index) => (stage.Id, Index: index))
                 .ToDictionary(x => x.Id, x => maps[x.Index]);
             using var read = new SqlCommand(
-                "SELECT sy.contract_id, p.stage_src, p.qty FROM dbo.positions p " +
+                "SELECT sy.contract_id, p.stage_src, p.qty, p.formulas FROM dbo.positions p " +
                 "JOIN dbo.systems sy ON sy.id=p.system_id JOIN dbo.contracts c ON c.id=sy.contract_id " +
                 "WHERE c.stage_of=@full AND ISNULL(c.stage_rest,0)=0 " +
                 "AND p.stage_src IS NOT NULL AND p.parent_id IS NULL AND p.out_of_kp=0 " +
@@ -647,6 +666,8 @@ public static partial class SqlServerStages
                 // Do not publish a potentially different allocation from the write path.
                 if (!map.TryAdd(srcId, qty))
                     throw new InvalidOperationException("Повторяющаяся исходная позиция в этапе. Проверьте распределение.");
+                var formula = EstimateCellFormula.Read(r.IsDBNull(3) ? "" : r.GetString(3), "qty");
+                if (formula.Length > 0) formulas[stageId][srcId] = formula;
             }
         }
         else for (var index = 0; index < stages.Count; index++)
@@ -654,14 +675,18 @@ public static partial class SqlServerStages
             var stage = stages[index];
             var map = maps[index];
             using var read = new SqlCommand(
-                "SELECT stage_src, qty FROM dbo.positions p " +
+                "SELECT stage_src, qty, p.formulas FROM dbo.positions p " +
                 "JOIN dbo.systems sy ON sy.id=p.system_id " +
                 "WHERE sy.contract_id=@stage AND p.stage_src IS NOT NULL AND p.parent_id IS NULL AND p.out_of_kp=0", conn, tx);
             read.Parameters.Add("@stage", SqlDbType.BigInt).Value = stage.Id;
             using var r = read.ExecuteReader();
             while (r.Read())
-                map[Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture)] =
-                    r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
+            {
+                var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                map[srcId] = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
+                var formula = EstimateCellFormula.Read(r.IsDBNull(2) ? "" : r.GetString(2), "qty");
+                if (formula.Length > 0) formulas[stage.Id][srcId] = formula;
+            }
         }
         var rows = new List<StageTableRow>();
         using (var read = new SqlCommand(
@@ -691,7 +716,10 @@ public static partial class SqlServerStages
                     r.IsDBNull(2) ? "" : r.GetString(2),
                     qty,
                     r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)),
-                    perStage, qty - taken));
+                    perStage, qty - taken)
+                {
+                    StageFormulas = stages.Select(s => formulas[s.Id].GetValueOrDefault(srcId, "")).ToArray()
+                });
             }
         }
         return rows;

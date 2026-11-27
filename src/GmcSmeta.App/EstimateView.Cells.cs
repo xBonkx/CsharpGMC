@@ -76,12 +76,18 @@ public partial class EstimateView
             editor.Focus();
             editor.SelectAll();
         }
+        BeginEstimateFormulaEdit(e);
     }
 
     private void EstimateGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
-        if (e.EditAction != DataGridEditAction.Commit ||
-            e.Row.Item is not EditableEstimateRow row || row.IsSystem) return;
+        if (e.EditAction != DataGridEditAction.Commit)
+        {
+            EndEstimateFormulaEdit();
+            return;
+        }
+        if (e.Row.Item is not EditableEstimateRow row || row.IsSystem) return;
+        if (!ResolveEstimateFormulaEdit(e)) { e.Cancel = true; return; }
         if (_inlineStageColumns.Contains(e.Column))
         {
             if (FindTextBox(e.EditingElement) is { } stageEditor)
