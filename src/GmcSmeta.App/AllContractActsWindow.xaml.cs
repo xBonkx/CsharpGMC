@@ -48,6 +48,7 @@ public partial class AllContractActsWindow : Window
     private bool _initialized;
     private bool _updatingSelection;
     private bool _closed;
+    private bool _loading;
 
     public AllContractActsWindow(string connectionString, int contractId, string title)
     {
@@ -64,11 +65,13 @@ public partial class AllContractActsWindow : Window
     {
         if (!_initialized || _closed) return;
         var version = ++_requestVersion;
+        _loading = true;
+        UpdateSelectedButtons();
         OverviewStatus.Text = "Загружаю акты из SQL Server…";
         try
         {
             var scope = await Task.Run(() =>
-                SqlServerKsContractScope.Read(_connectionString, _contractId));
+                SqlServerKsContractScope.ReadOverview(_connectionString, _contractId));
             if (_closed || version != _requestVersion) return;
             _scope = scope;
             var acts = scope.Acts;
@@ -88,7 +91,27 @@ public partial class AllContractActsWindow : Window
         catch (Exception ex)
         {
             if (!_closed && version == _requestVersion)
+            {
+                // A failed refresh can indicate a changed legal mapping. Never
+                // keep showing the previous scope as if it were still valid.
+                _scope = null;
+                _acts = Array.Empty<SqlServerActs.ActInfo>();
+                _groups = Array.Empty<KsWorkspaceProjection.Ks3Group>();
+                _selectedActId = 0;
+                _selectedGroupKey = "";
+                ScopeTitle.Text = "";
+                TotalActsText.Text = SignedAmountText.Text = DraftAmountText.Text = ActsAmountText.Text = "—";
+                ApplyActsFilter();
                 OverviewStatus.Text = "Ошибка чтения актов: " + ex.Message;
+            }
+        }
+        finally
+        {
+            if (!_closed && version == _requestVersion)
+            {
+                _loading = false;
+                UpdateSelectedButtons();
+            }
         }
     }
 
@@ -154,7 +177,7 @@ public partial class AllContractActsWindow : Window
     private void UpdateSelectedButtons()
     {
         if (!_initialized || _closed) return;
-        OpenSelectedButton.IsEnabled = _selectedActId != 0 &&
+        OpenSelectedButton.IsEnabled = !_loading && _scope is not null && _selectedActId != 0 &&
             ActListGrid.Items.OfType<Ks2RowVm>().Any(a => a.Id == _selectedActId);
         OpenKs3Button.IsEnabled = OpenSelectedButton.IsEnabled && _scope is not null &&
             !string.IsNullOrWhiteSpace(_selectedGroupKey) &&
@@ -169,6 +192,7 @@ public partial class AllContractActsWindow : Window
 
     private void OpenSelected()
     {
+        if (_loading || _scope is null) return;
         var act = _acts.FirstOrDefault(a => a.Id == _selectedActId);
         if (act is null) return;
         try
@@ -189,7 +213,7 @@ public partial class AllContractActsWindow : Window
 
     private void OpenGroupKs3()
     {
-        if (_scope is null || string.IsNullOrWhiteSpace(_selectedGroupKey) ||
+        if (_loading || _scope is null || string.IsNullOrWhiteSpace(_selectedGroupKey) ||
             !_groups.Any(g => g.Key == _selectedGroupKey)) return;
         try
         {

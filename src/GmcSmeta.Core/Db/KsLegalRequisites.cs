@@ -44,32 +44,9 @@ public static class KsLegalRequisites
     /// An imported opening balance is still keyed by object and legacy number, not legal ID.
     /// </summary>
     public static long RequirePrintAgreement(SqlServerKsContractScope.Scope scope, KsGroupReport report,
-        IReadOnlyDictionary<long, Agreement> legalAgreements, bool groupReport)
-    {
-        if (!legalAgreements.TryGetValue(scope.SelectedDocumentId, out var selected) || selected.SourceId <= 0)
-            throw new InvalidOperationException("Выбранное приложение не привязано к действующему юридическому договору.");
-
-        bool SameAgreement(long documentId) =>
-            legalAgreements.TryGetValue(documentId, out var legal) && legal.SourceId == selected.SourceId;
-
-        if (report.Acts.Count == 0 || report.Acts.Any(a => !SameAgreement(a.ContractId)))
-            throw new InvalidOperationException("КС содержит акты другого договора или без привязки. Проверьте принадлежность приложений.");
-
-        if (groupReport)
-        {
-            var previousKeys = report.Previous.Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
-            if (scope.Acts.Any(a => previousKeys.Contains(KsWorkspaceProjection.GroupKey(a)) &&
-                                    !SameAgreement(a.ContractId)))
-                throw new InvalidOperationException("В накопительные итоги КС-3 входят предыдущие акты другого договора или без привязки. Проверьте принадлежность приложений.");
-        }
-
-        // Even when previous acts are absent, the old opening marker cannot be
-        // assigned to a specific legal ID if several agreements share its key.
-        if (report.GrossCumulative && scope.Documents.Any(d => !SameAgreement(d.Id)))
-            throw new InvalidOperationException("Начальный остаток КС-3 относится к неоднозначной группе договоров. Проверьте его принадлежность перед выгрузкой.");
-
-        return selected.SourceId;
-    }
+        IReadOnlyDictionary<long, Agreement> legalAgreements, bool groupReport) =>
+        KsLegalScopePolicy.RequireReport(scope, report,
+            legalAgreements.ToDictionary(pair => pair.Key, pair => pair.Value.SourceId), groupReport);
 
     public static Agreement ForSummary(SqlServerKsPrintData.Package package)
     {

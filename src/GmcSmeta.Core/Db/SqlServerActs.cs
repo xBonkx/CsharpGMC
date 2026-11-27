@@ -864,8 +864,8 @@ public static partial class SqlServerActs
     /// <summary>
     /// Цифры КС-3 (acts.ks3_figures): без НДС — за период, за год и с начала работ
     /// (по актам документа до текущего включительно), НДС и сумма периода.
-    /// Ввозимый остаток из Excel (ks3_opening marker) не перенесён — появится
-    /// вместе с Excel-импортом.
+    /// Импортированный остаток (ks3_opening marker) учитывается по историческому
+    /// ключу; при неоднозначной юридической принадлежности расчёт блокируется.
     /// </summary>
     public static Ks3Report Ks3Figures(string connectionString, long actId)
     {
@@ -885,11 +885,16 @@ public static partial class SqlServerActs
             }
             var scope = SqlServerKsContractScope.Read(conn, contractId);
             var report = KsGroupReport.CalculateSingle(scope, actId);
+            var ownership = SqlServerKsContractScope.ReadLegalOwnership(conn, scope);
             if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            {
+                if (ownership is not null)
+                    KsLegalScopePolicy.RequireReport(scope, report, ownership, groupReport: false);
                 return new Ks3Report(report.PeriodNet, report.YearNet, report.SinceStartNet,
                     report.PeriodVat, report.PeriodGross,
                     report.Previous.Select(x => ($"КС-2 № {x.Key} от {x.Date:dd.MM.yyyy}", x.Net)).ToList(),
                     report.GrossCumulative);
+            }
         }
         throw new InvalidOperationException("КС изменились во время расчёта КС-3. Повторите обновление.");
     }

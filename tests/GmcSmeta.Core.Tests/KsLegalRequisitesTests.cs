@@ -156,6 +156,56 @@ public sealed class KsLegalRequisitesTests
         Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(p.Scope, p.Report, legal, true));
     }
 
+    [Theory]
+    [InlineData(101L, true)]
+    [InlineData(102L, false)]
+    [InlineData(0L, false)]
+    public void OverviewRequiresAllDocumentsEvenWithoutActs(long otherLegalId, bool allowed)
+    {
+        var p = Fixture();
+        var mapping = new Dictionary<long, long> { [2] = 101 };
+        if (otherLegalId != 0) mapping[1] = otherLegalId;
+        if (allowed)
+            KsLegalScopePolicy.RequireOverview(p.Scope, mapping);
+        else
+            Assert.Throws<InvalidOperationException>(() => KsLegalScopePolicy.RequireOverview(p.Scope, mapping));
+    }
+
+    [Fact]
+    public void OverviewCannotBypassMissingSelectedMappingOnEmptyScope()
+    {
+        var p = Fixture();
+        var scope = p.Scope with { Acts = Array.Empty<SqlServerActs.ActInfo>() };
+        Assert.Throws<InvalidOperationException>(() =>
+            KsLegalScopePolicy.RequireOverview(scope, new Dictionary<long, long>()));
+    }
+
+    [Fact]
+    public void OverviewRejectsActWithUnexpectedDocumentEvenWhenAllDocumentsMatch()
+    {
+        var p = Fixture();
+        var scope = p.Scope with { Acts = new[] { p.Report.Acts[0] with { ContractId = 999 } } };
+        Assert.Throws<InvalidOperationException>(() =>
+            KsLegalScopePolicy.RequireOverview(scope, new Dictionary<long, long> { [1] = 101, [2] = 101 }));
+    }
+
+    [Fact]
+    public void FinancialPreviewUsesSameGuardAsPrintForAmbiguousOpening()
+    {
+        var p = Fixture();
+        var act = p.Report.Acts[0];
+        var scope = p.Scope with { Opening = new Ks3OpeningBalance(act.Date.AddDays(-1), 100m) };
+        var report = KsGroupReport.CalculateSingle(scope, act.Id);
+        var print = PrintAgreements(p);
+        var ownership = print.ToDictionary(pair => pair.Key, pair => pair.Value.SourceId);
+        Assert.Throws<InvalidOperationException>(() => KsLegalScopePolicy.RequireReport(scope, report, ownership, false));
+        Assert.Throws<InvalidOperationException>(() => KsLegalRequisites.RequirePrintAgreement(scope, report, print, false));
+        ownership[1] = ownership[2];
+        print[1] = print[1] with { SourceId = print[2].SourceId };
+        Assert.Equal(KsLegalRequisites.RequirePrintAgreement(scope, report, print, false),
+            KsLegalScopePolicy.RequireReport(scope, report, ownership, false));
+    }
+
     private static Dictionary<long, KsLegalRequisites.Agreement> PrintAgreements(SqlServerKsPrintData.Package p) =>
         new()
         {

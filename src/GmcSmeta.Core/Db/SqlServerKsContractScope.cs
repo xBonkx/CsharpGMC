@@ -54,15 +54,27 @@ public static class SqlServerKsContractScope
             .OrderBy(d => d.Id).ToList();
     }
 
-    public static Scope Read(string connectionString, long selectedDocumentId)
+    public static Scope Read(string connectionString, long selectedDocumentId) =>
+        ReadConsistent(connectionString, selectedDocumentId, requireOverview: false);
+
+    // Overview totals cover all documents/acts, unlike an individual KS-3.
+    public static Scope ReadOverview(string connectionString, long selectedDocumentId) =>
+        ReadConsistent(connectionString, selectedDocumentId, requireOverview: true);
+
+    private static Scope ReadConsistent(string connectionString, long selectedDocumentId, bool requireOverview)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var before = SqlServerDatabase.Revision(conn);
             var result = Read(conn, selectedDocumentId);
+            var ownership = requireOverview ? ReadLegalOwnership(conn, result) : null;
             if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            {
+                if (ownership is not null)
+                    KsLegalScopePolicy.RequireOverview(result, ownership);
                 return result;
+            }
         }
         throw new InvalidOperationException("Данные договора изменились во время чтения КС. Повторите обновление.");
     }
@@ -128,6 +140,29 @@ public static class SqlServerKsContractScope
         }
         return new Scope(selectedDocumentId,
             agreementNumber, scopeDocs, acts, opening);
+    }
+
+    // Null means the legacy schema has no legal IDs; an empty map on schema 32
+    // means there are no valid active mappings and must not bypass validation.
+    internal static IReadOnlyDictionary<long, long>? ReadLegalOwnership(SqlConnection conn, Scope scope)
+    {
+        if (!SqlServerAgreements.Enabled(conn)) return null;
+        var selected = scope.Documents.Single(d => d.Id == scope.SelectedDocumentId);
+        var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
+        using var cmd = new SqlCommand(
+            "SELECT c.id,a.id FROM dbo.contracts c JOIN dbo.agreements a " +
+            "ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 " +
+            "WHERE c.object_id=@object", conn);
+        cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = selected.ObjectId;
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<long, long>();
+        while (reader.Read())
+        {
+            var id = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
+            if (documentIds.Contains(id))
+                result.Add(id, Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture));
+        }
+        return result;
     }
 
     public static KsGroupReport GroupReport(Scope scope, string groupKey) =>
