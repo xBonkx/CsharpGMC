@@ -3,7 +3,6 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using GmcSmeta.Core.Domain;
 using Microsoft.Win32;
 
@@ -24,6 +23,7 @@ public partial class PtoWindow : Window
     private bool _loading;
     private bool _closed;
     private bool _archiveOperation;
+    private bool _packageWriteNeedsRefresh;
 
     public PtoWindow(string connection,long? objectId=null,long? contractId=null)
     {
@@ -99,13 +99,6 @@ public partial class PtoWindow : Window
         MessageBox.Show(this,e.Message,"ПТО / Исполнительная документация",
             MessageBoxButton.OK,MessageBoxImage.Warning);
 
-    private void Try(Action action)
-    {
-        if(_closed || _loading || _initializing)return;
-        try{action();}
-        catch(Exception e){ShowError(e);}
-    }
-
     private IReadOnlyList<PtoPackageListProjection.Row> ReadRows(PtoArchive archive,CancellationToken token=default)=>
         PtoPackageListProjection.Build(archive.Sql.Packages(_scopeObjectId,_scopeContractId,token),
             _scopeObjectId,_scopeContractId,token);
@@ -136,19 +129,12 @@ public partial class PtoWindow : Window
         ArchiveLabel.Text="Список не загружен. Нажмите «Обновить».";
     }
 
-    // Existing mutation/child-dialog readback stays synchronous and authoritative.
-    private void Refresh()
-    {
-        var selected=SelectedId();
-        InvalidateRows();
-        ApplyRows(ReadRows(_archive),selected);
-    }
-
     private async Task RefreshAsync()
     {
         if(_closed || _loading || _initializing)return;
         var selected=SelectedId();
         var archive=_archive;
+        _packageWriteNeedsRefresh=true;
         InvalidateRows();
         SetLoading(true);
         ArchiveLabel.Text="Обновление списка комплектов…";
@@ -160,6 +146,7 @@ public partial class PtoWindow : Window
             var rows=await Task.Run(()=>ReadRows(archive,token),token);
             if(_closed || token.IsCancellationRequested)return;
             ApplyRows(rows,selected);
+            _packageWriteNeedsRefresh=false;
         }
         catch(Exception ex)
         {
@@ -177,175 +164,27 @@ public partial class PtoWindow : Window
         if(!_closed && !_loading && !_initializing && Packages is not null && Search is not null)
             ApplyFilter(SelectedId());
     }
-    private bool Belongs(PtoPackage p)=>
-        (!_scopeObjectId.HasValue || p.ObjectId==_scopeObjectId) &&
-        (!_scopeContractId.HasValue || p.ContractId==_scopeContractId);
-    private PtoPackage? Selected()
-    {
-        if(Packages.SelectedItem is not PtoPackageListProjection.Row row)return null;
-        var current=_archive.Sql.Get(row.Id,_scopeObjectId);
-        if(!Belongs(current)) {Refresh();return null;}
-        return current;
-    }
-    private void Edit(PtoPackage p)
-    {
-        new PtoEditorWindow(_archive,p,_connection) { Owner=this }.ShowDialog();
-        Refresh();
-    }
-
-    private void Create_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        var objects=_source.Objects().Where(o=>_scopeObjectId is null || o.Id==_scopeObjectId).ToArray();
-        if(objects.Length==0)throw new InvalidOperationException("Для ПТО отсутствуют доступные объекты.");
-        if(_scopeContractId is long cid)
-        {
-            var scopedObject=objects.Single();
-            var scopedContract=_source.Contracts(scopedObject.Id).FirstOrDefault(c=>c.Id==cid) ??
-                throw new InvalidOperationException("Договор больше не доступен в выбранном объекте.");
-            CreateFor(scopedObject,scopedContract);
-            return;
-        }
-        var picker=new Window
-        {
-            Owner=this,Title="Создать комплект ПТО",Width=610,Height=285,
-            WindowStartupLocation=WindowStartupLocation.CenterOwner,ResizeMode=ResizeMode.NoResize
-        };
-        var panel=new StackPanel{Margin=new Thickness(18)};
-        panel.Children.Add(new TextBlock{Text="Объект:",Margin=new Thickness(0,0,0,4)});
-        var objBox=new ComboBox{ItemsSource=objects,SelectedIndex=0,Margin=new Thickness(0,0,0,10),
-            DisplayMemberPath="Name"};
-        panel.Children.Add(objBox);
-        panel.Children.Add(new TextBlock{Text="Источник объёмов (можно создать комплект без договора):",
-            Margin=new Thickness(0,0,0,4)});
-        var contractBox=new ComboBox { Margin=new Thickness(0,0,0,12) };
-        panel.Children.Add(contractBox);
-        void UpdateContracts()
-        {
-            if(objBox.SelectedItem is not PtoSqlSource.ObjectChoice choice)return;
-            var items=new List<object>{"Без договора — самостоятельный комплект"};
-            items.AddRange(_source.Contracts(choice.Id));
-            contractBox.ItemsSource=items;contractBox.SelectedIndex=0;
-        }
-        objBox.SelectionChanged+=(_,_)=>UpdateContracts();
-        UpdateContracts();
-        var create=new Button {Content="Создать",Padding=new Thickness(16,7,16,7),
-            HorizontalAlignment=HorizontalAlignment.Right};
-        create.Click+=(_,_)=>picker.DialogResult=true;
-        panel.Children.Add(create);
-        picker.Content=panel;
-        if(picker.ShowDialog()!=true || objBox.SelectedItem is not PtoSqlSource.ObjectChoice obj)return;
-        var contract=contractBox.SelectedItem as PtoSqlSource.ContractChoice;
-        CreateFor(obj,contract);
-    });
-
-    private void CreateFor(PtoSqlSource.ObjectChoice obj,PtoSqlSource.ContractChoice? contract)
-    {
-        if(_scopeObjectId.HasValue && obj.Id!=_scopeObjectId ||
-            _scopeContractId.HasValue && contract?.Id!=_scopeContractId)
-            throw new InvalidOperationException("Неверная привязка комплекта ПТО.");
-        var p=_source.Snapshot(obj,contract,_archive.Sql.ObjectProfile(obj.Id));
-        p.Fields["number"]=PtoRules.NextNumber(_archive.Sql.Packages(obj.Id),p);
-        _archive.Sql.Save(p);
-        Edit(p);
-    }
-
-    private void Edit_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        if(Selected() is { } selected)Edit(selected);
-    });
-    private void Packages_DoubleClick(object sender,MouseButtonEventArgs e)=>Edit_Click(sender,e);
-
-    private void Copy_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        if(Selected() is { } p)Edit(_archive.Sql.Copy(p.Id));
-    });
-    private void Delete_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        if(Selected() is not { } p)return;
-        if(MessageBox.Show(this,"Удалить АОСР № "+PtoRules.Text(p,"number")+
-            "? Ранее опубликованные комплекты и исходные файлы остаются в архиве.",
-            "Удаление",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No)!=MessageBoxResult.Yes)return;
-        _archive.Sql.Delete(p);
-        Refresh();
-    });
     private async void Refresh_Click(object sender,RoutedEventArgs e)=>await RefreshAsync();
 
-    private void Certificates_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        new PtoCertificatesWindow(_archive) {Owner=this}.ShowDialog();
-        Refresh();
-    });
-
-    private void ObjectCard_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        var selected=Selected();
-        var obj=selected is not null?_source.Objects().FirstOrDefault(x=>x.Id==selected.ObjectId):
-            _source.Objects().FirstOrDefault(x=>_scopeObjectId is null || x.Id==_scopeObjectId);
-        if(obj is null)return;
-        var (current,revision)=_archive.Sql.ReadObjectProfile(obj.Id);
-        var dialog=new Window
-        {
-            Owner=this,Title="Карточка объекта — заготовка ПТО · "+obj.Name,
-            Width=750,Height=650,WindowStartupLocation=WindowStartupLocation.CenterOwner
-        };
-        var panel=new DockPanel{Margin=new Thickness(12)};
-        var note=new TextBlock { Text="Общие реквизиты объекта берутся из SQL Server только для чтения. "+
-            "Здесь редактируются исключительно ПТО-заготовки новых актов, старые снимки не изменяются.\n"+
-            "Объект: "+obj.Name+" · Адрес: "+obj.Address+" · Заказчик: "+obj.Customer,
-            TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,8)};
-        DockPanel.SetDock(note,Dock.Top);panel.Children.Add(note);
-        var save=new Button{Content="Сохранить заготовку ПТО",Padding=new Thickness(12,7,12,7),
-            HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,8,0,0)};
-        DockPanel.SetDock(save,Dock.Bottom);panel.Children.Add(save);
-        var fields=new Dictionary<string,TextBox>();
-        var stack=new StackPanel();
-        foreach(var key in new[]{"designer","designer_rep","contractor_rep","control_rep",
-            "worker_rep","project","standards","next_works","copies","handed_by"})
-        {
-            stack.Children.Add(new TextBlock{Text=PtoRules.Fields[key],Margin=new Thickness(0,8,0,2)});
-            var edit=new TextBox{Text=current.GetValueOrDefault(key,""),AcceptsReturn=true,
-                TextWrapping=TextWrapping.Wrap,MinHeight=35,MaxHeight=90,
-                VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
-            stack.Children.Add(edit);fields[key]=edit;
-        }
-        panel.Children.Add(new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto});
-        save.Click+=(_,_)=>
-        {
-            try
-            {
-                foreach(var(key,value) in fields)current[key]=value.Text.Trim();
-                _archive.Sql.SaveObjectProfile(obj.Id,current,revision);
-                dialog.DialogResult=true;
-            }
-            catch(Exception ex)
-            {
-                save.IsEnabled=false;
-                MessageBox.Show(dialog,ex.Message+"\nЗакройте карточку и проверьте сохранённые реквизиты.",
-                    "Карточка ПТО",MessageBoxButton.OK,MessageBoxImage.Warning);
-            }
-        };
-        dialog.Content=panel;dialog.ShowDialog();
-    });
-
-    private void Templates_Click(object sender,RoutedEventArgs e)=>Try(()=>
-    {
-        var dialog=new OpenFileDialog{Title="Шаблон АОСР или реестра",
-            Filter="Excel (*.xlsx)|*.xlsx"};
-        if(dialog.ShowDialog(this)!=true)return;
-        var kind=MessageBox.Show(this,
-            "Какой оригинальный шаблон загружаете?\nДа — АОСР\nНет — Реестр\nОтмена — не импортировать",
-            "Пользовательский шаблон",MessageBoxButton.YesNoCancel,MessageBoxImage.Question);
-        if(kind==MessageBoxResult.Cancel)return;
-        _archive.StoreTemplate(kind==MessageBoxResult.Yes?"aosr":"registry",dialog.FileName);
-        MessageBox.Show(this,"Шаблон проверен и сохранён. Оригинал не изменён.","ПТО");
-    });
     private async Task RunArchiveOperationAsync(Func<Task> action)
     {
         if(_closed||_loading||_initializing)return;
         _archiveOperation=true;
         SetLoading(true);
         try{await action();}
-        catch(Exception ex){if(!_closed)ShowError(ex);}
+        catch(Exception ex)
+        {
+            if(!_closed)
+            {
+                if(_packageWriteNeedsRefresh)
+                {
+                    InvalidateRows();
+                    ShowError(new InvalidOperationException(ex.Message+
+                        "\n"+"Обновите список и проверьте результат перед повторением операции.",ex));
+                }
+                else ShowError(ex);
+            }
+        }
         finally
         {
             _archiveOperation=false;
@@ -353,17 +192,20 @@ public partial class PtoWindow : Window
         }
     }
 
-    private async Task ReloadAfterArchiveChangeAsync()
+    private async Task ReloadAfterArchiveChangeAsync(Guid? preferred=null)
     {
-        var selected=SelectedId();
+        var selected=preferred??SelectedId();
         var archive=_archive;
+        _packageWriteNeedsRefresh=true;
         InvalidateRows();
         var rows=await Task.Run(()=>ReadRows(archive));
         ApplyRows(rows,selected);
+        _packageWriteNeedsRefresh=false;
     }
 
     private async void Root_Click(object sender,RoutedEventArgs e)=>await RunArchiveOperationAsync(async ()=>
     {
+        RequirePackageListCurrent();
         var folder=new OpenFolderDialog{Title="Архив файлов ПТО (метаданные остаются в SQL)"};
         if(folder.ShowDialog(this)!=true)return;
         var target=Path.GetFullPath(folder.FolderName);
@@ -399,6 +241,7 @@ public partial class PtoWindow : Window
     });
     private async void Restore_Click(object sender,RoutedEventArgs e)=>await RunArchiveOperationAsync(async ()=>
     {
+        RequirePackageListCurrent();
         var source=new OpenFileDialog{Title="Безопасная SQL/ZIP копия ПТО",Filter="ZIP (*.zip)|*.zip"};
         if(source.ShowDialog(this)!=true)return;
         var path=source.FileName;
@@ -407,6 +250,7 @@ public partial class PtoWindow : Window
         if(dest.ShowDialog(this)!=true)return;
         var target=dest.FolderName;
         // Invalidate the old view before starting a restore that can change SQL.
+        _packageWriteNeedsRefresh=true;
         InvalidateRows();
         _archive=await Task.Run(()=>
         {

@@ -62,15 +62,17 @@ public sealed class PtoPackageListProjectionTests
         Assert.NotNull(root);
         var source=File.ReadAllText(Path.Combine(root!.FullName,"src","GmcSmeta.App","PtoWindow.xaml.cs"));
         var filter=source[source.IndexOf("private void Filter_Changed",StringComparison.Ordinal)..
-            source.IndexOf("private bool Belongs",StringComparison.Ordinal)];
+            source.IndexOf("private async void Refresh_Click",StringComparison.Ordinal)];
         Assert.Contains("ApplyFilter(SelectedId());",filter);
         Assert.DoesNotContain("Refresh(",filter);
         Assert.Contains("await Task.Run(()=>ReadRows(archive,token),token)",source);
         Assert.Contains("if(_closed || token.IsCancellationRequested)return;",source);
-        Assert.Contains("_archive.Sql.Get(row.Id,_scopeObjectId)",source);
-        Assert.Contains("if(!Belongs(current))",source);
+        var actions=File.ReadAllText(Path.Combine(root!.FullName,"src","GmcSmeta.App","PtoWindow.Packages.cs"));
+        Assert.Contains("var id=SelectedId();",actions);
+        Assert.Contains("await Task.Run(()=>archive.Sql.Get(id.Value,_scopeObjectId))",actions);
+        Assert.Contains("if(!Belongs(current))",actions);
         Assert.Contains("if(_closed || _loading || _initializing)return;",source);
-        Assert.Contains("Closing+=(_,e)=>{if(_initializingArchive)e.Cancel=true;};",source);
+        Assert.Contains("Closing+=(_,e)=>{if(_initializingArchive||_archiveOperation)e.Cancel=true;};",source);
         Assert.Contains("_readCancellation?.Cancel();",source);
         Assert.Contains("archive.Sql.Packages(_scopeObjectId,_scopeContractId,token)",source);
         Assert.True(source.IndexOf("_initializingArchive=false;",StringComparison.Ordinal) <
