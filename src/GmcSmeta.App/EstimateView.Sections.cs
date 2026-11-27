@@ -408,8 +408,12 @@ public partial class EstimateView
     private async Task MoveSelectedAsync(int direction)
     {
         if (_estimate?.Locked != false) return;
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true) || !CanReorderEstimateRows)
+        {
+            SetStatus("Перестановка доступна в исходном порядке, без фильтров и незавершённых записей.", true);
+            return;
+        }
         if (EstimateGrid.SelectedItem is not EditableEstimateRow row ||
             row.IsSystem || row.IsVirtual)
         {

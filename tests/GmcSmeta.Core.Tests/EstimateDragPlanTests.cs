@@ -42,6 +42,19 @@ public sealed class EstimateDragPlanTests
     }
 
     [Fact]
+    public void ParentEstimateReorderPreservesSystemAndComponentIdentity()
+    {
+        var plan = EstimateDragPlan.PlacePositions(Positions, Sections, new long[] { 12 }, 1, null);
+        Assert.True(plan.Changed);
+        Assert.False(EstimateDragPlan.ChangesPositionSystems(Positions, plan));
+        Assert.Equal(new long[] { 12, 10, 11 }, plan.Assignments.Where(x => x.SystemId == 1)
+            .OrderBy(x => x.Order).Select(x => x.Id));
+        Assert.Equal(Positions.Select(x => x.Id).Order(), plan.Assignments.Select(x => x.Id).Order());
+        var cross = EstimateDragPlan.PlacePositions(Positions, Sections, new long[] { 12 }, 3, null);
+        Assert.True(EstimateDragPlan.ChangesPositionSystems(Positions, cross));
+    }
+
+    [Fact]
     public void MovingAfterSelfIsRejected()
     {
         Assert.Throws<InvalidOperationException>(() =>

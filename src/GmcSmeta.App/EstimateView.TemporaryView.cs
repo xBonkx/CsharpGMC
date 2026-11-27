@@ -133,6 +133,10 @@ public partial class EstimateView
             Add(nSel > 1 ? $"Дублировать выделенные ({nSel})" : "Копия строки",
                 () => Duplicate_Click(this, new RoutedEventArgs()),
                 canWrite && selected is { IsSystem: false }, "Ctrl+D", needsAnchor: false, glyph: "Duplicate");
+            Add("Переместить вверх", () => MoveUp_Click(this, new RoutedEventArgs()),
+                canWrite && CanReorderEstimateRows && selection.Length == 1 && !selected.IsSystem, "Alt+↑");
+            Add("Переместить вниз", () => MoveDown_Click(this, new RoutedEventArgs()),
+                canWrite && CanReorderEstimateRows && selection.Length == 1 && !selected.IsSystem, "Alt+↓");
             var canIndent = canWrite && CanPlaceEstimateRows && selection.Length == 1 &&
                 !selected.IsAreaSummary && !selected.Source.OutOfKp;
             if (selected.Source.ParentPositionId is null)

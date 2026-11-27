@@ -33,18 +33,26 @@ public static partial class SqlServerDatabase
         if (!string.Equals(expectedRevision, revision, StringComparison.Ordinal))
             return SaveResult.Fail("Смета обновлена другим сотрудником. Повтори перенос после обновления.", revision);
 
-        var contract = DragDocumentGuard(conn, tx, contractId);
+        var contract = DragDocumentGuard(conn, tx, contractId, allowParentReorder: true);
         if (contract.Problem is not null)
             return SaveResult.Fail(contract.Problem, revision);
         var systems = DragReadSections(conn, tx, contractId);
         var positions = DragReadPositions(conn, tx, contractId);
         var plan = EstimateDragPlan.PlacePositions(positions, systems, dragged,
             targetSystemId, afterPositionId);
+        if (contract.HasStages && EstimateDragPlan.ChangesPositionSystems(positions, plan))
+            return SaveResult.Fail("КП связано с этапами: разрешена перестановка только внутри одной системы.", revision);
         if (!plan.Changed)
         {
             tx.Commit();
             return new SaveResult(true, null, revision);
         }
+
+        // On a parent KP change order only, and only in the target system.
+        // Leave position IDs, hierarchy, allocations and all child documents untouched.
+        var assignments = contract.HasStages
+            ? plan.Assignments.Where(x => x.SystemId == targetSystemId).ToArray()
+            : plan.Assignments.ToArray();
 
         // Single temp table of assignments, batched below SQL Server's 2100
         // parameter limit. Checking ALL assignments also detects data loss
@@ -53,9 +61,9 @@ public static partial class SqlServerDatabase
             "CREATE TABLE #drag_positions (id BIGINT PRIMARY KEY, sy BIGINT NOT NULL, ord INT NOT NULL)",
             conn, tx))
             cmd.ExecuteNonQuery();
-        for (var offset = 0; offset < plan.Assignments.Count; offset += 200)
+        for (var offset = 0; offset < assignments.Length; offset += 200)
         {
-            var batch = plan.Assignments.Skip(offset).Take(200).ToArray();
+            var batch = assignments.Skip(offset).Take(200).ToArray();
             using var fill = new SqlCommand { Connection = conn, Transaction = tx };
             var placeholders = new List<string>(batch.Length);
             for (var i = 0; i < batch.Length; i++)
@@ -90,13 +98,18 @@ public static partial class SqlServerDatabase
         }
 
         using (var update = new SqlCommand(
-            @"UPDATE p SET system_id=d.sy, [order]=d.ord
-              FROM dbo.positions p JOIN #drag_positions d ON d.id=p.id
-              JOIN dbo.systems sy ON sy.id=p.system_id
-              WHERE sy.contract_id=@contract", conn, tx))
+            contract.HasStages
+                ? @"UPDATE p SET [order]=d.ord
+                    FROM dbo.positions p JOIN #drag_positions d ON d.id=p.id
+                    JOIN dbo.systems sy ON sy.id=p.system_id
+                    WHERE sy.contract_id=@contract AND p.system_id=d.sy"
+                : @"UPDATE p SET system_id=d.sy, [order]=d.ord
+                    FROM dbo.positions p JOIN #drag_positions d ON d.id=p.id
+                    JOIN dbo.systems sy ON sy.id=p.system_id
+                    WHERE sy.contract_id=@contract", conn, tx))
         {
             update.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            if (update.ExecuteNonQuery() != positions.Count)
+            if (update.ExecuteNonQuery() != assignments.Length)
                 throw new DBConcurrencyException("Не все позиции были перенумерованы; перенос отменён.");
         }
 
@@ -235,8 +248,8 @@ public static partial class SqlServerDatabase
         catch (ArgumentException) { return false; }
     }
 
-    private static (long ObjectId, string? Problem) DragDocumentGuard(
-        SqlConnection conn, SqlTransaction tx, long contractId)
+    private static (long ObjectId, string? Problem, bool HasStages) DragDocumentGuard(
+        SqlConnection conn, SqlTransaction tx, long contractId, bool allowParentReorder = false)
     {
         long objectId;
         using (var cmd = new SqlCommand(
@@ -245,23 +258,24 @@ public static partial class SqlServerDatabase
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = cmd.ExecuteReader();
-            if (!r.Read()) return (0, "Документ больше не существует.");
+            if (!r.Read()) return (0, "Документ больше не существует.", false);
             objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
             if (Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture))
-                return (objectId, "Подписанный договор нельзя перемещать.");
+                return (objectId, "Подписанный договор нельзя перемещать.", false);
             if (!r.IsDBNull(2))
-                return (objectId, "Внутри КП этапа перетаскивание пока запрещено.");
+                return (objectId, "Внутри КП этапа перетаскивание пока запрещено.", false);
             if (r.IsDBNull(3) || r.GetString(3) is not ("kp" or "main" or "dop"))
-                return (objectId, "Недопустимый тип документа для drag-and-drop.");
+                return (objectId, "Недопустимый тип документа для drag-and-drop.", false);
         }
         using (var stages = new SqlCommand(
             "SELECT TOP (1) id FROM dbo.contracts WITH(HOLDLOCK) WHERE stage_of=@id", conn, tx))
         {
             stages.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             if (stages.ExecuteScalar() is not null)
-                return (objectId, "Документ связан с этапами. Перетаскивание структуры пока запрещено.");
+                return (objectId, allowParentReorder ? null :
+                    "Документ связан с этапами. Перетаскивание структуры пока запрещено.", true);
         }
-        return (objectId, null);
+        return (objectId, null, false);
     }
 
     private static List<EstimateDragPlan.Section> DragReadSections(

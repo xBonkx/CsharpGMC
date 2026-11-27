@@ -30,16 +30,21 @@ public partial class EstimateView
 
     // Modal position placement also works for main/dop documents. The mouse
     // drag gesture itself stays KP-only to preserve existing navigation.
-    private bool CanPlaceEstimateRows =>
-        _estimate is { Locked: false } && !_serverConflict &&
+    private bool CanReorderEstimateRows =>
+        _estimate is { Locked: false } && !_serverConflict && !_detached &&
         Volatile.Read(ref _pendingWrites) == 0 &&
         _temporarySort == EstimateViewProjection.DocumentOrder &&
         _temporaryGroupMode is not (EstimateGroups.Same or EstimateGroups.Type or "list") &&
-        !_flatTemporaryView && !_noPriceTemporaryView && !_inlineStagesOn &&
+        !_flatTemporaryView && !_noPriceTemporaryView &&
+        (!_inlineStagesOn || (_inlineStagesFilter == StageAllocationPresentation.All &&
+            !_inlineStagesLoading && !_inlineStageCommandBusy && _inlineStagesData is { } data &&
+            data.Revision == _serverRevision)) &&
         string.IsNullOrWhiteSpace(EstimateSearch.Text) &&
-        !_refreshing && IsDragPilot();
+        !_refreshing && !HasActiveEstimateEdit();
 
-    private bool CanDragEstimate => _isKp && CanPlaceEstimateRows;
+    private bool CanPlaceEstimateRows => CanReorderEstimateRows && !_inlineStagesOn && IsDragPilot();
+
+    private bool CanDragEstimate => _isKp && CanReorderEstimateRows && IsDragPilot();
 
     private bool IsDragPilot()
     {
@@ -105,7 +110,7 @@ public partial class EstimateView
         DragPayload? payload = null;
         if (selected.IsSystem)
         {
-            if (selection.Count == 1)
+            if (!_inlineStagesOn && selection.Count == 1)
             {
                 payload = new DragPayload(_contractId, _serverRevision,
                     selected.ParentSystemId is null ? DragKind.RootSystem : DragKind.Subsection,
@@ -202,6 +207,9 @@ public partial class EstimateView
         // Python: drop on section header inserts immediately after header
         // (first row). On a component, normalise to its root.
         var targetSystem = (long)on.Source.SystemId;
+        if (_inlineStagesOn && data.Ids.Any(id =>
+            !_rows.Any(r => !r.IsSystem && r.Id == id && r.Source.SystemId == targetSystem)))
+            return false;
         long? anchor = null;
         if (!on.IsSystem)
         {

@@ -119,6 +119,13 @@ public static class EstimateDragPlan
         return new PositionsResult(newOrder, moveRoots, changed);
     }
 
+    public static bool ChangesPositionSystems(IReadOnlyCollection<Position> source, PositionsResult plan)
+    {
+        var systems = source.ToDictionary(p => p.Id, p => p.SystemId);
+        return plan.Assignments.Count != systems.Count ||
+            plan.Assignments.Any(p => !systems.TryGetValue(p.Id, out var system) || system != p.SystemId);
+    }
+
     public static SectionsResult PlaceGroup(
         IReadOnlyCollection<Section> source, long movingSystem, long? afterSystem)
     {
