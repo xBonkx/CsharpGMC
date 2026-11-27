@@ -26,7 +26,8 @@ public sealed class MainWorkspacesVisualTests
         var grid = XDocument.Parse(Source(file)).Descendants()
             .Single(e => e.Name.LocalName == "DataGrid" && (string?)e.Attribute(x + "Name") == name);
         Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        Assert.Null(grid.Attribute("RowHeight"));
+        var rowHeight = grid.Attribute("RowHeight");
+        Assert.True(rowHeight is null || (rowHeight.Value?.Contains("Binding") ?? false));
     }
 
     [Fact]

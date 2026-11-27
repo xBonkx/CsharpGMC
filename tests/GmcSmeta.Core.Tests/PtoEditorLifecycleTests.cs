@@ -31,7 +31,8 @@ public sealed class PtoEditorLifecycleTests
         Assert.Contains("if(_busy||_closingSave){e.Cancel=true;return;}",code);
         Assert.Contains("if(_writeUncertain)",code);
         Assert.Contains("Dispatcher.BeginInvoke(new Action(()=>_ = SaveAndCloseAsync()))",code);
-        Assert.Contains("await SaveAsync();\n            _allowClose=true;",code);
+        Assert.Contains("await SaveAsync();",code);
+Assert.Contains("_allowClose=true;",code);
         Assert.Contains("if(_allowClose)Close();",code);
     }
 

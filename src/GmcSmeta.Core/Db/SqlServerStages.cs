@@ -611,7 +611,7 @@ public static partial class SqlServerStages
     }
 
     /// <summary>Read-only distribution; caller verifies the revision before/after.</summary>
-    public static (List<StageInfo> Stages, List<StageTableRow> Rows, StageInfo? Rest) ReadStageDistribution(
+    public static (List<StageInfo> Stages, List<StageTableRow> Rows, StageInfo? Remaining) ReadStageDistribution(
         SqlConnection conn, long fullId)
     {
         var all = StagesOf(conn, fullId);

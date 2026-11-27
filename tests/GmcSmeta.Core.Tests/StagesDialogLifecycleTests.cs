@@ -20,7 +20,7 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("revision != SqlServerDatabase.Revision(conn)", code);
         Assert.Contains("if (_closed) return;", code);
         Assert.Contains("Table: BuildTable(stages, rows)", code);
-        Assert.Contains("PublishSnapshot(data.Stages, data.Rest, data.Table, data.Revision)", code);
+        Assert.Contains("PublishSnapshot(data.Stages, data.Remaining, data.Table, data.Revision)", code);
         Assert.Contains("if (_quantityWriteBusy) e.Cancel = true;", code);
         Assert.Contains("await ReloadAsync();", code);
         Assert.DoesNotContain("private void Reload()", code);

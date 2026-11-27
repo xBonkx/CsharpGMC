@@ -32,8 +32,8 @@ public sealed class ReportPublicationSourceTests
     {
         var source = Source("MetalRegisterWindow.cs");
         Assert.DoesNotContain("_book.SaveAs(picker.FileName)", source);
-        Assert.Contains("ExportFilePublication.WriteBytes(picker.FileName, bytes)", source);
-        Assert.Equal(2, source.Split("LiveWorkbookSnapshot.Capture(_book)").Length - 1);
+        Assert.Contains("ExportFilePublication.WriteBytes(path, bytes)", source);
+        Assert.Equal(2, source.Split("LiveWorkbookSnapshot.Capture(book)").Length - 1);
         var helper = Source("LiveWorkbookSnapshot.cs");
         Assert.Contains("var backing = new MemoryStream();", helper);
         Assert.Contains("workbook.SaveAs(backing);", helper);

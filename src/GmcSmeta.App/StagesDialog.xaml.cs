@@ -84,10 +84,10 @@ public partial class StagesDialog : Window
                 var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, _fullId);
                 if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
                     throw new InvalidOperationException("Данные изменились при загрузке этапов. Откройте окно снова.");
-                return (Stages: stages, Rest: rest, Revision: revision, Table: BuildTable(stages, rows));
+                return (Stages: stages, Remaining: rest, Revision: revision, Table: BuildTable(stages, rows));
             });
             if (_closed) return;
-            PublishSnapshot(data.Stages, data.Rest, data.Table, data.Revision);
+            PublishSnapshot(data.Stages, data.Remaining, data.Table, data.Revision);
         }
         finally
         {
@@ -203,12 +203,6 @@ public partial class StagesDialog : Window
     }
 
     private void Search_Changed(object sender, TextChangedEventArgs e) => QueueSearch();
-
-    private void ClearStageSearch_Click(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear();
-        SearchBox.Focus();
-    }
 
     private void QueueSearch()
     {

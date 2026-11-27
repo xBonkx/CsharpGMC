@@ -16,7 +16,7 @@ public sealed class ExcelPreviewVisualTests
     {
         var source = Source("ExcelImportPreviewWindow.cs");
         Assert.Contains("new(\"kp\", \"КП\")", source);
-        Assert.Contains("new(\"main\", \"Договор\")", source);
+        Assert.Contains("new(\"main\", \"Приложение\")", source);
         Assert.Contains("new(\"dop\", \"Допсоглашение\")", source);
         Assert.Contains("SelectedValueBinding = new Binding(nameof(PreviewRow.Kind))", source);
         Assert.Contains("ExcelPreviewUi.ReportSplitter()", source);
