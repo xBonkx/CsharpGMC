@@ -26,9 +26,10 @@ public sealed class ShipmentToolbarVisualSourceTests
         Assert.Contains(dateStyle.Descendants(p + "Border"), e => (string?)e.Attribute("CornerRadius") == "8");
         Assert.Contains(dateStyle.Descendants(p + "Trigger"), e => (string?)e.Attribute("Property") == "IsKeyboardFocusWithin");
         var search = Named("RowSearch");
-        Assert.Equal("{StaticResource PythonSearch}", (string?)search.Attribute("Style"));
+        Assert.Equal("{StaticResource PythonIconSearch}", (string?)search.Attribute("Style"));
         Assert.Equal("190", (string?)search.Parent!.Attribute("Width"));
-        Assert.Equal("32", (string?)search.Attribute("Height"));
+        Assert.Null(search.Attribute("Height"));
+        Assert.Null(search.Attribute("Padding"));
         Assert.Equal("RowSearch_Changed", (string?)search.Attribute("TextChanged"));
         var clear = Assert.Single(search.Parent!.Descendants(p + "Button"));
         Assert.Equal("ClearShipmentSearch_Click", (string?)clear.Attribute("Click"));
