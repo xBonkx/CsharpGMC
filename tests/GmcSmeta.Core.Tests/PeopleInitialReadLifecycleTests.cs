@@ -32,6 +32,19 @@ public sealed class PeopleInitialReadLifecycleTests
         Assert.Contains("finally { _loading = wasLoading; }", source);
     }
     [Fact]
+    public void AccessHistorySqlQuotesReservedFileIdentifier()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerPeopleAccess.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var source = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerPeopleAccess.cs"));
+        Assert.Contains("a.created_at,a.[file],a.[user],a.[data]", source);
+        Assert.DoesNotContain("a.file", source);
+        Assert.Contains("INSERT dbo.access_lists(object_id,kind,created_at,[user],[file],[data])", source);
+    }
+
+    [Fact]
     public void CancelledServiceConstructionDoesNotConnect()
     {
         using var cancellation = new CancellationTokenSource();

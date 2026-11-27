@@ -131,6 +131,11 @@ static void RunPilot(string connectionString, string folder)
     if (objects.Length < 2)
         throw new InvalidOperationException("Для SQL-проверки допусков требуется два тестовых объекта.");
 
+    // Run both history queries before any writes: catch SQL parser/identifier regressions
+    // even on a directory with no prior lists or orders.
+    _ = store.History(objects[0], "list");
+    _ = store.History(objects[0], "order");
+
     var id = Guid.NewGuid().ToString("N")[..8];
     var source = new PeopleImportPreview(
         Enumerable.Range(1, 1000).Select(i => new PeopleImportRow(
@@ -165,6 +170,10 @@ static void RunPilot(string connectionString, string folder)
     var reg = store.RegisterExport(objects[0], "list", access,
         JsonSerializer.Serialize(snapshot), number, current.Revision);
     Require(reg.Id > 0, "SQL pilot: history id");
+    var registered = store.History(objects[0], "list").Single(h => h.Id == reg.Id);
+    Require(registered.File == access && registered.ObjectId == objects[0] &&
+        registered.Kind == "list" && registered.Data == JsonSerializer.Serialize(snapshot),
+        "SQL pilot: history file and JSON roundtrip");
     Require(store.WasRegistered(objects[0], number), "SQL pilot: registered operation");
     Require(!store.WasRegistered(objects[1], number), "SQL pilot: object isolation");
     Require(store.History(objects[1], "list").Count == oldOther, "SQL pilot: object history unchanged");

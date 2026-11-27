@@ -31,10 +31,10 @@ WIN-26 сняты с активного контроля. Итог провер�
 | [UI_VISUAL_TODO_20261124.md](UI_VISUAL_TODO_20261124.md) | 242 | 14 | 226 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [PERFORMANCE_TODO_20261124.md](PERFORMANCE_TODO_20261124.md) | 58 | 18 | 38 | 2 | 0 | 0 | 0 | 0 | 0 |
 | [CONTEXT_MENU_TODO_20261124.md](CONTEXT_MENU_TODO_20261124.md) | 49 | 4 | 45 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [FUNCTIONAL_BUG_TODO_20261124.md](FUNCTIONAL_BUG_TODO_20261124.md) | 57 | 0 | 1 | 56 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **Всего** | 406 | 36 | 310 | 60 | 0 | 0 | 0 | 0 | 0 | 0 |
+| [FUNCTIONAL_BUG_TODO_20261124.md](FUNCTIONAL_BUG_TODO_20261124.md) | 58 | 0 | 1 | 57 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **Всего** | 407 | 36 | 310 | 61 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-Открыто до приёмки: **406**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
+Открыто до приёмки: **407**. Это не оценка числа новых кодовых исправлений. `UNVERIFIED` означает, что по конкретному ID не установлено состояние, а не что работа не начата. `PARTIAL` означает найденную связанную реализацию (включая частичную сверку); полнота ещё не доказана. `CODE READY` означает заявленное в исходном журнале исправление, но не независимо подтверждённую приёмку. Первичная ревизия сопоставляет явные ID и однозначно связанные визуальные блоки; не является полным повторным аудитом C#/Python, diff всех коммитов или живой проверкой. Для неясных совпадений сохранён UNVERIFIED. Статус DONE допустим только после доказательств критериев; старые отметки SMALL_TASKS отдельно.
 
 ## Статусы и обновление
 
@@ -484,6 +484,7 @@ WIN-26 сняты с активного контроля. Итог провер�
 | [BUG-F55](FUNCTIONAL_BUG_TODO_20261124.md#bug-f55--p1--code-ready-завершающий-десятичный-разделитель-в-excel-вор) | P1 | Завершающая точка у целых количеств в Excel ВОР | CODE READY | 27.11: KsVorForms.SetQuantity; 3 offline golden cases, 10 values per form | .NET golden, Excel desktop/print and regeneration of VOR |
 | [BUG-F56](FUNCTIONAL_BUG_TODO_20261124.md#bug-f56--p1--code-ready-нулевая-страница-и-лишний-номер-на-одностраничной-вор) | P1 | Страница 0 и лишний номер при печати ВОР | CODE READY | 27.11: KsVorForms.ConfigurePageNumbers; template XML and six golden cases (not run) | Windows build/golden, Excel single/multi-page preview, regenerate XLSX |
 | [BUG-F57](FUNCTIONAL_BUG_TODO_20261124.md#bug-f57--p1--code-ready-защита-существующих-файлов-выгрузки-при-ошибке) | P1 | Сохранение отчётов без повреждения предыдущего файла | CODE READY | 27.11: ExportFilePublication, XlsxExport, ProcurementPane.Exports, MetalWarehouseReport; 7 xUnit cases (not run); 27.11 SpecUpdateExcelReport, LiveWorkbookSnapshot, legacy KsPdfForms.Save, 3 source + App.Checks (not run); 27.11 shared owned two-phase staging / direct KS XLSX stream; [чекпоинт](../CURRENT_TASK.md) | Windows/xUnit, existing/locked destination, disk/network errors, Excel/PDF reopen, other direct exporters audit |
+| [BUG-F58](FUNCTIONAL_BUG_TODO_20261124.md#bug-f58--p1--code-ready-синтаксис-sql-истории-допусков-и-приказов) | P1 | SQL Server: зарезервированное имя file в истории допусков/приказов | CODE READY | 27.11: SqlServerPeopleAccess.History, source + Pilot smoke | Windows/xUnit/SQL Pilot, открыть допуск/приказы, проверить историю |
 
 ## Матрица охвата окон (отдельно от основных ID)
 

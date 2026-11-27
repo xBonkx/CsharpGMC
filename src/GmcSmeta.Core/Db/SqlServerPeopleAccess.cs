@@ -499,7 +499,7 @@ public sealed class SqlServerPeopleAccess
         if (kind is not ("list" or "order")) throw new ArgumentException("Недопустимый тип истории.");
         using var conn = Open(token);
         using var cmd = Command(conn, null, """
-            SELECT a.id,a.object_id,a.kind,a.created_at,a.file,a.[user],a.data
+            SELECT a.id,a.object_id,a.kind,a.created_at,a.[file],a.[user],a.[data]
             FROM dbo.access_lists a INNER JOIN dbo.objects o ON o.id=a.object_id
             WHERE a.object_id=@oid AND a.kind=@kind ORDER BY a.id DESC
             """, ("@oid", objectId), ("@kind", kind));
@@ -553,7 +553,7 @@ public sealed class SqlServerPeopleAccess
         CheckObject(conn, tx, objectId);
         using (var find = Command(conn, tx, """
             SELECT id FROM dbo.access_lists WHERE object_id=@oid AND kind=@kind AND
-            JSON_VALUE(CASE WHEN ISJSON(data)=1 THEN data ELSE N'{}' END, '$.OperationId')=@operation
+            JSON_VALUE(CASE WHEN ISJSON([data])=1 THEN [data] ELSE N'{}' END, '$.OperationId')=@operation
             """, ("@oid", objectId), ("@kind", kind), ("@operation", operationId.ToString())))
         {
             var already = find.ExecuteScalar();

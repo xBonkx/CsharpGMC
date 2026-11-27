@@ -1,5 +1,9 @@
 # Текущий чекпоинт — 25.11.2026
 
+## 27.11.2026 — SQL-синтаксис истории допусков и приказов
+
+27.11.2026 ChatGPT/main (base 31954ce) — BUG-F58 CODE READY. Скрин владельца: «Неправильный синтаксис около ключевого слова 'file'» при открытии списка на допуск. SqlServerPeopleAccess.History: a.file → a.[file], a.[data]; согласовано с уже экранированным INSERT и WasRegistered; JSON lookup также использует [data]. Один метод обслуживает историю списков и приказов. Проверены обращения к access_lists в PeopleAccess, Trash, TrashRestore, Workspace и CLI, а также [file] в SpecUpdate; других неэкранированных file в этих проверенных SQL не обнаружено. Добавлен source regression и SQL Pilot smoke (list/order до записей, file/JSON roundtrip после экспорта). Static only, Windows build/xUnit/SQL Pilot not run. No schema or DB changes; no release/DONE.
+
 ## 27.11.2026 — вкладка справочника людей и автомобилей
 
 27.11.2026 ChatGPT/main (base ca572cd) — WIN-17 PARTIAL, запрос владельца: общий справочник «Люди и автомобили» открывается вкладкой главного окна. PeopleView (общая реализация) выделен из Window; существующий PeopleWindow — совместимый host объектного допуска, без изменений SQL/документов. Две поверхности главного окна остаются в дереве, PageHost не переносится при переключении; повторное меню активирует единственный экземпляр; закрытие вкладки отменяет чтения, незавершённая запись/редактирование блокируют уход/закрытие/автоперезапуск. Существующий inline editor сохранён. Объектный допуск и вложенные диалоги оставлены отдельными. Source tests only, Windows build/xUnit/GUI/SQL Pilot not run; verify tab switch with estimate cache/active edit, resizing, main close/restart, initialization failure, history, import and modal owners. No production DB/release/DONE.
