@@ -33,6 +33,7 @@ public sealed record DocRow(
     public string KpPhase { get; init; } = "";
     public bool IsStage => StageOf is not null;
     public int? BaseContractId { get; init; }
+    public long? CompanyId { get; init; }
     public int Order { get; init; }
     public string NavigationName => Navigation.DocumentName(this);
     public string NavigationDate => Navigation.ShortDate(Date, DateTime.Today.Year);
@@ -123,8 +124,11 @@ public static class Workspace
 
     public static List<DocRow> Documents(DbConnection conn) => ReadDocuments(conn, null, true);
 
+    public static List<DocRow> ReadObjectDocumentMetadata(DbConnection conn, int objectId) =>
+        ReadDocuments(conn, objectId, false);
+
     private static string DocumentQuery(int? objectId) =>
-        "SELECT id, object_id, kind, number, [date], name, locked, stage_of, stage_no, stage_rest, kp_phase, base_contract_id, \"order\" FROM contracts " +
+        "SELECT id, object_id, kind, number, [date], name, locked, stage_of, stage_no, stage_rest, kp_phase, base_contract_id, \"order\", company_id FROM contracts " +
         (objectId.HasValue ? "WHERE object_id=@object " : "") + "ORDER BY object_id, \"order\", id";
 
     private static List<DocRow> ReadDocuments(DbConnection conn, int? objectId, bool includeTotals)
@@ -166,7 +170,8 @@ public static class Workspace
                 StageRest = !reader.IsDBNull(9) && Convert.ToBoolean(reader.GetValue(9)),
                 KpPhase = Str(reader, 10),
                 BaseContractId = reader.IsDBNull(11) ? null : SqlInteger.ReadInt32(reader, 11),
-                Order = reader.IsDBNull(12) ? 0 : SqlInteger.ReadInt32(reader, 12)
+                Order = reader.IsDBNull(12) ? 0 : SqlInteger.ReadInt32(reader, 12),
+                CompanyId = reader.IsDBNull(13) ? null : SqlInteger.ReadInt64(reader, 13)
             });
         }
         return list;

@@ -6,7 +6,7 @@ public sealed class AgreementPresentationTests
 {
     private static DocRow Main(int id, string number = "Д-1", string date = "23.01.2025") =>
         new(id, 12, "main", "Договор", "Договор № " + number, "Смета " + id, number, date,
-            false, 0m, 0m, 0m, 0);
+            false, 0m, 0m, 0m, 0) { CompanyId = 8 };
 
     [Fact]
     public void SameDisplayedRequisitesYieldHeadingWithoutChangingOriginalTitle()
@@ -27,11 +27,16 @@ public sealed class AgreementPresentationTests
         var one = Main(1);
         Assert.Null(AgreementPresentation.Heading(new[] { (one, "А"), (Main(2, "Д-2"), "А") }));
         Assert.Null(AgreementPresentation.Heading(new[] { (one, "А"), (Main(2, date: "24.01.2025"), "А") }));
-        Assert.Null(AgreementPresentation.Heading(new[] { (one, "А"), (Main(2), "Б") }));
+        Assert.Null(AgreementPresentation.Heading(new[] { (one, "А"), (Main(2) with { CompanyId = 9 }, "Б") }));
         Assert.Null(AgreementPresentation.Heading(new[] { (Main(1, ""), "А") }));
         Assert.Null(AgreementPresentation.Heading(new[] { (one, "") }));
         Assert.Null(AgreementPresentation.Heading(new[] { (one, "А"), (Main(3) with { Kind = "dop" }, "А") }));
         Assert.Null(AgreementPresentation.Heading(new[] { (Main(3) with { Kind = "kp" }, "А") }));
         Assert.Contains("ID 1", AgreementPresentation.AnnexTitle(one with { Name = "" }));
+        Assert.Null(AgreementPresentation.Resolve(new[] { one, Main(2) with { CompanyId = 9 } }));
+        Assert.Null(AgreementPresentation.Resolve(new[] { one with { CompanyId = null } }));
+        Assert.Null(AgreementPresentation.Resolve(new[] { one with { Date = "31.02.2025" } }));
+        Assert.Equal("23.01.2025", AgreementPresentation.Resolve(new[] { one, Main(2, date: "2025-01-23") })!.Date);
+        Assert.Equal("Смета 1", AgreementPresentation.NavigationName(one, shortTitle: true));
     }
 }

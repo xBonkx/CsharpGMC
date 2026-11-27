@@ -39,10 +39,10 @@ public partial class MainWindow
             top.Items.Clear();
             top.Items.Add(Item("Найти везде…", OpenGlobalSearch, "Search", "Ctrl+P"));
             top.Items.Add(new Separator());
-            top.Items.Add(Item("Карточка выбранного объекта", () =>
+            top.Items.Add(Item("Карточка выбранного договора / группы", () =>
             {
                 if (CommandObject() is { } obj) ReloadAndSelect(obj.Id);
-                else StatusText.Text = "Сначала выберите объект";
+                else StatusText.Text = "Сначала выберите карточку";
             }, "Building"));
             top.Items.Add(Item("Себестоимость и маржа (сводка)", ShowHome, "Building"));
             top.Items.Add(Item("Справочник номенклатуры…", () =>
@@ -53,7 +53,7 @@ public partial class MainWindow
                 new TagsWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Layers"));
             top.Items.Add(Item("Люди и автомобили (для допуска)…", OpenPeopleWorkspace, "Users"));
             top.Items.Add(Item("Журнал изменений…", () => OpenHistory(null), "History"));
-            top.Items.Add(Item("Корзина (удалённые объекты и документы)…", OpenTrash, "Trash"));
+            top.Items.Add(Item("Корзина (удалённые карточки и документы)…", OpenTrash, "Trash"));
             top.Items.Add(new Separator());
             top.Items.Add(Item("Как работать", OpenWorkspaceHelp, "Book", "F1"));
             top.Items.Add(new Separator());

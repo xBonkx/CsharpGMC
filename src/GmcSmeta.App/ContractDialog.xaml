@@ -17,6 +17,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock x:Name="CaptionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Text="Документ" TextWrapping="Wrap"/>
             <TextBlock x:Name="ObjectText" Foreground="#64748B" Margin="0,3,0,0" TextWrapping="Wrap"/>
+            <Button x:Name="AgreementDefaultsButton" Content="Подставить реквизиты договора" Visibility="Collapsed"
+                    Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                    Click="AgreementDefaults_Click" ToolTip="Заполнить номер, дату и организацию из совпадающих реквизитов приложений."/>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -44,10 +47,10 @@
             <ComboBox x:Name="KindCombo" Grid.Row="0" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"
                       SelectionChanged="Kind_SelectionChanged"/>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Номер" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock x:Name="NumberLabel" Grid.Row="1" Grid.Column="0" Text="Номер" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
             <TextBox x:Name="NumberBox" Grid.Row="1" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"/>
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Дата" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock x:Name="DateLabel" Grid.Row="2" Grid.Column="0" Text="Дата" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
             <TextBox x:Name="DateBox" Grid.Row="2" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}" ToolTip="дд.мм.гггг"/>
 
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Название" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
@@ -69,7 +72,7 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <TextBlock Grid.Row="6" Grid.Column="0" Text="К договору" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="К приложению / КП" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>
             <ComboBox x:Name="BaseCombo" Grid.Row="6" Grid.Column="1" Margin="{StaticResource LayoutFormFieldMargin}"/>
 
             <TextBlock Grid.Row="7" Grid.Column="0" x:Name="VatLabel" Text="НДС (внутри цен)" Margin="{StaticResource LayoutFormLabelMargin}" TextWrapping="Wrap" TextAlignment="Right" VerticalAlignment="Center"/>

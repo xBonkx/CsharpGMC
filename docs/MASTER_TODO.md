@@ -2,9 +2,11 @@
 
 ## Приоритет владельца 27.11.2026 — договор, приложения и ДС
 
+27.11.2026 ChatGPT/main (base b490e52) — AGR-01/02/03/04/05/08/09 PARTIAL. Read-only metadata projection now includes company_id (no DDL), agreement defaults require matching object/number/valid date/company ID and linked DS; normalize supported date formats, no legal identity inferred. Tree short title only for consistent group; original titles/tooltips/search and IDs unchanged. Fresh scoped metadata read before new-dialog + revision comparison, copy/DS routes excluded from defaults. Explicit «Подставить реквизиты договора» for new annex (auto only if dialog starts on main without copy); KP remains default generic creation to preserve Excel import route, switching kind never auto-overwrites entered fields. Form labels distinguish agreement/DS/KP; object properties show derived read-only requisites, no separate persistence. Editor chip/menu and main navigation commands use annex/card terms; deletion/archive wording explicitly covers all documents. Existing import, SQL write paths, legal exports, KS, totals, tabs, storage and icons unchanged. Tests extended + one source test; not run. Remaining full WPF/SQL Pilot acceptance, identity audit of real data, dedicated agreement fields/files/migration decision, downstream export/technical texts and full terminology audit. No production DB/release/DONE.
+
 27.11.2026 ChatGPT/main (base 9090218) — AGR-01/02/03/04 PARTIAL, AGR-09 PARTIAL: source audit + first visual block. SidebarSearch local template, zero TextBox padding, a single 30/32 inset on centered PART_ContentHost, min34 without fixed height, short placeholder, Ctrl+P in tooltip, 3:2 button columns. Existing icons unchanged. Main/card/tree display projections: main badge «Приложение», name first, legal number retained in tree and ambiguous cards; show short card title and header only for matching nonempty number/date/company display strings and explicitly linked DS within current object; this is conservative presentation, not legal identity proof. KP/archives distinct, unresolved group labels rather than fictitious contract. Creation dialog labels only; same handlers and kind codes, no autofill or data migrations. Existing totals, KS, tabs, document IDs/search tips and SQL untouched. Source review confirms objects name/customer/address/folder and contracts number/date/company/base/stage; separate legal ID absent in current projection; group conflicts and real data must be checked on Pilot. Added two domain tests and one XAML source test; not run. Remaining full terminology/form/export audit, explicit identity/number-date normalization and true company ID check, Windows build/xUnit, WPF narrow sidebar/DPI/large font, SQL Pilot. No release/DONE.
 
-[Подробный TODO](AGREEMENT_ANNEX_TODO_20261127.md). 11 задач: 5 PARTIAL, 6 NOT STARTED; отдельная очередь изменения продукта, не новые дефекты четырёх основных списков. Сначала аудит AGR-01 и минимальный визуал; условная миграция только по результатам аудита и отдельному согласованию. КС и готовые вкладки сохраняются; не добавлять реестр КС на главный экран.
+[Подробный TODO](AGREEMENT_ANNEX_TODO_20261127.md). 11 задач: 7 PARTIAL, 4 NOT STARTED; отдельная очередь изменения продукта, не новые дефекты четырёх основных списков. Сначала аудит AGR-01 и минимальный визуал; условная миграция только по результатам аудита и отдельному согласованию. КС и готовые вкладки сохраняются; не добавлять реестр КС на главный экран.
 
 | ID | P | Задача | Статус |
 |---|---|---|---|
@@ -12,10 +14,10 @@
 | [AGR-02](AGREEMENT_ANNEX_TODO_20261127.md#agr-02) | P1 | Главное окно: минимальная терминология | PARTIAL |
 | [AGR-03](AGREEMENT_ANNEX_TODO_20261127.md#agr-03) | P1 | Дерево, карточки и заголовки приложений | PARTIAL |
 | [AGR-04](AGREEMENT_ANNEX_TODO_20261127.md#agr-04) | P1 | Шапка и свойства договора | PARTIAL |
-| [AGR-05](AGREEMENT_ANNEX_TODO_20261127.md#agr-05) | P1 | Создание и импорт | NOT STARTED |
+| [AGR-05](AGREEMENT_ANNEX_TODO_20261127.md#agr-05) | P1 | Создание и импорт | PARTIAL |
 | [AGR-06](AGREEMENT_ANNEX_TODO_20261127.md#agr-06) | P1 | Файлы договора и приложения | NOT STARTED |
 | [AGR-07](AGREEMENT_ANNEX_TODO_20261127.md#agr-07) | P0 | Существующие вкладки и КС — регрессионный контроль | NOT STARTED |
-| [AGR-08](AGREEMENT_ANNEX_TODO_20261127.md#agr-08) | P1 | Смежные модули и юридические тексты | NOT STARTED |
+| [AGR-08](AGREEMENT_ANNEX_TODO_20261127.md#agr-08) | P1 | Смежные модули и юридические тексты | PARTIAL |
 | [AGR-09](AGREEMENT_ANNEX_TODO_20261127.md#agr-09) | P1 | Приёмка визуального блока | PARTIAL |
 | [AGR-10](AGREEMENT_ANNEX_TODO_20261127.md#agr-10) | P0 | Решение по структуре данных и миграции (условный этап) | NOT STARTED |
 | [AGR-11](AGREEMENT_ANNEX_TODO_20261127.md#agr-11) | P0 | Интеграционная приёмка и выпуск | NOT STARTED |

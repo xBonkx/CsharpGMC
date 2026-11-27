@@ -42,7 +42,7 @@
 
 <a id="agr-05"></a>
 
-### AGR-05 — P1 — NOT STARTED: Создание и импорт
+### AGR-05 — P1 — PARTIAL: Создание и импорт
 
 - [ ] ContractDialog.xaml/cs, MainWindow.ExcelImport.cs, сценарии создания/конвертации КП: «Добавить документ» предлагает приложение, ДС, КП и импорт Excel (сохранить существующий механизм пустой сметы/копии/импорта). У приложения номер/дата юридического договора подставляются только из проверенной карточки; отдельные реквизиты приложения не выдумывать. ДС сохраняет BaseContractId и собственные номер/дату. КП сохраняет самостоятельный жизненный цикл, стадии и режим навигации. Не менять схемы импорта до аудита.
 
@@ -60,7 +60,7 @@
 
 <a id="agr-08"></a>
 
-### AGR-08 — P1 — NOT STARTED: Смежные модули и юридические тексты
+### AGR-08 — P1 — PARTIAL: Смежные модули и юридические тексты
 
 - [ ] Сводка руководителя, письма, допуски, приказы, паспорта, ПТО, корзина, глобальный поиск, архив, меню, перенос документа и экспорт: провести адресную сверку контекста и терминов, не слепую замену. Объект строительства остаётся объектом строительства в адресах, актах, допусках, приказах и технической документации. Сохранить существующие связи объекта/документа, history, GUID/ID, права, блокировки и подписанные файлы.
 
@@ -87,3 +87,5 @@
 - 27.11.2026 — ChatGPT/main, base `49b25e57a848874d5259add7e8d8a6d96b9e3e55`: оформлено ТЗ по указанию владельца; 11 новых задач. Только документация. Код, БД, расчёты и релиз не менялись. Все задачи открыты, статусы уточнять после фактического аудита. Отдельный профильный счётчик, не прибавлять к четырём историческим спискам как новые дефекты; пересечения фиксировать как алиасы при проверке.
 
 - 27.11.2026 ChatGPT/main (base 9090218) — AGR-01/02/03/04 PARTIAL, AGR-09 PARTIAL: source audit + first visual block. SidebarSearch local template, zero TextBox padding, a single 30/32 inset on centered PART_ContentHost, min34 without fixed height, short placeholder, Ctrl+P in tooltip, 3:2 button columns. Existing icons unchanged. Main/card/tree display projections: main badge «Приложение», name first, legal number retained in tree and ambiguous cards; show short card title and header only for matching nonempty number/date/company display strings and explicitly linked DS within current object; this is conservative presentation, not legal identity proof. KP/archives distinct, unresolved group labels rather than fictitious contract. Creation dialog labels only; same handlers and kind codes, no autofill or data migrations. Existing totals, KS, tabs, document IDs/search tips and SQL untouched. Source review confirms objects name/customer/address/folder and contracts number/date/company/base/stage; separate legal ID absent in current projection; group conflicts and real data must be checked on Pilot. Added two domain tests and one XAML source test; not run. Remaining full terminology/form/export audit, explicit identity/number-date normalization and true company ID check, Windows build/xUnit, WPF narrow sidebar/DPI/large font, SQL Pilot. No release/DONE.
+
+- 27.11.2026 ChatGPT/main (base b490e52) — AGR-01/02/03/04/05/08/09 PARTIAL. Read-only metadata projection now includes company_id (no DDL), agreement defaults require matching object/number/valid date/company ID and linked DS; normalize supported date formats, no legal identity inferred. Tree short title only for consistent group; original titles/tooltips/search and IDs unchanged. Fresh scoped metadata read before new-dialog + revision comparison, copy/DS routes excluded from defaults. Explicit «Подставить реквизиты договора» for new annex (auto only if dialog starts on main without copy); KP remains default generic creation to preserve Excel import route, switching kind never auto-overwrites entered fields. Form labels distinguish agreement/DS/KP; object properties show derived read-only requisites, no separate persistence. Editor chip/menu and main navigation commands use annex/card terms; deletion/archive wording explicitly covers all documents. Existing import, SQL write paths, legal exports, KS, totals, tabs, storage and icons unchanged. Tests extended + one source test; not run. Remaining full WPF/SQL Pilot acceptance, identity audit of real data, dedicated agreement fields/files/migration decision, downstream export/technical texts and full terminology audit. No production DB/release/DONE.

@@ -372,17 +372,20 @@ public partial class MainWindow : Window
         // Build locally before replacing the placeholder. The existing
         // Navigation.Documents projection retains stage hierarchy and order.
         var opened = pending.Opened;
+        var shortTitle = CurrentMode != NavigationMode.Kp &&
+            AgreementPresentation.Resolve(pending.Documents) is not null;
         var children = Navigation.Documents(pending.Documents)
-            .Select(doc => DocumentNode(doc, opened, 2)).ToList();
+            .Select(doc => DocumentNode(doc, opened, 2, shortTitle)).ToList();
         _pendingNavigationDocuments.Remove(obj.Id);
         node.Expanded -= ObjectNavigation_Expanded;
         node.Items.Clear();
         foreach (var child in children) node.Items.Add(child);
     }
 
-    private TreeViewItem DocumentNode(NavigationDocument entry, HashSet<string>? opened, int depth)
+    private TreeViewItem DocumentNode(NavigationDocument entry, HashSet<string>? opened, int depth, bool shortTitle = false)
     {
-        var header = new NavigationDocumentHeader(entry.Document, depth > 2, entry.Children.Count > 0);
+        var header = new NavigationDocumentHeader(entry.Document, depth > 2, entry.Children.Count > 0)
+            { ShortAgreementTitle = shortTitle };
         var node = new TreeViewItem
         {
             Header = header, Tag = entry.Document,
@@ -391,10 +394,10 @@ public partial class MainWindow : Window
             ToolTip = entry.Document.NavigationTip,
             FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal
         };
-        System.Windows.Automation.AutomationProperties.SetName(node, entry.Document.NavigationName);
+        System.Windows.Automation.AutomationProperties.SetName(node, header.DisplayName);
         node.IsExpanded = entry.Children.Count > 0 || opened?.Contains(NodeKey(node)) == true;
         _documentNodes[entry.Document.Id] = node;
-        foreach (var child in entry.Children) node.Items.Add(DocumentNode(child, opened, depth + 1));
+        foreach (var child in entry.Children) node.Items.Add(DocumentNode(child, opened, depth + 1, shortTitle));
         return node;
     }
 
@@ -601,7 +604,7 @@ public partial class MainWindow : Window
             menu.Items.Add(passports);
         }
         menu.Items.Add(new Separator());
-        var finish = ContextMenuIcons.Create(obj.Archived ? "Вернуть в работу" : "Завершить объект (в архив)", "Check", SqlWritesEnabled);
+        var finish = ContextMenuIcons.Create(obj.Archived ? "Вернуть в работу" : "Завершить карточку (в архив)", "Check", SqlWritesEnabled);
         finish.Click += (_, _) => Run(FinishSqlServerObject);
         menu.Items.Add(finish);
         // Python object_view.act_year is visible only for archived objects.
@@ -612,7 +615,7 @@ public partial class MainWindow : Window
             menu.Items.Add(year);
         }
         menu.Items.Add(new Separator());
-        var delete = ContextMenuIcons.Create("Удалить объект…", "Trash", SqlWritesEnabled, danger: true);
+        var delete = ContextMenuIcons.Create("Удалить карточку и все документы…", "Trash", SqlWritesEnabled, danger: true);
         delete.Click += (_, _) => Run(DeleteSqlServerObjectFlow);
         menu.Items.Add(delete);
         menu.PlacementTarget = anchor;
@@ -630,9 +633,9 @@ public partial class MainWindow : Window
         }
         if (!obj.Archived)
         {
-            var question = $"Объект «{obj.Name}» закончен?\n\nОн уйдёт в «Архив» (вкладка над списком объектов), " +
+            var question = $"Завершить карточку «{obj.Name}» и отправить все её документы в архив?\n\nОн уйдёт в «Архив» (вкладка над списком объектов), " +
                 $"в {DateTime.Today.Year} год. Ничего не удаляется, вернуть можно в любой момент.";
-            if (MessageBox.Show(this, question, "Завершить объект", MessageBoxButton.YesNo,
+            if (MessageBox.Show(this, question, "Завершить карточку", MessageBoxButton.YesNo,
                     MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         }
         try
@@ -703,9 +706,9 @@ public partial class MainWindow : Window
             return;
         }
         var bullets = string.Join("\n", info.Details.Select(d => "• " + d));
-        var question = $"Удалить объект «{info.Name}»?\n\n" + (bullets.Length > 0 ? bullets : "Объект пустой.") +
-            "\n\nЕсли объект просто закончен — лучше «Завершить объект (в архив)».";
-        if (MessageBox.Show(this, question, "Удаление объекта", MessageBoxButton.YesNo,
+        var question = $"Удалить карточку «{info.Name}» и все её документы?\n\n" + (bullets.Length > 0 ? bullets : "Карточка пуста.") +
+            "\n\nЕсли работы завершены — лучше «Завершить карточку (в архив)».";
+        if (MessageBox.Show(this, question, "Удаление карточки", MessageBoxButton.YesNo,
                 MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         if (new ConfirmDeleteDialog(info.Name, info.Details) { Owner = this }.ShowDialog() != true) return;
         try
@@ -1107,7 +1110,7 @@ public partial class MainWindow : Window
             ? NavigationTree.SelectedItem as TreeViewItem
             : NavigationNodeUnderMouse();
         var menu = new ContextMenu();
-        var create = ContextMenuIcons.Create("Новый объект…", "FolderPlus");
+        var create = ContextMenuIcons.Create("Новый договор…", "FolderPlus");
         create.Click += (_, _) => EditObjectProperties(null);
         menu.Items.Add(create);
         // Global history and trash already live in the main menu (Python).
@@ -1133,30 +1136,30 @@ public partial class MainWindow : Window
                 };
                 menu.Items.Add(item);
             }
-            AddObjectCommand("Новое КП…", obj => NewContractFlow(obj.Id), "FilePlus", !selected.Archived);
-            AddObjectCommand("Импорт КП в этот объект…", obj => _ = ImportExcelForObjectAsync(obj.Id), "Upload", !selected.Archived);
+            AddObjectCommand(CurrentMode == NavigationMode.Kp ? "Новое КП…" : "Добавить документ…", obj => NewContractFlow(obj.Id), "FilePlus", !selected.Archived);
+            AddObjectCommand("Импорт КП в эту группу…", obj => _ = ImportExcelForObjectAsync(obj.Id), "Upload", !selected.Archived);
             menu.Items.Add(new Separator());
             AddObjectCommand("Переименовать", RenameObject, "Edit", !selected.Archived, "F2");
-            AddObjectCommand("Свойства объекта…", obj => EditObjectProperties(obj.Id), "Edit", !selected.Archived);
+            AddObjectCommand("Свойства карточки…", obj => EditObjectProperties(obj.Id), "Edit", !selected.Archived);
             AddObjectCommand("Список людей на допуск…", obj =>
                 OpenObjectTool(obj, "Допуск", (connection, current) => new PeopleWindow(connection, current.Id)), "Users");
             AddObjectCommand("Приказы об ответственных…", obj =>
                 OpenObjectTool(obj, "Приказы", (connection, current) =>
                     new OrdersWindow(connection, current.Id)), "File");
             menu.Items.Add(new Separator());
-            AddObjectCommand(selected.Archived ? "Вернуть в работу" : "Завершить объект (в архив)…",
+            AddObjectCommand(selected.Archived ? "Вернуть в работу" : "Завершить карточку (в архив)…",
                 FinishSqlServerObject, "Check");
             if (selected.Archived)
                 AddObjectCommand("Изменить год в архиве…", ChangeSqlServerObjectArchiveYear, "History");
             menu.Items.Add(new Separator());
-            AddObjectCommand("Удалить объект…", DeleteSqlServerObjectFlow, "Trash", danger: true);
+            AddObjectCommand("Удалить карточку и все документы…", DeleteSqlServerObjectFlow, "Trash", danger: true);
         }
         else if (target is { Tag: DocRow doc })
         {
             menu.Items.Add(new Separator());
             if (doc.Kind == "kp")
             {
-                var make = ContextMenuIcons.Create("Сделать договором…", "Check");
+                var make = ContextMenuIcons.Create("Оформить как приложение…", "Check");
                 make.Click += (_, _) => EditContractProperties(doc, makeContract: true);
                 menu.Items.Add(make);
                 var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate");
@@ -1174,7 +1177,7 @@ public partial class MainWindow : Window
                 var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus");
                 dop.Click += (_, _) => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id);
                 menu.Items.Add(dop);
-                var move = ContextMenuIcons.Create("Перенести в другой объект…", "FilePlus", SqlWritesEnabled);
+                var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", SqlWritesEnabled);
                 move.Click += (_, _) => MoveCurrentContract(doc);
                 menu.Items.Add(move);
             }
@@ -1229,7 +1232,7 @@ public partial class MainWindow : Window
             menu.Items.Add(props);
             menu.Items.Add(new Separator());
             var delete = ContextMenuIcons.Create(
-                doc.Kind switch { "main" => "Удалить договор…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
+                doc.Kind switch { "main" => "Удалить приложение…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
                 "Trash", danger: true);
             delete.Click += (_, _) => DeleteSqlServerContractFlow(doc);
             menu.Items.Add(delete);

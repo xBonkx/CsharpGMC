@@ -14,7 +14,8 @@ public sealed record NavigationDocumentHeader(DocRow Document, bool IsNested, bo
         ? (Document.StageRest ? "Remainder" : "Stage")
         : (HasChildren ? "Parent" : "File");
     public bool IsItalic => IsNested && Document.StageRest;
-    public string DisplayName => AgreementPresentation.NavigationName(Document);
+    public bool ShortAgreementTitle { get; init; }
+    public string DisplayName => AgreementPresentation.NavigationName(Document, ShortAgreementTitle);
 }
 
 /// <summary>Списки боковой панели как MainWindow._object_lists / _docs_for_mode в Python.</summary>

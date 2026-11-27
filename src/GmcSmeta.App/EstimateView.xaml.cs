@@ -245,9 +245,11 @@ public partial class EstimateView : UserControl
         RequestEstimateColumnFit();
 
         // Python kp_editor._fill_header: crumb = объект, чипы «КП» и организация, заголовок = c.title.
-        TitleText.Text = est.Title;
+        var isAnnex = est.KindTitle == "Договор";
+        TitleText.Text = isAnnex && est.Title.StartsWith("Договор", StringComparison.Ordinal)
+            ? "Приложение · " + est.Title : est.Title;
         SubtitleText.Text = est.ObjectName;
-        DocumentKindText.Text = est.KindTitle;
+        DocumentKindText.Text = isAnnex ? "Приложение" : est.KindTitle;
         CompanyText.Text = string.IsNullOrWhiteSpace(est.Company) ? "организация не указана" : est.Company;
         CompanyChip.Visibility = string.IsNullOrWhiteSpace(est.Company)
             ? Visibility.Collapsed : Visibility.Visible;

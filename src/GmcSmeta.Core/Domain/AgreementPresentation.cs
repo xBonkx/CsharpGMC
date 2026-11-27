@@ -3,25 +3,39 @@ namespace GmcSmeta.Core.Domain;
 /// <summary>Display-only projection. Does not determine legal identity, KS scope or persistence.</summary>
 public static class AgreementPresentation
 {
+    public sealed record Requisites(string Number, string Date, long CompanyId)
+    {
+        public string Heading => $"Договор № {Number} от {Date}";
+    }
+
+    // Only propose defaults from a consistent metadata group; never infer a legal ID.
+    public static Requisites? Resolve(IEnumerable<DocRow> source)
+    {
+        var documents = source.Where(d => d.Kind is "main" or "dop").ToArray();
+        var mains = documents.Where(d => d.Kind == "main").ToArray();
+        if (mains.Length == 0) return null;
+        var first = mains[0];
+        var number = first.Number.Trim();
+        if (number.Length == 0 || first.CompanyId is not long company || company <= 0 ||
+            !TryDate(first.Date, out var date)) return null;
+        if (mains.Any(d => d.ObjectId != first.ObjectId || d.Number.Trim() != number ||
+            d.CompanyId != company || !TryDate(d.Date, out var other) || other != date)) return null;
+        var ids = mains.Select(d => d.Id).ToHashSet();
+        if (documents.Any(d => d.ObjectId != first.ObjectId || d.CompanyId != company ||
+            (d.Kind == "dop" && (d.BaseContractId is not int id || !ids.Contains(id)))))
+            return null;
+        return new Requisites(number, date.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture), company);
+    }
+
+    private static bool TryDate(string value, out DateTime date) =>
+        DateTime.TryParseExact(value.Trim(), new[] { "d.M.yyyy", "dd.MM.yyyy", "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss" },
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out date);
+
     public static string? Heading(IEnumerable<(DocRow Document, string Company)> source)
     {
         var documents = source.Where(x => x.Document.Kind is "main" or "dop").ToArray();
-        var mains = documents.Where(x => x.Document.Kind == "main").ToArray();
-        if (mains.Length == 0) return null;
-        var first = mains[0];
-        var number = first.Document.Number.Trim();
-        var date = first.Document.Date.Trim();
-        var company = first.Company.Trim();
-        if (number.Length == 0 || date.Length == 0 || company.Length == 0) return null;
-        if (mains.Any(x => x.Document.ObjectId != first.Document.ObjectId ||
-            x.Document.Number.Trim() != number || x.Document.Date.Trim() != date ||
-            x.Company.Trim() != company)) return null;
-        var ids = mains.Select(x => x.Document.Id).ToHashSet();
-        if (documents.Any(x => x.Document.ObjectId != first.Document.ObjectId ||
-            x.Company.Trim() != company ||
-            (x.Document.Kind == "dop" && (x.Document.BaseContractId is not int id || !ids.Contains(id)))))
-            return null;
-        return $"Договор № {number} от {date}";
+        if (documents.Any(x => string.IsNullOrWhiteSpace(x.Company))) return null;
+        return Resolve(documents.Select(x => x.Document))?.Heading;
     }
 
     public static string AnnexTitle(DocRow doc) =>
@@ -31,9 +45,8 @@ public static class AgreementPresentation
         AnnexTitle(doc) + (string.IsNullOrWhiteSpace(doc.Number) ? "" : " · договор № " + doc.Number.Trim()) +
         (string.IsNullOrWhiteSpace(doc.Date) ? "" : " от " + doc.Date.Trim());
 
-    // Tree is loaded before company information: retain the legal number, unlike a verified-looking
-    // short title. Existing NavigationName and NavigationTip are deliberately not changed.
-    public static string NavigationName(DocRow doc) => doc.Kind == "main"
-        ? AnnexTitle(doc) + (string.IsNullOrWhiteSpace(doc.Number) ? "" : " · № " + doc.Number.Trim())
+    // Existing NavigationName and NavigationTip are deliberately not changed.
+    public static string NavigationName(DocRow doc, bool shortTitle = false) => doc.Kind == "main"
+        ? AnnexTitle(doc) + (shortTitle || string.IsNullOrWhiteSpace(doc.Number) ? "" : " · № " + doc.Number.Trim())
         : doc.NavigationName;
 }

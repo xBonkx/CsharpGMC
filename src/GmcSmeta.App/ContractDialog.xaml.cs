@@ -37,6 +37,7 @@ public partial class ContractDialog : Window
     };
 
     private readonly bool _isNew;
+    private readonly AgreementPresentation.Requisites? _agreement;
     private readonly Dictionary<long, decimal> _vatByCompany = new();
 
     public ContractDialogResult? Result { get; private set; }
@@ -50,8 +51,8 @@ public partial class ContractDialog : Window
         InitializeComponent();
         _isNew = false;
         ContentPanel.Visibility = Visibility.Collapsed;
-        Title = makeContract ? "Сделать договором" : "Свойства документа";
-        CaptionText.Text = makeContract ? "Сделать договором" : "Свойства документа";
+        Title = makeContract ? "Оформить как приложение" : "Свойства документа";
+        CaptionText.Text = makeContract ? "Оформить как приложение" : "Свойства документа";
         OkButton.Content = "Сохранить";
         ObjectText.Text = objectName;
         FillKinds(makeContract ? "main" : info.Kind);
@@ -71,13 +72,15 @@ public partial class ContractDialog : Window
     public ContractDialog(string objectName, IReadOnlyList<(long Id, string Title, string Kind)> contracts,
                           IReadOnlyList<CompanyInfo> companies, IReadOnlyList<ObjectTag> tags,
                           string kind = "kp", long? baseId = null, long? copyFromId = null,
-                          long? defaultCompany = null, bool allowCopy = true, bool allowExcelImport = false)
+                          long? defaultCompany = null, bool allowCopy = true, bool allowExcelImport = false,
+                          AgreementPresentation.Requisites? agreement = null)
     {
         InitializeComponent();
         _isNew = true;
+        _agreement = agreement;
         ImportExcelButton.Visibility = allowExcelImport ? Visibility.Visible : Visibility.Collapsed;
         Title = kind == "dop" ? "Новое допсоглашение" : kind == "main" ? "Новое приложение" : "Добавить документ";
-        CaptionText.Text = "Новое КП / допсоглашение";
+        CaptionText.Text = Title;
         OkButton.Content = "Создать";
         ObjectText.Text = objectName;
         FillKinds(kind);
@@ -103,6 +106,7 @@ public partial class ContractDialog : Window
 
         ApplyCompanyVat();
         SyncKind();
+        if (SelectedKind() == "main" && copyFromId is null) ApplyAgreementDefaults();
     }
 
     private void FillKinds(string current)
@@ -148,7 +152,26 @@ public partial class ContractDialog : Window
     private void SyncKind()
     {
         if (BaseCombo is null) return;
-        BaseCombo.IsEnabled = SelectedKind() == "dop";
+        var kind = SelectedKind();
+        BaseCombo.IsEnabled = kind == "dop";
+        if (NumberLabel is not null) NumberLabel.Text = kind == "main" ? "Номер договора" : kind == "dop" ? "Номер ДС" : "Номер КП";
+        if (DateLabel is not null) DateLabel.Text = kind == "main" ? "Дата договора" : kind == "dop" ? "Дата ДС" : "Дата КП";
+        if (AgreementDefaultsButton is not null)
+            AgreementDefaultsButton.Visibility = _isNew && kind == "main" && _agreement is not null
+                ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void AgreementDefaults_Click(object sender, RoutedEventArgs e) => ApplyAgreementDefaults();
+
+    private void ApplyAgreementDefaults()
+    {
+        if (!_isNew || SelectedKind() != "main" || _agreement is not { } agreement) return;
+        if (CompanyCombo.ItemsSource is not IEnumerable<IdItem> companies ||
+            companies.FirstOrDefault(c => c.Id == agreement.CompanyId) is not { } company) return;
+        NumberBox.Text = agreement.Number;
+        DateBox.Text = agreement.Date;
+        CompanyCombo.SelectedItem = company;
+        ApplyCompanyVat();
     }
 
     private void Content_Changed(object sender, RoutedEventArgs e)

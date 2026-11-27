@@ -25,8 +25,10 @@ public partial class MainWindow
         if (id is int existing && _objects.Any(o => o.Id == existing && o.Archived))
             throw new InvalidOperationException("Архивный объект нельзя изменять.");
 
+        var agreement = id is int groupId
+            ? AgreementPresentation.Resolve(Workspace.ReadObjectDocumentMetadata(_serverConn, groupId)) : null;
         var dialog = new ObjectDialog(
-            SqlServerWorkspace.ObjectTags(_serverConn, previous?.Form ?? ""), previous)
+            SqlServerWorkspace.ObjectTags(_serverConn, previous?.Form ?? ""), previous, agreement)
             { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Values is not { } values) return;
 
@@ -61,13 +63,18 @@ public partial class MainWindow
                 throw new InvalidOperationException("Архивный объект нельзя изменять.");
 
             var revision = SqlServerDatabase.Revision(_serverConn);
-            var contracts = _docs.Where(d => d.ObjectId == objectId)
-                .Select(d => (Id: (long)d.Id, d.Title, d.Kind)).ToList();
+            var metadata = Workspace.ReadObjectDocumentMetadata(_serverConn, objectId);
+            var contracts = metadata.Select(d => (Id: (long)d.Id,
+                Title: d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title, d.Kind)).ToList();
+            var agreement = baseId is null && copyFrom is null ? AgreementPresentation.Resolve(metadata) : null;
+            if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Данные изменились. Обновите список и повторите создание.");
             var dialog = new ContractDialog(obj.Name, contracts,
                 SqlServerWorkspace.Companies(_serverConn),
                 SqlServerWorkspace.ObjectTags(_serverConn), kind, baseId, copyFrom,
                 SqlServerWorkspace.LastCompanyId(_serverConn, objectId), allowCopy: true,
-                allowExcelImport: kind == "kp" && baseId is null && copyFrom is null)
+                allowExcelImport: kind == "kp" && baseId is null && copyFrom is null,
+                agreement: agreement)
                 { Owner = this };
             if (dialog.ShowDialog() != true) return;
             if (dialog.ImportExcelRequested)
@@ -329,7 +336,7 @@ public partial class MainWindow
 
             var objectName = _objects.FirstOrDefault(o => o.Id == doc.ObjectId)?.Name ?? "";
             var mains = _docs.Where(d => d.ObjectId == doc.ObjectId && d.Kind is "main" or "kp")
-                .Select(d => ((long)d.Id, d.Title)).ToList();
+                .Select(d => ((long)d.Id, d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title)).ToList();
             var dialog = new ContractDialog(objectName, info, SqlServerWorkspace.Companies(_serverConn),
                 SqlServerWorkspace.ObjectTags(_serverConn, info.Form), mains, makeContract) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } value) return;
