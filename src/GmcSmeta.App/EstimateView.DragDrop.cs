@@ -115,7 +115,7 @@ public partial class EstimateView
         DragPayload? payload = null;
         if (selected.IsSystem)
         {
-            if (!_inlineStagesOn && selection.Count == 1)
+            if (selection.Count == 1)
             {
                 payload = new DragPayload(_contractId, _serverRevision,
                     selected.ParentSystemId is null ? DragKind.RootSystem : DragKind.Subsection,
@@ -203,6 +203,8 @@ public partial class EstimateView
 
         if (data.Kind == DragKind.Subsection)
         {
+            if (_inlineStagesOn && sectionById[draggingId].ParentSystemId != rootSystemId)
+                return false;
             long? after = null;
             if (section.ParentSystemId is not null)
             {

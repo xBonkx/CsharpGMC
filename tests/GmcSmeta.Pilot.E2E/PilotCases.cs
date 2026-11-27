@@ -12,6 +12,11 @@ internal static class PilotCases
     public static void RunAll(PilotRunner p)
     {
         p.RunCase("public-object-contract-section-position", () => CreateWorkspace(p));
+        if (Environment.GetEnvironmentVariable("GMC_PILOT_E2E_CASE") == "parent-reorder")
+        {
+            p.RunCase("parent-kp-stages-section-position-reorder", () => PilotParentReorderCases.Run(p));
+            return;
+        }
         p.RunCase("2500-rows-bulk-fixture-read", () => SeedAndRead(p, p.SmallSystem, 2500));
         p.RunCase("10000-rows-bulk-fixture-read", () => SeedAndRead(p, p.LargeSystem, 10000));
         p.RunCase("two-real-sql-clients-revision-conflict", () => Concurrency(p));

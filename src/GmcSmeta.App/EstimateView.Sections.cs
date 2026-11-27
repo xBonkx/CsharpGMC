@@ -415,9 +415,9 @@ public partial class EstimateView
             return;
         }
         if (EstimateGrid.SelectedItem is not EditableEstimateRow row ||
-            row.IsSystem || row.IsVirtual)
+            row.IsVirtual || EstimateGrid.SelectedItems.Count != 1)
         {
-            SetStatus("Выбери позицию (не заголовок раздела).", true);
+            SetStatus("Выбери одну позицию или раздел.", true);
             return;
         }
         if (_serverConflict)
@@ -432,15 +432,18 @@ public partial class EstimateView
         try
         {
             if (_serverConflict) throw new InvalidOperationException("Смета устарела.");
-            var result = await Task.Run(() => SqlServerDatabase.MovePosition(
-                _sqlConnectionString, _contractId, row.Source.SystemId, row.Id, direction, _serverRevision));
+            var result = row.IsSystem
+                ? await MoveSelectedSystemAsync(row, direction)
+                : await Task.Run(() => SqlServerDatabase.MovePosition(
+                    _sqlConnectionString, _contractId, row.Source.SystemId, row.Id, direction, _serverRevision));
             if (!result.Saved)
             {
                 _serverConflict = true;
                 throw new InvalidOperationException(result.Error ?? "Перемещение отклонено.");
             }
             _serverRevision = result.Revision;
-            _focusAfterReload = row.Id;
+            if (row.IsSystem) _focusSystemAfterReload = row.Source.SystemId;
+            else _focusAfterReload = row.Id;
         }
         catch (Exception ex)
         {

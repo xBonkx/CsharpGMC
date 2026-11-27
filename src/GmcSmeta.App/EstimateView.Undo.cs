@@ -214,8 +214,10 @@ public partial class EstimateView
         }
         if (inTable && modifiers == ModifierKeys.Alt)
         {
-            if (e.Key == Key.Up) { MoveUp_Click(sender, e); e.Handled = true; return; }
-            if (e.Key == Key.Down) { MoveDown_Click(sender, e); e.Handled = true; return; }
+            // WPF reports Alt combinations as Key.System.
+            var moveKey = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (moveKey == Key.Up) { MoveUp_Click(sender, e); e.Handled = true; return; }
+            if (moveKey == Key.Down) { MoveDown_Click(sender, e); e.Handled = true; return; }
         }
         if (e.Key == Key.Z && ctrl)
         {

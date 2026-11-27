@@ -152,7 +152,7 @@ public static partial class SqlServerDatabase
             return SaveResult.Fail("В SQL Server отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(expectedRevision, revision, StringComparison.Ordinal))
             return SaveResult.Fail("Смета изменена другим сотрудником. Обнови и повтори перенос.", revision);
-        var contract = DragDocumentGuard(conn, tx, contractId);
+        var contract = DragDocumentGuard(conn, tx, contractId, allowParentReorder: true);
         if (contract.Problem is not null)
             return SaveResult.Fail(contract.Problem, revision);
 
@@ -160,6 +160,8 @@ public static partial class SqlServerDatabase
         var plan = asSubsection
             ? EstimateDragPlan.PlaceSubsection(sections, draggedId, parentId!.Value, afterId)
             : EstimateDragPlan.PlaceGroup(sections, draggedId, afterId);
+        if (contract.HasStages && EstimateDragPlan.ReparentsSection(sections, plan, draggedId))
+            return SaveResult.Fail("В КП с этапами подраздел можно переставлять только внутри своей системы.", revision);
         if (!plan.Changed)
         {
             tx.Commit();
@@ -211,9 +213,13 @@ public static partial class SqlServerDatabase
         }
 
         using (var update = new SqlCommand(
-            @"UPDATE sy SET parent_id=d.parent, [order]=d.ord
-              FROM dbo.systems sy JOIN #drag_sections d ON d.id=sy.id
-              WHERE sy.contract_id=@contract", conn, tx))
+            contract.HasStages
+                ? @"UPDATE sy SET [order]=d.ord
+                    FROM dbo.systems sy JOIN #drag_sections d ON d.id=sy.id
+                    WHERE sy.contract_id=@contract"
+                : @"UPDATE sy SET parent_id=d.parent, [order]=d.ord
+                    FROM dbo.systems sy JOIN #drag_sections d ON d.id=sy.id
+                    WHERE sy.contract_id=@contract", conn, tx))
         {
             update.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             if (update.ExecuteNonQuery() != sections.Count)
