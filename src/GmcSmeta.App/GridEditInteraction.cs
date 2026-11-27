@@ -47,18 +47,50 @@ internal static class GridEditInteraction
         var item = row.Item;
         var column = e.Column;
         var element = e.EditingElement;
-        // One callback, before the next input; never refocus a recycled or closed editor.
-        grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        // Template columns can enter edit without focusing their inner TextBox.
+        // Prefer synchronous focus so the very next Ctrl+V or keystroke is
+        // delivered to the editor. Retry once after template realization.
+        bool FocusCurrentEditor()
         {
             if (!grid.IsLoaded || !grid.IsKeyboardFocusWithin ||
                 !ReferenceEquals(grid.CurrentCell.Item, item) || grid.CurrentCell.Column != column ||
                 !ReferenceEquals(row.Item, item) || Ancestor<DataGridCell>(element) is not { IsEditing: true } cell ||
-                cell.Column != column || Ancestor<DataGrid>(cell) != grid ||
-                FindTextEditor(element) is not { IsLoaded: true } editor)
-                return;
-            if (!editor.IsKeyboardFocusWithin && !editor.Focus()) return;
-            editor.SelectAll();
+                cell.Column != column || Ancestor<DataGrid>(cell) != grid)
+                return false;
+            if (element is ContentPresenter presenter) presenter.ApplyTemplate();
+            if (FindTextEditor(element) is not { IsLoaded: true } editor)
+                return false;
+            if (!editor.IsKeyboardFocusWithin && !editor.Focus()) return false;
+            // Do not replace the first character or the '=' formula trigger.
+            if (e.EditingEventArgs is not TextCompositionEventArgs) editor.SelectAll();
+            return true;
+        }
+
+        if (FocusCurrentEditor()) return;
+        grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            FocusCurrentEditor();
         }));
+    }
+
+    /// <summary>
+    /// An active template editor owns paste even in the small interval before
+    /// keyboard focus is transferred from the DataGridCell to its TextBox.
+    /// Never reinterpret this Ctrl+V as a structural row insert.
+    /// </summary>
+    internal static bool TryPasteInEditingCell(DataGrid grid)
+    {
+        if (!grid.IsKeyboardFocusWithin || grid.CurrentCell is not { IsValid: true, Column: { } column } current ||
+            column.GetCellContent(current.Item) is not { } element ||
+            Ancestor<DataGridCell>(element) is not { IsEditing: true } cell ||
+            cell.Column != column || Ancestor<DataGrid>(cell) != grid ||
+            !ReferenceEquals(cell.DataContext, current.Item)) return false;
+
+        if (element is ContentPresenter presenter) presenter.ApplyTemplate();
+        if (FindTextEditor(element) is { } editor && editor.Focus() &&
+            ApplicationCommands.Paste.CanExecute(null, editor))
+            ApplicationCommands.Paste.Execute(null, editor);
+        return true;
     }
 
     internal static TextBox? FindTextEditor(DependencyObject? element)
