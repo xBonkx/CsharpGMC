@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using GmcSmeta.Core.Domain;
 using Microsoft.Win32;
 
@@ -19,7 +20,10 @@ public sealed class PtoCertificatesWindow : Window
         AutoGenerateColumns=false,IsReadOnly=true,MinRowHeight=27,AlternationCount=0,SelectionMode=DataGridSelectionMode.Single,Background=System.Windows.Media.Brushes.White,
         CanUserAddRows=false,CanUserDeleteRows=false,SelectionUnit=DataGridSelectionUnit.FullRow
     };
-    private List<PtoCertificate> _visible=new();
+    private IReadOnlyList<PtoCertificateSearch.Row> _rows=Array.Empty<PtoCertificateSearch.Row>();
+    private readonly DispatcherTimer _filterTimer=new(){Interval=TimeSpan.FromMilliseconds(150)};
+    private readonly WrapPanel _actions=new(){Margin=new Thickness(0,0,0,8)};
+    private bool _busy,_closed,_ready;
     public PtoCertificate? SelectedCertificate {get;private set;}
 
     public PtoCertificatesWindow(PtoArchive archive,bool pick=false)
@@ -35,27 +39,33 @@ public sealed class PtoCertificatesWindow : Window
         _grid.SetResourceReference(DataGrid.RowStyleProperty,"PythonTableRow");
         var panel=new DockPanel{Margin=new Thickness(12)};
         var header=new StackPanel();DockPanel.SetDock(header,Dock.Top);panel.Children.Add(header);
-        var bar=new WrapPanel{Margin=new Thickness(0,0,0,8)};
-        header.Children.Add(bar);
-        void Button(string caption,Action run,string? icon=null)
+        header.Children.Add(_actions);
+        void Button(string caption,Func<Task> run,string? icon=null)
         {
             var b=new Button{Content=caption,Padding=new Thickness(10,4,10,4),Margin=new Thickness(0,0,6,4)};
             b.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
             if(icon is not null)b.SetResourceReference(ContentControl.ContentTemplateProperty, icon);
-            b.Click+=(_,_)=>Run(run);bar.Children.Add(b);
+            b.Click+=async (_,_)=>await RunAsync(run);_actions.Children.Add(b);
         }
         Button("Добавить PDF…",New);
         Button("Изменить карточку",Edit);
         Button("Открыть PDF",Open);
-        if(pick)Button("Добавить выбранный в акт",Choose);
-        Button("Обновить",Refresh,"IconLabelRefresh");
+        if(pick)
+        {
+            var choose=new Button{Content="Добавить выбранный в акт",Padding=new Thickness(10,4,10,4),Margin=new Thickness(0,0,6,4)};
+            choose.SetResourceReference(FrameworkElement.StyleProperty,"PythonToolbarButton");
+            choose.Click+=(_,_)=>{if(!_busy&&_ready)Choose();};
+            _actions.Children.Add(choose);
+        }
+        Button("Обновить",RefreshAsync,"IconLabelRefresh");
         _search.Margin=new Thickness(0);
         _search.Height=32;
         _search.SetResourceReference(FrameworkElement.StyleProperty,"PythonSearch");
         _search.Background=System.Windows.Media.Brushes.White;
         _search.BorderBrush=new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD0,0xD7,0xE2));
         _search.ToolTip="Поиск по производителю, номеру, материалу, виду документа";
-        _search.TextChanged+=(_,_)=>Refresh();
+        _search.TextChanged+=(_,_)=>QueueFilter();
+        _filterTimer.Tick+=FilterTimer_Tick;
         header.Children.Add(PtoFormUi.WithPlaceholder(_search,"Продукция, материал, производитель, номер"));
         foreach(var(title,path,width) in new[]{
             ("Продукция","Product",260d),("Тип","Kind",150d),("Производитель","Manufacturer",180d),
@@ -79,32 +89,89 @@ public sealed class PtoCertificatesWindow : Window
         }
         TableColumnMenu.SetProtect(_grid, "Продукция|Номер|До|Проверено");
         TableColumnMenu.SetKey(_grid, "pto-certificates");
-        _grid.MouseDoubleClick+=(_,_)=>{if(_pick)Choose();else Edit();};
-        panel.Children.Add(_grid);Content=panel;Refresh();
+        _grid.MouseDoubleClick+=async (_,_)=>{if(_busy||!_ready)return;if(_pick)Choose();else await RunAsync(Edit);};
+        ScrollViewer.SetIsDeferredScrollingEnabled(_grid,true);
+        VirtualizingPanel.SetVirtualizationMode(_grid,VirtualizationMode.Recycling);
+        panel.Children.Add(_grid);Content=panel;
+        Loaded+=InitialLoad;
+        Closing+=(_,e)=>{if(_busy)e.Cancel=true;};
+        Closed+=(_,_)=>
+        {
+            _closed=true;
+            _filterTimer.Stop();
+            _filterTimer.Tick-=FilterTimer_Tick;
+        };
     }
-    private void Run(Action act)
+
+    private async void InitialLoad(object sender,RoutedEventArgs e)
     {
-        try{act();}
-        catch(Exception e){MessageBox.Show(this,e.Message,"Библиотека сертификатов",MessageBoxButton.OK,
+        Loaded-=InitialLoad;
+        await RunAsync(RefreshAsync);
+    }
+
+    private async Task RunAsync(Func<Task> act)
+    {
+        if(_busy||_closed)return;
+        if(_ready&&_filterTimer.IsEnabled)
+        {
+            _filterTimer.Stop();
+            ApplyFilter(Selected()?.Id);
+        }
+        _busy=true;_actions.IsEnabled=_grid.IsEnabled=_search.IsEnabled=false;
+        _filterTimer.Stop();
+        try{await act();}
+        catch(Exception e){if(!_closed)MessageBox.Show(this,e.Message,"Библиотека сертификатов",MessageBoxButton.OK,
             MessageBoxImage.Warning);}
+        finally
+        {
+            _busy=false;
+            if(!_closed){_actions.IsEnabled=true;_grid.IsEnabled=_search.IsEnabled=_ready;}
+        }
     }
+
     private PtoCertificate? Selected()=>_grid.SelectedItem as PtoCertificate;
-    private void Refresh()
+    private async Task RefreshAsync()
     {
-        _visible=_archive.Sql.Certificates(_search.Text.Trim()).ToList();
-        _grid.ItemsSource=_visible;
+        var selected=Selected()?.Id;
+        _ready=false;
+        _grid.ItemsSource=null;
+        _rows=Array.Empty<PtoCertificateSearch.Row>();
+        _rows=await Task.Run(()=>PtoCertificateSearch.Build(_archive.Sql.Certificates()));
+        _ready=true;
+        ApplyFilter(selected);
     }
-    private void New()
+
+    private void QueueFilter()
+    {
+        if(_busy||_closed||!_ready)return;
+        _filterTimer.Stop();
+        _filterTimer.Start();
+    }
+
+    private void FilterTimer_Tick(object? sender,EventArgs e)
+    {
+        _filterTimer.Stop();
+        if(!_busy&&!_closed&&_ready)ApplyFilter(Selected()?.Id);
+    }
+
+    private void ApplyFilter(Guid? selected)
+    {
+        var visible=PtoCertificateSearch.Filter(_rows,_search.Text);
+        _grid.ItemsSource=visible;
+        _grid.SelectedItem=visible.FirstOrDefault(c=>c.Id==selected);
+    }
+    private async Task New()
     {
         var picker=new OpenFileDialog{Title="Добавить сертификат / декларацию / паспорт PDF",
             Filter="PDF (*.pdf)|*.pdf"};
         if(picker.ShowDialog(this)!=true)return;
         var cert=new PtoCertificate();
         if(!EditDialog(cert))return;
-        _archive.ImportCertificate(picker.FileName,cert);
-        Refresh();
+        var path=picker.FileName;
+        await Task.Run(()=>_archive.ImportCertificate(path,cert));
+        await RefreshAsync();
     }
-    private void Edit()
+    private async Task Edit()
     {
         if(Selected() is not { } current)return;
         // detached copy, so rejecting the dialog never changes the list or SQL snapshots.
@@ -112,8 +179,8 @@ public sealed class PtoCertificatesWindow : Window
             System.Text.Json.JsonSerializer.Serialize(current,PtoRules.Json),PtoRules.Json)!;
         data.Revision=current.Revision;
         if(!EditDialog(data))return;
-        _archive.Sql.SaveCertificate(data);
-        Refresh();
+        await Task.Run(()=>_archive.Sql.SaveCertificate(data));
+        await RefreshAsync();
     }
     private bool EditDialog(PtoCertificate c)
     {
@@ -175,18 +242,25 @@ public sealed class PtoCertificatesWindow : Window
         dlg.Content=panel;
         return dlg.ShowDialog()==true;
     }
-    private void Open()
+    private async Task Open()
     {
         if(Selected() is not { } current)return;
-        var file=_archive.FilePath(current.RelativePath);
-        if(!File.Exists(file) || !PtoArchive.Sha(file).Equals(current.Sha256,StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Исходный PDF отсутствует или SHA-256 не совпадает.");
-        Process.Start(new ProcessStartInfo(file){UseShellExecute=true});
+        var file=await Task.Run(()=>
+        {
+            var path=_archive.FilePath(current.RelativePath);
+            if(!File.Exists(path) || !PtoArchive.Sha(path).Equals(current.Sha256,StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Исходный PDF отсутствует или SHA-256 не совпадает.");
+            return path;
+        });
+        if(!_closed)Process.Start(new ProcessStartInfo(file){UseShellExecute=true});
     }
     private void Choose()
     {
-        if(Selected() is not { } current)return;
-        SelectedCertificate=current;
+        if(!_ready||_busy||Selected() is not { } current)return;
+        // A pending search must not let Enter/double click pick a stale visible row.
+        if(_filterTimer.IsEnabled){_filterTimer.Stop();ApplyFilter(current.Id);}
+        if(Selected() is not { } confirmed)return;
+        SelectedCertificate=confirmed;
         DialogResult=true;
     }
 }

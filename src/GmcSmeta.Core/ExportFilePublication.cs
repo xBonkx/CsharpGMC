@@ -66,10 +66,12 @@ public static class ExportFilePublication
             _destination = destination;
         }
 
-        public void Publish()
+        public void Publish() => Publish(overwrite: true);
+
+        public void Publish(bool overwrite)
         {
             var temporary = _temporary ?? throw new ObjectDisposedException(nameof(PreparedExport));
-            File.Move(temporary, _destination, overwrite: true);
+            File.Move(temporary, _destination, overwrite: overwrite);
             _temporary = null;
         }
 

@@ -23,6 +23,7 @@ public partial class PtoWindow : Window
     private CancellationTokenSource? _readCancellation;
     private bool _loading;
     private bool _closed;
+    private bool _archiveOperation;
 
     public PtoWindow(string connection,long? objectId=null,long? contractId=null)
     {
@@ -34,7 +35,7 @@ public partial class PtoWindow : Window
         ArchiveLabel.Text="Загрузка исполнительной документации…";
         Loaded+=async (_,_)=>await InitializeAsync();
         // Archive initialization includes the existing Pilot-only schema check/creation.
-        Closing+=(_,e)=>{if(_initializingArchive)e.Cancel=true;};
+        Closing+=(_,e)=>{if(_initializingArchive||_archiveOperation)e.Cancel=true;};
         Closed+=(_,_)=>
         {
             _closed=true;
@@ -338,44 +339,83 @@ public partial class PtoWindow : Window
         _archive.StoreTemplate(kind==MessageBoxResult.Yes?"aosr":"registry",dialog.FileName);
         MessageBox.Show(this,"Шаблон проверен и сохранён. Оригинал не изменён.","ПТО");
     });
-    private void Root_Click(object sender,RoutedEventArgs e)=>Try(()=>
+    private async Task RunArchiveOperationAsync(Func<Task> action)
+    {
+        if(_closed||_loading||_initializing)return;
+        _archiveOperation=true;
+        SetLoading(true);
+        try{await action();}
+        catch(Exception ex){if(!_closed)ShowError(ex);}
+        finally
+        {
+            _archiveOperation=false;
+            if(!_closed)SetLoading(false);
+        }
+    }
+
+    private async Task ReloadAfterArchiveChangeAsync()
+    {
+        var selected=SelectedId();
+        var archive=_archive;
+        InvalidateRows();
+        var rows=await Task.Run(()=>ReadRows(archive));
+        ApplyRows(rows,selected);
+    }
+
+    private async void Root_Click(object sender,RoutedEventArgs e)=>await RunArchiveOperationAsync(async ()=>
     {
         var folder=new OpenFolderDialog{Title="Архив файлов ПТО (метаданные остаются в SQL)"};
         if(folder.ShowDialog(this)!=true)return;
         var target=Path.GetFullPath(folder.FolderName);
-        if(!string.Equals(target,_archive.Root,StringComparison.OrdinalIgnoreCase))
+        var archive=_archive;
+        var replacement=await Task.Run(()=>
         {
-            var refs=SqlServerPtoBackup.Export(_connection);
-            if(refs.Certificates.Count>0 || refs.Releases.Count>0 ||
-               _archive.Sql.Packages().Any(p=>p.Attachments.Count>0))
-                throw new InvalidOperationException(
-                    "Архив содержит документы, библиотеку сертификатов или опубликованные выпуски. "+
-                    "Без переноса файлов смена корня нарушит ссылки. "+
-                    "Используйте резервную копию и восстановление в пустой архив.");
-        }
-        var replacement=new PtoArchive(_connection,target);
-        PtoUserSettings.Root=replacement.Root;_archive=replacement;
-        Refresh();
+            if(!string.Equals(target,archive.Root,StringComparison.OrdinalIgnoreCase))
+            {
+                var refs=SqlServerPtoBackup.Export(_connection);
+                if(refs.Certificates.Count>0 || refs.Releases.Count>0 ||
+                   archive.Sql.Packages().Any(p=>p.Attachments.Count>0))
+                    throw new InvalidOperationException(
+                        "Архив содержит документы, библиотеку сертификатов или опубликованные выпуски. "+
+                        "Без переноса файлов смена корня нарушит ссылки. "+
+                        "Используйте резервную копию и восстановление в пустой архив.");
+            }
+            var next=new PtoArchive(_connection,target);
+            PtoUserSettings.Root=next.Root;
+            return next;
+        });
+        _archive=replacement;
+        await ReloadAfterArchiveChangeAsync();
     });
-    private void Backup_Click(object sender,RoutedEventArgs e)=>Try(()=>
+    private async void Backup_Click(object sender,RoutedEventArgs e)=>await RunArchiveOperationAsync(async ()=>
     {
         var dlg=new SaveFileDialog {Title="Резервная копия ПТО SQL + файлы",Filter="ZIP (*.zip)|*.zip",
             FileName="ПТО-резерв.zip"};
         if(dlg.ShowDialog(this)!=true)return;
-        PtoBackup.Create(_archive,dlg.FileName,_connection);
+        var archive=_archive;
+        var path=dlg.FileName;
+        await Task.Run(()=>PtoBackup.Create(archive,path,_connection));
         MessageBox.Show(this,"Копия создана вне архива ПТО.","ПТО");
     });
-    private void Restore_Click(object sender,RoutedEventArgs e)=>Try(()=>
+    private async void Restore_Click(object sender,RoutedEventArgs e)=>await RunArchiveOperationAsync(async ()=>
     {
         var source=new OpenFileDialog{Title="Безопасная SQL/ZIP копия ПТО",Filter="ZIP (*.zip)|*.zip"};
         if(source.ShowDialog(this)!=true)return;
-        PtoBackup.ValidateZip(source.FileName);
+        var path=source.FileName;
+        await Task.Run(()=>PtoBackup.ValidateZip(path));
         var dest=new OpenFolderDialog{Title="Новая пустая папка восстановления"};
         if(dest.ShowDialog(this)!=true)return;
-        PtoBackup.Restore(_connection,source.FileName,dest.FolderName);
-        _archive=new PtoArchive(_connection,dest.FolderName);
-        PtoUserSettings.Root=_archive.Root;
-        Refresh();
+        var target=dest.FolderName;
+        // Invalidate the old view before starting a restore that can change SQL.
+        InvalidateRows();
+        _archive=await Task.Run(()=>
+        {
+            PtoBackup.Restore(_connection,path,target);
+            var restored=new PtoArchive(_connection,target);
+            PtoUserSettings.Root=restored.Root;
+            return restored;
+        });
+        await ReloadAfterArchiveChangeAsync();
         MessageBox.Show(this,"Восстановлено в пустой архив и пустые таблицы тестовой SQL Server.","ПТО");
     });
 }

@@ -115,5 +115,18 @@ public sealed class ExportFilePublicationTests : IDisposable
         Assert.Empty(Directory.GetFiles(_folder));
     }
 
+    [Fact]
+    public void CreateNewPublicationPreservesConcurrentDestination()
+    {
+        var path = Path.Combine(_folder, "backup.zip");
+        using (var prepared = ExportFilePublication.Stage(path, stream => stream.WriteByte(42)))
+        {
+            File.WriteAllText(path, "other backup");
+            Assert.Throws<IOException>(() => prepared.Publish(overwrite: false));
+        }
+        Assert.Equal("other backup", File.ReadAllText(path));
+        Assert.Single(Directory.GetFiles(_folder));
+    }
+
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 }

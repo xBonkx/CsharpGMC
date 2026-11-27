@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using GmcSmeta.Core.Db;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
@@ -37,8 +38,14 @@ public static class PtoBackup
                !PtoArchive.Sha(path).Equals(pair.Sha,StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Оригинал отсутствует или повреждён: "+pair.Path);
         }
-        using var stream=new FileStream(output,FileMode.CreateNew,FileAccess.Write,FileShare.None);
-        using var zip=new ZipArchive(stream,ZipArchiveMode.Create);
+        // Preserve the original create-new contract, including concurrent collisions.
+        using var prepared=ExportFilePublication.Stage(output,stream=>WriteArchive(stream,archive,root,data));
+        prepared.Publish(overwrite:false);
+    }
+
+    private static void WriteArchive(Stream stream,PtoArchive archive,string root,PtoSqlSnapshot data)
+    {
+        using var zip=new ZipArchive(stream,ZipArchiveMode.Create,leaveOpen:true);
         void Write(string name,string text)
         {
             using var writer=new StreamWriter(zip.CreateEntry(name,CompressionLevel.Optimal).Open(),Encoding.UTF8);
