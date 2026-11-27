@@ -30,23 +30,19 @@ public static class SqlServerKsPrintData
         public IReadOnlyDictionary<long, KsLegalRequisites.Agreement> LegalAgreements { get; init; } = new Dictionary<long, KsLegalRequisites.Agreement>();
         public IReadOnlyList<Section> Sections {get;init;}=Array.Empty<Section>();
 
+        // External cache uses reference identity, so a record 'with' copy with
+        // different Lines/Sections/Scope never inherits the original index.
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Package, KsPrintPackageIndex>
+            Indexes = new();
+
+        private KsPrintPackageIndex Index => Indexes.GetValue(this, static p => new KsPrintPackageIndex(p));
+
+        public IReadOnlyList<Line> LinesFor(long actId) => Index.LinesFor(actId);
+
         // Resolve by stable ID, not section caption; include sections with no closed positions.
         public IReadOnlyList<PrintSection> SectionsFor(SqlServerActs.ActInfo act)
         {
-            var rows=Lines.Where(l=>l.ActId==act.Id).ToList();
-            var sections=Sections.Where(s=>s.ContractId==act.ContractId).ToList();
-            if(sections.Count==0)
-                return rows.GroupBy(l=>l.Section).Select(g=>new PrintSection(g.Key,g.ToList(),0m,0m)).ToList();
-            var ids=sections.Select(s=>s.Id).ToHashSet();
-            if(rows.Any(l=>!ids.Contains(l.SystemId)))
-                throw new InvalidOperationException("Строка КС ссылается на неизвестный раздел.");
-            var perPosition=Scope.Documents.Single(d=>d.Id==act.ContractId).SmrMode=="pos";
-            var amounts=KsActAllocation.Resolve(rows.Select(l=>new KsActAllocation.Line(l.SystemId,l.Quantity,l.Price,l.WorkPrice)).ToList(),
-                ids,act.Smr,act.Transport,perPosition,act.SmrBySystem,act.SectionAmountsJson,act.RoundRows);
-            var byId=rows.ToLookup(l=>l.SystemId);
-            return sections.Select(s=>new PrintSection(s.Name,byId[s.Id].ToList(),
-                perPosition?0m:amounts.Smr.GetValueOrDefault(s.Id),amounts.Transport.GetValueOrDefault(s.Id)))
-                .Where(s=>s.Lines.Count>0||s.Smr!=0m||s.Transport!=0m).ToList();
+            return Index.SectionsFor(act);
         }
     }
 
@@ -244,6 +240,7 @@ public static class SqlServerKsPrintData
             var legalId = KsLegalRequisites.RequirePrintAgreement(scope, report, legalSources, groupReport);
             requisites = cards[legalId].Print with { SitePart = requisites.SitePart };
         }
-        return new Package(scope,report,requisites,lines,contractors){Sections=sections, LegalAgreements=legalSources};
+        return new Package(scope,report,requisites,lines.AsReadOnly(),contractors)
+            {Sections=sections.AsReadOnly(), LegalAgreements=legalSources};
     }
 }

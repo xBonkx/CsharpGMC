@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 3404795) — PERF-022 PARTIAL: indexed print package lines and reusable section projection for KS/VOR exports; golden checks extended, not run. See performance TODO.
+
 28.11.2026 ChatGPT/main (base 4671be4) — PERF-022 PARTIAL: prepared report context for batch KS-3 calculations; tests added, not run. See performance TODO.
 
 28.11.2026 ChatGPT/main (base a8c7eba) — PERF-022 PARTIAL: prepared all-acts overview search and stable visible selection; tests added, not run. See performance TODO.

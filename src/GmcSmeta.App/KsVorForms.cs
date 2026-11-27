@@ -35,7 +35,7 @@ public static class KsVorForms
         try
         {
             var ws=form==KsCustomerForms.Form.R4 ? wb.Worksheet("ВОР") : wb.Worksheet(1);
-            var groups=package.Lines.Where(x=>x.ActId==actId && x.Quantity>0m)
+            var groups=package.LinesFor(actId).Where(x=>x.Quantity>0m)
                 .GroupBy(x=>x.Section).ToList();
             var data=new List<Row>();
             foreach(var group in groups)

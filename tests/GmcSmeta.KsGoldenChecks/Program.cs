@@ -259,6 +259,11 @@ internal static class Program
             }
         };
         var sections=package.SectionsFor(act);
+        Assert(ReferenceEquals(sections,package.SectionsFor(act)),"Same print snapshot must reuse section calculation");
+        var revisedAct=act with { SectionAmountsJson="""{"smr":{"101":1},"transport":{"101":2}}""" };
+        var revisedSections=package.SectionsFor(revisedAct);
+        MoneyEquals(1m,revisedSections.Sum(x=>x.Smr),"changed allocation must not reuse old projection");
+        MoneyEquals(2m,revisedSections.Sum(x=>x.Transport),"changed transport must not reuse old projection");
         Assert(sections.Count==3,"three sections, including empty allocated section");
         Assert(sections[0].Lines.Count==1&&sections[1].Lines.Count==1&&sections[2].Lines.Count==0,
             "group by ID, not name");
@@ -434,6 +439,14 @@ internal static class Program
             snapshot.Report with { Acts=new[]{first} },
             snapshot.Report with { Acts=new[]{second,first} }
         };
+        // Warm the original package before making copies, then verify every
+        // copy has its own membership index (record copies must not inherit it).
+        foreach(var act in snapshot.Report.Acts)
+        {
+            var indexed=snapshot.LinesFor(act.Id);
+            Assert(indexed.SequenceEqual(source.Where(l=>l.ActId==act.Id)),"Indexed original order");
+            Assert(ReferenceEquals(indexed,snapshot.LinesFor(act.Id)),"Repeated line lookup");
+        }
         var scoped=SqlServerKsPrintData.ScopeReports(snapshot,reports);
         Assert(scoped.Count==reports.Length,"Report count changed");
         for(int i=0;i<reports.Length;i++)
@@ -441,6 +454,10 @@ internal static class Program
             var ids=reports[i].Acts.Select(a=>a.Id).ToHashSet();
             Assert(scoped[i].Lines.SequenceEqual(source.Where(l=>ids.Contains(l.ActId))),
                 "Scoped report lost, duplicated or reordered lines");
+            foreach(var act in snapshot.Report.Acts)
+                Assert(scoped[i].LinesFor(act.Id).SequenceEqual(
+                    source.Where(l=>ids.Contains(l.ActId)&&l.ActId==act.Id)),
+                    "Scoped copy inherited unrelated act lines");
             Assert(ReferenceEquals(scoped[i].Report,reports[i]) &&
                 ReferenceEquals(scoped[i].Scope,snapshot.Scope) &&
                 ReferenceEquals(scoped[i].Contractors,snapshot.Contractors) &&

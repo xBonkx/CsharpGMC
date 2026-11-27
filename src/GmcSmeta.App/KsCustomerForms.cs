@@ -199,7 +199,7 @@ public static class KsCustomerForms
         DateCell(ws,"F19",act.Date);
         DateCell(ws,"G19",act.PeriodFrom);
         DateCell(ws,"H19",act.PeriodTo);
-        var lines = p.Lines.Where(l=>l.ActId==act.Id).ToList();
+        var lines = p.LinesFor(act.Id);
         var items = new List<(bool Heading, SqlServerKsPrintData.Line? Line, string Section)>();
         int sectionNumber=0;
         foreach (var group in lines.GroupBy(l=>l.Section))
@@ -277,7 +277,7 @@ public static class KsCustomerForms
         DateCell(ws,"F18",act.Date);
         DateCell(ws,"G18",act.PeriodFrom);
         DateCell(ws,"H18",act.PeriodTo);
-        var lines=p.Lines.Where(x=>x.ActId==act.Id).ToList();
+        var lines=p.LinesFor(act.Id);
         var doc=p.Scope.Documents.Single(d=>d.Id==act.ContractId);
         var perPosition=doc.SmrMode.Equals("pos",StringComparison.OrdinalIgnoreCase);
         var items=new List<(string Name,string Number,string Code,string Unit,decimal? Qty,decimal Price,bool Work)>();
