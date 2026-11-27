@@ -185,7 +185,7 @@ public partial class EstimateView
         {
             var bulkPositions = nSel > 1 && selection.All(r =>
                 !r.IsSystem && !r.IsVirtual && !r.IsAreaSummary);
-            var singleRow = nSel == 1;
+            var singleRow = selection.Length == 1 && nSel == 1 && !selection[0].IsAreaSummary;
             Add(bulkPositions ? $"Удалить выделенные ({nSel})…" : "Удалить",
                 singleRow && selected is { IsSystem: true }
                     ? () => DeleteSection_Click(this, new RoutedEventArgs())
