@@ -76,11 +76,11 @@ public partial class EstimateView
                         using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились. Обновите смету.");
-                        var money = SqlServerStages.ReadStageMoney(_sqlConnectionString, id);
+                        var systemMoney = SqlServerStages.ReadStageMoney(_sqlConnectionString, id);
                         var systems = SqlServerStages.ReadStageSystems(_sqlConnectionString, id);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились при чтении.");
-                        return (Money: money, Systems: systems);
+                        return (Money: systemMoney, Systems: systems);
                     });
                     if (!CanRunInlineStageCommand(snapshot)) return;
                     if (!data.Money.CanEdit || !data.Money.SignedStageExists || data.Systems.Count == 0)
