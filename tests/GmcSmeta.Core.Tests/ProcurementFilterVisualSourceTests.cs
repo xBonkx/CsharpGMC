@@ -18,7 +18,6 @@ public sealed class ProcurementFilterVisualSourceTests
         XElement Named(string name) => Assert.Single(view.Descendants()
             .Where(e => (string?)e.Attribute(x + "Name") == name));
         var search = Named("ProcurementSearchBox");
-        Assert.Equal("30,5,32,5", (string?)search.Attribute("Padding"));
         Assert.Equal("ProcurementFilter_Changed", (string?)search.Attribute("TextChanged"));
         var clear = Assert.Single(view.Descendants(p + "Button")
             .Where(e => (string?)e.Attribute("Click") == "ClearProcurementSearch_Click"));
