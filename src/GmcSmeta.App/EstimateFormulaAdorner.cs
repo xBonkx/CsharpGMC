@@ -12,6 +12,19 @@ internal sealed class EstimateFormulaAdorner : Adorner
     internal sealed record Reference(int Number, EditableEstimateRow Row, DataGridColumn Column);
     private readonly DataGrid _grid;
     private IReadOnlyList<Reference> _refs = Array.Empty<Reference>();
+    private static readonly Typeface LabelTypeface = new("Segoe UI");
+    private static readonly (SolidColorBrush Ink, SolidColorBrush Fill, Pen Border)[] Colors =
+        KsFormulaReferenceColors.Palette.Select(value =>
+        {
+            var color = (Color)ColorConverter.ConvertFromString(value);
+            var ink = new SolidColorBrush(color);
+            var fill = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B));
+            ink.Freeze();
+            fill.Freeze();
+            var border = new Pen(ink, 2);
+            border.Freeze();
+            return (ink, fill, border);
+        }).ToArray();
 
     public EstimateFormulaAdorner(DataGrid grid) : base(grid)
     {
@@ -21,13 +34,16 @@ internal sealed class EstimateFormulaAdorner : Adorner
 
     internal void Update(IReadOnlyList<Reference> refs)
     {
+        if (_refs.SequenceEqual(refs)) return;
         _refs = refs;
         InvalidateVisual();
     }
 
     protected override void OnRender(DrawingContext dc)
     {
+        if (_refs.Count == 0) return;
         var bounds = new Rect(_grid.RenderSize);
+        var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         dc.PushClip(new RectangleGeometry(bounds));
         foreach (var reference in _refs)
         {
@@ -49,15 +65,12 @@ internal sealed class EstimateFormulaAdorner : Adorner
                 }
             rect.Intersect(clip);
             if (rect.IsEmpty || rect.Width < 4 || rect.Height < 4) continue;
-            var color = (Color)ColorConverter.ConvertFromString(
-                KsFormulaReferenceColors.Palette[(reference.Number - 1) % KsFormulaReferenceColors.Palette.Count]);
-            var ink = new SolidColorBrush(color);
-            var fill = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B));
+            var (ink, fill, border) = Colors[(reference.Number - 1) % Colors.Length];
             rect.Inflate(-1, -1);
-            dc.DrawRectangle(fill, new Pen(ink, 2), rect);
+            dc.DrawRectangle(fill, border, rect);
             var label = new FormattedText(reference.Number.ToString(CultureInfo.InvariantCulture),
-                CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"),
-                10, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface,
+                10, Brushes.White, pixelsPerDip);
             var badge = new Rect(rect.Left + 2, rect.Top + 2, label.Width + 6, label.Height + 2);
             if (badge.Width < rect.Width && badge.Height < rect.Height)
             {

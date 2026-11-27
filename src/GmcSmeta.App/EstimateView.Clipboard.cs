@@ -31,48 +31,9 @@ public partial class EstimateView
     private List<CopiedRow> BuildClipboardFromSelection()
     {
         var selected = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToHashSet();
-        if (selected.Any(row => row.IsVirtual)) return new List<CopiedRow>();
-        var result = new List<CopiedRow>();
-        var emittedTops = new HashSet<int>();
-        foreach (var r in _rows)
-        {
-            if (r.IsSystem)
-            {
-                if (selected.Contains(r))
-                    foreach (var top in _rows.Where(x => !x.IsSystem &&
-                        x.Source.SystemId == r.Source.SystemId && x.Source.ParentPositionId is null))
-                        if (emittedTops.Add(top.Id))
-                            result.Add(RowToCopied(top));
-                continue;
-            }
-            if (r.Source.ParentPositionId is int parent)
-            {
-                if (emittedTops.Contains(parent)) continue;      // ушла вместе со своей строкой
-                if (selected.Contains(r))
-                    result.Add(new(r.Source.Name, r.Source.Unit, r.Source.Qty, 0m, null, r.Source.Note, r.Source.Formulas, null));
-                continue;
-            }
-            if (selected.Contains(r) && emittedTops.Add(r.Id))
-                result.Add(RowToCopied(r));
-        }
-        return result;
-    }
-
-    private CopiedRow RowToCopied(EditableEstimateRow top)
-    {
-        var children = new List<CopiedChild>();
-        var index = _rows.IndexOf(top);
-        for (var i = index + 1; i < _rows.Count; i++)
-        {
-            var r = _rows[i];
-            if (r.IsSystem || r.Source.ParentPositionId is null || r.Source.ParentPositionId != top.Id) break;
-            children.Add(new(r.Source.Name, r.Source.Unit, r.Source.Qty, r.Source.Note));
-        }
-        var src = top.Source;
-        return new CopiedRow(src.Name, src.Unit, src.Qty, src.Price, src.PurchasePrice, src.Note, src.Formulas, children)
-        {
-            WorkPrice = src.WorkPrice
-        };
+        if (selected.Count == 0 || selected.Any(row => row.IsVirtual))
+            return new List<CopiedRow>();
+        return EstimateClipboardProjection.Build(_rows, row => row.Source, selected.Contains);
     }
 
     /// <summary>Ctrl+C: запомнить строки и положить таблицу в буфер Windows для Excel.</summary>
@@ -335,7 +296,11 @@ public partial class EstimateView
         var dialog = new ReplaceDialog(oldRows, bufferRows, extraNames) { Owner = Window.GetWindow(this) };
         if (dialog.ShowDialog() != true) return;
         var result = dialog.ComputeResult();
-        if (!CanAppendImport(revision) || pickedTops.Any(r => !_rows.Contains(r)) ||
+        // For large replacements, validate current row identity once rather
+        // than scanning the entire estimate separately for each chosen row.
+        var currentRows = pickedTops.Count > 32 ? _rows.ToHashSet() : null;
+        if (!CanAppendImport(revision) || pickedTops.Any(r =>
+                !(currentRows?.Contains(r) ?? _rows.Contains(r))) ||
             !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
                 .Where(r => !r.IsSystem && !r.IsVirtual && r.Source.ParentPositionId is null && !r.Source.OutOfKp)
                 .Select(r => r.Id).SequenceEqual(pickedTops.Select(r => r.Id)))

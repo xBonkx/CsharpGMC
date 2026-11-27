@@ -24,9 +24,21 @@ public static class EstimateCellFormula
         return "";
     }
 
-    public static IReadOnlyList<int> References(string? expression) =>
-        Token.Matches(expression ?? "").Select(m => int.TryParse(m.Groups[1].Value, out var n) ? n : 0)
-            .Where(n => n > 0).Distinct().ToArray();
+    public static IReadOnlyList<int> References(string? expression)
+    {
+        if (string.IsNullOrEmpty(expression)) return Array.Empty<int>();
+        List<int>? references = null;
+        HashSet<int>? seen = null;
+        for (var match = Token.Match(expression); match.Success; match = match.NextMatch())
+        {
+            if (!int.TryParse(match.Groups[1].ValueSpan, out var n) || n <= 0) continue;
+            seen ??= new HashSet<int>();
+            if (!seen.Add(n)) continue;
+            references ??= new List<int>();
+            references.Add(n);
+        }
+        return references is null ? Array.Empty<int>() : references.ToArray();
+    }
 
     public static string? Expand(string text, IReadOnlyDictionary<int, decimal> values)
     {
