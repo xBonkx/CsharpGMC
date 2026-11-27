@@ -83,16 +83,21 @@ public partial class EstimateView
             : ids.Count > 0 ? $"Выделено: {ids.Count} позиций →"
                             : "Выдели позиции, группу или систему →";
 
+        // No inactive button wall before selection; signed stages remain
+        // visible in the cards and grid but are not allocation targets.
+        if (ids.Count == 0) return;
         for (var i = 0; i < data.Stages.Count; i++)
         {
             var stage = data.Stages[i];
+            if (stage.Locked) continue;
             var sourceId = stage.Id;
             var btn = new Button
             {
                 Content = $"→ {ShortStageName(stage.Name)}",
                 IsEnabled = editable && ids.Count > 0 && !stage.Locked,
-                Margin = new Thickness(0, 0, 6, 4),
-                Padding = new Thickness(9, 5, 9, 5),
+                Style = (Style)FindResource("PythonToolbarButton"),
+                MinHeight = 28, Margin = new Thickness(0, 0, 6, 2),
+                Padding = new Thickness(9, 3, 9, 3),
                 Background = StageBrush(StageTints[i % StageTints.Length]),
                 BorderBrush = StageBrush("#D0D7E2"),
                 ToolTip = stage.Locked
@@ -107,8 +112,9 @@ public partial class EstimateView
         var remove = new Button
         {
             Content = "✕ Убрать из этапов",
-            Margin = new Thickness(0, 0, 6, 4),
-            Padding = new Thickness(9, 5, 9, 5),
+            Style = (Style)FindResource("PythonToolbarButton"),
+            MinHeight = 28, Margin = new Thickness(0, 0, 6, 2),
+            Padding = new Thickness(9, 3, 9, 3),
             IsEnabled = editable && ids.Count > 0,
             ToolTip = "Убрать выбранные позиции из всех НЕподписанных этапов и вернуть в остаток"
         };

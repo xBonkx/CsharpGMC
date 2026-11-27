@@ -452,7 +452,13 @@ public partial class EstimateView
         var left = AlignedHeader(HorizontalAlignment.Left);
         foreach (var column in EstimateGrid.Columns)
         {
-            if (_inlineStageColumns.Contains(column)) continue;
+            var stageIndex = _inlineStageColumns.IndexOf(column);
+            if (stageIndex >= 0)
+            {
+                column.HeaderStyle = CreateInlineStageHeaderStyle(stageIndex,
+                    stageIndex == _inlineStageColumns.Count - 1);
+                continue;
+            }
             column.HeaderStyle = column.Header?.ToString() switch
             {
                 "№" or "Ед." or "Кол-во" => center,

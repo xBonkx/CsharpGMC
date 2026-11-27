@@ -712,8 +712,8 @@
                 <!-- Python ui/stage_mode.py: stage cards and segmented filters sit immediately
                      above the same estimate table; document rows and source amounts stay unchanged. -->
                 <Border x:Name="InlineStagesBar" DockPanel.Dock="Top" Visibility="Collapsed"
-                        Margin="8,8,8,5" Padding="10,8,10,8" CornerRadius="9"
-                        Background="#FFFFFF" BorderBrush="#2563EB" BorderThickness="1">
+                        Margin="0" Padding="12,8" CornerRadius="0"
+                        Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="0,0,0,1">
                     <StackPanel>
                         <DockPanel LastChildFill="True">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -727,14 +727,14 @@
                                         Style="{StaticResource PythonToolbarButton}" Click="CloseInlineStages_Click"
                                         ToolTip="Убрать колонки этапов из таблицы"/>
                             </StackPanel>
-                            <TextBlock Text="ЭТАПЫ" Foreground="#1D4ED8" FontWeight="Bold"
-                                       VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBlock Text="Этапы" Foreground="#334155" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" FontSize="{StaticResource UiH2Size}" Margin="0,0,8,0"/>
                         </DockPanel>
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                      Margin="0,6,0,4">
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                                      MaxHeight="144" Margin="0,6,0,4">
                             <WrapPanel x:Name="InlineStagesCards"/>
                         </ScrollViewer>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Показать:" VerticalAlignment="Center" Foreground="#64748B"
                                        Margin="0,0,7,0"/>
                             <ComboBox x:Name="InlineStagesFilter" Width="183" SelectedIndex="0"
@@ -745,21 +745,20 @@
                                 <ComboBoxItem Content="В этапах" Tag="assigned"/>
                                 <ComboBoxItem Content="Перебор" Tag="overrun"/>
                             </ComboBox>
-                            <TextBlock x:Name="InlineStagesSummary" Foreground="#64748B"
-                                       VerticalAlignment="Center" Margin="14,0,0,0"
+                            <TextBlock x:Name="InlineStagesSummary" Foreground="#475569"
+                                       VerticalAlignment="Center" Margin="12,4,0,4"
                                        TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <!-- Python stage_mode.picked(): actions apply to selected systems,
-                             equal-position groups and actual rows, never the whole КП. -->
-                        <StackPanel Margin="0,8,0,0">
-                            <TextBlock x:Name="InlineStagesSelectionInfo"
-                                       Text="Выдели позиции или системы →"
-                                       FontSize="12" Foreground="#475569" Margin="0,0,0,5"/>
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled">
+                        </WrapPanel>
+                        <!-- Keep selection tools on one compact line; locked stages stay in cards. -->
+                        <DockPanel Margin="0,5,0,0" LastChildFill="True">
+                            <TextBlock DockPanel.Dock="Left" x:Name="InlineStagesSelectionInfo"
+                                       FontSize="{StaticResource UiCaptionSize}" Foreground="#64748B"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto" MaxHeight="78">
                                 <WrapPanel x:Name="InlineStagesSelectionButtons"/>
                             </ScrollViewer>
-                        </StackPanel>
+                        </DockPanel>
                     </StackPanel>
                 </Border>
                 <DataGrid x:Name="EstimateGrid" local:AdaptiveGridRowHeight.Enabled="True" MinColumnWidth="36" BorderThickness="0" Background="White"

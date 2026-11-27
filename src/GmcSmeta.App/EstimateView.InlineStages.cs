@@ -267,20 +267,9 @@ public partial class EstimateView
                 IsReadOnly = rest || data.Stages[i].Locked,
                 CanUserSort = false,
                 CanUserReorder = false,
-                HeaderStyle = new Style(typeof(DataGridColumnHeader))
-                {
-                    Setters =
-                    {
-                        new Setter(Control.BackgroundProperty, StageBrush(rest
-                            ? "#F1F4F9" : StageTints[i % StageTints.Length])),
-                        new Setter(Control.ForegroundProperty, StageBrush(rest
-                            ? "#334155" : StageInk[i % StageInk.Length])),
-                        new Setter(Control.FontWeightProperty, FontWeights.Bold)
-                    }
-                }
+                HeaderStyle = CreateInlineStageHeaderStyle(i, rest),
+                HeaderTemplate = CreateInlineStageHeaderTemplate()
             };
-            column.HeaderStyle.Setters.Add(new EventSetter(ButtonBase.ClickEvent,
-                new RoutedEventHandler(InlineStageHeader_Click)));
             _inlineStageColumns.Add(column);
             _inlineStageIds.Add(column, id);
             if (_hiddenInlineStageIds.Contains(id))
@@ -332,56 +321,23 @@ public partial class EstimateView
             var total = data.DocumentTotals.GetValueOrDefault(stage.Id);
             var count = metrics.AssignedCounts[i];
             var hasDifference = stage.StageSum is decimal goal && Math.Abs(total - goal) >= 1m;
-            var second = $"{N2(total)} ₽ · строк {count}" +
-                (stage.StageSum is null ? "" :
-                    hasDifference ? $" · разница {N2(total - stage.StageSum.Value)} ₽"
-                                  : " · ✓ как в договоре");
-            AddCard(stage.Id, ShortStageName(stage.Name),
-                second + (stage.Locked ? " · подписан" : ""),
-                StageTints[i % StageTints.Length], hasDifference);
+            var status = stage.StageSum is null ? (stage.Locked ? "Подписан" : "В работе") :
+                hasDifference ? $"Разница {N2(total - stage.StageSum.Value)} ₽" :
+                stage.Locked ? "Подписан · сумма совпадает" : "Сумма совпадает";
+            AddCard(stage.Id, ShortStageName(stage.Name), $"{N2(total)} ₽",
+                $"{count} поз. · {status}", StageTints[i % StageTints.Length],
+                StageInk[i % StageInk.Length], hasDifference);
         }
         if (data.Rest is { } rest)
         {
             var total = data.DocumentTotals.GetValueOrDefault(rest.Id);
-            AddCard(rest.Id, "Остаток (считается сам)",
-                $"{N2(total)} ₽", "#F8FAFC", false);
+            AddCard(rest.Id, "Остаток", $"{N2(total)} ₽",
+                "Рассчитывается автоматически", "#F1F4F9", "#64748B", false);
         }
 
         InlineStagesSummary.Text =
             $"Не распределено строк: {metrics.UnassignedCount} · на {N2(metrics.RemainingAmount)} ₽" +
-            (metrics.OverrunCount > 0 ? $" · Перебор: {metrics.OverrunCount}" : "") +
-            " · Столбцы этапов справа";
-    }
-
-    private void AddCard(long id, string name, string secondLine, string tint, bool warning)
-    {
-        var body = new StackPanel();
-        body.Children.Add(new TextBlock
-        {
-            Text = name, FontWeight = FontWeights.Bold, Foreground = StageBrush("#1E293B")
-        });
-        body.Children.Add(new TextBlock
-        {
-            Text = secondLine, Foreground = StageBrush(warning ? "#DC2626" : "#64748B"),
-            TextWrapping = TextWrapping.Wrap, FontSize = 11
-        });
-        var button = new Button
-        {
-            Content = body, Background = StageBrush(tint),
-            BorderBrush = StageBrush(warning ? "#DC2626" : "#E4E8EF"),
-            BorderThickness = new Thickness(1), Padding = new Thickness(10, 6, 10, 6),
-            Margin = new Thickness(0, 0, 7, 5), MinWidth = 132,
-            ToolTip = "Меню этапа: открыть КП, название, суммы, распределение"
-        };
-        var snapshot = _inlineStagesData;
-        button.Click += (_, _) =>
-        {
-            if (snapshot is null || !ReferenceEquals(snapshot, _inlineStagesData)) return;
-            var stage = snapshot.Stages.FirstOrDefault(item => item.Id == id) ??
-                (snapshot.Rest?.Id == id ? snapshot.Rest : null);
-            if (stage is not null) ShowInlineStageMenu(button, stage, snapshot);
-        };
-        InlineStagesCards.Children.Add(button);
+            (metrics.OverrunCount > 0 ? $" · Перебор: {metrics.OverrunCount}" : "");
     }
 
     private void InlineStageHeader_Click(object sender, RoutedEventArgs e)

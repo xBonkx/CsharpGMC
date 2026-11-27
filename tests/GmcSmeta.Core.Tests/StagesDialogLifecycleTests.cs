@@ -92,6 +92,25 @@ public sealed class StagesDialogLifecycleTests
     }
 
     [Fact]
+    public void InlineStagesUseCompactCardsAndSharedZoomedHeaders()
+    {
+        var visual = Source("GmcSmeta.App/EstimateView.InlineStages.Visual.cs");
+        Assert.Contains("BasedOn = EstimateGrid.ColumnHeaderStyle", visual);
+        Assert.Contains("TextWrapping.Wrap", visual);
+        Assert.Contains("TextAlignment.Center", visual);
+        Assert.Contains("Width = 218", visual);
+        Assert.Contains("PythonToolbarButton", visual);
+        var zoom = Source("GmcSmeta.App/EstimateView.TemporaryView.cs");
+        Assert.Contains("column.HeaderStyle = CreateInlineStageHeaderStyle(stageIndex", zoom);
+        var batch = Source("GmcSmeta.App/EstimateView.InlineStages.Batch.cs");
+        Assert.Contains("if (ids.Count == 0) return;", batch);
+        Assert.Contains("if (stage.Locked) continue;", batch);
+        var xaml = Source("GmcSmeta.App/EstimateView.xaml");
+        Assert.Contains("MaxHeight=\"144\"", xaml);
+        Assert.Contains("x:Name=\"InlineStagesSelectionButtons\"", xaml);
+    }
+
+    [Fact]
     public void NavigationSelectionDoesNotChangeFontWeightOrSize()
     {
         var xaml = Source("GmcSmeta.App/MainWindow.xaml");
