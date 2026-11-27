@@ -77,7 +77,7 @@
                 <CheckBox x:Name="SummaryRestOnly" Content="Только остатки" VerticalAlignment="Center"
                           Margin="0,0,10,0" Checked="SummaryRest_Changed" Unchecked="SummaryRest_Changed"
                           ToolTip="Скрыть позиции, закрытые полностью"/>
-                <Button Content="Сохранить сводную в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
+                <Button x:Name="SummaryExportButton" Content="Сохранить сводную в Excel" ContentTemplate="{StaticResource IconLabelDownload}" Style="{StaticResource PythonToolbarButton}"
                         Click="SummaryExport_Click"
                         ToolTip="Сводная по выполнению: по позициям и актам"/>
             </WrapPanel>

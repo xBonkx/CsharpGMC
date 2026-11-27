@@ -61,12 +61,35 @@ public sealed class WorkspaceRefreshSourceTests
         Assert.Contains("_summaryRestRows ??= BuildSummaryRows(true)", code);
         Assert.Contains("_summaryAllRows ??= BuildSummaryRows(false)", code);
         Assert.Contains("_summaryColumnKeys.SequenceEqual(keys)", code);
-        Assert.Contains("KsWorkspaceProjection.ExportSummaryGroups(summary)", code);
-        Assert.Contains("foreach (var (actId, quantity) in row.PerAct)", code);
-        Assert.Contains("estimateSum += amount;", code);
-        Assert.Contains("doneSum += row.DoneSumRaw;", code);
-        Assert.Contains("leftSum += row.LeftSumRaw;", code);
-        Assert.DoesNotContain("doneSumByAct", code);
+        var workbook = Source("KsProgressWorkbook.cs");
+        Assert.Contains("KsWorkspaceProjection.ExportSummaryGroups(summary)", workbook);
+        Assert.Contains("foreach (var (actId, quantity) in row.PerAct)", workbook);
+        Assert.Contains("estimateSum += amount;", workbook);
+        Assert.Contains("doneSum += row.DoneSumRaw;", workbook);
+        Assert.Contains("leftSum += row.LeftSumRaw;", workbook);
+        Assert.DoesNotContain("doneSumByAct", workbook);
+    }
+
+    [Fact]
+    public void KsProgressExportStagesOffUiAndRejectsSupersededSummary()
+    {
+        var workspace = Source("ContractActsWorkspace.xaml.cs");
+        var export = Source("ContractActsWorkspace.Export.cs");
+        var workbook = Source("KsProgressWorkbook.cs");
+        Assert.Contains("_summaryExportCancellation?.Cancel();", workspace);
+        Assert.Contains("if (_summaryExportCancellation is not null) return;", export);
+        Assert.Contains("var acts = _summaryActs.OrderBy", export);
+        Assert.Contains("version == _summaryVersion", export);
+        Assert.Contains("ReferenceEquals(summary, _summary)", export);
+        Assert.Contains("await Task.Run(() => ExportFilePublication.Stage", export);
+        var stage = export.IndexOf("await Task.Run(() => ExportFilePublication.Stage", StringComparison.Ordinal);
+        var publish = export.IndexOf("await Task.Run(prepared.Publish)", StringComparison.Ordinal);
+        Assert.True(stage >= 0 && publish > stage);
+        Assert.Contains("if (!IsCurrent()) return;", export[stage..publish]);
+        Assert.Contains("await Task.Run(prepared.Dispose)", export);
+        Assert.Contains("token.ThrowIfCancellationRequested();", workbook);
+        Assert.DoesNotContain("SummaryGrid", workbook);
+        Assert.DoesNotContain("SqlServerDatabase.Open", workbook);
     }
 
 }

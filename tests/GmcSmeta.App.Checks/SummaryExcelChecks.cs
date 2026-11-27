@@ -36,6 +36,52 @@ internal static class SummaryExcelChecks
         Require(saved.Cell("N3").GetDouble() == -15 && saved.Cell("P3").GetDouble() == 50, "Margin/markup.");
         Require(saved.Cell("L5").GetDouble() == 1543.12 && saved.Cell("A5").Style.Font.Bold, "Total or style lost.");
         Console.WriteLine("Summary displayed XLSX numeric cells and missing markers OK.");
+        CheckKsProgress();
+    }
+
+    private static void CheckKsProgress()
+    {
+        var acts = new[] {
+            new GmcSmeta.Core.Db.SqlServerActs.ActInfo(101, "1", new DateTime(2026, 11, 1),
+                null, null, true, 1, 50m),
+            new GmcSmeta.Core.Db.SqlServerActs.ActInfo(102, "2", new DateTime(2026, 11, 2),
+                null, null, false, 1, 20m)
+        };
+        var systems = new List<(GmcSmeta.Core.Db.SqlServerActs.SummarySystem System, bool SectionHeader)>
+            { (new(1, "П1", false), false), (new(2, "Пустая", false), true) };
+        var positions = new[] {
+            new GmcSmeta.Core.Db.SqlServerActs.SummaryRow(1, 1, "1", "Позиция", "шт",
+                5m, 10m, 5m, 50m, 0m, 0m, 5m,
+                new Dictionary<long, decimal> { [101] = 5m }),
+            new GmcSmeta.Core.Db.SqlServerActs.SummaryRow(2, 1, "2", "Остаток", "шт",
+                4m, 10m, 1m, 10m, 3m, 30m, 4m,
+                new Dictionary<long, decimal> { [102] = 1m })
+        };
+        var summary = new GmcSmeta.Core.Db.SqlServerActs.SummaryData(acts, systems, positions);
+        var totals = new GmcSmeta.Core.Domain.ContractTotals(1, "main", "", 0m,
+            90m, 0m, 90m, 90m, 0m, 2);
+        using var book = KsProgressWorkbook.Create(summary, totals, acts, "Объект", new DateTime(2026,11,28));
+        using var bytes = new System.IO.MemoryStream();
+        book.SaveAs(bytes);
+        bytes.Position = 0;
+        using var reopened = new XLWorkbook(bytes);
+        var sheet = reopened.Worksheet(1);
+        Require(sheet.Cell("A1").GetString() == "Объект — сводная по выполнению", "Captured title.");
+        Require(sheet.Cell("A2").GetString() == "на 28.11.2026", "Captured date.");
+        Require(sheet.Cell("G7").GetDouble() == 5 && sheet.Cell("H7").IsEmpty(), "Sparse act columns.");
+        Require(sheet.Cell("H8").GetDouble() == 1 && sheet.Cell("G8").IsEmpty(), "Second act.");
+        Require(sheet.Cell("B9").GetString() == "Пустая", "Empty header retained.");
+        Require(sheet.Cell("F10").GetDouble() == 90 && sheet.Cell("J10").GetDouble() == 60 &&
+            sheet.Cell("L10").GetDouble() == 30, "Summary totals.");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        try
+        {
+            using var cancelled = KsProgressWorkbook.Create(summary, totals, acts, "", DateTime.Today, cancellation.Token);
+            throw new Exception("Cancelled export must not create workbook.");
+        }
+        catch (OperationCanceledException) { }
+        Console.WriteLine("KS progress workbook totals, sparse cells, captured date and cancellation OK.");
     }
 
     private static void Require(bool condition, string message)
