@@ -465,61 +465,64 @@ public partial class EstimateView
     private async void DeletePosition_Click(object sender, RoutedEventArgs e)
     {
         if (_estimate?.Locked != false) return;
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
-        if (EstimateGrid.SelectedItem is not EditableEstimateRow row ||
-            row.IsSystem || row.IsVirtual)
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true))
         {
-            SetStatus("Выбери позицию, которую нужно удалить.", true);
+            SetStatus("Заверши редактирование ячейки перед удалением.", true);
             return;
         }
-        if (_serverConflict)
+        // Delete and the context-menu command operate on the SAME Extended selection.
+        // Never silently delete just SelectedItem when several rows are highlighted.
+        var selected = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        if (selected.Length == 0 || selected.Any(row =>
+                row.IsSystem || row.IsVirtual || row.IsAreaSummary || row.Id <= 0))
         {
-            SetStatus("Данные изменились на сервере. Сначала обнови смету.", true);
+            SetStatus("Выдели только обычные позиции или комплектующие, без разделов и групп.", true);
             return;
         }
-        var related = row.Source.ParentPositionId is null
-            ? _rows.Count(x => !x.IsSystem && x.Source.ParentPositionId == row.Id)
-            : 0;
-        var question = $"Удалить «{row.Name}»?" +
-            (related > 0 ? $"\n\nС ней будут удалены комплектующие: {related}." : "") +
-            "\n\nЕсли позиция есть в КС-2 или проведённой выдаче, SQL Server отклонит удаление.";
-        if (MessageBox.Show(Window.GetWindow(this), question, "Удаление позиции",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
-            return;
-        _reloadTimer.Stop();
-        var count = Interlocked.Increment(ref _pendingWrites);
-        SetStatus($"Удаление… ({count})", false);
-        await _writeLock.WaitAsync();
-        try
+        if (_serverConflict || HasUnsettledCacheWrites)
         {
-            if (_serverConflict) throw new InvalidOperationException("Смета устарела.");
-            var result = await Task.Run(() => SqlServerDatabase.DeletePosition(
-                _sqlConnectionString, _contractId, row.Source.SystemId, row.Id, _serverRevision));
-            if (!result.Saved)
+            SetStatus("Сначала заверши сохранение или обнови смету с сервера.", true);
+            return;
+        }
+
+        var positionIds = selected.Select(row => (long)row.Id).Distinct().ToArray();
+        var selectedIds = positionIds.ToHashSet();
+        // Removing a root includes its components, but explicitly selected components
+        // must not be double-counted in the preview.
+        var extraComponents = _rows.Count(row => !row.IsSystem && !row.IsVirtual &&
+            row.Source.ParentPositionId is long parent && selectedIds.Contains(parent) &&
+            !selectedIds.Contains(row.Id));
+        var revision = _serverRevision;
+        var dialog = new DeletePositionsDialog(selected.Select(row => row.Name).ToArray(), extraComponents)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        if (_serverConflict || _estimate?.Locked != false || revision != _serverRevision ||
+            HasUnsettledCacheWrites ||
+            selected.Any(row => !_rows.Contains(row)) ||
+            !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
+                .Select(row => (long)row.Id).ToHashSet().SetEquals(selectedIds))
+        {
+            SetStatus("Выделение или данные изменились. Повтори удаление после обновления.", true);
+            return;
+        }
+
+        var sectionToFocus = selected[0].Source.SystemId;
+        await RunSectionCommandAsync(rev =>
+        {
+            if (rev != revision)
+                return SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повтори удаление.", rev);
+            return SqlServerDatabase.DeletePositions(
+                _sqlConnectionString, _contractId, positionIds, rev);
+        }, "Удаление позиций", $"Удалено позиций: {positionIds.Length}",
+            () =>
             {
-                _serverConflict = true;
-                throw new InvalidOperationException(result.Error ?? "Удаление отклонено.");
-            }
-            _serverRevision = result.Revision;
-            _focusAfterReload = null;
-            _focusSystemAfterReload = row.Source.SystemId;
-        }
-        catch (Exception ex)
-        {
-            _saveError = ex.Message;
-        }
-        finally
-        {
-            _writeLock.Release();
-            if (Interlocked.Decrement(ref _pendingWrites) == 0)
-            {
-                SetStatus(_saveError is null ? "Позиция удалена ✓" : "Ошибка: " + _saveError,
-                    _saveError is not null);
-                _reloadTimer.Stop();
-                _reloadTimer.Start();
-            }
-        }
+                _focusAfterReload = null;
+                _focusSystemAfterReload = sectionToFocus;
+            });
     }
 
     /// <summary>Run every structural command behind the same save lock as cell editing.</summary>
