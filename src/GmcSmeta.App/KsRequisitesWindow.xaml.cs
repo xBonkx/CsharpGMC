@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using GmcSmeta.Core.Db;
@@ -11,6 +12,8 @@ public partial class KsRequisitesWindow : Window
     private readonly long _contractId;
     private string _revision = "";
     private SqlServerKsRequisites.Values? _loaded;
+    private bool _saving;
+    private bool _closed;
 
     public KsRequisitesWindow(string connectionString, long contractId)
     {
@@ -28,7 +31,7 @@ public partial class KsRequisitesWindow : Window
         {
             var (values, revision) = await Task.Run(() =>
                 SqlServerKsRequisites.ReadSnapshot(_connectionString, _contractId));
-            if (!IsLoaded) return;
+            if (_closed || !IsLoaded) return;
             _loaded = values;
             _revision = revision;
             ObjectTitle.Text = values.ObjectName;
@@ -44,18 +47,19 @@ public partial class KsRequisitesWindow : Window
             SecondNameBox.Text = values.SecondName;
             WorkTitleBox.Text = values.WorkTitle;
             WorksStartBox.Text = values.WorksStart;
-            SaveButton.IsEnabled = true;
+            RequisitesFields.IsEnabled = !string.IsNullOrWhiteSpace(_revision);
+            SaveButton.IsEnabled = RequisitesFields.IsEnabled;
             StatusText.Text = "Изменения сохраняются в тестовой копии SQL Server.";
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Ошибка загрузки: " + ex.Message;
+            if (!_closed) StatusText.Text = "Ошибка загрузки: " + ex.Message;
         }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_loaded is null || string.IsNullOrWhiteSpace(_revision) || !SaveButton.IsEnabled) return;
+        if (_closed || _saving || _loaded is null || string.IsNullOrWhiteSpace(_revision) || !SaveButton.IsEnabled) return;
         var start = WorksStartBox.Text.Trim();
         if (start.Length > 0 && !DateTime.TryParseExact(start, "dd.MM.yyyy",
                 CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out _))
@@ -79,12 +83,15 @@ public partial class KsRequisitesWindow : Window
             WorksStart = start
         };
         var revision = _revision;
+        _saving = true;
+        RequisitesFields.IsEnabled = false;
         SaveButton.IsEnabled = false;
         StatusText.Text = "Сохранение…";
         try
         {
             var result = await Task.Run(() =>
                 SqlServerKsRequisites.Save(_connectionString, _contractId, values, revision));
+            if (_closed) return;
             if (!result.Saved)
             {
                 _revision = "";
@@ -99,10 +106,35 @@ public partial class KsRequisitesWindow : Window
         catch (Exception ex)
         {
             _revision = "";
+            if (_closed) return;
             StatusText.Text = "Сохранение не подтверждено: " + ex.Message +
                 ". Откройте окно заново и проверьте данные.";
         }
-        finally { SaveButton.IsEnabled = !string.IsNullOrWhiteSpace(_revision); }
+        finally
+        {
+            _saving = false;
+            if (!_closed)
+            {
+                RequisitesFields.IsEnabled = !string.IsNullOrWhiteSpace(_revision);
+                SaveButton.IsEnabled = RequisitesFields.IsEnabled;
+            }
+        }
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (_saving)
+        {
+            e.Cancel = true;
+            StatusText.Text = "Дождитесь подтверждения сохранения реквизитов.";
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        base.OnClosed(e);
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

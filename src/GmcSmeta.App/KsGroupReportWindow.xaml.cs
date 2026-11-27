@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Threading;
 using System.IO;
 using System.Diagnostics;
 using Microsoft.Win32;
@@ -18,6 +19,7 @@ public partial class KsGroupReportWindow : Window
     private SqlServerKsPrintData.Package? _package;
     private bool _exportInProgress;
     private bool _closed;
+    private readonly CancellationTokenSource _lifetime = new();
 
     public KsGroupReportWindow(string connectionString, long contractId, string groupKey)
     {
@@ -35,8 +37,9 @@ public partial class KsGroupReportWindow : Window
         StatusText.Text="Чтение актов, строк КС и реквизитов из SQL Server…";
         try
         {
+            var token = _lifetime.Token;
             var package=await Task.Run(() => SqlServerKsPrintData.Read(
-                _connectionString,_contractId,_groupKey));
+                _connectionString,_contractId,_groupKey), token);
             if (_closed || !IsLoaded) return;
             _package=package;
             var r=package.Report;
@@ -120,6 +123,7 @@ public partial class KsGroupReportWindow : Window
         _exportInProgress = true;
         SetExportButtons(false);
         ExportFilePublication.PreparedExport? prepared = null;
+        var token = _lifetime.Token;
         try
         {
             var invalid = Path.GetInvalidFileNameChars();
@@ -133,19 +137,24 @@ public partial class KsGroupReportWindow : Window
             var destination = Path.GetFullPath(dialog.FileName);
             StatusText.Text = "Формирование файла…";
             var timer = Stopwatch.StartNew();
-            prepared = await Task.Run(() => ExportFilePublication.Stage(destination, render));
+            prepared = await Task.Run(() => ExportFilePublication.Stage(destination, render), token);
             var renderMs = timer.ElapsedMilliseconds;
             if (_closed) return;
 
             // Commit point: until here an existing destination is untouched.
             timer.Restart();
-            await Task.Run(prepared.Publish);
+            await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                prepared.Publish();
+            }, token);
             Trace.WriteLine($"KS group export: render+stage={renderMs}ms; publish={timer.ElapsedMilliseconds}ms");
             if (_closed) return;
             StatusText.Text = "Сохранено: " + Path.GetFileName(destination);
             try { Process.Start(new ProcessStartInfo(destination) { UseShellExecute = true }); }
             catch { /* Viewer is optional. */ }
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
             if (!_closed) StatusText.Text = "Ошибка экспорта: " + ex.Message;
@@ -163,6 +172,8 @@ public partial class KsGroupReportWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
         base.OnClosed(e);
     }
 

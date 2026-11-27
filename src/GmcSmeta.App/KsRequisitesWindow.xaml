@@ -23,7 +23,7 @@
         <Border Grid.Row="1" Background="White" BorderBrush="#E4E8EF"
                 BorderThickness="1" CornerRadius="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
-                <StackPanel>
+                <StackPanel x:Name="RequisitesFields" IsEnabled="False">
                     <TextBlock Text="Стройка и договор" FontWeight="Bold"
                                Foreground="#2563EB" Margin="0,0,0,7"/>
                     <TextBlock Text="Заказчик (с адресом)" Foreground="#475569"/>

@@ -47,10 +47,13 @@ public sealed class KsAsyncExportSourceTests
         Assert.Contains("KsPdfForms.Create(p)", code);
         Assert.Contains("KsVorForms.Create(p, act.Id)", code);
         Assert.Contains("if (_closed || _exportInProgress) return;", code);
-        Assert.Contains("await Task.Run(() => ExportFilePublication.Stage(destination, render));", code);
+        Assert.Contains("await Task.Run(() => ExportFilePublication.Stage(destination, render), token);", code);
         var check = code.IndexOf("if (_closed) return;", code.IndexOf("ExportFilePublication.Stage(destination, render)", StringComparison.Ordinal), StringComparison.Ordinal);
-        var publish = code.IndexOf("await Task.Run(prepared.Publish);", StringComparison.Ordinal);
-        Assert.True(check >= 0 && publish > check);
+        var publish = code.IndexOf("prepared.Publish();", StringComparison.Ordinal);
+        var cancellation = code.IndexOf("token.ThrowIfCancellationRequested();", StringComparison.Ordinal);
+        Assert.True(check >= 0 && cancellation > check && publish > cancellation);
+        Assert.Contains("_lifetime.Cancel();", code);
+        Assert.Contains("catch (OperationCanceledException) when (token.IsCancellationRequested)", code);
         Assert.Contains("await Task.Run(prepared.Dispose);", code);
         Assert.Contains("if (!_closed) SetExportButtons(_package is not null);", code);
         Assert.DoesNotContain("XlsxExport.SaveCreatedWorkbook(", code);

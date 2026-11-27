@@ -19,6 +19,7 @@ public partial class Ks3ReportWindow : Window
     private readonly long _actId;
     private readonly string _actNumber;
     private readonly DateTime _actDate;
+    private readonly string _actInfo;
     private SqlServerActs.Ks3Report? _report;
     private readonly CancellationTokenSource _exportLifetime = new();
     private bool _closed;
@@ -32,8 +33,9 @@ public partial class Ks3ReportWindow : Window
         _actNumber = actNumber;
         _actDate = actDate;
         InitializeComponent();
-        ActInfoText.Text = $"КС-2 № {actNumber} от {actDate:dd.MM.yyyy} · " +
+        _actInfo = $"КС-2 № {actNumber} от {actDate:dd.MM.yyyy} · " +
             $"период с {from:dd.MM.yyyy} по {to:dd.MM.yyyy}";
+        ActInfoText.Text = _actInfo;
         Loaded += OnLoaded;
         Closed += (_, _) =>
         {
@@ -49,10 +51,11 @@ public partial class Ks3ReportWindow : Window
         try
         {
             ActInfoText.Text += " · загрузка SQL Server…";
-            var report = await Task.Run(() => SqlServerActs.Ks3Figures(_connectionString, _actId));
+            var token = _exportLifetime.Token;
+            var report = await Task.Run(() => SqlServerActs.Ks3Figures(_connectionString, _actId), token);
             if (_closed || !IsLoaded) return;
             _report = report;
-            ActInfoText.Text = $"КС-2 № {_actNumber} от {_actDate:dd.MM.yyyy}";
+            ActInfoText.Text = _actInfo;
             PeriodNetText.Text = Money.Format(report.Period);
             YearAmountLabel.Text = report.GrossCumulative ? "С начала года · с НДС, включая начальный остаток" : "С начала года · без НДС";
             StartAmountLabel.Text = report.GrossCumulative ? "С начала работ · с НДС, включая начальный остаток" : "С начала работ · без НДС";
