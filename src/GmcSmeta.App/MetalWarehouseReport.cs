@@ -16,46 +16,58 @@ internal static class MetalWarehouseReport
         RequireSameRevision(source, snapshot);
         using var book = new XLWorkbook();
 
-        void Sheet(string title, string[] headers, IEnumerable<object?[]> rows, int[] numeric)
+        IXLWorksheet StartSheet(string title, string[] headers)
         {
             var ws = book.Worksheets.Add(title);
             for (var col = 0; col < headers.Length; col++)
                 ws.Cell(1,col+1).Value = headers[col];
-            var row = 2;
-            foreach (var values in rows)
+            return ws;
+        }
+
+        static void AppendRow(IXLWorksheet ws, int row, int columns, object?[] values)
+        {
+            for (var col = 0; col < columns; col++)
             {
-                for (var col = 0; col < headers.Length; col++)
+                var value = col < values.Length ? values[col] : null;
+                var cell = ws.Cell(row,col+1);
+                switch (value)
                 {
-                    var value = col < values.Length ? values[col] : null;
-                    var cell = ws.Cell(row,col+1);
-                    switch (value)
-                    {
-                        case decimal d: cell.Value=(double)d; break;
-                        case double d: cell.Value=d; break;
-                        case long l: cell.Value=(double)l; break;
-                        case int i: cell.Value=i; break;
-                        case DateTime dt: cell.Value=dt;cell.Style.DateFormat.Format="dd.MM.yyyy HH:mm";break;
-                        case bool b: cell.Value=b?"Да":"Нет";break;
-                        default: cell.Value= SafeText(value?.ToString()??""); break;
-                    }
+                    case decimal d: cell.Value=(double)d; break;
+                    case double d: cell.Value=d; break;
+                    case long l: cell.Value=(double)l; break;
+                    case int i: cell.Value=i; break;
+                    case DateTime dt: cell.Value=dt;cell.Style.DateFormat.Format="dd.MM.yyyy HH:mm";break;
+                    case bool b: cell.Value=b?"Да":"Нет";break;
+                    default: cell.Value=SafeText(value?.ToString()??"");break;
                 }
-                row++;
             }
-            var last = Math.Max(1,row-1);
-            var header = ws.Range(1,1,1,headers.Length);
+        }
+
+        static void FinishSheet(IXLWorksheet ws, int columns, int last, int[] numeric)
+        {
+            var header = ws.Range(1,1,1,columns);
             header.Style.Font.Bold=true;
             header.Style.Fill.BackgroundColor=XLColor.FromHtml("#E7EFF8");
             header.Style.Alignment.WrapText=true;
             header.Style.Alignment.Vertical=XLAlignmentVerticalValues.Center;
             ws.Row(1).Height=35;
             foreach (var col in numeric)
-                if (last >= 2 && col > 0 && col <= headers.Length)
+                if (last >= 2 && col > 0 && col <= columns)
                     ws.Range(2,col,last,col).Style.NumberFormat.Format="#,##0.000";
             ws.SheetView.FreezeRows(1);
-            ws.Range(1,1,last,headers.Length).SetAutoFilter();
-            ws.Columns(1,headers.Length).AdjustToContents();
-            for (var col=1;col<=headers.Length;col++)
+            ws.Range(1,1,last,columns).SetAutoFilter();
+            ws.Columns(1,columns).AdjustToContents();
+            for (var col=1;col<=columns;col++)
                 ws.Column(col).Width=Math.Clamp(ws.Column(col).Width+2,13,55);
+        }
+
+        void Sheet(string title, string[] headers, IEnumerable<object?[]> rows, int[] numeric)
+        {
+            var ws = StartSheet(title, headers);
+            var row = 2;
+            foreach (var values in rows)
+                AppendRow(ws, row++, headers.Length, values);
+            FinishSheet(ws, headers.Length, row-1, numeric);
         }
 
         static object?[] StockRow(MetalStockView x) =>
@@ -73,28 +85,38 @@ internal static class MetalWarehouseReport
             snapshot.Objects.Select(x => (object?[])[x.ObjectName,x.Category,x.Material,Area(x.Demand),
                 Area(x.Reserved),Area(x.Issued),Area(x.Remaining)]),[4,5,6,7]);
 
-        var movements = new List<MetalMovement>();
+        string[] movementHeaders = ["Дата","Операция","Категория","Материал","м²","Шт.","Откуда","Куда",
+            "Объект","Сотрудник","Поставщик","Счёт","Примечание"];
+        string[] issuedHeaders = ["Дата","Объект","Материал","Категория","Операция","Площадь, м²","Шт.","Примечание"];
+        var movementSheet = StartSheet("Движения", movementHeaders);
+        var issuedSheet = StartSheet("Выдано", issuedHeaders);
+        var movementRow = 2;
+        var issuedRow = 2;
         long? beforeId = null;
         for(var page=0;page<100000;page++)
         {
             var batch=source.ReadJournalBefore(beforeId,1000);
-            movements.AddRange(batch);
+            foreach (var x in batch)
+            {
+                // XLSX has 1,048,576 rows including the header. Fail before publishing anything.
+                if (movementRow > 1048576)
+                    throw new InvalidOperationException("Журнал превышает число строк листа Excel.");
+                AppendRow(movementSheet, movementRow++, movementHeaders.Length,
+                    [x.CreatedUtc,x.Kind,x.Category,x.Material,
+                     Area(x.Kind is "Резерв" or "Снять резерв" ? Math.Abs(x.Reservation) : x.Area),
+                     x.Pieces,x.Source,x.Destination,x.ObjectName,x.User,x.Supplier,x.Invoice,x.Note]);
+                if (x.Kind is "Выдача" or "Возврат")
+                    AppendRow(issuedSheet, issuedRow++, issuedHeaders.Length,
+                        [x.CreatedUtc,x.ObjectName,x.Material,x.Category,x.Kind,
+                         Area(x.Kind=="Возврат"?-x.Area:x.Area),
+                         x.Kind=="Возврат"?-x.Pieces:x.Pieces,x.Note]);
+            }
             if(batch.Count<1000) break;
             beforeId = batch[^1].Id;
             if(page==99999) throw new InvalidOperationException("Слишком большой журнал.");
         }
-        Sheet("Движения",
-            ["Дата","Операция","Категория","Материал","м²","Шт.","Откуда","Куда",
-             "Объект","Сотрудник","Поставщик","Счёт","Примечание"],
-            movements.Select(x => (object?[])[x.CreatedUtc,x.Kind,x.Category,x.Material,
-                Area(x.Kind is "Резерв" or "Снять резерв" ? Math.Abs(x.Reservation) : x.Area),
-                x.Pieces,x.Source,x.Destination,x.ObjectName,x.User,x.Supplier,x.Invoice,x.Note]),[5]);
-        Sheet("Выдано",
-            ["Дата","Объект","Материал","Категория","Операция","Площадь, м²","Шт.","Примечание"],
-            movements.Where(x => x.Kind is "Выдача" or "Возврат").Select(x => (object?[])
-                [x.CreatedUtc,x.ObjectName,x.Material,x.Category,x.Kind,
-                 Area(x.Kind=="Возврат"?-x.Area:x.Area),
-                 x.Kind=="Возврат"?-x.Pieces:x.Pieces,x.Note]),[6]);
+        FinishSheet(movementSheet, movementHeaders.Length, movementRow-1, [5]);
+        FinishSheet(issuedSheet, issuedHeaders.Length, issuedRow-1, [6]);
         Sheet("Резервы",
             ["Объект","Категория","Материал","Зарезервировано, м²"],
             snapshot.Objects.Where(x => x.Reserved!=0).Select(x => (object?[])
@@ -118,7 +140,7 @@ internal static class MetalWarehouseReport
                 new object?[] {"Объектов с потребностями",snapshot.Objects.Select(x=>x.ObjectId is long id ? "id:"+id :
                     "name:"+x.ObjectName.Trim().ToUpperInvariant()).Distinct().Count(),"шт."},
                 new object?[] {"Партии",snapshot.Lots.Count,"шт."},
-                new object?[] {"Движений всего",movements.Count,"шт."}
+                new object?[] {"Движений всего",movementRow-2,"шт."}
             },[2]);
         RequireSameRevision(source, snapshot);
         using var prepared = ExportFilePublication.Stage(path, stream => book.SaveAs(stream));

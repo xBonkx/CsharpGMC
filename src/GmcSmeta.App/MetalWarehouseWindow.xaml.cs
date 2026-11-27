@@ -31,6 +31,7 @@ public partial class MetalWarehouseWindow : Window
     private readonly string _connection;
     private SqlServerMetalWarehouse? _store;
     private MetalSnapshot? _snapshot;
+    private MetalStockSearch? _stockSearch;
     private int _page;
     private bool _busy;
     private int _reloadVersion;
@@ -78,6 +79,9 @@ public partial class MetalWarehouseWindow : Window
         var version = ++_reloadVersion;
         ++_journalVersion;
         _snapshot = null; // An unsuccessful read must not leave a writable stale dashboard.
+        _stockSearch = null;
+        _placesByMaterial = null;
+        _objectsByMaterial = null;
         _journalDirty = true;
         UpdateJournalControls();
         StatusText.Text = "Обновление склада…";
@@ -89,13 +93,15 @@ public partial class MetalWarehouseWindow : Window
                 var snapshot = store.ReadSnapshot();
                 return (Store: store, Snapshot: snapshot,
                     Places: snapshot.Places.Where(x => x.Area != 0 || x.Pieces != 0).ToLookup(x => x.MaterialId),
-                    Objects: snapshot.Objects.ToLookup(x => x.MaterialId));
+                    Objects: snapshot.Objects.ToLookup(x => x.MaterialId),
+                    Search: new MetalStockSearch(snapshot.Stock));
             });
             if (version != _reloadVersion) return;
             _store = data.Store;
             _snapshot = data.Snapshot;
             _placesByMaterial = data.Places;
             _objectsByMaterial = data.Objects;
+            _stockSearch = data.Search;
             OpeningButton.Visibility = !_snapshot.Initialized && _snapshot.Stock.Count == 0
                 ? Visibility.Visible : Visibility.Collapsed;
             ObjectsGrid.ItemsSource = _snapshot.Objects;
@@ -109,6 +115,18 @@ public partial class MetalWarehouseWindow : Window
         catch (Exception ex)
         {
             _snapshot = null;
+            _stockSearch = null;
+            _placesByMaterial = null;
+            _objectsByMaterial = null;
+            StockGrid.ItemsSource = null;
+            ObjectsGrid.ItemsSource = null;
+            LotsGrid.ItemsSource = null;
+            JournalGrid.ItemsSource = null;
+            OpeningButton.Visibility = Visibility.Collapsed;
+            foreach (var field in new[] { TotalOwned, TotalOurs, TotalSupplier, TotalNeed, TotalDeficit })
+                field.Text = "—";
+            TotalDeficit.Foreground = MetalNormalBrush;
+            FillSelectedMaterial();
             StatusText.Text = "Ошибка чтения склада: " + ex.Message;
             MessageBox.Show(this, ex.Message, "Склад металла", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -124,15 +142,12 @@ public partial class MetalWarehouseWindow : Window
 
     private void FilterStock()
     {
-        if (_snapshot is null || StockCategory is null || StockSearch is null || StockGrid is null)
+        if (_snapshot is null || _stockSearch is not { } search || StockCategory is null || StockSearch is null || StockGrid is null)
             return;
         var category = (StockCategory.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
-        var query = StockSearch.Text.Trim().Replace(',', '.');
         var selected = (StockGrid.SelectedItem as MetalStockView)?.MaterialId;
-        var rows = _snapshot.Stock.Where(s =>
-            (category.Length == 0 || category == s.Category) &&
-            (s.Category + " " + s.Material).Replace(',', '.')
-                .Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        var filtered = search.Filter(category, StockSearch.Text);
+        var rows = filtered.Rows;
         _publishingStock = true;
         try
         {
@@ -140,15 +155,7 @@ public partial class MetalWarehouseWindow : Window
             StockGrid.SelectedItem = rows.FirstOrDefault(x => x.MaterialId == selected) ?? rows.FirstOrDefault();
         }
         finally { _publishingStock = false; }
-        var totals = new long[5];
-        foreach (var row in rows)
-        {
-            totals[0] = checked(totals[0] + row.Ours + row.Supplier);
-            totals[1] = checked(totals[1] + row.Ours);
-            totals[2] = checked(totals[2] + row.Supplier);
-            totals[3] = checked(totals[3] + row.RemainingDemand);
-            totals[4] = checked(totals[4] + row.Deficit);
-        }
+        var totals = new[] { filtered.Owned, filtered.Ours, filtered.Supplier, filtered.Need, filtered.Deficit };
         var fields = new[] { TotalOwned, TotalOurs, TotalSupplier, TotalNeed, TotalDeficit };
         for (var i = 0; i < 5; i++)
             fields[i].Text = MetalWarehouseRules.SqmText(totals[i]) + " м²";

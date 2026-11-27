@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 84f4e09) — PERF-047 PARTIAL: metal warehouse snapshot-scoped normalized stock search keys and single-pass checked filtered totals; failed refresh clears stale grids/selection/totals; journal XLSX writes movements and issue/return sheets during one keyset traversal without retaining the full movement DTO list, explicit Excel row limit, existing revision fences and staged publication retained. Seven regression cases added (including 25000 rows), not run; static review only. ClosedXML still retains workbook cells; actual SQL/WPF/XLSX performance and acceptance remain. No database/schema/calculation policy/layout/icons/release changes.
+
 28.11.2026 ChatGPT/main (base 0d65ad1) — PERF-050/052 PARTIAL: combine mandatory SQL open schema/version checks in one statement; KP export reuses loaded tag rule and requisites percent without rereading contract. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 056e404) — PERF-050/047 PARTIAL: shared procurement report batch on one guarded connection; supplier/shop/control use only needed result sets, child IDs from existing parent IDs, revision/day fences retained. Tests added, not run; see performance TODO.

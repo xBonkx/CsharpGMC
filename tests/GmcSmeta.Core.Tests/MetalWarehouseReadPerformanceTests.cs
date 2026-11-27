@@ -59,4 +59,58 @@ public sealed class MetalWarehouseReadPerformanceTests
         var publish = code.IndexOf("prepared.Publish();", start, StringComparison.Ordinal);
         Assert.True(start >= 0 && check > start && publish > check);
     }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("", "  0,5 ")]
+    [InlineData("Бухты", "оцинк")]
+    [InlineData("Листы", "Бухты")]
+    [InlineData("Бухты", "нет совпадений")]
+    public void StockSearchMatchesFormerProjectionAndCheckedTotals(string category, string query)
+    {
+        var stock = Enumerable.Range(0, 25000).Select(i => new MetalStockView(
+            i, i % 2 == 0 ? "Бухты" : "Листы", i % 3 == 0 ? "ОЦИНК 0,5" : "Сталь 0.7",
+            i % 31 - 15, 0, i % 11 - 5, 0, i % 23, 0, 0, 0, i % 13)).ToArray();
+        var normalized = query.Trim().Replace(',', '.');
+        var expected = stock.Where(s => (category.Length == 0 || category == s.Category) &&
+            (s.Category + " " + s.Material).Replace(',', '.')
+                .Contains(normalized, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var search = new MetalStockSearch(stock);
+        var actual = search.Filter(category, query);
+        Assert.Equal(expected, actual.Rows.ToArray());
+        Assert.Equal(expected.Sum(x => x.Ours + x.Supplier), actual.Owned);
+        Assert.Equal(expected.Sum(x => x.Ours), actual.Ours);
+        Assert.Equal(expected.Sum(x => x.Supplier), actual.Supplier);
+        Assert.Equal(expected.Sum(x => x.RemainingDemand), actual.Need);
+        Assert.Equal(expected.Sum(x => x.Deficit), actual.Deficit);
+        Assert.Equal(stock, search.Filter("", "").Rows.ToArray());
+    }
+
+    [Fact]
+    public void StockSearchRetainsCheckedOverflowAndEmptyTotals()
+    {
+        var row = new MetalStockView(1, "Листы", "0,5", long.MaxValue, 0, 1, 0, 0, 0, 0, 0, 0);
+        var search = new MetalStockSearch(new[] { row });
+        Assert.Throws<OverflowException>(() => search.Filter("", ""));
+        var empty = search.Filter("", "missing");
+        Assert.Empty(empty.Rows);
+        Assert.Equal(0L, empty.Owned);
+    }
+
+    [Fact]
+    public void ReportWritesBothJournalSheetsInOnePagedTraversal()
+    {
+        var code = Source("GmcSmeta.App/MetalWarehouseReport.cs");
+        Assert.DoesNotContain("new List<MetalMovement>", code);
+        Assert.Contains("foreach (var x in batch)", code);
+        Assert.Contains("AppendRow(movementSheet, movementRow++", code);
+        Assert.Contains("AppendRow(issuedSheet, issuedRow++", code);
+        Assert.Contains("movementRow > 1048576", code);
+        Assert.Contains("movementRow-2", code);
+        Assert.Contains("x.Kind==\"Возврат\"?-x.Area:x.Area", code);
+        var window = Source("GmcSmeta.App/MetalWarehouseWindow.xaml.cs");
+        Assert.Contains("Search: new MetalStockSearch(snapshot.Stock)", window);
+        Assert.Contains("search.Filter(category, StockSearch.Text)", window);
+        Assert.Contains("StockGrid.ItemsSource = null;", window);
+    }
 }
