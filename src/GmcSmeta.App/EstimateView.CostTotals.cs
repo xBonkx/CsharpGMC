@@ -271,16 +271,7 @@ public partial class EstimateView
 
     private void TotalsGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
-        var editor = MaterialsEditorTextBox(e.EditingElement);
-        if (editor is null) return;
-        RoutedEventHandler onLoaded = (_, _) => { editor.Focus(); editor.SelectAll(); };
-        editor.Loaded += onLoaded;
-        Dispatcher.BeginInvoke(() =>
-        {
-            editor.Focus();
-            editor.SelectAll();
-            editor.Loaded -= onLoaded;
-        }, DispatcherPriority.Background);
+        if (sender is DataGrid grid) GridEditInteraction.FocusTextEditor(grid, e);
     }
 
     private void TotalsGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
@@ -293,6 +284,7 @@ public partial class EstimateView
         var column = e.Column.SortMemberPath ?? "";
         var text = editor.Text.Trim().Replace("₽", "").Trim();
         if (column is not ("cost" or "sell")) return;
+        if (editor.Text == (column == "cost" ? row.CostRaw : row.SellRaw)) return;
 
         var field = column == "cost"
             ? row.Key switch

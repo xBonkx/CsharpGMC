@@ -127,7 +127,8 @@ public partial class EstimateView
         if (!force && _materialsData is not null && !string.IsNullOrWhiteSpace(_materialsRevision) &&
             _materialsRevision == _serverRevision)
         {
-            MaterialsRebuild();
+            // A cached read must not replace the live editor or its row.
+            if (MaterialsGrid?.Items is not IEditableCollectionView { IsEditingItem: true }) MaterialsRebuild();
             return;
         }
         _materialsLoading = true;
@@ -572,7 +573,6 @@ public partial class EstimateView
         // Keep selection, viewport and edit controls for an unchanged view.
         // New authoritative rows always have different references.
         if (grid.ItemsSource is ObservableCollection<MaterialsRow> existing &&
-            grid.Items is System.ComponentModel.IEditableCollectionView { IsEditingItem: false, IsAddingNew: false } &&
             MaterialsVisibleRows.SameReferences(existing, result))
             return;
         grid.ItemsSource = new ObservableCollection<MaterialsRow>(result);
@@ -767,35 +767,11 @@ public partial class EstimateView
 
     private void MaterialsGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
-        // DataGridTemplateColumn оборачивает редактор в ContentPresenter — ищем TextBox внутри.
-        var editor = MaterialsEditorTextBox(e.EditingElement);
-        if (editor is null) return;
-        // Возвращаем клавиатурный фокус в TextBox позже собственной логики грида —
-        // пользователь после двойного щелчка сразу набирает число.
-        RoutedEventHandler onLoaded = (_, _) =>
-        {
-            editor.Focus();
-            editor.SelectAll();
-        };
-        editor.Loaded += onLoaded;
-        Dispatcher.BeginInvoke(() =>
-        {
-            editor.Focus();
-            editor.SelectAll();
-            editor.Loaded -= onLoaded;
-        }, DispatcherPriority.Background);
+        if (sender is DataGrid grid) GridEditInteraction.FocusTextEditor(grid, e);
     }
 
-    /// <summary>TextBox редактора: у DataGridTemplateColumn он спрятан внутри ContentPresenter.</summary>
-    private static TextBox? MaterialsEditorTextBox(DependencyObject? container)
-    {
-        for (DependencyObject? node = container; node is not null; node = System.Windows.Media.VisualTreeHelper.GetChild(node, 0))
-        {
-            if (node is TextBox box) return box;
-            if (System.Windows.Media.VisualTreeHelper.GetChildrenCount(node) == 0) return null;
-        }
-        return null;
-    }
+    private static TextBox? MaterialsEditorTextBox(DependencyObject? container) =>
+        GridEditInteraction.FindTextEditor(container);
 
     // Текстовые блоки плитки «Транспорт» живут внутри ControlTemplate кнопки.
     private TextBlock? MatTileTransCaption;
@@ -810,6 +786,18 @@ public partial class EstimateView
         if (editor is null) return;
         var column = e.Column.Header?.ToString() ?? "";
         var text = editor.Text;
+        // Opening and leaving an unchanged cell is not a write (including mixed groups).
+        if (text == (column switch
+        {
+            "Наименование" => row.Name,
+            "Цена клиенту" => row.PriceRaw,
+            "Закуп за ед." => row.CostRaw,
+            "Наценка, %" => row.MarkupRaw,
+            "Факт по счёту" => row.FactRaw,
+            "Поставщик" => row.Supplier,
+            "Пометки" => row.NoteText,
+            _ => null
+        })) return;
         var ids = row.IsGroup && row.MemberIds.Length > 0
             ? row.MemberIds.ToList()
             : row.PositionId > 0 ? new List<long> { row.PositionId } : new List<long>();

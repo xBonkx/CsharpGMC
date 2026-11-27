@@ -1055,16 +1055,7 @@ public partial class EstimateView
 
     internal void SummaryGrid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
-        var editor = MaterialsEditorTextBox(e.EditingElement);
-        if (editor is null) return;
-        RoutedEventHandler onLoaded = (_, _) => { editor.Focus(); editor.SelectAll(); };
-        editor.Loaded += onLoaded;
-        Dispatcher.BeginInvoke(() =>
-        {
-            editor.Focus();
-            editor.SelectAll();
-            editor.Loaded -= onLoaded;
-        }, DispatcherPriority.Background);
+        if (sender is DataGrid grid) GridEditInteraction.FocusTextEditor(grid, e);
     }
 
     internal void SummaryGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
@@ -1076,6 +1067,15 @@ public partial class EstimateView
         if (editor is null) return;
         var column = SummaryColumnKey(e.Column);
         var text = editor.Text;
+        if (text == (column switch
+        {
+            "name" => row.Name, "unit" => row.Unit, "qty" => row.QtyRaw,
+            "m_ucost" => row.CostUnitRaw, "m_uprice" => row.PriceUnitRaw,
+            "m_mcost" => row.MCostText, "m_msell" => row.MSellText,
+            "w_ucost" => row.WorkCostRaw, "w_usell" => row.WorkSellRaw,
+            "t_cost" => row.TotalCostText, "t_sell" => row.TotalSellText,
+            _ => null
+        })) return;
 
         // Валидация до записи (cost_summary_view._save / save_cell)
         switch (column)

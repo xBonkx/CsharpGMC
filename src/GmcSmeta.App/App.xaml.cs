@@ -65,6 +65,7 @@ public partial class App : Application
         StartupTrace.Mark("app_startup_enter");
         InstallWindowBranding();
         ContextMenuIcons.InstallSeparatorNormalization();
+        GridEditInteraction.Install();
         // Русская локаль для всех чисел и дат в окнах: 1 234 567,89 (а не 1,234,567.89).
         FrameworkElement.LanguageProperty.OverrideMetadata(
             typeof(FrameworkElement),
