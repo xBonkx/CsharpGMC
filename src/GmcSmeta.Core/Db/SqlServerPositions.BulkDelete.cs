@@ -50,14 +50,21 @@ public static partial class SqlServerDatabase
 
         // Include components of selected roots. If a component itself is selected, remove
         // only that component; its unselected parent remains untouched.
+        // A parameterized SqlCommand executes in sp_executesql scope. A local
+        // temp table created inside that batch disappears when it returns.
+        // Create it on the connection first, then populate it with parameters.
+        using (var create = new SqlCommand(
+            "CREATE TABLE #delete_positions (id BIGINT NOT NULL PRIMARY KEY, " +
+            "system_id BIGINT NOT NULL, parent_id BIGINT NULL, name NVARCHAR(MAX) NULL)", conn, tx))
+            create.ExecuteNonQuery();
         using (var build = new SqlCommand(
-            "SELECT p.id,p.system_id,p.parent_id,p.name INTO #delete_positions " +
+            "INSERT INTO #delete_positions (id,system_id,parent_id,name) " +
+            "SELECT p.id,p.system_id,p.parent_id,p.name " +
             "FROM dbo.positions p WITH (UPDLOCK,HOLDLOCK) " +
             "JOIN dbo.systems s WITH (UPDLOCK,HOLDLOCK) ON s.id=p.system_id " +
             "WHERE s.contract_id=@contract AND (" +
             "EXISTS (SELECT 1 FROM #selected_delete_positions d WHERE d.id=p.id) OR " +
-            "EXISTS (SELECT 1 FROM #selected_delete_positions d WHERE d.id=p.parent_id)); " +
-            "CREATE UNIQUE CLUSTERED INDEX IX_delete_positions ON #delete_positions(id)", conn, tx))
+            "EXISTS (SELECT 1 FROM #selected_delete_positions d WHERE d.id=p.parent_id))", conn, tx))
         {
             build.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             build.ExecuteNonQuery();
@@ -143,7 +150,7 @@ public static partial class SqlServerDatabase
             "FROM dbo.positions p JOIN (SELECT DISTINCT system_id FROM #delete_positions) s " +
             "ON s.system_id=p.system_id) " +
             "UPDATE p SET [order]=CONVERT(INT,ord.n) " +
-            "FROM dbo.positions p JOIN ord ON ord.id=p.id", conn, tx))
+            "FROM dbo.positions p JOIN ord ON ord.id=p.id WHERE p.[order]<>ord.n", conn, tx))
             renumber.ExecuteNonQuery();
 
         foreach (var row in requested)
