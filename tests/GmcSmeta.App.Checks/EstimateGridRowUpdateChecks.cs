@@ -85,5 +85,28 @@ internal static class EstimateGridRowUpdateChecks
             { IsPendingInsert = true };
         if (!pending.IsVirtual || pending.Id >= 0)
             throw new Exception("A pending position was not isolated from persisted IDs.");
+
+        // A 2500-row section with ten successive local inserts must not
+        // cross the next section or lose the anchor on a pending row.
+        var large = new List<EditableEstimateRow> { heading, root, component };
+        large.AddRange(Enumerable.Range(100, 2500).Select(id => Row(id, 1)));
+        large.Add(otherHeading);
+        large.Add(other);
+        var draftIds = new List<int>();
+        var anchorId = root.Id;
+        for (var n = 1; n <= 10; n++)
+        {
+            var draft = new EditableEstimateRow(root.Source with { Id = -n })
+                { IsPendingInsert = true };
+            var index = EstimateView.PendingInsertIndex(large, 1, anchorId);
+            if (index != n + 2)
+                throw new Exception("Consecutive pending insertion lost its anchor.");
+            large.Insert(index, draft);
+            draftIds.Add(draft.Id);
+            anchorId = draft.Id;
+        }
+        if (!large.Skip(3).Take(10).Select(row => row.Id).SequenceEqual(draftIds) ||
+            large.Select(row => row.Id).Where(id => id < 0).Distinct().Count() != 10)
+            throw new Exception("Multiple pending rows were duplicated or reordered.");
     }
 }
