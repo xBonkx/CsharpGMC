@@ -31,6 +31,8 @@ public partial class PeopleWindow : Window
     private bool _loading;
     private bool _defaultsApplied;
     private bool _registrationUncertain;
+    private bool _operationBusy;
+    private bool _checkUpdateQueued;
     private bool IsAccess => _objectId.HasValue;
 
     private sealed record HistoryOption(AccessHistory History, string Label);
@@ -68,6 +70,7 @@ public partial class PeopleWindow : Window
             WindowState = WindowState.Maximized;
             await InitializeAsync(connectionString, content);
         };
+        Closing += (_, e) => { if (_operationBusy) e.Cancel = true; };
         Closed += (_, _) =>
         {
             _closed = true;
@@ -130,26 +133,60 @@ public partial class PeopleWindow : Window
         }
     }
 
-    private void Run(Action action)
+    private async Task RunAsync(Func<Task> action)
     {
-        if (_closed || _loading) return;
+        if (_closed || _loading || _operationBusy) return;
         if (string.IsNullOrWhiteSpace(_revision))
         {
             HintText.Text = "Нет актуальной ревизии справочника. Измените фильтр или откройте окно заново.";
             return;
         }
-        try { action(); }
+        if (!CommitChecks())
+        {
+            HintText.Text = "Завершите редактирование списка.";
+            return;
+        }
+        RememberChecks();
+        _operationBusy = true;
+        var content = (UIElement)Content;
+        content.IsEnabled = false;
+        try { await action(); }
         catch (DBConcurrencyException)
         {
-            MessageBox.Show(this, "Данные изменились в другом окне. Справочник перечитан; повторите действие.",
-                "Конфликт изменений", MessageBoxButton.OK, MessageBoxImage.Warning);
-            Reload();
+            try
+            {
+                await ReloadMutationAsync();
+                MessageBox.Show(this, _registrationUncertain
+                    ? "Файл списка уже создан. Проверьте запись журнала; не повторяйте экспорт."
+                    : "Данные изменились в другом окне. Справочник перечитан; повторите действие.",
+                    "Конфликт изменений", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Люди и автомобили", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+        finally
+        {
+            _operationBusy = false;
+            if (!_closed) content.IsEnabled = true;
+            if (_registrationUncertain)
+                HintText.Text = "Файл создан, но запись в журнал не подтверждена. Повторный экспорт не выполняйте.";
+            else if (string.IsNullOrWhiteSpace(_revision))
+                HintText.Text = "Запись или чтение не подтверждены. Проверьте данные и обновите справочник перед повтором.";
+        }
     }
+
+    private bool CommitChecks() =>
+        PeopleGrid.CommitEdit(DataGridEditingUnit.Cell, true) &&
+        PeopleGrid.CommitEdit(DataGridEditingUnit.Row, true) &&
+        CarsGrid.CommitEdit(DataGridEditingUnit.Cell, true) &&
+        CarsGrid.CommitEdit(DataGridEditingUnit.Row, true);
+
     private void RememberChecks()
     {
         if (!IsAccess || _loading) return;
@@ -158,21 +195,29 @@ public partial class PeopleWindow : Window
         foreach (var row in _cars)
             if (row.Selected) _checkedCars.Add(row.Id); else _checkedCars.Remove(row.Id);
     }
-    private void Reload() => Reload(rememberChecks: true);
-    private void Reload(bool rememberChecks)
+
+    // Only the captured revision reaches SQL. No stale writes after an uncertain result.
+    private async Task<T> MutateAsync<T>(Func<string,T> mutation)
     {
-        if (rememberChecks) RememberChecks();
-        var selectedP = (PeopleGrid.SelectedItem as PeoplePerson)?.Id;
-        var selectedC = (CarsGrid.SelectedItem as PeopleCar)?.Id;
+        var revision = _revision;
         _revision = "";
-        var data = _db.Load(ShowInactive.IsChecked == true);
-        ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
+        return await Task.Run(() => mutation(revision));
     }
 
-    // Read-only refreshes may be cancelled; mutation readback keeps its existing synchronous path.
+    private async Task ReloadMutationAsync(long? personId = null, long? carId = null)
+    {
+        var selectedP = personId ?? (PeopleGrid.SelectedItem as PeoplePerson)?.Id;
+        var selectedC = carId ?? (CarsGrid.SelectedItem as PeopleCar)?.Id;
+        var showInactive = ShowInactive.IsChecked == true;
+        _revision = "";
+        var data = await Task.Run(() => _db.Load(showInactive));
+        if (!_closed) ApplyDirectory(data.People, data.Cars, data.Revision, selectedP, selectedC);
+    }
+
+    // Read-only refreshes may be cancelled; mutation readback is guarded until completion.
     private async Task ReloadReadOnlyAsync(AccessHistory? history = null)
     {
-        if (_closed || _loading || _reloadCancellation is not null) return;
+        if (_closed || _loading || _operationBusy || _reloadCancellation is not null) return;
         RememberChecks();
         var selectedP = (PeopleGrid.SelectedItem as PeoplePerson)?.Id;
         var selectedC = (CarsGrid.SelectedItem as PeopleCar)?.Id;
@@ -248,21 +293,23 @@ public partial class PeopleWindow : Window
                     .Contains(query, StringComparison.CurrentCultureIgnoreCase)
                 : row is PeopleCar c && (c.Model + " " + c.Plate + " " + c.Note)
                     .Contains(query, StringComparison.CurrentCultureIgnoreCase);
-            view.Refresh();
         }
         UpdateCounts();
     }
     private void UpdateCounts()
     {
+        if (_loading) return;
+        var selectedPeople = IsAccess ? _people.Count(x => x.Selected) : 0;
+        var selectedCars = IsAccess ? _cars.Count(x => x.Selected) : 0;
         PeopleCount.Text = IsAccess
-            ? $"в списке {_people.Count(x => x.Selected)} из {_people.Count}"
+            ? $"в списке {selectedPeople} из {_people.Count}"
             : $"работают {_people.Count(x => x.Active)}, показано {_people.Count}";
         CarsCount.Text = IsAccess
-            ? $"в списке {_cars.Count(x => x.Selected)} из {_cars.Count}"
+            ? $"в списке {selectedCars} из {_cars.Count}"
             : $"{_cars.Count} авто";
         if (IsAccess)
-            ExportButton.Content = $"Сформировать список (Excel) — {_people.Count(x => x.Selected)} чел., " +
-                $"{_cars.Count(x => x.Selected)} авто";
+            ExportButton.Content = $"Сформировать список (Excel) — {selectedPeople} чел., " +
+                $"{selectedCars} авто";
     }
     private void Search_Changed(object sender, TextChangedEventArgs e)
     {
@@ -295,11 +342,13 @@ public partial class PeopleWindow : Window
     }
     private void CheckCell_Changed(object sender, EventArgs e)
     {
-        if (_loading || !IsAccess) return;
-        // WPF check-box edits commit on focus change; a dispatcher update reflects new selections.
+        if (_loading || _operationBusy || !IsAccess || _checkUpdateQueued) return;
+        _checkUpdateQueued = true;
+        // Coalesce notifications from multiple realized checkboxes.
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (IsAccess)
+            _checkUpdateQueued = false;
+            if (!_closed && !_loading && !_operationBusy && IsAccess)
             {
                 RememberChecks();
                 UpdateCounts();
@@ -309,7 +358,7 @@ public partial class PeopleWindow : Window
     private PeoplePerson? SelectedPerson() => PeopleGrid.SelectedItem as PeoplePerson;
     private PeopleCar? SelectedCar() => CarsGrid.SelectedItem as PeopleCar;
 
-    private void PersonAdd_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void PersonAdd_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var values = EditFields("Добавить человека", new (string, string)[]
         {
@@ -318,14 +367,13 @@ public partial class PeopleWindow : Window
             ("Должность — кого (пусто = автоматически)", "")
         });
         if (values is null) return;
-        var result = _db.SavePerson(new PeoplePerson(0, values[0], values[1], values[2], values[3],
-            values[4], values[5], true, 0), _revision);
-        _revision = result.Revision;
+        var row = new PeoplePerson(0, values[0], values[1], values[2], values[3],
+            values[4], values[5], true, 0);
+        var result = await MutateAsync(revision => _db.SavePerson(row, revision));
         if (IsAccess) _checkedPeople.Add(result.Id);
-        Reload();
-        PeopleGrid.SelectedItem = _people.FirstOrDefault(x => x.Id == result.Id);
+        await ReloadMutationAsync(personId: result.Id);
     });
-    private void PersonEdit_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void PersonEdit_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var p = SelectedPerson();
         if (p is null) return;
@@ -336,31 +384,31 @@ public partial class PeopleWindow : Window
             ("Должность — кого (пусто = автоматически)", p.PostGen)
         });
         if (values is null) return;
-        _revision = _db.SavePerson(p with { Fio = values[0], Post = values[1], Birth = values[2],
-            Note = values[3], FioGen = values[4], PostGen = values[5] }, _revision).Revision;
-        Reload();
+        var row = p with { Fio = values[0], Post = values[1], Birth = values[2],
+            Note = values[3], FioGen = values[4], PostGen = values[5] };
+        await MutateAsync(revision => _db.SavePerson(row, revision));
+        await ReloadMutationAsync();
     });
-    private void CarAdd_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void CarAdd_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var values = EditFields("Добавить автомобиль", new (string, string)[]
         { ("Марка / модель", ""), ("Госномер", ""), ("Примечание", "") });
         if (values is null) return;
-        var result = _db.SaveCar(new PeopleCar(0, values[0], values[1], values[2], true, 0), _revision);
-        _revision = result.Revision;
+        var row = new PeopleCar(0, values[0], values[1], values[2], true, 0);
+        var result = await MutateAsync(revision => _db.SaveCar(row, revision));
         if (IsAccess) _checkedCars.Add(result.Id);
-        Reload();
-        CarsGrid.SelectedItem = _cars.FirstOrDefault(x => x.Id == result.Id);
+        await ReloadMutationAsync(carId: result.Id);
     });
-    private void CarEdit_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void CarEdit_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var c = SelectedCar();
         if (c is null) return;
         var values = EditFields("Редактировать автомобиль", new (string, string)[]
             { ("Марка / модель", c.Model), ("Госномер", c.Plate), ("Примечание", c.Note) });
         if (values is null) return;
-        _revision = _db.SaveCar(c with { Model = values[0], Plate = values[1], Note = values[2] },
-            _revision).Revision;
-        Reload();
+        var row = c with { Model = values[0], Plate = values[1], Note = values[2] };
+        await MutateAsync(revision => _db.SaveCar(row, revision));
+        await ReloadMutationAsync();
     });
     private (long Id, bool Active, string Name)[] SelectedEntries(bool person) =>
         person ? PeopleGrid.SelectedItems.OfType<PeoplePerson>()
@@ -380,7 +428,7 @@ public partial class PeopleWindow : Window
     private void OpenEntryMenu(bool person, ContextMenuEventArgs e)
     {
         e.Handled = true;
-        if (_loading || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_loading || _operationBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var grid = person ? PeopleGrid : CarsGrid;
         if (person ? ContextMenuTarget.SelectRow<PeoplePerson>(grid, e) is null :
             ContextMenuTarget.SelectRow<PeopleCar>(grid, e) is null) return;
@@ -414,18 +462,16 @@ public partial class PeopleWindow : Window
         menu.IsOpen = true;
     }
 
-    private void ChangeActive(bool person, long[] ids, bool active, string revision) => Run(() =>
+    private async void ChangeActive(bool person, long[] ids, bool active, string revision) => await RunAsync(async () =>
     {
         if (ids.Length == 0 || _revision != revision || _loading) return;
-        _revision = _db.SetActiveBatch(person, ids, active, revision);
+        await MutateAsync(expected => _db.SetActiveBatch(person, ids, active, expected));
         if (!active)
         {
-            RememberChecks();
             var checkedIds = person ? _checkedPeople : _checkedCars;
             foreach (var id in ids) checkedIds.Remove(id);
-            Reload(rememberChecks: false);
         }
-        else Reload();
+        await ReloadMutationAsync();
     });
 
     private void ToggleSelectedActive(bool person)
@@ -444,8 +490,8 @@ public partial class PeopleWindow : Window
     private void CarDelete_Click(object sender, RoutedEventArgs e) =>
         DeleteEntries(false, SelectedEntries(false), _revision);
 
-    private void DeleteEntries(bool person, (long Id, bool Active, string Name)[] entries,
-        string revision) => Run(() =>
+    private async void DeleteEntries(bool person, (long Id, bool Active, string Name)[] entries,
+        string revision) => await RunAsync(async () =>
     {
         if (entries.Length == 0 || string.IsNullOrWhiteSpace(revision)) return;
         var ids = entries.Select(p => p.Id).OrderBy(id => id).ToArray();
@@ -458,40 +504,26 @@ public partial class PeopleWindow : Window
                 "Удаление из базы", MessageBoxButton.YesNo, MessageBoxImage.Warning,
                 MessageBoxResult.No) != MessageBoxResult.Yes ||
             !IsMenuSnapshot(person, ids, revision)) return;
-        var result = _db.DeleteOrDeactivateBatch(person, ids, revision);
-        _revision = result.Revision;
-        RememberChecks();
+        var result = await MutateAsync(expected => _db.DeleteOrDeactivateBatch(person, ids, expected));
         var checkedIds = person ? _checkedPeople : _checkedCars;
         foreach (var id in ids) checkedIds.Remove(id);
-        Reload(rememberChecks: false);
+        await ReloadMutationAsync();
         MessageBox.Show(this, $"Удалено: {result.Deleted}. Отключено (есть история): {result.Deactivated}.",
             Title, MessageBoxButton.OK, MessageBoxImage.Information);
     });
-    private void Move(bool person, int delta)
+    private async void Move(bool person, int delta)
     {
-        Run(() =>
+        await RunAsync(async () =>
         {
-            if (person)
-            {
-                var selected = SelectedPerson();
-                if (selected is null) return;
-                var i = _people.FindIndex(p => p.Id == selected.Id);
-                var j = i + delta;
-                if (j < 0 || j >= _people.Count) return;
-                (_people[i], _people[j]) = (_people[j], _people[i]);
-                _revision = _db.Reorder(true, _people.Select(p => p.Id).ToArray(), _revision);
-            }
-            else
-            {
-                var selected = SelectedCar();
-                if (selected is null) return;
-                var i = _cars.FindIndex(p => p.Id == selected.Id);
-                var j = i + delta;
-                if (j < 0 || j >= _cars.Count) return;
-                (_cars[i], _cars[j]) = (_cars[j], _cars[i]);
-                _revision = _db.Reorder(false, _cars.Select(p => p.Id).ToArray(), _revision);
-            }
-            Reload();
+            var selected = person ? SelectedPerson()?.Id : SelectedCar()?.Id;
+            if (selected is null) return;
+            var ids = person ? _people.Select(p => p.Id).ToArray() : _cars.Select(c => c.Id).ToArray();
+            var i = Array.IndexOf(ids, selected.Value);
+            var j = i + delta;
+            if (i < 0 || j < 0 || j >= ids.Length) return;
+            (ids[i], ids[j]) = (ids[j], ids[i]);
+            await MutateAsync(revision => _db.Reorder(person, ids, revision));
+            await ReloadMutationAsync();
         });
     }
     private void PersonUp_Click(object sender, RoutedEventArgs e) => Move(true, -1);
@@ -500,6 +532,7 @@ public partial class PeopleWindow : Window
     private void CarDown_Click(object sender, RoutedEventArgs e) => Move(false, +1);
     private void CheckAll(bool people, bool selected)
     {
+        if (_loading || _operationBusy || !CommitChecks()) return;
         if (people)
             foreach (var p in _people.Where(p => IsVisible(PeopleGrid, p))) p.Selected = selected;
         else
@@ -538,8 +571,8 @@ public partial class PeopleWindow : Window
         var ok = new Button { Content = "Сохранить", Padding = new Thickness(16, 7, 16, 7) };
         var cancel = new Button { Content = "Отмена", Padding = new Thickness(16, 7, 16, 7),
             Margin = new Thickness(8, 0, 0, 0) };
-        ok.Click += (_, _) => { dialog.DialogResult = true; dialog.Close(); };
-        cancel.Click += (_, _) => { dialog.DialogResult = false; dialog.Close(); };
+        ok.Click += (_, _) => dialog.DialogResult = true;
+        cancel.Click += (_, _) => dialog.DialogResult = false;
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
         root.Children.Add(buttons);
@@ -548,17 +581,18 @@ public partial class PeopleWindow : Window
         return boxes.Select(x => PeopleRules.Clean(x.Text)).ToArray();
     }
 
-    private void Import_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void Import_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         var picker = new OpenFileDialog { Filter = "Excel (*.xlsx;*.xlsm)|*.xlsx;*.xlsm" };
         if (picker.ShowDialog(this) != true) return;
-        var detected = PeopleDocuments.ReadImport(picker.FileName);
+        var path = picker.FileName;
+        var detected = await Task.Run(() => PeopleDocuments.ReadImport(path));
         var review = new PeopleImportPreviewWindow(picker.FileName, detected) { Owner = this };
         if (review.ShowDialog() != true) return;
         var preview = review.Preview;
-        var resultImport = _db.Import(preview, _revision);
-        // Reloading immediately prevents stale revision errors for a subsequent action.
-        Reload();
+        var resultImport = await MutateAsync(revision => _db.Import(preview, revision));
+        // One authoritative readback; apply imported checkmarks locally below.
+        await ReloadMutationAsync();
         HintText.Text = $"Импорт: новых {resultImport.NewPeople} чел., {resultImport.NewCars} авто; " +
             $"существующих {resultImport.ExistingPeople} чел., {resultImport.ExistingCars} авто.";
         if (IsAccess)
@@ -571,14 +605,20 @@ public partial class PeopleWindow : Window
                 _checkedPeople.Add(p.Id);
             foreach (var c in _cars.Where(c => ckeys.Contains(PeopleRules.PlateKey(c.Plate))))
                 _checkedCars.Add(c.Id);
-            Reload(rememberChecks: false);
+            foreach (var p in _people) p.Selected = _checkedPeople.Contains(p.Id);
+            foreach (var c in _cars) c.Selected = _checkedCars.Contains(c.Id);
+            PeopleGrid.Items.Refresh();
+            CarsGrid.Items.Refresh();
+            UpdateCounts();
         }
     });
 
-    private void RefreshHistory()
+    private async Task RefreshHistoryAsync()
     {
         if (!IsAccess) return;
-        ApplyHistory(_db.History(_objectId!.Value, "list"));
+        var id = _objectId!.Value;
+        var history = await Task.Run(() => _db.History(id, "list"));
+        ApplyHistory(history);
     }
 
     private void ApplyHistory(IReadOnlyList<AccessHistory> history)
@@ -634,29 +674,27 @@ public partial class PeopleWindow : Window
         if (_loading || HistoryBox.SelectedItem is not HistoryOption option) return;
         await ReloadReadOnlyAsync(option.History);
     }
-    private void OpenHistory_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void OpenHistory_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         if (HistoryBox.SelectedItem is not HistoryOption option) return;
-        if (!File.Exists(option.History.File))
+        var path = option.History.File;
+        if (!await Task.Run(() => File.Exists(path)))
             throw new FileNotFoundException("Файл ранее созданного списка не найден. История осталась в SQL Server.");
-        Process.Start(new ProcessStartInfo(option.History.File) { UseShellExecute = true });
+        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     });
-    private void Orders_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void Orders_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         if (!_objectId.HasValue) return;
         var child = new OrdersWindow(_db, _objectId.Value) { Owner = this };
         child.ShowDialog();
-        _site = _db.Site(_objectId.Value);
-        Reload(); // orders update meta.rev; avoid using the stale revision for the next list.
+        _revision = "";
+        var id = _objectId.Value;
+        _site = await Task.Run(() => _db.Site(id));
+        await ReloadMutationAsync(); // orders update meta.rev; avoid stale revision for the next list.
     });
-    private void Export_Click(object sender, RoutedEventArgs e) => Run(() =>
+    private async void Export_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
         if (_site is null || _objectId is null || _registrationUncertain) return;
-        if (!PeopleGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
-            !PeopleGrid.CommitEdit(DataGridEditingUnit.Row, true) ||
-            !CarsGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
-            !CarsGrid.CommitEdit(DataGridEditingUnit.Row, true))
-            throw new InvalidOperationException("Завершите редактирование списка допуска.");
         var revision = _revision;
         if (string.IsNullOrWhiteSpace(revision))
             throw new InvalidOperationException("Сначала обновите справочник.");
@@ -676,30 +714,40 @@ public partial class PeopleWindow : Window
         var signer = company is null ? "" :
             (string.IsNullOrWhiteSpace(company.SignerPost) ? "Генеральный директор" : company.SignerPost) +
             " " + company.Name + " " + company.SignerName;
+        var site = _site;
+        var objectId = _objectId.Value;
+        var showInactive = ShowInactive.IsChecked == true;
+        var companies = _companies.ToArray();
+        var intro = IntroBox.Text;
+        var initialFolder = await Task.Run(() => Directory.Exists(site.Folder) ? site.Folder :
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
         var picker = new SaveFileDialog
         {
             Title = "Сохранить список на допуск",
             Filter = "Excel (*.xlsx)|*.xlsx", DefaultExt = ".xlsx",
             FileName = PeopleRules.SafeFileName("Список людей " + _site.Name +
                 " " + DateTime.Today.ToString("dd.MM.yyyy")) + ".xlsx",
-            InitialDirectory = Directory.Exists(_site.Folder) ? _site.Folder :
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            InitialDirectory = initialFolder
         };
         if (picker.ShowDialog(this) != true) return;
-        if (File.Exists(picker.FileName))
-            throw new IOException("Файл уже существует. Выберите другое имя — перезапись не допускается.");
-        if (revision != _revision || _db.Load(ShowInactive.IsChecked == true).Revision != revision ||
-            _db.Site(_objectId.Value) != _site || !_db.Companies().SequenceEqual(_companies))
-            throw new InvalidOperationException("Справочник, объект или реквизиты изменились. Перезапустите окно.");
+        var path = picker.FileName;
         var operation = Guid.NewGuid();
-        var snapshot = new AccessSnapshot(people, cars, IntroBox.Text, req, company?.Id,
+        var snapshot = new AccessSnapshot(people, cars, intro, req, company?.Id,
             company?.Name ?? "", signer, operation);
-        // No false history record if XLSX was not successfully saved.
-        PeopleDocuments.ExportAccessList(picker.FileName, company, req, IntroBox.Text, people, cars, signer);
+        await Task.Run(() =>
+        {
+            if (File.Exists(path))
+                throw new IOException("Файл уже существует. Выберите другое имя — перезапись не допускается.");
+            if (_db.Load(showInactive).Revision != revision ||
+                _db.Site(objectId) != site || !_db.Companies().SequenceEqual(companies))
+                throw new InvalidOperationException("Справочник, объект или реквизиты изменились. Перезапустите окно.");
+            // No history record if XLSX was not successfully saved.
+            PeopleDocuments.ExportAccessList(path, company, req, intro, people, cars, signer);
+        });
         try
         {
-            _revision = _db.RegisterExport(_objectId.Value, "list", picker.FileName,
-                JsonSerializer.Serialize(snapshot), operation, revision).Revision;
+            _revision = (await MutateAsync(expected => _db.RegisterExport(objectId, "list", path,
+                JsonSerializer.Serialize(snapshot), operation, expected))).Revision;
         }
         catch (Exception)
         {
@@ -709,9 +757,15 @@ public partial class PeopleWindow : Window
             HintText.Text = "Файл создан, но запись в журнал не подтверждена. Повторный экспорт не выполняйте.";
             throw;
         }
-        RefreshHistory();
         HintText.Text = "Список создан и зарегистрирован в SQL Server.";
-        Process.Start(new ProcessStartInfo(picker.FileName) { UseShellExecute = true });
+        try { await RefreshHistoryAsync(); }
+        catch (Exception ex)
+        {
+            HintText.Text = "Список зарегистрирован. Не удалось обновить историю.";
+            MessageBox.Show(this, "Файл сохранён: " + path + "\n" + ex.Message,
+                Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     });
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

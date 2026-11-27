@@ -28,7 +28,7 @@ public sealed class PeopleInitialReadLifecycleTests
         Assert.Contains("ApplyHistory(snapshot.History);", source);
         Assert.Contains("ApplyDirectory(snapshot.Directory.People, snapshot.Directory.Cars, snapshot.Directory.Revision, null, null);", source);
         Assert.Contains("content.IsEnabled = true;", source);
-        Assert.Contains("if (_closed || _loading) return;", source);
+        Assert.Contains("if (_closed || _loading || _operationBusy) return;", source);
         Assert.Contains("finally { _loading = wasLoading; }", source);
     }
     [Fact]
@@ -73,7 +73,7 @@ public sealed class PeopleInitialReadLifecycleTests
         Assert.Contains("await ReloadReadOnlyAsync();", source);
         Assert.Contains("await ReloadReadOnlyAsync(option.History);", source);
         Assert.Contains("if (string.IsNullOrWhiteSpace(_revision))", source);
-        Assert.Contains("private void Reload(bool rememberChecks)", source);
+        Assert.Contains("private async Task ReloadMutationAsync", source);
     }
 
 }
