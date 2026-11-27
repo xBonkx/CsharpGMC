@@ -67,7 +67,7 @@ public static class StageAllocationPresentation
 
     /// <summary>All card and remainder statistics in one pass over the snapshot.</summary>
     public static Metrics Summarize(int stageCount,
-        IEnumerable<(decimal Price, decimal Rest, IReadOnlyList<decimal> PerStage)> rows)
+        IEnumerable<(decimal Price, decimal Remaining, IReadOnlyList<decimal> PerStage)> rows)
     {
         var assigned = new int[stageCount];
         int unassigned = 0, overrun = 0;
@@ -76,9 +76,9 @@ public static class StageAllocationPresentation
         {
             for (var i = 0; i < stageCount; i++)
                 if (row.PerStage[i] > Epsilon) assigned[i]++;
-            if (Math.Abs(row.Rest) > Epsilon) unassigned++;
-            if (row.Rest < -Epsilon) overrun++;
-            amount += Math.Max(row.Rest, 0m) * row.Price;
+            if (Math.Abs(row.Remaining) > Epsilon) unassigned++;
+            if (row.Remaining < -Epsilon) overrun++;
+            amount += Math.Max(row.Remaining, 0m) * row.Price;
         }
         return new Metrics(Array.AsReadOnly(assigned), unassigned, overrun, amount);
     }

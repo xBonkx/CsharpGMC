@@ -18,7 +18,7 @@ public sealed class DirectorFooterSourceTests
         var panel = Assert.Single(xml.Descendants(presentation + "DockPanel")
             .Where(e => (string?)e.Attribute(xaml + "Name") == "LoadStatusPanel"));
         Assert.Equal("Collapsed", (string?)panel.Attribute("Visibility"));
-        Assert.Equal("0,12,0,0", (string?)panel.Parent!.Attribute("Margin"));
+        Assert.Equal("{StaticResource LayoutDirectorSectionGap}", (string?)panel.Parent!.Attribute("Margin"));
         Assert.Contains(panel.Parent.Elements(presentation + "TextBlock"),
             e => ((string?)e.Attribute("Text"))?.Contains("Суммы с НДС.") == true);
         var code = File.ReadAllText(Path.Combine(app, "DirectorView.xaml.cs"));

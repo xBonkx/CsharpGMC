@@ -80,14 +80,14 @@ public sealed class StageAllocationPresentationTests
     public void LargeCardMetricsMatchIndependentFormerScans()
     {
         var rows = Enumerable.Range(0, 25000).Select(i =>
-            (Price: (decimal)(i % 17), Rest: i % 7 - 3m,
+            (Price: (decimal)(i % 17), Remaining: i % 7 - 3m,
              PerStage: (IReadOnlyList<decimal>)new decimal[] { i % 3, i % 5 - 2, 0.000001m })).ToArray();
         var metrics = StageAllocationPresentation.Summarize(3, rows);
         Assert.Equal(Enumerable.Range(0, 3).Select(i =>
             rows.Count(r => r.PerStage[i] > StageAllocationPresentation.Epsilon)), metrics.AssignedCounts);
-        Assert.Equal(rows.Count(r => Math.Abs(r.Rest) > StageAllocationPresentation.Epsilon), metrics.UnassignedCount);
-        Assert.Equal(rows.Count(r => r.Rest < -StageAllocationPresentation.Epsilon), metrics.OverrunCount);
-        Assert.Equal(StageAllocationPresentation.AmountOfRemaining(rows.Select(r => (r.Price, r.Rest))),
+        Assert.Equal(rows.Count(r => Math.Abs(r.Remaining) > StageAllocationPresentation.Epsilon), metrics.UnassignedCount);
+        Assert.Equal(rows.Count(r => r.Remaining < -StageAllocationPresentation.Epsilon), metrics.OverrunCount);
+        Assert.Equal(StageAllocationPresentation.AmountOfRemaining(rows.Select(r => (r.Price, r.Remaining))),
             metrics.RemainingAmount);
         var empty = StageAllocationPresentation.Summarize(0, Array.Empty<(decimal, decimal, IReadOnlyList<decimal>)>());
         Assert.Empty(empty.AssignedCounts);

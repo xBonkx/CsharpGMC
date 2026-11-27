@@ -19,7 +19,7 @@ public sealed class EstimateMoneyCardSourceTests
             .Where(e => (string?)e.Attribute(xaml + "Key") == "PythonMoneyEdit"));
         string? Value(string property) => (string?)Assert.Single(style.Elements(p + "Setter")
             .Where(e => (string?)e.Attribute("Property") == property)).Attribute("Value");
-        Assert.Equal("16", Value("FontSize"));
+        Assert.Equal("{StaticResource UiMoneyInputSize}", Value("FontSize"));
         Assert.Equal("SemiBold", Value("FontWeight"));
         Assert.Equal("6,2", Value("Padding"));
         Assert.Equal("26", Value("MinHeight"));
@@ -33,7 +33,7 @@ public sealed class EstimateMoneyCardSourceTests
         }
         var vat = Named("VatText");
         var discount = Named("DiscountTotalText");
-        Assert.Equal("12", (string?)vat.Attribute("FontSize"));
+        Assert.Equal("{StaticResource UiTotalDetailSize}", (string?)vat.Attribute("FontSize"));
         Assert.Equal("#E6FFFFFF", (string?)vat.Attribute("Foreground"));
         Assert.Equal("0,2,0,0", (string?)vat.Attribute("Margin"));
         Assert.Same(discount, vat.ElementsAfterSelf().First());

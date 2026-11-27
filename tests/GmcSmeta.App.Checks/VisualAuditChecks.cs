@@ -164,16 +164,16 @@ internal static class VisualAuditChecks
                 visual.TransformToAncestor(root).Transform(new Point());
             var padding = element switch
             {
-                Control control => control.Padding.ToString(CultureInfo.InvariantCulture),
-                Border border => border.Padding.ToString(CultureInfo.InvariantCulture),
-                TextBlock text => text.Padding.ToString(CultureInfo.InvariantCulture),
+                Control control => control.Padding.ToString(),
+                Border border => border.Padding.ToString(),
+                TextBlock text => text.Padding.ToString(),
                 _ => ""
             };
             var fontSize = (double)element.GetValue(TextElementFontSize);
             var font = (FontFamily)element.GetValue(TextElementFontFamily);
             var dpi = VisualTreeHelper.GetDpi(visual);
             writer.WriteLine(FormattableString.Invariant(
-                $"{path}\t{element.GetType().Name}\t{element.Name}\t{element.Visibility}\t{offset.X:0.##}\t{offset.Y:0.##}\t{element.ActualWidth:0.##}\t{element.ActualHeight:0.##}\t{element.DesiredSize.Width:0.##}\t{element.DesiredSize.Height:0.##}\t{element.Margin.ToString(CultureInfo.InvariantCulture)}\t{padding}\t{fontSize:0.##}\t{font.Source}\t{dpi.PixelsPerInchX:0.##}\t{dpi.PixelsPerInchY:0.##}"));
+                $"{path}\t{element.GetType().Name}\t{element.Name}\t{element.Visibility}\t{offset.X:0.##}\t{offset.Y:0.##}\t{element.ActualWidth:0.##}\t{element.ActualHeight:0.##}\t{element.DesiredSize.Width:0.##}\t{element.DesiredSize.Height:0.##}\t{element.Margin.ToString()}\t{padding}\t{fontSize:0.##}\t{font.Source}\t{dpi.PixelsPerInchX:0.##}\t{dpi.PixelsPerInchY:0.##}"));
         }
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(visual); i++)
             if (VisualTreeHelper.GetChild(visual, i) is Visual child)
