@@ -1,6 +1,10 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows.Controls;
+using System.Windows;
+using System.Windows.Data;
+using System.Globalization;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -18,6 +22,10 @@ public sealed class NameWrapPreference : INotifyPropertyChanged
     private NameWrapPreference() => IsEnabled = Load();
 
     public bool IsEnabled { get; private set; }
+    // NaN is WPF's automatic row height. The compact mode must constrain
+    // every row, including explicit newlines in names or other columns.
+    public double RowHeight => IsEnabled ? double.NaN : 27d;
+    public TextWrapping EditorWrapping => IsEnabled ? TextWrapping.Wrap : TextWrapping.NoWrap;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -40,6 +48,8 @@ public sealed class NameWrapPreference : INotifyPropertyChanged
         if (IsEnabled == enabled) return;
         IsEnabled = enabled;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowHeight)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditorWrapping)));
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
@@ -66,4 +76,14 @@ public sealed class NameWrapPreference : INotifyPropertyChanged
         item.Click += (_, _) => Current.SetEnabled(item.IsChecked);
         menu.Items.Add(item);
     }
+}
+
+/// <summary>Display only: retain the original value for editing, tooltips and exports.</summary>
+public sealed class SingleLineNameConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        NameDisplayText.SingleLine(value as string);
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
 }

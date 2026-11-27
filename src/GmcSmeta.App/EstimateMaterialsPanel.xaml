@@ -3,11 +3,14 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:local="clr-namespace:GmcSmeta.App">
     <Grid.Resources>
+        <local:SingleLineNameConverter x:Key="SingleLineName"/>
         <Style x:Key="DocumentNameDisplay" TargetType="TextBlock">
+            <Setter Property="Text" Value="{Binding Name}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="TextTrimming" Value="None"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
+                    <Setter Property="Text" Value="{Binding Name, Converter={StaticResource SingleLineName}}"/>
                     <Setter Property="TextWrapping" Value="NoWrap"/>
                     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                 </DataTrigger>
@@ -143,7 +146,7 @@
     <DataGrid local:TableColumnMenu.Key="estimate-materials" x:Name="MaterialsGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="False"
               CellStyle="{StaticResource CompactCostCell}"
               RowStyle="{StaticResource MaterialsCostRow}"
-              MinRowHeight="27" ColumnHeaderStyle="{StaticResource CompactCostHeader}"
+              MinRowHeight="27" ColumnHeaderStyle="{StaticResource CompactCostHeader}" RowHeight="{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}"
               CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False" RowHeaderWidth="0"
               HeadersVisibility="Column" GridLinesVisibility="All"
               HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF" BorderBrush="#E4E8EF" BorderThickness="1" Background="White"
@@ -184,7 +187,7 @@
                                     CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Name}" Style="{StaticResource DocumentNameDisplay}"
+                        <TextBlock Style="{StaticResource DocumentNameDisplay}"
                                    VerticalAlignment="Center"
                                    ToolTip="{Binding NameTooltip}"/>
                     </DataTemplate>

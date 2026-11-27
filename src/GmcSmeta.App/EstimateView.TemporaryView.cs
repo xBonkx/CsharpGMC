@@ -361,13 +361,20 @@ public partial class EstimateView
 
     private void StyleBlue(Button button, bool on)
     {
-        button.Background = on ? new SolidColorBrush(Color.FromRgb(0xE8, 0xF0, 0xFE)) : Brushes.Transparent;
-        button.BorderBrush = on ? new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB))
-            : Brushes.Transparent;
         button.FontWeight = FontWeights.Normal;
-        button.Padding = on ? new Thickness(10, 5, 10, 5) : new Thickness(9, 6, 9, 6);
-        button.Foreground = on ? new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF))
-            : new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+        if (on)
+        {
+            button.Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF0, 0xFE));
+            button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xEB));
+            button.Foreground = new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF));
+        }
+        else
+        {
+            // Restore the standard white toolbar chrome, not a transparent button.
+            button.ClearValue(Control.BackgroundProperty);
+            button.ClearValue(Control.BorderBrushProperty);
+            button.ClearValue(Control.ForegroundProperty);
+        }
     }
 
     private void EstimateView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)

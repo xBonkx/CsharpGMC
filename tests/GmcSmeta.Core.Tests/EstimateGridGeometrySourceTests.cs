@@ -22,7 +22,8 @@ public sealed class EstimateGridGeometrySourceTests
         var grid = Assert.Single(view.Descendants(p + "DataGrid")
             .Where(e => (string?)e.Attribute(xaml + "Name") == "EstimateGrid"));
         Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
-        Assert.Null(grid.Attribute("RowHeight"));
+        Assert.Equal("{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}",
+            (string?)grid.Attribute("RowHeight"));
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
         Assert.Equal("Recycling", (string?)grid.Attribute("VirtualizingPanel.VirtualizationMode"));
         Assert.Equal("White", (string?)grid.Attribute("Background"));

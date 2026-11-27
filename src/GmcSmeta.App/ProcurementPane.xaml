@@ -6,6 +6,7 @@
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <UserControl.Resources>
+        <local:SingleLineNameConverter x:Key="SingleLineName"/>
         <!-- Python common.GridDelegate pill: 5px radius, foreground alpha 70 border,
              demi-bold 86% of the normal 10pt font, left inset 6px. -->
         <Style x:Key="ProcurementHistoryExpander" TargetType="Expander">
@@ -321,7 +322,7 @@
                         Margin="0,0,2,4" Click="ProcurementSortMenu_Click"/>
             </WrapPanel>
         </DockPanel>
-        <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource ProcurementHeader}" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+        <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource ProcurementHeader}" MinRowHeight="27" RowHeight="{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
                   Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="BuyGrid" Grid.Row="2" Margin="0,0,0,0"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
@@ -399,12 +400,14 @@
                                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#B45309"/>
                                     </Canvas>
                                 </Viewbox>
-                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
+                                <TextBlock VerticalAlignment="Center" ToolTip="{Binding Name}">
                                     <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
+                                        <Setter Property="Text" Value="{Binding Name}"/>
                                         <Setter Property="TextWrapping" Value="Wrap"/>
                                         <Setter Property="TextTrimming" Value="None"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsEnabled, Source={x:Static local:NameWrapPreference.Current}}" Value="False">
+                                                <Setter Property="Text" Value="{Binding Name, Converter={StaticResource SingleLineName}}"/>
                                                 <Setter Property="TextWrapping" Value="NoWrap"/>
                                                 <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                             </DataTrigger><DataTrigger Binding="{Binding HasBuyName}" Value="True"><Setter Property="Foreground" Value="#1E40AF"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>

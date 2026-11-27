@@ -45,10 +45,36 @@ public sealed class NameWrapPreferenceSourceTests
         var style = trigger.Parent!.Parent!;
         Assert.Contains(style.Elements(ns + "Setter"), s =>
             (string?)s.Attribute("Property") == "TextWrapping" && (string?)s.Attribute("Value") == "Wrap");
+        Assert.Contains(style.Elements(ns + "Setter"), s =>
+            (string?)s.Attribute("Property") == "Text" && (string?)s.Attribute("Value") == "{Binding Name}");
+        Assert.Contains(trigger.Elements(ns + "Setter"), s =>
+            (string?)s.Attribute("Property") == "Text" &&
+            (string?)s.Attribute("Value") == "{Binding Name, Converter={StaticResource SingleLineName}}");
         var nameBlocks = xaml.Descendants(ns + "TextBlock").Where(t =>
-            (string?)t.Attribute("Text") == "{Binding Name}" &&
-            ((string?)t.Attribute("Style") == "{StaticResource DocumentNameDisplay}" || t.Descendants(ns + "DataTrigger").Contains(trigger)));
-        Assert.Equal(expectedNames, nameBlocks.Count());
+            (string?)t.Attribute("Style") == "{StaticResource DocumentNameDisplay}" || t.Descendants(ns + "DataTrigger").Contains(trigger)).ToArray();
+        Assert.Equal(expectedNames, nameBlocks.Length);
+        // A local Text binding would override both style setters.
+        Assert.All(nameBlocks, t => Assert.Null(t.Attribute("Text")));
+    }
+
+    [Theory]
+    [InlineData("EstimateView.xaml", "EstimateGrid")]
+    [InlineData("EstimateMaterialsPanel.xaml", "MaterialsGrid")]
+    [InlineData("ProcurementPane.xaml", "BuyGrid")]
+    public void CompactModeConstrictsEveryRowAndWrapModeRestoresAutoHeight(string path, string gridName)
+    {
+        var xaml = XDocument.Load(Path.Combine(AppDirectory(), path));
+        XNamespace ns = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var grid = Assert.Single(xaml.Descendants(ns + "DataGrid")
+            .Where(e => (string?)e.Attribute(x + "Name") == gridName));
+        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
+        Assert.Equal("{Binding RowHeight, Source={x:Static local:NameWrapPreference.Current}}",
+            (string?)grid.Attribute("RowHeight"));
+        var code = File.ReadAllText(Path.Combine(AppDirectory(), "NameWrapPreference.cs"));
+        Assert.Contains("IsEnabled ? double.NaN : 27d", code);
+        Assert.Contains("PropertyChangedEventArgs(nameof(RowHeight))", code);
+        Assert.Contains("NameDisplayText.SingleLine(value as string)", code);
     }
 
     [Fact]

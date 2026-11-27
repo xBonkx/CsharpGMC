@@ -59,6 +59,14 @@ public sealed class EstimateTypographyAndToolsSourceTests
         var doc = XDocument.Parse(Source("EstimateView.xaml"));
         var group = Assert.Single(doc.Descendants(W + "Button").Where(e => (string?)e.Attribute(X + "Name") == "GroupButton"));
         Assert.Equal("0,0,6,4", (string?)group.Attribute("Margin"));
-        Assert.Contains("button.FontWeight = FontWeights.Normal", Source("EstimateView.TemporaryView.cs"));
+        var sort = Assert.Single(doc.Descendants(W + "Button").Where(e => (string?)e.Attribute(X + "Name") == "SortButton"));
+        Assert.Equal("{StaticResource PythonToolbarButton}", (string?)group.Attribute("Style"));
+        Assert.Equal("{StaticResource PythonToolbarButton}", (string?)sort.Attribute("Style"));
+        var code = Source("EstimateView.TemporaryView.cs");
+        Assert.Contains("button.FontWeight = FontWeights.Normal", code);
+        Assert.Contains("button.ClearValue(Control.BackgroundProperty)", code);
+        Assert.Contains("button.ClearValue(Control.BorderBrushProperty)", code);
+        Assert.DoesNotContain("button.Padding = on", code);
+        Assert.DoesNotContain(": Brushes.Transparent", code[code.IndexOf("private void StyleBlue", StringComparison.Ordinal)..code.IndexOf("private void EstimateView_PreviewMouseWheel", StringComparison.Ordinal)]);
     }
 }
