@@ -151,6 +151,11 @@ public partial class EstimateView
         // A real cell editor (or search box) owns its normal Ctrl+C/V/Z and
         // typing shortcuts. Never replace a cell's text by pasting SQL rows.
         if (Keyboard.FocusedElement is TextBox) return;
+        if (inTable && ctrl && e.Key == Key.V && GridEditInteraction.TryPasteInEditingCell(EstimateGrid))
+        {
+            e.Handled = true;
+            return;
+        }
 
         // Python editor shortcuts: safe navigation and explicit delete
         // confirmation (CanUserDeleteRows remains disabled).
