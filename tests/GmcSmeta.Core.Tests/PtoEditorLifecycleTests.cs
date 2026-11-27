@@ -68,6 +68,20 @@ Assert.Contains("_allowClose=true;",code);
     }
 
     [Fact]
+    public void NewPackageRevalidatesPickerIdentityAndReadsOneRevision()
+    {
+        var source=Source("PtoSqlSource.cs");
+        Assert.Contains("var current=ReadObjects(conn,obj.Id).SingleOrDefault()",source);
+        Assert.Contains("document.Agreement?.Id!=contract.Agreement?.Id",source);
+        Assert.Contains("p=document.NewPackage(current.Id,current.Name,current.Address,current.Customer,defaults)",source);
+        Assert.Contains("cmd.Parameters.Add(\"@id\",SqlDbType.BigInt).Value=document.Id;",source);
+        Assert.Contains("before==SqlServerDatabase.Revision(conn)",source);
+        var window=Source("PtoWindow.Packages.cs");
+        Assert.Contains("_source.Snapshot(obj,contract,archive.Sql.ObjectProfile(obj.Id))",window);
+        Assert.DoesNotContain("var currentContract=contract is null?null:",window);
+    }
+
+    [Fact]
     public void AttachmentReadAndImportUseWorkerAndPreserveSelection()
     {
         var code=Source("PtoEditorWindow.xaml.cs");

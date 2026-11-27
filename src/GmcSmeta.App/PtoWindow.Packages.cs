@@ -88,11 +88,11 @@ public partial class PtoWindow
         panel.Children.Add(create);
         picker.Content=panel;
         if(picker.ShowDialog()!=true || objBox.SelectedItem is not PtoSqlSource.ObjectChoice obj)return;
-        var contract=contractBox.SelectedItem as PtoSqlSource.ContractChoice;
+        var contract=contractBox.SelectedItem as PtoContractContext;
         await CreateForAsync(obj,contract);
     });
 
-    private async Task CreateForAsync(PtoSqlSource.ObjectChoice obj,PtoSqlSource.ContractChoice? contract)
+    private async Task CreateForAsync(PtoSqlSource.ObjectChoice obj,PtoContractContext? contract)
     {
         if(_scopeObjectId.HasValue && obj.Id!=_scopeObjectId ||
             _scopeContractId.HasValue && contract?.Id!=_scopeContractId)
@@ -101,13 +101,9 @@ public partial class PtoWindow
         _packageWriteNeedsRefresh=true;
         var p=await Task.Run(()=>
         {
-            // Revalidate the chosen source after the modal picker.
-            var currentObject=_source.Objects().FirstOrDefault(o=>o.Id==obj.Id) ??
-                throw new InvalidOperationException("Объект больше не доступен.");
-            var currentContract=contract is null?null:
-                _source.Contracts(obj.Id).FirstOrDefault(c=>c.Id==contract.Id) ??
-                throw new InvalidOperationException("Договор больше не доступен в выбранном объекте.");
-            var package=_source.Snapshot(currentObject,currentContract,archive.Sql.ObjectProfile(obj.Id));
+            // Snapshot revalidates the original picker identity and reads
+            // object, legal context and quantities inside one revision fence.
+            var package=_source.Snapshot(obj,contract,archive.Sql.ObjectProfile(obj.Id));
             package.Fields["number"]=PtoRules.NextNumber(archive.Sql.Packages(obj.Id),package);
             archive.Sql.Save(package);
             return package;

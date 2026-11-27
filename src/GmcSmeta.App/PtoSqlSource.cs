@@ -15,12 +15,6 @@ public sealed class PtoSqlSource
     {
         public override string ToString()=>Name;
     }
-    public sealed record ContractChoice(long Id,long ObjectId,string Number,string Date,
-        string Name,string Kind,string Contractor)
-    {
-        public override string ToString()=> (Kind=="dop"?"ДС ":"Договор ")+"№"+Number+
-            (string.IsNullOrWhiteSpace(Name)?"":" · "+Name);
-    }
     public sealed record KsChoice(long Id,string Number,string Date,string Revision)
     {
         public override string ToString()=>"КС № "+Number+" от "+Date;
@@ -29,58 +23,73 @@ public sealed class PtoSqlSource
     public IReadOnlyList<ObjectChoice> Objects()
     {
         using var conn=SqlServerDatabase.Open(_connection);
-        using var cmd=new SqlCommand("SELECT id,name,address,customer FROM dbo.objects ORDER BY name,id",conn);
+        return ReadObjects(conn);
+    }
+
+    private static IReadOnlyList<ObjectChoice> ReadObjects(SqlConnection conn,long? objectId=null)
+    {
+        using var cmd=new SqlCommand("SELECT id,name,address,customer FROM dbo.objects "+
+            "WHERE @id IS NULL OR id=@id ORDER BY name,id",conn);
+        cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=objectId.HasValue?objectId.Value:DBNull.Value;
         var result=new List<ObjectChoice>();
         using var r=cmd.ExecuteReader();
         string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
         while(r.Read())result.Add(new(SqlInteger.ReadInt64(r, 0),S(1),S(2),S(3)));
         return result;
     }
-    public IReadOnlyList<ContractChoice> Contracts(long? objectId=null)
+    public IReadOnlyList<PtoContractContext> Contracts(long? objectId=null)
     {
         using var conn=SqlServerDatabase.Open(_connection);
-        using var cmd=new SqlCommand(
-            "SELECT c.id,c.object_id,c.number,c.[date],c.name,c.kind,co.legal_full "+
-            "FROM dbo.contracts c LEFT JOIN dbo.companies co ON co.id=c.company_id "+
-            "WHERE c.kind IN(N'main',N'dop') AND (@obj IS NULL OR c.object_id=@obj) "+
-            "ORDER BY c.object_id,c.id",conn);
-        cmd.Parameters.Add("@obj",SqlDbType.BigInt).Value=objectId.HasValue?objectId.Value:DBNull.Value;
-        var result=new List<ContractChoice>();
-        using var r=cmd.ExecuteReader();
-        string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
-        while(r.Read())result.Add(new(SqlInteger.ReadInt64(r, 0),SqlInteger.ReadInt64(r, 1),S(2),S(3),S(4),S(5),S(6)));
-        return result;
+        for(var attempt=0;attempt<2;attempt++)
+        {
+            var revision=SqlServerDatabase.Revision(conn);
+            var result=SqlServerPtoContractContext.Read(conn,objectId);
+            if(!string.IsNullOrWhiteSpace(revision)&&revision==SqlServerDatabase.Revision(conn))
+                return result;
+        }
+        throw new InvalidOperationException("Список приложений изменился. Повторите выбор.");
     }
-    public PtoPackage Snapshot(ObjectChoice obj,ContractChoice? contract=null,
+
+    public PtoPackage Snapshot(ObjectChoice obj,PtoContractContext? contract=null,
         IReadOnlyDictionary<string,string>? defaults=null)
     {
         if(contract is not null && contract.ObjectId!=obj.Id)
-            throw new InvalidOperationException("Договор относится к другому объекту.");
-        var p=PtoRules.New(obj.Id,obj.Name,obj.Address,
-            contract?.Id,contract?.ToString()??"Документы объекта",
-            contract?.Number??"",contract?.Date??"");
-        p.Fields["customer"]=obj.Customer;
-        if(contract is not null)
+            throw new InvalidOperationException("Приложение относится к другому объекту.");
+        using var conn=SqlServerDatabase.Open(_connection);
+        for(var attempt=0;attempt<2;attempt++)
         {
-            p.Fields["contractor"]=contract.Contractor;
-            p.Fields["executor"]=contract.Contractor;
-            using var conn=SqlServerDatabase.Open(_connection);
-            using var cmd=new SqlCommand(
-                "SELECT sy.name,p.name,p.unit,p.qty FROM dbo.positions p "+
-                "JOIN dbo.systems sy ON sy.id=p.system_id "+
-                "WHERE sy.contract_id=@id AND ISNULL(p.out_of_kp,0)=0 "+
-                "ORDER BY sy.[order],sy.id,p.[order],p.id",conn);
-            cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=contract.Id;
-            using var r=cmd.ExecuteReader();
-            string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
-            while(r.Read())
-                p.Positions.Add(new PtoWork {System=S(0),Name=S(1),Unit=S(2),Qty=S(3)});
+            var before=SqlServerDatabase.Revision(conn);
+            var current=ReadObjects(conn,obj.Id).SingleOrDefault()
+                ??throw new InvalidOperationException("Объект больше не доступен.");
+            PtoPackage p;
+            if(contract is null)
+            {
+                p=PtoRules.New(current.Id,current.Name,current.Address,contractLabel:"Документы объекта");
+                p.Fields["customer"]=current.Customer;
+                PtoContractContext.ApplyDefaults(p,defaults);
+            }
+            else
+            {
+                var document=SqlServerPtoContractContext.Read(conn,obj.Id).SingleOrDefault(c=>c.Id==contract.Id)
+                    ??throw new InvalidOperationException("Приложение больше не доступно в выбранном объекте.");
+                if(document.LegalRequired!=contract.LegalRequired || document.Agreement?.Id!=contract.Agreement?.Id)
+                    throw new InvalidOperationException("Юридическая привязка приложения изменилась. Выберите источник объёмов заново.");
+                p=document.NewPackage(current.Id,current.Name,current.Address,current.Customer,defaults);
+                using var cmd=new SqlCommand(
+                    "SELECT sy.name,p.name,p.unit,p.qty FROM dbo.positions p "+
+                    "JOIN dbo.systems sy ON sy.id=p.system_id "+
+                    "WHERE sy.contract_id=@id AND ISNULL(p.out_of_kp,0)=0 "+
+                    "ORDER BY sy.[order],sy.id,p.[order],p.id",conn);
+                cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=document.Id;
+                using var r=cmd.ExecuteReader();
+                string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
+                while(r.Read())
+                    p.Positions.Add(new PtoWork {System=S(0),Name=S(1),Unit=S(2),Qty=S(3)});
+            }
+            if(!string.IsNullOrWhiteSpace(before)&&before==SqlServerDatabase.Revision(conn))
+                return p;
         }
-        if(defaults is not null)
-            foreach(var (key,value) in defaults)
-                if(PtoRules.Fields.ContainsKey(key) && string.IsNullOrWhiteSpace(PtoRules.Text(p,key)))
-                    p.Fields[key]=value;
-        return p;
+        throw new InvalidOperationException("Реквизиты или объёмы изменились во время создания ПТО. Повторите операцию.");
     }
     public IReadOnlyList<KsChoice> Ks(long contractId)
     {

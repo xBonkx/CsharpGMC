@@ -22,6 +22,69 @@ public sealed class PtoRulesTests
         Assert.Equal("Черновик",p.Status);
         Assert.False(p.ManualReview);
     }
+    [Theory]
+    [InlineData("main","П-2")]
+    [InlineData("dop","ДС-5")]
+    public void NewPtoUsesLegalRequisitesButKeepsEstimateDocumentId(string kind,string ownNumber)
+    {
+        var source=new PtoContractContext(22,1,ownNumber,"01.02.2026","ОВ",kind,"Старый подрядчик")
+        {
+            LegalRequired=true,AnnexNumber=ownNumber,
+            Agreement=new(7,"Д-42","23.01.2025","Новый заказчик","Новый подрядчик")
+        };
+        var p=source.NewPackage(1,"Стройка","Адрес","Старый заказчик");
+        Assert.Equal(22L,p.ContractId);
+        Assert.Equal("Д-42",p.ContractNumber);
+        Assert.Equal("23.01.2025",p.ContractDate);
+        Assert.Contains(ownNumber,p.ContractLabel);
+        Assert.Contains("Д-42",p.ContractLabel);
+        Assert.Equal("Стройка",PtoRules.Text(p,"object"));
+        Assert.Equal("Новый заказчик",PtoRules.Text(p,"customer"));
+        Assert.Equal("Новый подрядчик",PtoRules.Text(p,"contractor"));
+        Assert.Equal("Новый подрядчик",PtoRules.Text(p,"executor"));
+        Assert.Equal("",PtoRules.Text(p,"start"));
+        Assert.Equal("",PtoRules.Text(p,"finish"));
+    }
+
+    [Fact]
+    public void IncompleteLegalRequisitesAreNotFilledFromAnotherAgreementOrProfile()
+    {
+        var source=new PtoContractContext(22,1,"ДС-5","01.02.2026","ОВ","dop","Старый подрядчик")
+        {LegalRequired=true,Agreement=new(7,"","","","")};
+        var defaults=new Dictionary<string,string>
+        {["customer"]="Другой заказчик",["contractor"]="Другой подрядчик",["executor"]="Другой исполнитель",["project"]="ОВ-1"};
+        var p=source.NewPackage(1,"Стройка","Адрес","Старый заказчик",defaults);
+        Assert.Equal("",p.ContractNumber);
+        Assert.Equal("",p.ContractDate);
+        Assert.Equal("",PtoRules.Text(p,"customer"));
+        Assert.Equal("",PtoRules.Text(p,"contractor"));
+        Assert.Equal("",PtoRules.Text(p,"executor"));
+        Assert.Equal("ОВ-1",PtoRules.Text(p,"project"));
+        Assert.Contains("номер не заполнен",p.ContractLabel);
+        Assert.Contains(PtoRules.Check(p).Errors,e=>e.Contains(PtoRules.Fields["contractor"]));
+    }
+
+    [Fact]
+    public void MissingLegalLinkAndWrongObjectCannotCreateNewPto()
+    {
+        var source=new PtoContractContext(22,1,"42","01.02.2026","ОВ","main","ГМС");
+        Assert.Throws<InvalidOperationException>(()=>(source with {LegalRequired=true}).NewPackage(1,"Стройка","",""));
+        Assert.Throws<InvalidOperationException>(()=>source.NewPackage(2,"Другая стройка","",""));
+    }
+
+    [Fact]
+    public void LegacySourceKeepsOriginalRequisitesAndExistingSnapshotsStayUnchanged()
+    {
+        var source=new PtoContractContext(22,1,"42","01.02.2026","ОВ","main","ГМС");
+        var old=source.NewPackage(1,"Стройка","Адрес","Заказчик");
+        var updated=source with {LegalRequired=true,Agreement=new(7,"99","02.02.2026","Новый","Другой")};
+        var fresh=updated.NewPackage(1,"Стройка","Адрес","Заказчик");
+        Assert.Equal("42",old.ContractNumber);
+        Assert.Equal("99",fresh.ContractNumber);
+        Assert.Equal("ГМС",PtoRules.Text(old,"contractor"));
+        Assert.Equal("Другой",PtoRules.Text(fresh,"contractor"));
+    }
+
     [Fact]public void NumberingUsesObjectScope()
     {
         var p=Sample();
