@@ -73,6 +73,8 @@ public sealed record EstimateDocument(
     public decimal SmrPercent { get; init; }
     public bool MoneyFromStages { get; init; }
     public bool BasisAllowed { get; init; }
+    // Print uses case-insensitive r4, unlike the editor's legacy numbering.
+    public bool PrintManualNumbering { get; init; }
     // Этап подготовки КП (kp_workflow.PHASES эталона): volumes / prices / review / ready / sent.
     public string KpPhase { get; init; } = "";
     public bool SupportsFinalDiscount { get; init; }
@@ -379,6 +381,8 @@ public static partial class EstimateReader
             AnnexDisplayTitle = head.Kind == "main" ? AgreementPresentation.AnnexTitle(contractId, head.Name) : null,
             SmrMode = head.SmrMode,
             SmrPercent = head.SmrPercent,
+            PrintManualNumbering = string.Equals(head.Form, "r4", StringComparison.OrdinalIgnoreCase) ||
+                rules.Has(head.Form, "num_manual"),
             MoneyFromStages = head.MoneyFromStages,
             BasisAllowed = AreaCellPresentation.IsBasisAllowed(head.Form, rules.Has(head.Form, "basis")),
             Statistics = Statistics(totals, positions),

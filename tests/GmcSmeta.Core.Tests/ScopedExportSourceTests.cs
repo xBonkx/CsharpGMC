@@ -16,6 +16,10 @@ public sealed class ScopedExportSourceTests
         var source = Source("MainWindow.ContractExport.cs");
         Assert.Contains("Workspace.ReadDocumentMetadata(conn, contractId)", source);
         Assert.DoesNotContain("Workspace.Documents(conn)", source);
+        Assert.DoesNotContain("SqlServerWorkspace.ReadContract(conn, contractId)", source);
+        Assert.DoesNotContain("TagRules.Load(conn)", source);
+        Assert.Contains("requisites.RawSmrPercent", source);
+        Assert.Contains("estimate.PrintManualNumbering", source);
         Assert.Contains("LoadKpPrintData(connectionString, doc.Id)", source);
         Assert.Contains("if (_kpExportInProgress ||", source);
         Assert.Contains("finally { _kpExportInProgress = false; }", source);

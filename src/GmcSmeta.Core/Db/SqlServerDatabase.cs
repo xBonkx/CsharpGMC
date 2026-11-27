@@ -61,19 +61,17 @@ public static partial class SqlServerDatabase
                 || SqlSchemaCompatibility.IsOrdinarySchema31TestDatabase(conn.Database, builder.DataSource)
                 || SqlSchemaCompatibility.IsAgreementTestDatabase(conn.Database, builder.DataSource);
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
-            var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
             if (preview || approvedCutover || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = cmd.ExecuteReader();
                 if (!reader.Read()) throw new InvalidOperationException("Не удалось проверить тестовую базу.");
-                SqlSchemaCompatibility.Validate(version, conn.Database,
-                    Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1, builder.DataSource);
+                ValidatePreviewResult(reader, conn.Database, builder.DataSource);
             }
             else
             {
+                cmd.CommandText = SchemaVersionSql;
+                var version = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
                 SqlSchemaCompatibility.Validate(version, conn.Database, null, false, builder.DataSource);
             }
             return conn;
@@ -139,22 +137,20 @@ public static partial class SqlServerDatabase
                 || SqlSchemaCompatibility.IsAgreementTestDatabase(conn.Database, builder.DataSource);
             token.ThrowIfCancellationRequested();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
-            var version = Convert.ToString(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
-            token.ThrowIfCancellationRequested();
             if (preview || approvedCutover || SqlSchemaCompatibility.OrdinarySchema31Enabled)
             {
                 cmd.CommandText = PreviewValidationSql;
                 using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
                 if (!await reader.ReadAsync(token).ConfigureAwait(false)) throw new InvalidOperationException("Не удалось проверить тестовую базу.");
-                SqlSchemaCompatibility.Validate(version, conn.Database,
-                    Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture) == 1, builder.DataSource);
+                token.ThrowIfCancellationRequested();
+                ValidatePreviewResult(reader, conn.Database, builder.DataSource);
             }
             else
             {
-                SqlSchemaCompatibility.Validate(version, conn.Database, null, false, builder.DataSource);
+                cmd.CommandText = SchemaVersionSql;
+                var version = Convert.ToString(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
                 token.ThrowIfCancellationRequested();
+                SqlSchemaCompatibility.Validate(version, conn.Database, null, false, builder.DataSource);
             }
             token.ThrowIfCancellationRequested();
             return conn;
@@ -197,8 +193,15 @@ public static partial class SqlServerDatabase
                     THEN 1 ELSE 0 END
         """;
 
+    private const string SchemaVersionSql =
+        "SET QUOTED_IDENTIFIER ON; SELECT [value] FROM dbo.meta WHERE [key] = N'schema_version'";
+
+    // Read the version and the existing mandatory compatibility checks in
+    // one statement on every logical open. Never cache approval or identity.
     private const string PreviewValidationSql = """
-                    SELECT CONVERT(nvarchar(32), DATABASEPROPERTYEX(DB_NAME(), 'Updateability')),
+                    SET QUOTED_IDENTIFIER ON;
+                    SELECT (SELECT [value] FROM dbo.meta WHERE [key]=N'schema_version'),
+                    CONVERT(nvarchar(32), DATABASEPROPERTYEX(DB_NAME(), 'Updateability')),
                     CASE WHEN COL_LENGTH(N'dbo.contracts', N'discount_percent') IS NOT NULL
                           AND COL_LENGTH(N'dbo.acts', N'discount_percent') IS NOT NULL
                           AND COL_LENGTH(N'dbo.acts', N'section_amounts_json') IS NOT NULL
@@ -211,6 +214,12 @@ public static partial class SqlServerDatabase
                          THEN 1 ELSE 0 END
                     """
         ;
+
+    internal static void ValidatePreviewResult(IDataRecord reader, string database, string dataSource) =>
+        SqlSchemaCompatibility.Validate(
+            Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture), database,
+            Convert.ToString(reader.GetValue(1), CultureInfo.InvariantCulture),
+            Convert.ToInt32(reader.GetValue(2), CultureInfo.InvariantCulture) == 1, dataSource);
 
     /// <summary>Save a single cell, including text and catalog bookkeeping, in one SQL transaction.</summary>
     public static SaveResult SaveCell(string connectionString, long positionId, string field,

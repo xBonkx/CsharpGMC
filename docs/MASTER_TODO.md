@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 0d65ad1) — PERF-050/052 PARTIAL: combine mandatory SQL open schema/version checks in one statement; KP export reuses loaded tag rule and requisites percent without rereading contract. Tests added, not run; see performance TODO.
+
 28.11.2026 ChatGPT/main (base 056e404) — PERF-050/047 PARTIAL: shared procurement report batch on one guarded connection; supplier/shop/control use only needed result sets, child IDs from existing parent IDs, revision/day fences retained. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 4cc7ed1) — PERF-023/047/050 PARTIAL: scoped KP print header, captured connection and single-flight export, background displayed cost summary workbook, coherent procurement-control export. Tests added, not run; see performance TODO.

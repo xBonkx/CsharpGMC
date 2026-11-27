@@ -62,9 +62,9 @@ public partial class MainWindow
                     : Convert.ToDecimal(reader.GetValue(1), CultureInfo.InvariantCulture);
         }
         var requisites = SqlServerKpRequisites.Read(conn, contractId);
-        var percent = (decimal)SqlServerWorkspace.ReadContract(conn, contractId).SmrPercent;
-        var manualNumbering = string.Equals(estimate.Form, "r4", StringComparison.OrdinalIgnoreCase) ||
-            TagRules.Load(conn).Has(estimate.Form, "num_manual");
+        var percent = (decimal)(requisites.RawSmrPercent ??
+            throw new InvalidOperationException("Не указан процент СМР."));
+        var manualNumbering = estimate.PrintManualNumbering;
         if (startRevision != SqlServerDatabase.Revision(conn))
             throw new InvalidOperationException("Данные документа изменились во время выгрузки. Повторите экспорт.");
         return new KpSnapshot(estimate, header, systemSmr, requisites, percent, manualNumbering);
