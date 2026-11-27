@@ -67,14 +67,22 @@ public partial class MainWindow
             var contracts = metadata.Select(d => (Id: (long)d.Id,
                 Title: d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title, d.Kind)).ToList();
             var agreement = baseId is null && copyFrom is null ? AgreementPresentation.Resolve(metadata) : null;
+            var sourceIdForCompany = baseId ?? copyFrom;
+            var source = sourceIdForCompany is long id ? metadata.FirstOrDefault(d => d.Id == id && (baseId is null || !d.IsStage)) : null;
+            if (sourceIdForCompany is not null && source is null)
+                throw new InvalidOperationException("Исходный документ больше недоступен. Обновите список.");
+            var defaultCompany = sourceIdForCompany is not null ? source?.CompanyId ?? 0L : SqlServerWorkspace.LastCompanyId(_serverConn, objectId);
+            var baseCompanies = metadata.Where(d => !d.IsStage && (d.Kind is "main" or "kp"))
+                .ToDictionary(d => (long)d.Id, d => d.CompanyId);
+            var companies = SqlServerWorkspace.Companies(_serverConn);
+            var tags = SqlServerWorkspace.ObjectTags(_serverConn);
             if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(_serverConn))
                 throw new InvalidOperationException("Данные изменились. Обновите список и повторите создание.");
             var dialog = new ContractDialog(obj.Name, contracts,
-                SqlServerWorkspace.Companies(_serverConn),
-                SqlServerWorkspace.ObjectTags(_serverConn), kind, baseId, copyFrom,
-                SqlServerWorkspace.LastCompanyId(_serverConn, objectId), allowCopy: true,
+                companies, tags, kind, baseId, copyFrom,
+                defaultCompany, allowCopy: true,
                 allowExcelImport: kind == "kp" && baseId is null && copyFrom is null,
-                agreement: agreement)
+                agreement: agreement, baseCompanies: baseCompanies)
                 { Owner = this };
             if (dialog.ShowDialog() != true) return;
             if (dialog.ImportExcelRequested)
@@ -335,10 +343,16 @@ public partial class MainWindow
             }
 
             var objectName = _objects.FirstOrDefault(o => o.Id == doc.ObjectId)?.Name ?? "";
-            var mains = _docs.Where(d => d.ObjectId == doc.ObjectId && d.Kind is "main" or "kp")
+            var metadata = Workspace.ReadObjectDocumentMetadata(_serverConn, doc.ObjectId);
+            var mains = metadata.Where(d => !d.IsStage && (d.Kind is "main" or "kp"))
                 .Select(d => ((long)d.Id, d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title)).ToList();
-            var dialog = new ContractDialog(objectName, info, SqlServerWorkspace.Companies(_serverConn),
-                SqlServerWorkspace.ObjectTags(_serverConn, info.Form), mains, makeContract) { Owner = this };
+            var companies = SqlServerWorkspace.Companies(_serverConn);
+            var tags = SqlServerWorkspace.ObjectTags(_serverConn, info.Form);
+            var agreement = makeContract && info.Kind == "kp" ? AgreementPresentation.Resolve(metadata) : null;
+            if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Данные изменились. Обновите список и повторите открытие свойств.");
+            var dialog = new ContractDialog(objectName, info, companies,
+                tags, mains, makeContract, agreement) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } value) return;
 
             // Python: make_contract при выборе «КП» превращает документ в договор.

@@ -15,10 +15,13 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("Workspace.ReadObjectDocumentMetadata(_serverConn, objectId)", flow);
         Assert.Contains("baseId is null && copyFrom is null ? AgreementPresentation.Resolve(metadata) : null", flow);
         Assert.Contains("revision != SqlServerDatabase.Revision(_serverConn)", flow);
-        Assert.Contains("if (!_isNew || SelectedKind() != \"main\" || _agreement is not { } agreement) return;", dialog);
+        Assert.Contains("if (SelectedKind() != \"main\" || _agreement is not { } agreement) return;", dialog);
         Assert.Contains("NumberBox.Text = agreement.Number;", dialog);
         Assert.Contains("DateBox.Text = agreement.Date;", dialog);
         Assert.Contains("CompanyCombo.SelectedItem = company;", dialog);
+        Assert.Contains("sourceIdForCompany = baseId ?? copyFrom", flow);
+        Assert.Contains("makeContract && info.Kind == \"kp\" ? AgreementPresentation.Resolve(metadata) : null", flow);
+        Assert.Contains("if (_isNew) ApplyCompanyVat();", dialog);
     }
 
     [Fact]
@@ -34,7 +37,9 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("_baseDocs.SelectedIndex = -1;", preview);
         Assert.DoesNotContain("_baseDocs.SelectedIndex = 0", preview);
         Assert.Contains("c.Kind == \"dop\" && c.BaseContractId is null", preview);
-        Assert.Contains("организацию по умолчанию", preview);
+        Assert.Contains("SelectedBaseCompany()", preview);
+        Assert.Contains("ApplyAgreementDefaults()", preview);
+        Assert.Contains("_annexCompany.SelectedIndex = -1;", preview);
         var editor = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
         Assert.Contains("TitleText.Text = est.AnnexDisplayTitle ?? est.Title;", editor);
         Assert.Contains("TitleText.ToolTip = $\"{est.Title}", editor);

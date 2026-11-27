@@ -48,6 +48,9 @@ internal sealed class ExcelImportPreviewWindow : Window
     private readonly ExcelImportResult _result;
     private readonly IReadOnlyDictionary<long, IReadOnlySet<string>> _alreadyLoaded;
     private readonly List<DocRow> _docs;
+    private readonly IReadOnlyList<CompanyInfo> _companies;
+    private readonly ComboBox _annexCompany = new() { MinWidth = 210, MinHeight = 32, DisplayMemberPath = nameof(CompanyInfo.Name) };
+    private readonly Button _agreementDefaults = new() { Content = "Реквизиты договора", MinHeight = 32 };
     private readonly ComboBox _objects = new() { MinWidth = 240, MinHeight = 32 };
     private readonly ComboBox _baseDocs = new() { MinWidth = 220, MinHeight = 32 };
     private readonly TextBox _newName = new() { MinWidth = 240, MinHeight = 32 };
@@ -71,16 +74,21 @@ internal sealed class ExcelImportPreviewWindow : Window
     public string NewObjectName => _newName.Text.Trim();
     public IReadOnlyList<ExcelImportChoice> Choices => _rows.Where(r => r.Selected)
         .Select(r => new ExcelImportChoice(r.Block, r.Kind, r.Number.Trim(),
-            r.Date.Trim(), r.Name.Trim(), r.Kind == "dop" ? (_baseDocs.SelectedItem as BaseDocument)?.Id : null))
+            r.Date.Trim(), r.Name.Trim(), r.Kind == "dop" ? (_baseDocs.SelectedItem as BaseDocument)?.Id : null,
+            r.Kind == "main" ? (_annexCompany.SelectedItem as CompanyInfo)?.Id :
+            r.Kind == "dop" ? SelectedBaseCompany() : null))
         .ToList();
 
     public ExcelImportPreviewWindow(Window parent, ExcelImportResult result,
         IEnumerable<ObjectRow> objects, IEnumerable<DocRow> docs,
-        long? defaultObjectId, IReadOnlyDictionary<long, IReadOnlySet<string>> alreadyLoaded)
+        long? defaultObjectId, IReadOnlyDictionary<long, IReadOnlySet<string>> alreadyLoaded,
+        IReadOnlyList<CompanyInfo> companies)
     {
         Owner = parent;
         _result = result;
         _docs = docs.ToList();
+        _companies = companies;
+        _annexCompany.ItemsSource = companies;
         _alreadyLoaded = alreadyLoaded;
         Title = "Импорт документов — " + Path.GetFileName(result.FileName);
         Width = 1250; Height = 720; MinWidth = 880; MinHeight = 560;
@@ -126,6 +134,14 @@ internal sealed class ExcelImportPreviewWindow : Window
         meta.Children.Add(new TextBlock { Text = "Общее основание выбранных ДС:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
         _baseDocs.ToolTip = "Выберите основание явно. Все отмеченные ДС будут связаны с одним выбранным документом. Для разных оснований импортируйте отдельно.";
         meta.Children.Add(_baseDocs);
+        meta.Children.Add(new TextBlock { Text = "Организация приложений:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
+        _annexCompany.ToolTip = "Общая организация для выбранных приложений. ДС наследуют организацию своего основания, КП — прежнее значение по умолчанию.";
+        meta.Children.Add(_annexCompany);
+        _agreementDefaults.Margin = new Thickness(8, 0, 0, 0);
+        _agreementDefaults.ToolTip = "Подставить номер, дату и организацию договора в отмеченные приложения. Не меняет КП и ДС.";
+        WorkspaceWindowUi.StyleButton(_agreementDefaults);
+        _agreementDefaults.Click += (_, _) => ApplyAgreementDefaults();
+        meta.Children.Add(_agreementDefaults);
         Grid.SetRow(meta, 1); layout.Children.Add(meta);
 
         _table.Columns.Add(new DataGridCheckBoxColumn { Header = "✓", Binding = new Binding(nameof(PreviewRow.Selected)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 37 });
@@ -217,9 +233,33 @@ internal sealed class ExcelImportPreviewWindow : Window
         _baseDocs.Items.Clear();
         foreach (var d in _docs.Where(d => d.ObjectId == ObjectId && d.Kind is "main" or "kp" && !d.IsStage))
             _baseDocs.Items.Add(new BaseDocument(d.Id, d.Kind == "main"
-                ? AgreementPresentation.FullAnnexTitle(d) : d.Title));
+                ? AgreementPresentation.FullAnnexTitle(d) + CompanySuffix(d) : d.Title + CompanySuffix(d)));
         // Never attach an imported DS to the first document by list order.
         _baseDocs.SelectedIndex = -1;
+        _annexCompany.SelectedIndex = -1;
+        var agreement = CurrentAgreement();
+        _agreementDefaults.IsEnabled = agreement is not null && _companies.Any(c => c.Id == agreement.CompanyId);
+    }
+
+    private string CompanySuffix(DocRow d) => " · " + (_companies.FirstOrDefault(c => c.Id == d.CompanyId)?.Name ?? "организация не указана");
+
+    private AgreementPresentation.Requisites? CurrentAgreement() =>
+        AgreementPresentation.Resolve(_docs.Where(d => d.ObjectId == ObjectId));
+
+    private long? SelectedBaseCompany() => _baseDocs.SelectedItem is BaseDocument b
+        ? _docs.FirstOrDefault(d => d.Id == b.Id && d.ObjectId == ObjectId)?.CompanyId : null;
+
+    private void ApplyAgreementDefaults()
+    {
+        if (!_table.CommitEdit(DataGridEditingUnit.Cell, true) || !_table.CommitEdit(DataGridEditingUnit.Row, true)) return;
+        if (CurrentAgreement() is not { } agreement || _companies.FirstOrDefault(c => c.Id == agreement.CompanyId) is not { } company) return;
+        var rows = _rows.Where(r => r.Selected && r.Kind == "main").ToArray();
+        if (rows.Length == 0) return;
+        if (MessageBox.Show(this, $"Подставить {agreement.Heading} и организацию «{company.Name}» в {rows.Length} отмеченных приложений?\nНомер и дата в этих строках будут заменены.",
+            "Реквизиты договора", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        foreach (var row in rows) { row.Number = agreement.Number; row.Date = agreement.Date; }
+        _annexCompany.SelectedItem = company;
+        _table.Items.Refresh();
     }
 
     private void ShowReport()
@@ -286,11 +326,20 @@ internal sealed class ExcelImportPreviewWindow : Window
             MessageBox.Show(this, "Для некоторых документов суммы не сходятся с файлом или нет итоговых строк.\n" +
                 "Импортировать выбранные блоки?", "Проверка сумм", MessageBoxButton.YesNo,
                 MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        if (selections.Any(c => c.Kind is "main" or "dop") &&
-            MessageBox.Show(this, "Импорт использует организацию по умолчанию из справочника, а не реквизиты выбранного договора.\n" +
-                "После импорта проверь организацию, номер и дату в свойствах каждого приложения и ДС. Продолжить?",
-                "Проверка реквизитов", MessageBoxButton.YesNo, MessageBoxImage.Warning,
-                MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (selections.Any(c => (c.Kind is "main" or "dop") && (c.CompanyId is not > 0 || !_companies.Any(company => company.Id == c.CompanyId))))
+        {
+            MessageBox.Show(this, "Выберите организацию приложений и основание ДС с указанной организацией.",
+                "Реквизиты", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (selections.Any(c => c.Kind is "main" or "dop"))
+        {
+            var details = selections.Where(c => c.Kind is "main" or "dop").Select(c =>
+                $"{c.Name} · № {c.Number} от {c.Date} · {_companies.First(company => company.Id == c.CompanyId).Name}");
+            if (MessageBox.Show(this, "Проверьте реквизиты (НДС ДНС — из файла, прочие формы — по выбранной организации):\n" +
+                string.Join("\n", details) + "\nПродолжить?", "Проверка реквизитов", MessageBoxButton.YesNo,
+                MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        }
         DialogResult = true;
     }
 }

@@ -94,24 +94,35 @@ public partial class MainWindow
 
         // Read only metadata once, not one network query for each preview block.
         Dictionary<long, IReadOnlySet<string>> existing;
+        List<ObjectRow> objects;
+        List<DocRow> documents;
+        IReadOnlyList<CompanyInfo> companies;
+        string revision;
         try
         {
-            existing = await Task.Run(() =>
+            (existing, objects, documents, companies, revision) = await Task.Run(() =>
             {
                 using var conn = SqlServerDatabase.Open(_sqlConnectionString);
+                var before = SqlServerDatabase.Revision(conn);
+                var freshObjects = Workspace.Objects(conn);
+                var freshDocuments = Workspace.ReadAllDocumentMetadata(conn);
+                var freshCompanies = SqlServerWorkspace.Companies(conn);
                 using var query = new SqlCommand(
                     "SELECT object_id,source_file,source_sheet FROM dbo.contracts WHERE source_file<>N''", conn);
                 using var reader = query.ExecuteReader();
                 var keys = new Dictionary<long, HashSet<string>>();
                 while (reader.Read())
                 {
-                    var id = reader.GetInt64(0);
+                    var id = SqlInteger.ReadInt64(reader, 0);
                     var file = reader.IsDBNull(1) ? "" : Path.GetFileName(reader.GetString(1).Replace('\\', '/'));
                     var sheet = reader.IsDBNull(2) ? "" : reader.GetString(2);
                     if (!keys.TryGetValue(id, out var set)) keys[id] = set = new(StringComparer.OrdinalIgnoreCase);
                     set.Add(file + "|" + sheet);
                 }
-                return keys.ToDictionary(p => p.Key, p => (IReadOnlySet<string>)p.Value);
+                reader.Close();
+                if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
+                    throw new InvalidOperationException("Данные изменились во время чтения. Повторите импорт.");
+                return (keys.ToDictionary(p => p.Key, p => (IReadOnlySet<string>)p.Value), freshObjects, freshDocuments, freshCompanies, before);
             });
         }
         catch (Exception ex)
@@ -120,9 +131,8 @@ public partial class MainWindow
                 "Импорт Excel", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
-        var revision = SqlServerDatabase.Revision(_serverConn);
-        var preview = new ExcelImportPreviewWindow(this, result, _objects, _docs,
-            preferredObjectId, existing);
+        var preview = new ExcelImportPreviewWindow(this, result, objects, documents,
+            preferredObjectId, existing, companies);
         if (preview.ShowDialog() != true) return;
         var selections = preview.Choices;
         var target = preview.ObjectId;
@@ -137,7 +147,7 @@ public partial class MainWindow
                 _sqlConnectionString, target, name, fileDialog.FileName, selections,
                 revision, writeCancellation.Token), writeCancellation.Token);
             ReloadAndSelect(checked((int)saved.ObjectId));
-            StatusText.Text = $"Импортировано КП: {saved.ContractIds.Count}, строк: " +
+            StatusText.Text = $"Импортировано документов: {saved.ContractIds.Count}, строк: " +
                 selections.Sum(s => s.Block.PositionCount) + ".";
         }
         catch (OperationCanceledException)

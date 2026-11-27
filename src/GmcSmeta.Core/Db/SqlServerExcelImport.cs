@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace GmcSmeta.Core.Db;
 
 public sealed record ExcelImportChoice(ExcelImportBlock Block, string Kind, string Number,
-    string Date, string Name, long? BaseContractId = null);
+    string Date, string Name, long? BaseContractId = null, long? CompanyId = null);
 
 public sealed record ExcelImportSaved(long ObjectId, IReadOnlyList<long> ContractIds, string Revision);
 
@@ -50,8 +50,9 @@ public static class SqlServerExcelImport
         foreach (var c in choices)
         {
             if (c.Block.PositionCount == 0) throw new ArgumentException("Пустой блок нельзя импортировать.");
-            var validated = SqlServerWorkspace.ValidateContract(
-                new SqlServerWorkspace.NewContractData(c.Kind, c.Number, c.Date, c.Name, null, c.BaseContractId));
+            SqlServerWorkspace.ValidateContract(
+                new SqlServerWorkspace.NewContractData(c.Kind, c.Number, c.Date, c.Name, c.CompanyId, c.BaseContractId));
+            ExcelImportAgreementPolicy.Validate(c);
             if (c.Name.Length > 255 || c.Block.Sheet.Length > 255)
                 throw new ArgumentException("Название документа или листа слишком длинное.");
             foreach (var section in c.Block.Sections)
@@ -114,26 +115,30 @@ public static class SqlServerExcelImport
             Log(conn, tx, "object", objectId, "create", newObjectName.Trim(), null, objectId);
         }
         // Validate every parent and every duplicate before inserting any document.
-        foreach (var choice in choices.Where(c => c.BaseContractId is not null))
+        foreach (var choice in choices.Where(c => c.Kind == "dop"))
         {
             using var check = new SqlCommand(
-                "SELECT COUNT_BIG(*) FROM dbo.contracts WITH (HOLDLOCK) " +
+                "SELECT company_id FROM dbo.contracts WITH (HOLDLOCK) " +
                 "WHERE id=@parent AND object_id=@obj AND kind IN (N'main',N'kp') AND stage_of IS NULL", conn, tx);
             check.Parameters.Add("@parent", SqlDbType.BigInt).Value = choice.BaseContractId!.Value;
             check.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
-                throw new InvalidOperationException("Исходный договор для ДС не найден в выбранном объекте.");
+            var value = check.ExecuteScalar();
+            var parentCompany = value is null or DBNull ? (long?)null : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+            ExcelImportAgreementPolicy.ValidateBaseCompany(choice, parentCompany);
         }
-        long? companyId = null;
-        decimal companyVat = 22m;
+        var companies = new Dictionary<long, decimal>();
+        long? defaultCompanyId = null;
         using (var co = new SqlCommand(
-            "SELECT TOP(1) id,vat_rate FROM dbo.companies ORDER BY [order],id", conn, tx))
+            "SELECT id,vat_rate FROM dbo.companies WITH (HOLDLOCK) ORDER BY [order],id", conn, tx))
         using (var r = co.ExecuteReader())
-            if (r.Read())
+            while (r.Read())
             {
-                companyId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-                companyVat = r.IsDBNull(1) ? 22m : Convert.ToDecimal(r.GetValue(1), CultureInfo.InvariantCulture);
+                var directoryCompanyId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                defaultCompanyId ??= directoryCompanyId;
+                companies.Add(directoryCompanyId, r.IsDBNull(1) ? 22m : Convert.ToDecimal(r.GetValue(1), CultureInfo.InvariantCulture));
             }
+        var resolvedCompanies = choices.Select(c =>
+            ExcelImportAgreementPolicy.ResolveCompany(c, defaultCompanyId, companies)).ToArray();
         using var temp = new SqlCommand(
             @"CREATE TABLE #excel_rows (
                 idx INT NOT NULL PRIMARY KEY, parent_idx INT NULL, system_id BIGINT NOT NULL,
@@ -154,9 +159,11 @@ public static class SqlServerExcelImport
             orderCommand.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
             nextOrder = Convert.ToInt32(orderCommand.ExecuteScalar(), CultureInfo.InvariantCulture) + 1;
         }
-        foreach (var choice in choices)
+        for (var choiceIndex = 0; choiceIndex < choices.Count; choiceIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var choice = choices[choiceIndex];
+            var (companyId, companyVat) = resolvedCompanies[choiceIndex];
             var b = choice.Block;
             var smrMode = b.HasWork ? "pos" :
                 b.Sections.Any(s => s.Smr.HasValue) &&

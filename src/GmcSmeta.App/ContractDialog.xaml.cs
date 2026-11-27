@@ -46,10 +46,11 @@ public partial class ContractDialog : Window
     /// <summary>Свойства существующего документа (ContractDialog в Python).</summary>
     public ContractDialog(string objectName, ContractInfo info, IReadOnlyList<CompanyInfo> companies,
                           IReadOnlyList<ObjectTag> tags, IReadOnlyList<(long Id, string Title)> mainContracts,
-                          bool makeContract)
+                          bool makeContract, AgreementPresentation.Requisites? agreement = null)
     {
         InitializeComponent();
         _isNew = false;
+        _agreement = makeContract ? agreement : null;
         ContentPanel.Visibility = Visibility.Collapsed;
         Title = makeContract ? "Оформить как приложение" : "Свойства документа";
         CaptionText.Text = makeContract ? "Оформить как приложение" : "Свойства документа";
@@ -73,7 +74,8 @@ public partial class ContractDialog : Window
                           IReadOnlyList<CompanyInfo> companies, IReadOnlyList<ObjectTag> tags,
                           string kind = "kp", long? baseId = null, long? copyFromId = null,
                           long? defaultCompany = null, bool allowCopy = true, bool allowExcelImport = false,
-                          AgreementPresentation.Requisites? agreement = null)
+                          AgreementPresentation.Requisites? agreement = null,
+                          IReadOnlyDictionary<long, long?>? baseCompanies = null)
     {
         InitializeComponent();
         _isNew = true;
@@ -86,7 +88,19 @@ public partial class ContractDialog : Window
         FillKinds(kind);
         FillCompanies(companies, defaultCompany);
         FillTags(tags, "");
-        FillBase(contracts.Where(x => x.Kind is "main" or "kp").Select(x => (x.Id, x.Title)), baseId);
+        FillBase(contracts.Where(x => (x.Kind is "main" or "kp") && (baseCompanies is null || baseCompanies.ContainsKey(x.Id)))
+            .Select(x => (x.Id, x.Title)), baseId);
+        if (baseCompanies is not null)
+        {
+            BaseCombo.ToolTip = "При выборе основания нового ДС подставляется его организация; проверьте реквизиты перед созданием.";
+            BaseCombo.SelectionChanged += (_, _) =>
+            {
+                if (SelectedKind() != "dop" || SelectedId(BaseCombo) is not long id ||
+                    !baseCompanies.TryGetValue(id, out var companyId)) return;
+                if (CompanyCombo.ItemsSource is IEnumerable<IdItem> items)
+                    CompanyCombo.SelectedItem = items.FirstOrDefault(c => c.Id == companyId) ?? items.First();
+            };
+        }
 
         SourceCombo.ItemsSource = contracts.Select(c => new IdItem(c.Id, c.Title)).ToList();
         var source = (IReadOnlyList<IdItem>)SourceCombo.ItemsSource;
@@ -157,7 +171,7 @@ public partial class ContractDialog : Window
         if (NumberLabel is not null) NumberLabel.Text = kind == "main" ? "Номер договора" : kind == "dop" ? "Номер ДС" : "Номер КП";
         if (DateLabel is not null) DateLabel.Text = kind == "main" ? "Дата договора" : kind == "dop" ? "Дата ДС" : "Дата КП";
         if (AgreementDefaultsButton is not null)
-            AgreementDefaultsButton.Visibility = _isNew && kind == "main" && _agreement is not null
+            AgreementDefaultsButton.Visibility = kind == "main" && _agreement is not null
                 ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -165,13 +179,15 @@ public partial class ContractDialog : Window
 
     private void ApplyAgreementDefaults()
     {
-        if (!_isNew || SelectedKind() != "main" || _agreement is not { } agreement) return;
+        if (SelectedKind() != "main" || _agreement is not { } agreement) return;
         if (CompanyCombo.ItemsSource is not IEnumerable<IdItem> companies ||
             companies.FirstOrDefault(c => c.Id == agreement.CompanyId) is not { } company) return;
         NumberBox.Text = agreement.Number;
         DateBox.Text = agreement.Date;
+        // Changing the selected company already triggers Company_SelectionChanged.
+        // Preserve the existing document VAT when conversion keeps the same company.
         CompanyCombo.SelectedItem = company;
-        ApplyCompanyVat();
+        if (_isNew) ApplyCompanyVat();
     }
 
     private void Content_Changed(object sender, RoutedEventArgs e)
