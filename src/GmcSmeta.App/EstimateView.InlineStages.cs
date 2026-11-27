@@ -31,6 +31,20 @@ public partial class EstimateView
     private InlineStagesSnapshot? _inlineStagesData;
     private string _inlineStagesFilter = StageAllocationPresentation.All;
     private readonly List<DataGridColumn> _inlineStageColumns = new();
+    // Display-only preferences for this activation, keyed by stable stage ID
+    // (zero denotes the computed remainder, not a document).
+    private readonly HashSet<long> _hiddenInlineStageIds = new();
+    private readonly Dictionary<DataGridColumn, long> _inlineStageIds = new();
+
+    private bool SetInlineStageColumnVisibility(DataGridColumn column, bool visible)
+    {
+        if (!_inlineStageIds.TryGetValue(column, out var id)) return false;
+        if (visible) _hiddenInlineStageIds.Remove(id);
+        else _hiddenInlineStageIds.Add(id);
+        column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        RequestEstimateColumnFit();
+        return true;
+    }
     private readonly record struct StageColumnKey(long Id, string Title, bool Locked);
     private StageColumnKey[] _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
     private IReadOnlyList<string> _blankStageLabels = Array.Empty<string>();
@@ -96,6 +110,8 @@ public partial class EstimateView
         foreach (var column in _inlineStageColumns)
             EstimateGrid.Columns.Remove(column);
         _inlineStageColumns.Clear();
+        _inlineStageIds.Clear();
+        _hiddenInlineStageIds.Clear();
         _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
         _blankStageLabels = Array.Empty<string>();
         foreach (var row in _rows)
@@ -207,10 +223,13 @@ public partial class EstimateView
             return;
         foreach (var col in _inlineStageColumns) EstimateGrid.Columns.Remove(col);
         _inlineStageColumns.Clear();
+        _inlineStageIds.Clear();
+        _hiddenInlineStageIds.RemoveWhere(id => id != 0 && !keys.Any(key => key.Id == id));
         _inlineStageColumnKeys = keys;
         for (var i = 0; i <= data.Stages.Count; i++)
         {
             var rest = i == data.Stages.Count;
+            var id = rest ? 0L : data.Stages[i].Id;
             var title = rest ? "Остаток" : ShortStageName(data.Stages[i].Name);
             var style = new Style(typeof(TextBlock));
             style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
@@ -263,6 +282,9 @@ public partial class EstimateView
             column.HeaderStyle.Setters.Add(new EventSetter(ButtonBase.ClickEvent,
                 new RoutedEventHandler(InlineStageHeader_Click)));
             _inlineStageColumns.Add(column);
+            _inlineStageIds.Add(column, id);
+            if (_hiddenInlineStageIds.Contains(id))
+                column.Visibility = Visibility.Collapsed;
             EstimateGrid.Columns.Add(column);
             column.DisplayIndex = EstimateGrid.Columns.Count - 1;
         }
@@ -278,7 +300,8 @@ public partial class EstimateView
             if (!_inlineStagesOn || _detached || !ReferenceEquals(snapshot, _inlineStagesData) ||
                 !EstimateGrid.IsVisible || _inlineStageColumns.Count == 0 ||
                 EstimateScrollViewer() is not { } scroll || scroll.ViewportWidth <= 0) return;
-            var first = _inlineStageColumns[0];
+            var first = _inlineStageColumns.FirstOrDefault(c => c.Visibility == Visibility.Visible);
+            if (first is null) { _revealInlineStageColumns = false; return; }
             var right = EstimateGrid.Columns
                 .Where(c => c.Visibility == Visibility.Visible && c.DisplayIndex <= first.DisplayIndex)
                 .Sum(c => c.ActualWidth);

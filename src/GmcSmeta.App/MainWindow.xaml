@@ -176,7 +176,6 @@
                             <Setter TargetName="HeaderBorder" Property="Background" Value="#E8F0FE"/>
                             <Setter TargetName="SelectionMark" Property="Visibility" Value="Visible"/>
                             <Setter Property="Foreground" Value="#1E40AF"/>
-                            <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="KeyboardFrame" Property="Visibility" Value="Visible"/>

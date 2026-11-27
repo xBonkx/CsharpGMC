@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+27.11.2026 ChatGPT/main (base 2cea7db) — owner screenshot, navigation typography / Issue #32 / CTX-033 PARTIAL. Python main_window.py delegate uses same opt.font for selected/unselected document; only ink changes. C# TreeViewItem selected trigger no longer overrides FontWeight; object/year intrinsic weights, row colors/focus frame unchanged. Estimate column menu includes dynamic stage/remainder columns for both toolbar and header right click; hide/show/show all by stable stage ID (0=remainder), refresh/rename retains state within mode, exit resets it. Base column profile excludes dynamic columns as before, fit accounts for visibility; reveal targets first visible stage. Stale menu references rejected. No SQL, row order or allocation changes. Source tests added; Windows build/xUnit/GUI not run. Verify selection/focus/hover 100/125/150% DPI, stage menu both entry points, hide/show all, rename/create/delete/refresh, exit/re-enter.
+
 ## 27.11.2026 — результат согласованного блока
 
 27.11.2026 Codex/main — AGR-04/05/06/07/10/11 CODE READY/PARTIAL: самостоятельное

@@ -77,6 +77,38 @@ public sealed class StagesDialogLifecycleTests
     }
 
     [Fact]
+    public void StageColumnsParticipateInVisibilityMenuWithoutChangingBasePreferences()
+    {
+        var code = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
+        Assert.Contains("_inlineStageIds.Add(column, id)", code);
+        Assert.Contains("_hiddenInlineStageIds.Contains(id)", code);
+        Assert.Contains("_hiddenInlineStageIds.Clear()", code);
+        Assert.Contains("FirstOrDefault(c => c.Visibility == Visibility.Visible)", code);
+        var menu = Source("GmcSmeta.App/EstimateView.xaml.cs");
+        Assert.Contains("_inlineStageIds.ContainsKey(c)", menu);
+        Assert.Contains("SetInlineStageColumnVisibility(column, checkItem.IsChecked)", menu);
+        Assert.Contains("SetInlineStageColumnVisibility(column, true)", menu);
+        Assert.Contains("EstimateGrid.Columns.Where(c => !_inlineStageColumns.Contains(c))", menu);
+    }
+
+    [Fact]
+    public void NavigationSelectionDoesNotChangeFontWeightOrSize()
+    {
+        var xaml = Source("GmcSmeta.App/MainWindow.xaml");
+        var start = xaml.IndexOf("<Style TargetType=\"TreeViewItem\">", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var selected = xaml.IndexOf("<Trigger Property=\"IsSelected\" Value=\"True\">", start, StringComparison.Ordinal);
+        Assert.True(selected >= 0);
+        var end = xaml.IndexOf("</Trigger>", selected, StringComparison.Ordinal);
+        Assert.True(end > selected);
+        var trigger = xaml[selected..end];
+        Assert.Contains("HeaderBorder", trigger);
+        Assert.Contains("Foreground", trigger);
+        Assert.DoesNotContain("FontWeight", trigger);
+        Assert.DoesNotContain("FontSize", trigger);
+    }
+
+    [Fact]
     public void SearchUsesLocalViewAndRetainsExactValues()
     {
         var code = Source("GmcSmeta.App/StagesDialog.xaml.cs");

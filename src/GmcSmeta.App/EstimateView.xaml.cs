@@ -1003,9 +1003,10 @@ public partial class EstimateView : UserControl
         if (HasActiveEstimateEdit()) return;
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = placement };
         menu.Items.Add(new MenuItem { Header = "Показывать столбцы", IsEnabled = false });
-        bool Allowed(DataGridColumn c) => !_inlineStageColumns.Contains(c) &&
-            c != WorkColumn && c != WorkTotalColumn && (includePurchase || c != PurchaseColumn) &&
-            (c != BasisColumn || _estimate is { } est && (est.Form == "r4" || est.BasisAllowed));
+        bool Allowed(DataGridColumn c) => EstimateGrid.Columns.Contains(c) &&
+            (_inlineStageIds.ContainsKey(c) ||
+             (c != WorkColumn && c != WorkTotalColumn && (includePurchase || c != PurchaseColumn) &&
+              (c != BasisColumn || _estimate is { } est && (est.Form == "r4" || est.BasisAllowed))));
         var items = new List<(MenuItem Item, DataGridColumn Column)>();
         // Порядок пунктов — как колонки на экране (DisplayIndex), у DataGrid.Columns
         // перечисление идёт в порядке объявления.
@@ -1037,6 +1038,7 @@ public partial class EstimateView : UserControl
             {
                 if (HasActiveEstimateEdit() || !Allowed(column) || column == BasisColumn && _estimate?.Form == "r4")
                 { checkItem.IsChecked = column.Visibility == Visibility.Visible; return; }
+                if (SetInlineStageColumnVisibility(column, checkItem.IsChecked)) return;
                 column.Visibility = checkItem.IsChecked ? Visibility.Visible : Visibility.Collapsed;
                 if (ReferenceEquals(column, PurchaseColumn)) PurchaseToggle.IsChecked = checkItem.IsChecked;
                 if (ReferenceEquals(column, AreaUnitColumn)) _uiSettings.AreaUnitVisible = checkItem.IsChecked;
@@ -1057,8 +1059,9 @@ public partial class EstimateView : UserControl
             foreach (var (item, column) in items)
             {
                 if (!Allowed(column) || column == BasisColumn && _estimate?.Form == "r4") continue;
-                column.Visibility = Visibility.Visible;
                 item.IsChecked = true;
+                if (SetInlineStageColumnVisibility(column, true)) continue;
+                column.Visibility = Visibility.Visible;
                 if (column == PurchaseColumn) PurchaseToggle.IsChecked = true;
                 if (column == AreaUnitColumn) _uiSettings.AreaUnitVisible = true;
                 if (column == AreaTotalColumn) _uiSettings.AreaTotalVisible = true;
