@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GmcSmeta.Core\GmcSmeta.Core.csproj" />
+    <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\InstallDirectoryPublisher.cs" Link="InstallDirectoryPublisher.cs" />
   </ItemGroup>
 
 </Project>

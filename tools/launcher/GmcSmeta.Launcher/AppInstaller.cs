@@ -59,7 +59,7 @@ internal sealed class InstalledApp
             "sha256=" + (Sha256 ?? ""),
             "installedUtc=" + InstalledUtc,
         };
-        var temporary = paths.StateFile + ".tmp";
+        var temporary = paths.StateFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             File.WriteAllLines(temporary, lines);
@@ -137,7 +137,7 @@ internal sealed class AppInstaller
 
     public string PreferredFlavor => RuntimeProbe.HasDesktopRuntime10() ? "fx" : "sc";
 
-    public InstalledApp Install(ReleaseInfo release, InstalledApp? current)
+    public InstalledApp Install(ReleaseInfo release)
     {
         var preferred = PreferredFlavor;
         var asset = release.Assets.FirstOrDefault(a =>
@@ -158,85 +158,62 @@ internal sealed class AppInstaller
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
         if (OfficeLauncher.IsOfficeExecutable && expected is null)
             throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
-        var zip = Path.Combine(_paths.Downloads, asset.Name);
-        if (File.Exists(zip)) File.Delete(zip);
-
-        _ui.Info($"Файл: {asset.Name}" + (asset.Size > 0 ? $", {asset.Size / 1048576.0:0.0} МБ" : ""));
-        var hash = _releases.Download(asset, zip, expected);
-
+        // Each attempt owns its files; a failed retry must not touch a live
+        // installation or another attempt's temporary files.
+        var attempt = Guid.NewGuid().ToString("N");
+        var zip = Path.Combine(_paths.Downloads, attempt + "-" + asset.Name);
         var target = Path.Combine(_paths.Apps, $"{release.Version}-{flavor}");
-        var staging = target + ".staging";
-        if (Directory.Exists(staging)) Directory.Delete(staging, true);
-        Directory.CreateDirectory(staging);
-
-        _ui.UpdatePhase($"Подготавливаем версию {release.Version}", "Распаковываем проверенный пакет.");
-        _ui.Info("Распаковываю…");
+        var staging = target + "." + attempt + ".staging";
         try
         {
-            ZipFile.ExtractToDirectory(zip, staging);
-        }
-        catch (InvalidDataException ex)
-        {
-            TryDeleteDirectory(staging);
-            throw new InvalidOperationException("архив повреждён: " + ex.Message);
-        }
+            _ui.Info($"Файл: {asset.Name}" + (asset.Size > 0 ? $", {asset.Size / 1048576.0:0.0} МБ" : ""));
+            var hash = _releases.Download(asset, zip, expected);
 
-        var exe = Path.Combine(staging, AppExeName);
-        if (!File.Exists(exe))
-        {
-            TryDeleteDirectory(staging);
-            throw new InvalidOperationException($"в архиве нет {AppExeName}.");
-        }
-
-        if (Directory.Exists(target))
-        {
-            try { Directory.Delete(target, true); }
-            catch (IOException)
+            Directory.CreateDirectory(staging);
+            _ui.UpdatePhase($"Подготавливаем версию {release.Version}", "Распаковываем проверенный пакет.");
+            _ui.Info("Распаковываю…");
+            try
             {
-                // Предыдущая версия ещё запущена — ставим рядом с суффиксом.
-                target = target + "-" + DateTime.UtcNow.ToString("HHmmss");
+                ZipFile.ExtractToDirectory(zip, staging);
             }
-        }
-        Directory.Move(staging, target);
-        try { File.Delete(zip); } catch (IOException) { }
+            catch (InvalidDataException ex)
+            {
+                throw new InvalidOperationException("архив повреждён: " + ex.Message);
+            }
 
-        var installed = new InstalledApp
+            if (!File.Exists(Path.Combine(staging, AppExeName)))
+                throw new InvalidOperationException($"в архиве нет {AppExeName}.");
+
+            // Move only to a previously unused folder, then publish the pointer.
+            // Never recursively delete an installed version: even a failed
+            // deletion can remove DLLs that a running process has not loaded yet.
+            target = InstallDirectoryPublisher.Publish(staging, target, DateTime.UtcNow);
+            var installed = new InstalledApp
+            {
+                Version = release.Version,
+                Flavor = flavor,
+                Directory = target,
+                Exe = Path.Combine(target, AppExeName),
+                Sha256 = hash,
+                InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            };
+            installed.Save(_paths);
+            return installed;
+        }
+        finally
         {
-            Version = release.Version,
-            Flavor = flavor,
-            Directory = target,
-            Exe = Path.Combine(target, AppExeName),
-            Sha256 = hash,
-            InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-        };
-        installed.Save(_paths);
-        PruneOldVersions(target, current?.Directory);
-        return installed;
+            // Only temporary paths owned by this attempt. Published versions
+            // are retained for running sessions and rollback; offline cleanup
+            // is intentionally separate from updating.
+            TryDeleteDirectory(staging);
+            try { File.Delete(zip); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
     }
 
     public static string AssetNameFor(string flavor) =>
         flavor == "fx" ? AssetFramework : AssetSelfContained;
-
-    /// <summary>Удаляет старые распакованные версии, чтобы не копить гигабайты.</summary>
-    private void PruneOldVersions(string currentDirectory, string? previousDirectory)
-    {
-        try
-        {
-            foreach (var directory in Directory.EnumerateDirectories(_paths.Apps))
-            {
-                if (string.Equals(directory, currentDirectory, StringComparison.OrdinalIgnoreCase)) continue;
-                if (string.Equals(directory, previousDirectory, StringComparison.OrdinalIgnoreCase)) continue;
-                if (Path.GetFileName(directory).EndsWith(".staging", StringComparison.OrdinalIgnoreCase))
-                {
-                    TryDeleteDirectory(directory);
-                    continue;
-                }
-                TryDeleteDirectory(directory);
-            }
-        }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
 
     private static void TryDeleteDirectory(string directory)
     {

@@ -125,7 +125,7 @@ try
                 : "Проверяем пакет обновления.");
             ui.Step($"2/3  Устанавливаю версию {release.Version}…");
             StartupTrace.Mark("launcher_install_begin");
-            installed = installer.Install(release, installed);
+            installed = installer.Install(release);
             StartupTrace.Mark("launcher_install_end");
             ui.Info("Установлено в " + installed.Directory);
         }
