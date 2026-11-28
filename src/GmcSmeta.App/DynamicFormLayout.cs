@@ -18,7 +18,16 @@ internal static class DynamicFormLayout
     {
         if (control.Content is not string caption) return;
         AutomationProperties.SetName(control, caption);
-        control.Content = new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap };
+        control.Content = new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center, LineStackingStrategy = LineStackingStrategy.MaxHeight };
+    }
+
+    internal static TextBlock Secondary(string text, string? marginKey = null)
+    {
+        var block = new TextBlock { Text = text };
+        block.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
+        if (marginKey is not null) block.SetResourceReference(FrameworkElement.MarginProperty, marginKey);
+        return block;
     }
 
     internal static void Field(Control control)
@@ -29,7 +38,7 @@ internal static class DynamicFormLayout
     internal static DockPanel WithFooter(FrameworkElement body, FrameworkElement footer,
         string marginKey = "LayoutFormDialogMargin")
     {
-        body.Margin = new Thickness(0);
+        body.SetResourceReference(FrameworkElement.MarginProperty, "LayoutNoInset");
         var root = new DockPanel { LastChildFill = true };
         root.SetResourceReference(FrameworkElement.MarginProperty, marginKey);
         footer.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
