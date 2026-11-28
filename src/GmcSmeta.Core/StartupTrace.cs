@@ -74,6 +74,51 @@ public static class StartupTrace
         WriteMetrics(phase, 0, 0, value1, value2, Operation.Value);
     }
 
+    // Cumulative counters permit allocation-rate/GC-pause deltas without forced GC.
+    // HeapSizeBytes and committed/fragmented bytes describe the last completed GC.
+    public sealed record MemorySnapshot(long MonotonicTicks, long Frequency, long PrivateBytes,
+        long WorkingSetBytes, long ManagedLiveBytes, long HeapSizeBytes, long CommittedBytes,
+        long FragmentedBytes, long AllocatedBytes, double GcPauseMs,
+        int Gen0Collections, int Gen1Collections, int Gen2Collections, int HandleCount);
+
+    public static MemorySnapshot CaptureMemory()
+    {
+        using var process = Process.GetCurrentProcess();
+        var gc = GC.GetGCMemoryInfo();
+        return new MemorySnapshot(Stopwatch.GetTimestamp(), Stopwatch.Frequency,
+            process.PrivateMemorySize64, process.WorkingSet64, GC.GetTotalMemory(false),
+            gc.HeapSizeBytes, gc.TotalCommittedBytes, gc.FragmentedBytes,
+            GC.GetTotalAllocatedBytes(false), GC.GetTotalPauseDuration().TotalMilliseconds,
+            GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2), process.HandleCount);
+    }
+
+    private static string? _memoryFile;
+
+    public static void SampleMemory(string phase, long cacheEntries, long cacheRowWeight)
+    {
+        if (!Enabled) return;
+        try
+        {
+            var m = CaptureMemory();
+            lock (Gate)
+            {
+                if (_memoryFile is null)
+                {
+                    Directory.CreateDirectory(DirectoryPath!);
+                    var path = Path.Combine(DirectoryPath!, $"memory-{Environment.ProcessId}-{Guid.NewGuid():N}.csv");
+                    File.WriteAllText(path, "Utc,ProcessId,Operation,Phase,MonotonicTicks,Frequency,PrivateBytes,WorkingSetBytes,ManagedLiveBytes,HeapSizeBytes,CommittedBytes,FragmentedBytes,AllocatedBytes,GcPauseMs,Gen0Collections,Gen1Collections,Gen2Collections,HandleCount,CacheEntries,CacheRowWeight\n");
+                    _memoryFile = path;
+                }
+                File.AppendAllText(_memoryFile, string.Create(CultureInfo.InvariantCulture,
+                    $"{DateTime.UtcNow:O},{Environment.ProcessId},{Operation.Value},{phase},{m.MonotonicTicks},{m.Frequency},{m.PrivateBytes},{m.WorkingSetBytes},{m.ManagedLiveBytes},{m.HeapSizeBytes},{m.CommittedBytes},{m.FragmentedBytes},{m.AllocatedBytes},{m.GcPauseMs:F3},{m.Gen0Collections},{m.Gen1Collections},{m.Gen2Collections},{m.HandleCount},{cacheEntries},{cacheRowWeight}\n"));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or InvalidOperationException or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        {
+            // Diagnostics must not change navigation or persistence.
+        }
+    }
+
     private sealed class PhaseScope : IDisposable
     {
         private readonly string _phase;

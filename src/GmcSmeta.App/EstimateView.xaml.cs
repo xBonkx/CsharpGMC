@@ -170,6 +170,8 @@ public partial class EstimateView : UserControl
                 _reloadAfterAttach |= _refreshing || _reloadCancellation is not null || _reloadTimer.IsEnabled;
                 _reloadTimer.Stop();
                 _reloadGate.NextRequest(); // discard an in-flight read of a detached, clean editor
+                if (_reloadCancellation is not null || HasNestedCacheActivity)
+                    StartupTrace.Mark("estimate_detach_read_cancel_requested");
                 _reloadCancellation?.Cancel(); // preserve mandatory readback on detach
                 CancelSummaryRead();
                 CancelMaterialsRead();
@@ -534,6 +536,9 @@ public partial class EstimateView : UserControl
 
     private bool HasActiveCostGridEdit() =>
         HasGridEdit(SummaryGrid) || HasGridEdit(MaterialsGrid) || HasGridEdit(TotalsGrid);
+
+    // Exercise the same lazy read/cancellation paths without simulating global input.
+    internal void RetentionCostMode(string mode) => ApplyEstimateMode(mode);
 
     private void ApplyEstimateMode(string mode)
     {

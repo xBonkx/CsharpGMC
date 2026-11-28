@@ -33,9 +33,26 @@ public partial class MainWindow
 
     private void TraceEstimateCache(string phase)
     {
-        if (StartupTrace.Enabled)
-            StartupTrace.Sample(phase, _estimateCache.Count, _estimateCache.Values.Sum(view => view.CacheRowWeight));
+        if (!StartupTrace.Enabled) return;
+        var weight = _estimateCache.Values.Sum(view => view.CacheRowWeight);
+        StartupTrace.Sample(phase, _estimateCache.Count, weight);
+        StartupTrace.SampleMemory(phase, _estimateCache.Count, weight);
     }
+
+    // Read-only observation and normal navigation entry points used by the Pilot retention check.
+    internal int[] RetentionDocumentIds() => _docs.Where(d => !d.StageRest && !d.IsStage)
+        .Select(d => d.Id).Distinct().Take(8).ToArray();
+
+    internal void RetentionOpen(int id) => OpenEstimate(id);
+    internal void RetentionClose() => ShowEmptyPage();
+
+    internal (int Entries, long Weight, bool Settled, bool OverBudget) RetentionCacheState() =>
+        (_estimateCache.Count, _estimateCache.Values.Sum(v => v.CacheRowWeight),
+            _estimateCacheValidation is null && _estimateCache.Values.All(v => v.CanReleaseCachedView),
+            EstimateCacheOverBudget());
+
+    internal bool RetentionContains(EstimateView view) =>
+        _estimateCache.Values.Any(candidate => ReferenceEquals(candidate, view));
 
     private bool EstimateCacheOverBudget() =>
         EstimateCachePolicy.IsOverBudget(_estimateCache.Count,

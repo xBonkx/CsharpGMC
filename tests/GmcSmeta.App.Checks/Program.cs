@@ -66,6 +66,14 @@ internal static class Program
                 auditApp.Shutdown();
                 return 0;
             }
+            if (args.Length == 2 && args[0] == "--workspace-retention-check")
+            {
+                WorkspaceRetentionChecks.RequireIsolatedPilot();
+                var retentionApp = CreateApplication();
+                try { WorkspaceRetentionChecks.Run(args[1]); }
+                finally { retentionApp.Shutdown(); }
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--layout-interaction-check")
             {
                 var interactionApp = CreateApplication();
@@ -169,7 +177,7 @@ internal static class Program
         }
     }
 
-    private static void PumpUntil(Func<bool> complete, string operation)
+    internal static void PumpUntil(Func<bool> complete, string operation)
     {
         if (complete()) return;
         var frame = new DispatcherFrame();
