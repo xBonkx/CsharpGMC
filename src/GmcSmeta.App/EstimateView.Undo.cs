@@ -156,11 +156,12 @@ public partial class EstimateView
         var ctrl = modifiers == ModifierKeys.Control;
         var ctrlShift = modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
         var inTable = EstimateGrid.IsKeyboardFocusWithin;
-        if (TryZoomShortcut(e, modifiers)) return;
-
         // A real cell editor (or search box) owns its normal Ctrl+C/V/Z and
         // typing shortcuts. Never replace a cell's text by pasting SQL rows.
-        if (Keyboard.FocusedElement is TextBox) return;
+        if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox or ComboBox) return;
+        if (TryZoomShortcut(e, modifiers)) return;
+        // WPF reports Alt combinations as SystemKey.
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (inTable && ctrl && e.Key == Key.V && GridEditInteraction.TryPasteInEditingCell(EstimateGrid))
         {
             e.Handled = true;
@@ -182,16 +183,40 @@ public partial class EstimateView
             e.Handled = true;
             return;
         }
+        if (inTable && modifiers == ModifierKeys.None && e.Key == Key.F2 &&
+            EstimateGrid.SelectedItem is EditableEstimateRow { IsSystem: true } section)
+        {
+            e.Handled = true;
+            if (!e.IsRepeat && EstimateGrid.SelectedItems.Count == 1 &&
+                ReferenceEquals(EstimateGrid.CurrentItem, section) && IsRealCommandRow(section))
+                RenameSection_Click(sender, e);
+            return;
+        }
         if (inTable && modifiers == ModifierKeys.None && e.Key == Key.Delete)
         {
-            DeletePosition_Click(sender, e);
             e.Handled = true;
+            if (e.IsRepeat) return;
+            if (EstimateGrid.SelectedItem is EditableEstimateRow { IsSystem: true } selectedSection)
+            {
+                if (EstimateGrid.SelectedItems.Count == 1 &&
+                    ReferenceEquals(EstimateGrid.CurrentItem, selectedSection) &&
+                    IsRealCommandRow(selectedSection))
+                    DeleteSection_Click(sender, e);
+            }
+            else
+                DeletePosition_Click(sender, e);
             return;
         }
         if (inTable && ctrl && e.Key == Key.M)
         {
-            MoveSection_Click(sender, e);
             e.Handled = true;
+            var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+            if (!CommandSelectionCurrent(selection) || selection.Any(row => row.IsSystem))
+            {
+                SetStatus("Выбери только реальные позиции для переноса.", true);
+                return;
+            }
+            MoveSection_Click(sender, e);
             return;
         }
         if (inTable && ctrl && (e.Key == Key.Oem6 || e.Key == Key.Oem4))
@@ -217,7 +242,7 @@ public partial class EstimateView
 
         // Python kp_editor._shortcuts: fast structural edits without opening
         // "Действия". Existing click handlers enforce locked and SQL checks.
-        if (inTable && e.Key == Key.Insert)
+        if (inTable && key == Key.Insert)
         {
             if (modifiers == ModifierKeys.None) { AddRow_Click(sender, e); e.Handled = true; return; }
             if (modifiers == ModifierKeys.Shift) { AddComponent_Click(sender, e); e.Handled = true; return; }
@@ -229,10 +254,8 @@ public partial class EstimateView
         }
         if (inTable && modifiers == ModifierKeys.Alt)
         {
-            // WPF reports Alt combinations as Key.System.
-            var moveKey = e.Key == Key.System ? e.SystemKey : e.Key;
-            if (moveKey == Key.Up) { MoveUp_Click(sender, e); e.Handled = true; return; }
-            if (moveKey == Key.Down) { MoveDown_Click(sender, e); e.Handled = true; return; }
+            if (key == Key.Up) { MoveUp_Click(sender, e); e.Handled = true; return; }
+            if (key == Key.Down) { MoveDown_Click(sender, e); e.Handled = true; return; }
         }
         if (e.Key == Key.Z && ctrl)
         {

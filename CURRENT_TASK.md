@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-041.01–03 PARTIAL: keyboard menu target, system F2/Del, Ctrl+M selection, Ctrl+Alt+Insert normalization. 9 static checks, 3 source tests added (not run). [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+
 - 29.11.2026 — AGR-07/08: защита от неполной исторической группы КС, изоляция печатных реквизитов и ID в поиске; AGR-08.01 CODE READY, 4 PARTIAL, 0 DONE. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-financial-scope-20261129). Windows/SQL не запускались, бронь снята.
 
 - 29.11.2026 — PERF-047.01 CODE READY: история читает заголовок и строки одним соединением с контролем ревизии, старый API сохранён. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
