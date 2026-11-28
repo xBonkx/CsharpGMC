@@ -6,6 +6,8 @@ public class ObjectCardLayoutTests
 {
     [Theory]
     [InlineData(0, 318, 1, 288)]
+    [InlineData(250, 318, 1, 238)]
+    [InlineData(100, 318, 1, 88)]
     [InlineData(691, 1000, 1, 679)]
     [InlineData(692, 1000, 2, 334)]
     [InlineData(1044, 1000, 3, 336)]
@@ -14,6 +16,15 @@ public class ObjectCardLayoutTests
     {
         Assert.Equal((columns,width),ObjectCardLayout.Measure(viewport,actual));
     }
+
+    [Theory]
+    [InlineData(0, 0, 0, 1, 0, 0)]
+    [InlineData(61, 0, 0, 2, 0, 60)]
+    [InlineData(61, 1, 1, 2, 60, 1)]
+    [InlineData(251, 99, 4, 5, 240, 11)]
+    [InlineData(120, -1, 0, 2, 0, 60)]
+    public void CardPagesKeepBoundsAndReachLastItem(int count, int requested, int page, int pages, int first, int size) =>
+        Assert.Equal((page, pages, first, size), ObjectCardLayout.PageRange(count, requested));
 
     [Fact]
     public void RestoredGeometryClampsToWorkAreaOrKeepsDefaultWhenTooSmall()

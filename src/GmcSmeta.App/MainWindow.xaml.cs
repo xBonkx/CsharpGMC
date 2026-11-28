@@ -1014,6 +1014,7 @@ public partial class MainWindow : Window
         var cardWidth = ObjectCardLayout.Measure(ObjectCardsScroll.ViewportWidth, ObjectCardsScroll.ActualWidth).CardWidth;
         if (CardWidth != cardWidth) CardWidth = cardWidth;
         LayoutObjectTotals();
+        UpdateObjectTotalsVisibility();
     }
 
     private void LayoutObjectTotals()

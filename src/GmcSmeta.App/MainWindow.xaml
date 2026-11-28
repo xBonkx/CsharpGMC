@@ -214,7 +214,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
             <Setter Property="MinHeight" Value="150"/>
-            <Setter Property="MinWidth" Value="300"/>
+            <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Margin" Value="0,0,12,12"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template"><Setter.Value>
@@ -310,7 +310,7 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
-            <Setter Property="MinWidth" Value="300"/>
+            <Setter Property="MinWidth" Value="0"/>
             <Setter Property="MinHeight" Value="150"/>
             <Setter Property="Margin" Value="0,0,12,12"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -454,7 +454,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="300" MinWidth="270"/>
                 <ColumnDefinition x:Name="SplitterColumn" Width="{Binding Source={StaticResource LayoutSidebarSplitterWidth}}"/>
-                <ColumnDefinition Width="*" MinWidth="420"/>
+                <ColumnDefinition Width="*" MinWidth="0"/>
             </Grid.ColumnDefinitions>
             <Border x:Name="Sidebar" Background="#FBFCFE" BorderThickness="0" Padding="{StaticResource LayoutSidebarPadding}">
                 <DockPanel>
@@ -618,10 +618,10 @@
                                    TextAlignment="Center" TextWrapping="Wrap"/>
                         <TextBlock x:Name="EmptyNavigationHint" Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
                                    Foreground="#64748B" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
+                        <WrapPanel HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
                             <Button Content="Загрузить КП из Excel" ContentTemplate="{StaticResource IconLabelUpload}" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
                             <Button x:Name="EmptyNewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
-                        </StackPanel>
+                        </WrapPanel>
                     </StackPanel>
                 </Grid>
                 <ContentControl x:Name="PageHost" Grid.Row="1" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
@@ -635,7 +635,7 @@
                         </Style>
                     </ContentControl.Style>
                     <ContentControl.Content>
-                        <Grid x:Name="ObjectPage" Margin="{StaticResource LayoutPageMargin}">
+                        <Grid x:Name="ObjectPage" Margin="{StaticResource LayoutPageMargin}" SizeChanged="ObjectPage_SizeChanged">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -644,25 +644,25 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <StackPanel Margin="0,0,0,16">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,4">
+                                <local:ResponsiveToolbarPanel MinimumLeftWidth="100">
+                                    <TextBlock x:Name="ObjectCrumb" Text="Объект" Foreground="#64748B" Margin="0,0,0,4" Visibility="Collapsed"/>
+                                    <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,4">
                                         <Button x:Name="ObjectNewKpButton" Content="Новое КП" ContentTemplate="{StaticResource IconLabelPlus}" Click="ObjectNewContract_Click"
                                                 Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="0,0,8,0"
                                                 ToolTip="Создать КП: пустое или копию существующего"/>
                                         <Button x:Name="ObjectPropertiesButton" Style="{StaticResource PythonToolbarButton}" Content="Свойства" ContentTemplate="{StaticResource IconLabelEdit}" Click="ObjectProperties_Click" Visibility="Collapsed" Margin="0,0,8,0"/>
                                         <Button x:Name="ObjectMoreButton" Style="{StaticResource PythonToolbarButton}" Content="Ещё" ContentTemplate="{StaticResource IconOnlyMore}" Padding="7,4" MinWidth="32" ToolTip="Ещё"
                                                 AutomationProperties.Name="Ещё" Click="ObjectMore_Click" Visibility="Collapsed"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="ObjectCrumb" Text="Объект" Foreground="#64748B" Margin="0,0,0,4" Visibility="Collapsed"/>
-                                </DockPanel>
+                                    </WrapPanel>
+                                </local:ResponsiveToolbarPanel>
                                 <DockPanel HorizontalAlignment="Left" LastChildFill="True">
                                     <Button x:Name="ObjectRenameButton" Style="{StaticResource PythonToolbarButton}" DockPanel.Dock="Right" Content="Переименовать" ContentTemplate="{StaticResource IconOnlyEdit}" AutomationProperties.Name="Переименовать объект" ToolTip="Переименовать объект"
                                             Click="ObjectRename_Click" Visibility="Collapsed" Margin="4,0,0,0" Padding="4,2" MinHeight="26" MinWidth="26" Background="Transparent" BorderBrush="Transparent"/>
-                                    <TextBlock x:Name="ObjectTitle" Style="{StaticResource UiWrappedHeading}" FontSize="{StaticResource UiH1Size}" FontWeight="Bold" Text="Объекты" TextTrimming="None" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                    <TextBlock x:Name="ObjectTitle" Style="{StaticResource UiPageHeading}" FontSize="{StaticResource UiH1Size}" Text="Объекты" TextTrimming="None" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                                Cursor="Hand" MouseLeftButtonDown="ObjectTitle_MouseDown"/>
                                 </DockPanel>
                                 <TextBox x:Name="ObjectRenameBox" Style="{StaticResource PythonSearch}" Visibility="Collapsed" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"
-                                         Padding="8,2" MinWidth="260" MaxWidth="640" Margin="0,2,0,0"
+                                         Padding="8,2" MinWidth="0" MaxWidth="640" Margin="0,2,0,0"
                                          KeyDown="ObjectRenameBox_KeyDown" LostFocus="ObjectRenameBox_LostFocus"/>
                                 <TextBlock x:Name="ObjectSubtitle" Style="{StaticResource UiSecondaryText}" Margin="0,4,0,0"/>
                             </StackPanel>
@@ -693,7 +693,17 @@
                                     <TextBlock Text="{Binding EarnedText}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel></Border>
                             </Grid>
-                            <TextBlock x:Name="ObjectDocumentsCaption" Text="ДОКУМЕНТЫ" Foreground="#64748B" FontSize="{StaticResource UiSectionSize}" FontWeight="Bold" Grid.Row="2" Margin="0,0,0,10"/>
+                            <local:ResponsiveToolbarPanel Grid.Row="2" Margin="0,0,0,10">
+                                <TextBlock x:Name="ObjectDocumentsCaption" Text="ДОКУМЕНТЫ" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiSectionSize}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <Button x:Name="ObjectTotalsToggle" Content="Скрыть итоги" Style="{StaticResource PythonToolbarButton}" Click="ObjectTotalsToggle_Click" Margin="0,0,6,0" Visibility="Collapsed"/>
+                                    <StackPanel x:Name="ObjectCardPager" Orientation="Horizontal" Visibility="Collapsed">
+                                        <Button x:Name="ObjectCardsPrevious" Content="Назад" ContentTemplate="{StaticResource IconOnlyArrowBack}" Style="{StaticResource PythonToolbarButton}" Click="ObjectCardsPrevious_Click" ToolTip="Предыдущая страница" AutomationProperties.Name="Предыдущая страница" MinWidth="32"/>
+                                        <TextBlock x:Name="ObjectCardsPageText" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource UiMutedTextBrush}"/>
+                                        <Button x:Name="ObjectCardsNext" Content="Далее" ContentTemplate="{StaticResource IconOnlyArrowForward}" Style="{StaticResource PythonToolbarButton}" Click="ObjectCardsNext_Click" ToolTip="Следующая страница" AutomationProperties.Name="Следующая страница" MinWidth="32"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                            </local:ResponsiveToolbarPanel>
                             <TextBlock x:Name="ObjectCardsStatus" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="ObjectCardsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed" SizeChanged="ObjectCards_SizeChanged" ScrollChanged="ObjectCards_ScrollChanged">
                                 <ItemsControl x:Name="DocumentCards" ItemTemplateSelector="{StaticResource ObjectCardSelector}">

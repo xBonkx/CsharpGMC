@@ -17,6 +17,53 @@ public partial class MainWindow
     private CancellationTokenSource? _objectCardReadCancellation;
     private int? _displayedObjectId;
     private bool _objectCardTransitionPending;
+    private IReadOnlyList<object> _objectCardItems = Array.Empty<object>();
+    private int _objectCardPage;
+    private bool? _objectTotalsUserVisible;
+
+    private void PublishObjectCardPage(int requestedPage, bool resetScroll)
+    {
+        var range = ObjectCardLayout.PageRange(_objectCardItems.Count, requestedPage);
+        _objectCardPage = range.Page;
+        DocumentCards.ItemsSource = _objectCardItems.Skip(range.First).Take(range.Count).ToArray();
+        ObjectCardPager.Visibility = range.Pages > 1 ? Visibility.Visible : Visibility.Collapsed;
+        ObjectCardsPrevious.IsEnabled = range.Page > 0;
+        ObjectCardsNext.IsEnabled = range.Page + 1 < range.Pages;
+        ObjectCardsPageText.Text = $"{range.Page + 1} / {range.Pages}";
+        if (resetScroll) ObjectCardsScroll.ScrollToTop();
+    }
+
+    private void ObjectCardsPrevious_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_objectCardTransitionPending) PublishObjectCardPage(_objectCardPage - 1, true);
+    }
+
+    private void ObjectCardsNext_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_objectCardTransitionPending) PublishObjectCardPage(_objectCardPage + 1, true);
+    }
+
+    private void ObjectPage_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateObjectTotalsVisibility();
+
+    private void UpdateObjectTotalsVisibility()
+    {
+        if (ObjectTotals is null || ObjectTotalsToggle is null || ObjectPage is null) return;
+        var available = ObjectTotals.DataContext is ObjectDocuments;
+        ObjectTotalsToggle.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        // On a short viewport keep document cards usable. The user's explicit
+        // choice takes priority for the current page; resizing never changes it.
+        var show = available && (_objectTotalsUserVisible ?? (ObjectPage.ActualHeight <= 0 || ObjectPage.ActualHeight >= 560));
+        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (ObjectTotals.Visibility != visibility) ObjectTotals.Visibility = visibility;
+        ObjectTotalsToggle.Content = show ? "Скрыть итоги" : "Показать итоги";
+    }
+
+    private void ObjectTotalsToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (_objectCardTransitionPending) return;
+        _objectTotalsUserVisible = ObjectTotals.Visibility != Visibility.Visible;
+        UpdateObjectTotalsVisibility();
+    }
 
     private void CancelObjectCardRead() => _objectCardReadCancellation?.Cancel();
 
@@ -91,8 +138,10 @@ public partial class MainWindow
                 // An error belongs to the requested object, never to the retained
                 // previous page. Do not leave stale document actions accessible.
                 PrepareObjectHeader(o, mode);
-                DocumentCards.ItemsSource = null;
+                _objectCardItems = Array.Empty<object>();
+                PublishObjectCardPage(0, true);
                 ObjectTotals.DataContext = null;
+                UpdateObjectTotalsVisibility();
                 ObjectTotals.Visibility = ObjectCardsScroll.Visibility = Visibility.Collapsed;
                 ObjectCardsStatus.Text = "Не удалось загрузить документы. Нажмите F5, чтобы повторить.";
                 ObjectCardsStatus.Visibility = Visibility.Visible;
@@ -122,11 +171,14 @@ public partial class MainWindow
         ObjectProgressCard.Visibility = documents.ShowProgress ? Visibility.Visible : Visibility.Collapsed;
         // The final tile is the real Python "Новое КП" action. Financial
         // totals and document count intentionally use documents.Cards only.
-        DocumentCards.ItemsSource = ObjectCardLayout.AppendNewContract(
+        _objectCardItems = ObjectCardLayout.AppendNewContract(
             documents.Cards, SqlWritesEnabled && !o.Archived,
             mode == NavigationMode.Kp ? "Новое КП" : "Добавить документ");
+        if (resetScroll) _objectTotalsUserVisible = null;
+        PublishObjectCardPage(resetScroll ? 0 : _objectCardPage, resetScroll);
         ObjectCardsStatus.Visibility = Visibility.Collapsed;
-        ObjectTotals.Visibility = ObjectCardsScroll.Visibility = Visibility.Visible;
+        ObjectCardsScroll.Visibility = Visibility.Visible;
+        UpdateObjectTotalsVisibility();
         ObjectTotalValue.Text = Money.Format(documents.Total);
         ObjectTotalSub.Visibility = documents.VatTop > .005m ? Visibility.Visible : Visibility.Collapsed;
         ObjectTotalSub.Text = $"материалы + СМР {Money.Format(documents.Total - documents.VatTop)} + НДС сверху {Money.Format(documents.VatTop)}";
