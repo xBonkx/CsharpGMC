@@ -226,7 +226,7 @@ public partial class PtoWindow
         if(dialog.ShowDialog(this)!=true)return;
         var kind=MessageBox.Show(this,
             "Какой оригинальный шаблон загружаете?\nДа — АОСР\nНет — Реестр\nОтмена — не импортировать",
-            "Пользовательский шаблон",MessageBoxButton.YesNoCancel,MessageBoxImage.Question);
+            "Пользовательский шаблон",MessageBoxButton.YesNoCancel,MessageBoxImage.Question,MessageBoxResult.Cancel);
         if(kind==MessageBoxResult.Cancel)return;
         var archive=_archive;
         var path=dialog.FileName;

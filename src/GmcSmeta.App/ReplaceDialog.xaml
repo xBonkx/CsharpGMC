@@ -72,7 +72,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="TotalText" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="Заменить" ContentTemplate="{StaticResource IconLabelCheck}" IsDefault="True" Click="Accept_Click" Style="{StaticResource PrimaryButton}" Padding="18,6" FontWeight="SemiBold" Margin="0,0,8,0"/>
+            <Button Grid.Column="1" Content="Заменить" ContentTemplate="{StaticResource IconLabelCheck}" Click="Accept_Click" Style="{StaticResource PrimaryButton}" Padding="18,6" FontWeight="SemiBold" Margin="0,0,8,0"/>
             <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Padding="18,6"/>
         </Grid>
     </Grid>

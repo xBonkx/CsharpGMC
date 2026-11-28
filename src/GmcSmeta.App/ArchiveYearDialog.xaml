@@ -42,7 +42,7 @@
     <DockPanel Margin="{StaticResource LayoutFormDialogMargin}">
         <WrapPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource LayoutFormFooterGap}">
             <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" Margin="{StaticResource LayoutDialogActionGap}"/>
-            <Button x:Name="MoveButton" Content="Перенести" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Move_Click"/>
+            <Button x:Name="MoveButton" Content="Перенести" Style="{StaticResource PrimaryButton}" Click="Move_Click"/>
         </WrapPanel>
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>

@@ -24,6 +24,32 @@ public sealed class MainAndAddMenuParitySourceTests
     }
 
     [Fact]
+    public void FontScaleMenuUsesCapturedOwnerAndRepresentsNonPresetPreference()
+    {
+        var code = Source("MainWindow.Navigation.cs");
+        Assert.Contains("SelectFontScale(fontMenu, option, scale)", code);
+        Assert.Contains("!fontMenu.Items.OfType<MenuItem>().Any(option => option.IsChecked)", code);
+        Assert.Contains("Текущий масштаб", code);
+        Assert.Contains("IsEnabled = false,", code);
+        Assert.Contains("!fontMenu.Items.Contains(selected)", code);
+        Assert.Contains("fontMenu.Items.Remove(option)", code);
+        Assert.Contains("option.IsChecked = ReferenceEquals(option, selected)", code);
+        Assert.Contains("_uiSettings.FontScale = scale;", code);
+    }
+
+    [Fact]
+    public void MainMenuPopupHasExplicitOwnerAndPtoModeKeepsLocalVisibility()
+    {
+        var xaml = Source("MainWindow.xaml");
+        Assert.Contains("PlacementTarget=\"{Binding RelativeSource={RelativeSource TemplatedParent}}\"", xaml);
+        Assert.Contains("IsOpen=\"{TemplateBinding IsSubmenuOpen}\"", xaml);
+        var pto = Source("MainWindow.Pto.cs");
+        Assert.Contains("PtoModeToggle.IsChecked=enabled", pto);
+        Assert.Contains("PtoModeVisibility=PtoMenuItem.Visibility=", pto);
+        Assert.Contains("!PtoUserSettings.Enabled", pto);
+    }
+
+    [Fact]
     public void AddMenuUsesPythonGroupsAndCapturedSelectionForEveryCommand()
     {
         var code = Source("EstimateView.xaml.cs");

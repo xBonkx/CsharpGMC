@@ -233,7 +233,7 @@ internal sealed class MetalRegisterWindow : Window
         if (picker.ShowDialog(this) != true) return;
         if (_book is not null && MessageBox.Show(this,
             "Заменить текущую таблицу выбранным Excel при сохранении для всех?",
-            "Учёт металла",MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+            "Учёт металла",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No) != MessageBoxResult.Yes) return;
         SetBusy(true);
         try
         {
@@ -305,7 +305,7 @@ internal sealed class MetalRegisterWindow : Window
             var preview = await Task.Run(() => MetalOpeningReader.Read(path));
             if (new MetalOpeningPreviewDialog(preview) { Owner = this }.ShowDialog() != true) return;
             if (MessageBox.Show(this, "Перенести остатки в склад один раз?",
-                "Первоначальный импорт",MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+                "Первоначальный импорт",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var revision = await Task.Run(store.Revision);
             await Task.Run(() => store.ImportOpening(
                 preview.Records,preview.FileName,preview.Original,revision));

@@ -340,7 +340,7 @@ internal static class Program
             using var loaded = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
             Assert(loaded.PageCount >= 2, "KS2 and KS3 require PDF pages");
             var output = SamplePath(form + "_KS2_KS3.pdf");
-            if (output is not null) File.WriteAllBytes(output, pdf);
+            if (output is not null) GmcSmeta.Core.ExportFilePublication.WriteBytes(output, pdf);
         }
     }
 
@@ -563,6 +563,10 @@ internal static class Program
             if(form=="r4") Assert(odd.Contains("&N"),"R4 must retain total page count");
         }
 
+        var output = SamplePath(form + "_VOR_print_" + count + ".xlsx");
+        if (output is not null)
+            GmcSmeta.Core.ExportFilePublication.WriteBytes(output, stream.ToArray());
+
         static bool IsTrue(XAttribute? attribute) => attribute?.Value is "1" or "true";
     }
 
@@ -605,6 +609,9 @@ internal static class Program
             Assert(cell.GetFormattedString(CultureInfo.InvariantCulture)==expected.Display,
                 label+" displayed as "+cell.GetFormattedString(CultureInfo.InvariantCulture));
         }
+        var output = SamplePath(form + "_VOR_quantities.xlsx");
+        if (output is not null)
+            GmcSmeta.Core.ExportFilePublication.WriteBytes(output, stream.ToArray());
     }
 
     private static void CheckDnsRoundRows()
@@ -701,11 +708,6 @@ internal static class Program
         using var data = new MemoryStream();
         book.SaveAs(data);
         Assert(data.Length > 2000, "XLSX package unexpectedly small");
-        if (writeArtifact)
-        {
-            var output = SamplePath(artifactName);
-            if (output is not null) File.WriteAllBytes(output, data.ToArray());
-        }
         data.Position = 0;
         using var reopened = new XLWorkbook(data);
         Assert(reopened.Worksheets.Count == book.Worksheets.Count,
@@ -716,6 +718,12 @@ internal static class Program
                 "Missing print area after XLSX save/reopen: " + sheet.Name);
             Assert(sheet.CellsUsed().Any(),
                 "Empty worksheet after XLSX save/reopen: " + sheet.Name);
+        }
+        if (writeArtifact)
+        {
+            var output = SamplePath(artifactName);
+            if (output is not null)
+                GmcSmeta.Core.ExportFilePublication.WriteBytes(output, data.ToArray());
         }
     }
 }

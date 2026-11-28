@@ -128,5 +128,45 @@ public sealed class ExportFilePublicationTests : IDisposable
         Assert.Single(Directory.GetFiles(_folder));
     }
 
+    [Theory]
+    [InlineData(".xlsx")]
+    [InlineData(".pdf")]
+    public void LockedWindowsDestinationPreservesOldBytes(string extension)
+    {
+        // POSIX rename semantics differ from Windows sharing restrictions.
+        if (!OperatingSystem.IsWindows()) return;
+        var path = Path.Combine(_folder, "locked" + extension);
+        byte[] old = [1, 2, 3, 4];
+        byte[] next = [5, 6, 7];
+        File.WriteAllBytes(path, old);
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var error = Record.Exception(() => ExportFilePublication.WriteBytes(path, next));
+            Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString());
+            Assert.Equal(old, File.ReadAllBytes(path));
+            Assert.Empty(Directory.GetFiles(_folder, ".gmc-export-*"));
+        }
+        ExportFilePublication.WriteBytes(path, next);
+        Assert.Equal(next, File.ReadAllBytes(path));
+        Assert.Single(Directory.GetFiles(_folder));
+    }
+
+    [Theory]
+    [InlineData(".xlsx")]
+    [InlineData(".pdf")]
+    public void CancellationAfterPartialRenderKeepsPreviousOutput(string extension)
+    {
+        var path = Path.Combine(_folder, "cancelled" + extension);
+        byte[] old = [8, 9];
+        File.WriteAllBytes(path, old);
+        Assert.Throws<OperationCanceledException>(() => ExportFilePublication.Write(path, stream =>
+        {
+            stream.WriteByte(42);
+            throw new OperationCanceledException("Synthetic renderer cancellation");
+        }));
+        Assert.Equal(old, File.ReadAllBytes(path));
+        Assert.Single(Directory.GetFiles(_folder));
+    }
+
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 }

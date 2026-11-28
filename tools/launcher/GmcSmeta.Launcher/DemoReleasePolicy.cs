@@ -27,6 +27,18 @@ internal static class DemoReleasePolicy
         return (args[1], args.Length == 3);
     }
 
+    // Matches gmcsmeta/tools/install-demo-shortcuts.ps1.
+    internal static bool IsSeedFolder(string folder) =>
+        Regex.IsMatch(folder, @"\Aseed-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}\z", RegexOptions.CultureInvariant);
+
+    internal static void RequireCandidateMetadata(string directory, string version)
+    {
+        var declared = File.ReadAllText(Path.Combine(directory, PackageIntegrity.VersionFile)).Trim();
+        var schema = File.ReadAllText(Path.Combine(directory, PackageIntegrity.SchemaFile)).Trim();
+        if (!string.Equals(declared, version, StringComparison.Ordinal) || schema != "32")
+            throw new InvalidOperationException("Метаданные пакета не подтверждают версию релиза и тестовую схему 32.");
+    }
+
     internal static void RequireCapability(string? contents)
     {
         var lines = (contents ?? "").Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries);

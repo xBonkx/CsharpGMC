@@ -89,11 +89,26 @@ public partial class MainWindow
                 {
                     Header = title,
                     IsCheckable = true,
-                    IsChecked = Math.Abs(scale - _uiSettings.FontScale) < 0.01,
+                    IsChecked = Math.Abs(scale - _uiSettings.FontScale) < 0.000001,
                     Tag = scale,
                 };
-                option.Click += FontScaleOption_Click;
+                // Use the owning menu directly: popup visual/logical ancestry is not
+                // a reliable source of the command's intended target.
+                option.Click += (_, _) => SelectFontScale(fontMenu, option, scale);
                 fontMenu.Items.Add(option);
+            }
+            // Older or manually configured preferences can contain any scale in
+            // the supported range. Show that current value without rounding it to
+            // a preset or silently changing the saved preference.
+            if (!fontMenu.Items.OfType<MenuItem>().Any(option => option.IsChecked))
+            {
+                fontMenu.Items.Insert(0, new MenuItem
+                {
+                    Header = $"Текущий масштаб · {Math.Round(_uiSettings.FontScale * 100, 2)} %",
+                    IsCheckable = true,
+                    IsChecked = true,
+                    IsEnabled = false,
+                });
             }
             settings.Items.Add(fontMenu);
             settings.Items.Add(Item("Показать подсказки снова", ShowHintsAgain, local: true));
@@ -127,11 +142,17 @@ public partial class MainWindow
             "Эта команда не создаёт резервную копию и не изменяет базу.",
             "Резервные копии", MessageBoxButton.OK, MessageBoxImage.Information);
 
-    private void FontScaleOption_Click(object sender, RoutedEventArgs e)
+    private void SelectFontScale(MenuItem fontMenu, MenuItem selected, double scale)
     {
-        if (sender is not MenuItem { Tag: double scale, Parent: MenuItem fontMenu }) return;
-        foreach (var option in fontMenu.Items.OfType<MenuItem>())
-            option.IsChecked = ReferenceEquals(option, sender);
+        if (_startupClosed || !fontMenu.Items.Contains(selected) || !selected.IsEnabled) return;
+        // The disabled current-scale indicator is not an available preset.
+        foreach (var option in fontMenu.Items.OfType<MenuItem>().ToArray())
+        {
+            if (option.Tag is not double)
+                fontMenu.Items.Remove(option);
+            else
+                option.IsChecked = ReferenceEquals(option, selected);
+        }
         ApplyFontScale(scale);
         fontMenu.Header = $"Размер шрифта · {Math.Round(scale * 100)} %";
         _uiSettings.FontScale = scale;
