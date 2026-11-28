@@ -11,6 +11,24 @@ public static class AgreementEditPolicy
         return parentLegal;
     }
 
+    // A copy supplies positions, not authority to select an existing legal card.
+    // Only the first card of a previously cardless object may be created here.
+    public static long? ResolveNewAnnexTarget(long? preferred, int existingCardCount)
+    {
+        if (preferred is <= 0) throw new ArgumentException("Некорректный ID договора.");
+        if (preferred is null && existingCardCount != 0)
+            throw new InvalidOperationException("Выберите действующий юридический договор для приложения.");
+        return preferred;
+    }
+
+    public static void ValidateNewDsParent(long? parentLegal, long? parentCompany, long? documentCompany)
+    {
+        if (parentLegal is null)
+            throw new InvalidOperationException("У основания ДС нет действующего юридического договора.");
+        if (parentCompany != documentCompany)
+            throw new InvalidOperationException("Организация ДС должна совпадать с организацией основания.");
+    }
+
     public static long? ResolveRequested(string kind, string oldKind, long? previous,
         long? preferred, bool baseChanged, long? inherited)
     {

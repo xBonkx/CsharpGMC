@@ -52,6 +52,19 @@ public sealed class ExcelImportAgreementPolicyTests
     }
 
     [Fact]
+    public void DraftBatchUsesTheReturnedIdentityRatherThanSelectingFirstCard()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "GmcSmeta.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var sql = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerExcelImport.cs"));
+        Assert.Contains("createdDraftAgreementId = attached;", sql);
+        Assert.Contains("choice.AgreementId ?? (choice.Kind == \"main\" ? createdDraftAgreementId : null)", sql);
+        Assert.Contains("ValidateNewDraftBatch(annexes)", sql);
+        Assert.Contains("COMMIT импорта не подтверждён", sql);
+    }
+
+    [Fact]
     public void DsCompanyMustStillMatchItsSelectedBase()
     {
         var choice = Choice("dop", 2, 10);

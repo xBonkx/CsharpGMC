@@ -32,6 +32,8 @@
 
 29.11: AGR-04.01/02 CODE READY на уровне дочерних пакетов; AGR-05.01–03 PARTIAL. Родители и счётчики не изменены; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-card-scope-20261129).
 
+29.11: AGR-05.01–03 CODE READY (новый код), AGR-06.01 ранее реализован; AGR-07.02 PARTIAL. Родители без изменения; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-server-scope-20261129).
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |

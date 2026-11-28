@@ -30,6 +30,27 @@ public sealed class AgreementEditPolicyTests
         Assert.Throws<ArgumentException>(()=>AgreementEditPolicy.InheritParent(10,20));
     }
 
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(1, 10L)]
+    [InlineData(2, 20L)]
+    public void NewAnnexTargetIsExplicit(int existingCards, long? target)
+        => Assert.Equal(target, AgreementEditPolicy.ResolveNewAnnexTarget(target, existingCards));
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void NeverGuessesExistingTarget(int existingCards)
+        => Assert.Throws<InvalidOperationException>(() => AgreementEditPolicy.ResolveNewAnnexTarget(null, existingCards));
+
+    [Fact]
+    public void NewDsRequiresLegalBaseAndSameCompany()
+    {
+        AgreementEditPolicy.ValidateNewDsParent(10, 20, 20);
+        Assert.Throws<InvalidOperationException>(() => AgreementEditPolicy.ValidateNewDsParent(null, 20, 20));
+        Assert.Throws<InvalidOperationException>(() => AgreementEditPolicy.ValidateNewDsParent(10, 20, 21));
+    }
+
     [Fact]
     public void RejectsMismatchedOrUnlinkedNewBase()
     {

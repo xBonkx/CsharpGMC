@@ -145,15 +145,15 @@ public static class SqlServerAgreements
         cmd.ExecuteNonQuery();
     }
 
-    internal static void AttachNewDocument(SqlConnection conn, SqlTransaction tx, long documentId, long? preferred = null, long? sourceId = null, bool validateNewAnnex = false)
+    internal static long? AttachNewDocument(SqlConnection conn, SqlTransaction tx, long documentId, long? preferred = null, long? sourceId = null, bool validateNewAnnex = false)
     {
         if (!Enabled(conn, tx))
         {
             if (preferred.HasValue) throw new InvalidOperationException("Схема базы не поддерживает юридические договоры.");
-            return;
+            return null;
         }
-        long objectId; string kind; long? stageOf, baseId;
-        using (var cmd = new SqlCommand("SELECT object_id,kind,stage_of,base_contract_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
+        long objectId; string kind; long? stageOf, baseId, companyIdForDocument;
+        using (var cmd = new SqlCommand("SELECT object_id,kind,stage_of,base_contract_id,company_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
             using var r = cmd.ExecuteReader();
@@ -161,34 +161,45 @@ public static class SqlServerAgreements
             objectId = SqlInteger.ReadInt64(r, 0); kind = r.GetString(1);
             stageOf = r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2);
             baseId = r.IsDBNull(3) ? null : SqlInteger.ReadInt64(r, 3);
+            companyIdForDocument = r.IsDBNull(4) ? null : SqlInteger.ReadInt64(r, 4);
         }
         var actualParent = stageOf ?? (kind == "dop" ? baseId : null);
         if (actualParent is long parentId)
         {
             // Stages use kind=kp in storage. Their parent relation, not kind,
             // controls legal identity. A truly unlinked base stays unlinked.
-            long? parentLegal;
+            long? parentLegal, parentCompany;
             using (var parent = new SqlCommand(
-                "SELECT agreement_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@parent AND object_id=@object AND stage_of IS NULL", conn, tx))
+                "SELECT agreement_id,company_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@parent AND object_id=@object AND stage_of IS NULL", conn, tx))
             {
                 parent.Parameters.Add("@parent", SqlDbType.BigInt).Value = parentId;
                 parent.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
-                var raw = parent.ExecuteScalar();
-                if (raw is null) throw new InvalidOperationException("Основание или полное КП не найдено в этом объекте.");
-                parentLegal = raw is DBNull ? null : SqlInteger.RequireInt64(raw);
+                using var reader = parent.ExecuteReader();
+                if (!reader.Read()) throw new InvalidOperationException("Основание или полное КП не найдено в этом объекте.");
+                parentLegal = reader.IsDBNull(0) ? null : SqlInteger.ReadInt64(reader, 0);
+                parentCompany = reader.IsDBNull(1) ? null : SqlInteger.ReadInt64(reader, 1);
             }
+            if (validateNewAnnex && kind == "dop" && stageOf is null)
+                AgreementEditPolicy.ValidateNewDsParent(parentLegal, parentCompany, companyIdForDocument);
             var inheritedId = AgreementEditPolicy.InheritParent(preferred, parentLegal);
             if (inheritedId.HasValue && Read(conn, objectId, tx).All(a => a.Id != inheritedId.Value))
                 throw new InvalidOperationException("Юридический договор основания архивирован или недоступен.");
             WriteDocumentAgreement(conn, tx, documentId, objectId, inheritedId);
-            return;
+            return inheritedId;
         }
-        if (kind == "kp") return;
-        // A copy source is not a legal parent. An explicit target can differ
-        // from the document supplying its positions.
-        var inherited = !preferred.HasValue && sourceId.HasValue ? DocumentAgreementId(conn, sourceId.Value, tx) : null;
+        if (kind == "kp") return null;
+        if (kind == "dop")
+            throw new InvalidOperationException("Для ДС необходимо действующее основание.");
+        // A copy source is not a legal parent. A newly created annex never
+        // guesses a target from the source document or the only active card.
         var cards = Read(conn, objectId, tx);
-        var id = inherited ?? preferred;
+        var id = preferred;
+        if (id is null)
+        {
+            using var count = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.agreements WITH(UPDLOCK,HOLDLOCK) WHERE object_id=@object", conn, tx);
+            count.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
+            id = AgreementEditPolicy.ResolveNewAnnexTarget(null, checked((int)SqlInteger.RequireInt64(count.ExecuteScalar())));
+        }
         if (id is null && cards.Count == 0)
         {
             using var source = new SqlCommand("SELECT number,[date],company_id FROM dbo.contracts WHERE id=@id", conn, tx);
@@ -207,11 +218,6 @@ public static class SqlServerAgreements
             id=Save(conn,tx,draft);
             cards=new[]{draft with{Id=id.Value}};
         }
-        if (id is null)
-        {
-            if (cards.Count != 1) throw new InvalidOperationException("Выберите юридический договор в реквизитах документа. Для нового объекта сначала сохраните реквизиты договора.");
-            id = cards[0].Id;
-        }
         var selected = cards.SingleOrDefault(a => a.Id == id)
             ?? throw new ArgumentException("Выбранный договор относится к другому объекту или архивирован.");
         if (validateNewAnnex && kind == "main")
@@ -228,6 +234,7 @@ public static class SqlServerAgreements
                 throw new InvalidOperationException("Реквизиты нового приложения не совпадают с юридическим договором.");
         }
         WriteDocumentAgreement(conn, tx, documentId, objectId, selected.Id);
+        return selected.Id;
     }
 
     private static void WriteDocumentAgreement(SqlConnection conn, SqlTransaction tx, long documentId, long objectId, long? legalId)

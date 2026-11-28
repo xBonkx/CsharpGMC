@@ -503,7 +503,9 @@ public partial class MainWindow
             if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(_serverConn))
                 throw new InvalidOperationException("Данные изменились. Обновите список и повторите открытие свойств.");
             var dialog = new ContractDialog(objectName, info, companies,
-                tags, mains, makeContract, agreement) { Owner = this };
+                tags, mains, makeContract, agreement,
+                metadata.Where(d => !d.IsStage && (d.Kind is "main" or "kp"))
+                    .ToDictionary(d => (long)d.Id, d => d.CompanyId)) { Owner = this };
             dialog.ConfigureAgreements(SqlServerAgreements.Read(_serverConn,doc.ObjectId),SqlServerAgreements.DocumentAgreementId(_serverConn,doc.Id),SqlServerAgreements.AnnexNumber(_serverConn,doc.Id));
             if (revision != SqlServerDatabase.Revision(_serverConn))
                 throw new InvalidOperationException("Данные изменились во время чтения договоров.");
