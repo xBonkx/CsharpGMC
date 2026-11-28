@@ -14,6 +14,15 @@ public static class StartupTrace
 
     public static bool Enabled => !string.IsNullOrWhiteSpace(DirectoryPath);
 
+    public static void MarkBuild()
+    {
+#if DEBUG
+        Mark("trace_build_debug");
+#else
+        Mark("trace_build_release");
+#endif
+    }
+
     public static void Mark(string phase)
     {
         if (!Enabled) return;

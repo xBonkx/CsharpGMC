@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using GmcSmeta.Core;
 
 namespace GmcSmeta.Launcher;
 
@@ -16,6 +17,7 @@ internal static class GitHubAuth
     public static string? Resolve(out string source)
     {
         source = "";
+        StartupTrace.Mark("launcher_auth_noninteractive");
         foreach (var name in new[] { "GMC_SMETA_TOKEN", "GITHUB_TOKEN", "GH_TOKEN" })
         {
             var value = Environment.GetEnvironmentVariable(name);
@@ -42,7 +44,9 @@ internal static class GitHubAuth
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
 
-        var fromGit = FromGitCredentialManager();
+        string? fromGit;
+        using (StartupTrace.MeasureElapsed("launcher_auth_gcm"))
+            fromGit = FromGitCredentialManager();
         if (fromGit is not null)
         {
             source = "git credential manager";
@@ -75,10 +79,15 @@ internal static class GitHubAuth
             var errorTask = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(15000))
             {
+                StartupTrace.Mark("launcher_auth_gcm_timeout");
                 try { process.Kill(true); } catch { }
                 return null;
             }
-            if (!Task.WaitAll(new Task[] { outputTask, errorTask }, 1000)) return null;
+            if (!Task.WaitAll(new Task[] { outputTask, errorTask }, 1000))
+            {
+                StartupTrace.Mark("launcher_auth_gcm_pipe_timeout");
+                return null;
+            }
             var output = outputTask.GetAwaiter().GetResult();
             var error = errorTask.GetAwaiter().GetResult();
             if (process.ExitCode != 0 || error.Length > 0) return null;
@@ -230,7 +239,9 @@ internal sealed class GitHubReleases : IDisposable
         using var request = CreateRequest(HttpMethod.Get, asset.ApiUrl, "application/octet-stream");
         using var headerTimeout = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
         headerTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var headers = StartupTrace.MeasureElapsed("launcher_asset_http_headers");
         using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, headerTimeout.Token);
+        headers?.Dispose();
         headerTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new InvalidOperationException(
@@ -247,6 +258,7 @@ internal sealed class GitHubReleases : IDisposable
         try
         {
             using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            using var transfer = StartupTrace.MeasureElapsed("launcher_asset_transfer_with_hash");
             actual = ReleaseDownloadTransfer.CopyVerified(source, target, total, expectedSha256,
                 timeout.Token, TimeSpan.FromSeconds(60), done =>
                 {
@@ -256,10 +268,13 @@ internal sealed class GitHubReleases : IDisposable
                         Report(done, total);
                     }
                 });
-            target.Flush(flushToDisk: true);
+            transfer?.Dispose();
+            using (StartupTrace.MeasureElapsed("launcher_asset_flush"))
+                target.Flush(flushToDisk: true);
         }
         catch (OperationCanceledException ex)
         {
+            StartupTrace.Mark("launcher_asset_transfer_timeout");
             throw new IOException("Истекло время скачивания вложения. Повторите запуск.", ex);
         }
         Console.WriteLine();

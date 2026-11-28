@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using GmcSmeta.Core;
 
 namespace GmcSmeta.Launcher;
 
@@ -37,7 +38,19 @@ internal sealed class UpdateCard : IDisposable
                 _window = window;
                 window.SetStatus(status, details);
                 window.Closed += (_, _) => _window = null;
+                if (StartupTrace.Enabled)
+                {
+                    EventHandler? rendered = null;
+                    rendered = (_, _) =>
+                    {
+                        window.ContentRendered -= rendered;
+                        StartupTrace.Mark("launcher_update_card_rendered");
+                    };
+                    window.ContentRendered += rendered;
+                }
+                StartupTrace.Mark("launcher_update_card_show_begin");
                 window.Show();
+                StartupTrace.Mark("launcher_update_card_show_returned");
                 ready.SetResult(dispatcher);
                 Dispatcher.Run();
             }

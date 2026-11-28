@@ -10,6 +10,7 @@ if (DemoReleasePolicy.IsDemoEntry(args, Path.GetFileName(Environment.ProcessPath
 }
 
 StartupTrace.Mark("launcher_start");
+StartupTrace.MarkBuild();
 
 // Скачивает готовую WPF-сборку из GitHub Releases и запускает её.
 // Если релиза нет или GitHub недоступен — собирает локальный git-клон (запасной путь).
@@ -94,7 +95,9 @@ try
 
     // Cache only successful processing of an exact installed state. No credentials or asset URLs are stored.
     var cachePath = Path.Combine(paths.Root, "release-check.json");
-    var preferredFlavor = RuntimeProbe.HasDesktopRuntime10() ? "fx" : "sc";
+    string preferredFlavor;
+    using (StartupTrace.Measure("launcher_runtime_probe"))
+        preferredFlavor = RuntimeProbe.HasDesktopRuntime10() ? "fx" : "sc";
     ReleaseCheckKey Key(InstalledApp app) => new(repository!, app.Version, app.Flavor, app.Exe,
         app.InstalledUtc, AppVersion.CurrentLauncher(), preferredFlavor,
         Environment.GetEnvironmentVariable("GMC_SMETA_NO_SELF_UPDATE") == "1");
@@ -125,6 +128,7 @@ try
         StartupTrace.Mark("launcher_release_check_begin");
         release = releases.TryGetLatest(cached?.ETag, out responseEtag, out var notModified, out updateError);
         StartupTrace.Mark("launcher_release_check_end");
+        if (updateError is not null) StartupTrace.Mark("launcher_release_check_failed");
         if (notModified && cached is not null && installed is not null)
         {
             ReleaseCheckCache.Save(cachePath, Key(installed), responseEtag, DateTimeOffset.UtcNow);

@@ -72,6 +72,7 @@ public partial class App : Application
             }
         }
         StartupTrace.Mark("app_startup_enter");
+        StartupTrace.MarkBuild();
         StartupTrace.Mark("app_previous_process_wait_begin");
         if (!demo && !UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
         {

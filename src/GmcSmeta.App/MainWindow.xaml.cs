@@ -208,6 +208,7 @@ public partial class MainWindow : Window
                         ReferenceEquals(System.Windows.Input.Keyboard.FocusedElement, SidebarBrandButton)))
                         ObjectSearch.Focus();
                     StartupTrace.Mark("main_workspace_data_ready");
+                    ObserveReadyWorkspaceRender();
                     // Dispatcher idle is a queue/layout milestone, not proof of a physical monitor frame.
                     if (StartupTrace.Enabled)
                         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(() =>

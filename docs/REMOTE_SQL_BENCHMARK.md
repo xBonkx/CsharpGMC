@@ -107,3 +107,20 @@ dotnet run -c Release --project tools/RemoteSqlBench/RemoteSqlBench.csproj -- --
 - Offline `python tools/local-qa/performance_matrix.py manifest.json matrix.json`: manifest has pairs (scenario unique; before/after relative metadata JSON) or unmeasured rows {scenario,status:OPEN/PARTIAL/BLOCKED,reason}. Metadata keys: sha (exact 40/64 hex), run_id (unique pseudonym), scenario, client (CSharp/Python), dataset, machine_profile, topology, cache, build, runtime, os, sql_version, schema, rows, contracts, dpi, resolution, runs (30..300), required_metrics, correctness (PASS/FAIL/UNVERIFIED), correctness_evidence (relative independent proof), raw (relative CSV). CSV header: iteration,status,elapsed_ms,sql_count,ui_stall_ms,private_bytes,working_set_bytes,managed_bytes,cpu_ms,retained_bytes,bytes_received. Iteration 0 WARMUP, remaining OK/FAIL/TIMEOUT/CANCELLED. Missing values blank, never invent zeros. Each metric required by scenario must have all samples; declare non-applicable fields explicitly by omitting from required_metrics. Matrix comparisons are same-client/same-cache/same-profile only; separate rows for C# and Python, cold/warm, write/read, sizes and topologies. Raw and proof file SHA256 recorded. Matrix DONE means supplied row comparison meets declared threshold and operator-provided correctness evidence, not release acceptance; no automatic attestation of evidence content. `--max-regression-pct` default 10; output create-new, exit 3 incomplete/regression, 2 invalid. External producer integration still PERF-053/054/058. Tests: `python -m unittest discover -s tools/local-qa -p test_performance_matrix.py`.
 
 Strict final acceptance can resolve a synthetic E2E PARTIAL only by verifying every generated `pilot-limitations.csv` row (PASS, actual result, relative nonempty independent evidence) against the original Pilot report and clean SHA. The automated-only gate remains incomplete if there are SKIPs. Matrix tool requires Python 3.11+ and distinct run IDs/raw paths; equal independent measurements are valid.
+
+## PERF-001: старт приложения (Windows, только тестовая среда)
+
+Использовать отдельную пустую папку на каждый прогон, тестовую конфигурацию лаунчера и синтетическую SQL-базу. Из одной PowerShell-сессии непосредственно перед запуском измерить Stopwatch ticks, сохранить PID и Frequency. Не запускать рабочий лаунчер для испытания обновления.
+
+~~~powershell
+$env:GMC_SMETA_STARTUP_TRACE_DIR = (New-Item -ItemType Directory -Path (Join-Path $env:TEMP ("gmc-trace-" + [guid]::NewGuid()))).FullName
+# $testLauncher — путь к уже собранному тестовому EXE, не рабочему ярлыку.
+$frequency = [Diagnostics.Stopwatch]::Frequency
+$t0 = [Diagnostics.Stopwatch]::GetTimestamp()
+$p = Start-Process -FilePath $testLauncher -PassThru
+# После готовности и штатного закрытия тестового приложения:
+python tools/local-qa/startup_trace.py $env:GMC_SMETA_STARTUP_TRACE_DIR --launcher-pid $p.Id --start-ticks $t0 --frequency $frequency
+Remove-Item Env:\GMC_SMETA_STARTUP_TRACE_DIR
+~~~
+
+JSON сохраняет отдельные события и длительности; неполный прогон не считается успешным. Точка отсчёта — вызов Start-Process, не физический клик. Не складывать вложенные длительности. GCM вызывается без интерактивного входа; его задержка/тайм-аут отмечаются отдельно. SQL provider Open включает соединение, TLS и login, отдельная проверка схемы измеряется существующими метриками; физическую задержку ввода/дисплея и раздельный TLS/login измерять внешней трассировкой Windows. ContentRendered первого окна не равен готовности базы; main_workspace_ready_rendering — первый callback WPF после готовности рабочего пространства, а не физическая развёртка монитора. Повторить для Debug/Release, cold/warm, установленной сборки и изолированного сценария обновления. Не публиковать сырые трассы с чужого компьютера без проверки. Не выполнялось в текущем проходе.

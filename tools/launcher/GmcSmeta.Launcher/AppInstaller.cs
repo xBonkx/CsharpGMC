@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using GmcSmeta.Core;
 
 namespace GmcSmeta.Launcher;
 
@@ -81,7 +82,10 @@ internal sealed class InstalledApp
         if (connectionString is not null)
             start.Environment["GMC_SMETA_SQL_CONNECTION"] = connectionString;
         start.Environment["GMC_SMETA_AUTO_RESTART"] = autoRestart ? "1" : "0";
-        Process.Start(start);
+        StartupTrace.Mark(Flavor == "fx" ? "launcher_app_flavor_fx" : "launcher_app_flavor_sc");
+        using var child = Process.Start(start);
+        if (child is not null && StartupTrace.Enabled)
+            StartupTrace.Sample("launcher_child_pid", child.Id);
     }
 }
 
@@ -154,7 +158,9 @@ internal sealed class AppInstaller
             _ui.Warn($"Сборка «{AssetNameFor(preferred)}» не опубликована — скачиваю «{asset.Name}».");
         }
 
-        var checksums = _releases.TryGetChecksums(release);
+        string? checksums;
+        using (StartupTrace.MeasureElapsed("launcher_checksum_manifest"))
+            checksums = _releases.TryGetChecksums(release);
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
         if ((OfficeLauncher.IsOfficeExecutable || validateCandidate is not null) && expected is null)
             throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
@@ -167,14 +173,17 @@ internal sealed class AppInstaller
         try
         {
             _ui.Info($"Файл: {asset.Name}" + (asset.Size > 0 ? $", {asset.Size / 1048576.0:0.0} МБ" : ""));
-            var hash = _releases.Download(asset, zip, expected);
+            string hash;
+            using (StartupTrace.MeasureElapsed("launcher_archive_download"))
+                hash = _releases.Download(asset, zip, expected);
 
             Directory.CreateDirectory(staging);
             _ui.UpdatePhase($"Подготавливаем версию {release.Version}", "Распаковываем проверенный пакет.");
             _ui.Info("Распаковываю…");
             try
             {
-                ZipFile.ExtractToDirectory(zip, staging);
+                using (StartupTrace.Measure("launcher_archive_extract"))
+                    ZipFile.ExtractToDirectory(zip, staging);
             }
             catch (InvalidDataException ex)
             {
@@ -186,12 +195,15 @@ internal sealed class AppInstaller
 
             // Demo mode checks its capability marker before execution and smoke-tests
             // the candidate before the installed pointer can change.
-            validateCandidate?.Invoke(staging);
+            if (validateCandidate is not null)
+                using (StartupTrace.MeasureElapsed("launcher_candidate_validation"))
+                    validateCandidate(staging);
 
             // Move only to a previously unused folder, then publish the pointer.
             // Never recursively delete an installed version: even a failed
             // deletion can remove DLLs that a running process has not loaded yet.
-            target = InstallDirectoryPublisher.Publish(staging, target, DateTime.UtcNow);
+            using (StartupTrace.Measure("launcher_install_directory_publish"))
+                target = InstallDirectoryPublisher.Publish(staging, target, DateTime.UtcNow);
             var installed = new InstalledApp
             {
                 Version = release.Version,
@@ -201,7 +213,8 @@ internal sealed class AppInstaller
                 Sha256 = hash,
                 InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             };
-            installed.Save(_paths);
+            using (StartupTrace.Measure("launcher_install_pointer_publish"))
+                installed.Save(_paths);
             return installed;
         }
         finally
