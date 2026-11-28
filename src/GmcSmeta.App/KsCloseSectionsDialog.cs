@@ -20,22 +20,20 @@ internal static class KsCloseSectionsDialog
         };
         DynamicFormLayout.Apply(dialog);
         var panel = new StackPanel();
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"Отмеченные разделы попадут в КС-2 №{actNumber} всем остатком (100 %). " +
-                   "Снимите галочки с тех, что не закрываем.",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)),
-        });
+        panel.Children.Add(DynamicFormLayout.Secondary(
+            $"Отмеченные разделы попадут в КС-2 №{actNumber} всем остатком (100 %). " +
+            "Снимите галочки с тех, что не закрываем."));
         var checks = new Dictionary<long, CheckBox>();
-        var list = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
+        var list = new StackPanel();
+        list.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogListGap");
         foreach (var top in sections)
         {
             var rest = top.Rest;
             var text = rest > 0.005m
                 ? $"{top.Label}   —   остаток {Money.Format(rest)} ₽"
                 : $"{top.Label}   —   уже сдан";
-            var check = new CheckBox { Content = text, IsChecked = rest > 0.005m, Margin = new Thickness(0, 0, 0, 4) };
+            var check = new CheckBox { Content = text, IsChecked = rest > 0.005m };
+            check.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogListItemGap");
             DynamicFormLayout.WrapCaption(check);
             checks[top.SystemId] = check;
             list.Children.Add(check);
@@ -46,15 +44,16 @@ internal static class KsCloseSectionsDialog
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             MaxHeight = 320,
         });
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 12) };
+        var row = new WrapPanel { Orientation = Orientation.Horizontal };
+        row.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionRowGap");
         Button MarkAll(string caption, bool value)
         {
             var button = new Button
             {
                 Content = caption,
                 Style = (Style)owner.FindResource("PythonToolbarButton"),
-                Margin = new Thickness(0, 0, 8, 0),
             };
+            button.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
             button.Click += (_, _) =>
             {
                 foreach (var c in checks.Values) c.IsChecked = value;
@@ -73,9 +72,10 @@ internal static class KsCloseSectionsDialog
         {
             Content = "Сохранить",
             Style = (Style)owner.FindResource("PythonToolbarPrimary"),
-            Padding = new Thickness(14, 5, 14, 5),
+            IsDefault = true,
         };
-        var cancel = new Button { Content = "Отмена", Style = (Style)owner.FindResource("PythonToolbarButton") };
+        var cancel = new Button { Content = "Отмена", IsCancel = true, Style = (Style)owner.FindResource("PythonToolbarButton") };
+        ok.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
         dialog.Content = DynamicFormLayout.WithFooter(panel, buttons);
