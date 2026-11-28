@@ -44,12 +44,12 @@ internal sealed class SummaryColumnFit
 
     private void ObserveMetrics()
     {
-        if (!_grid.IsLoaded || !_grid.IsVisible || Suspended) return;
+        if (!_grid.IsLoaded || !_grid.IsVisible || Suspended || _grid.ActualWidth <= 0) return;
         var dpi = VisualTreeHelper.GetDpi(_grid);
         var metrics = (_grid.FontFamily, _grid.FontSize, _grid.FontStyle, _grid.FontStretch,
             dpi.DpiScaleX, dpi.PixelsPerDip);
         if (_observedMetrics is { } previous && previous.Equals(metrics) &&
-            (_manual() || _minimums is null || HeadersUnchanged())) return;
+            (_manual() || _minimums is not null && IsMeasuredSource(_grid.ItemsSource) && HeadersUnchanged())) return;
         _observedMetrics = metrics;
         Request();
     }
