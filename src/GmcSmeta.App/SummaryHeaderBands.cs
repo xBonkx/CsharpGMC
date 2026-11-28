@@ -26,6 +26,9 @@ public sealed class SummaryHeaderBands : FrameworkElement
     private SummaryHeaderLayout.Run[] _runs = [];
     private Rect _viewport = Rect.Empty;
     private double _dpi = 1;
+    private FontFamily? _renderFamily;
+    private SummaryHeaderLayout.Column[] _lastColumns = [];
+    private double _lastOrigin;
 
     public SummaryHeaderBands()
     {
@@ -54,6 +57,7 @@ public sealed class SummaryHeaderBands : FrameworkElement
         if (_subscribed is not null) _subscribed.LayoutUpdated -= LayoutChanged;
         _subscribed = null;
         _presenter = null;
+        _lastColumns = [];
         SetGeometry(Rect.Empty, []);
     }
 
@@ -108,17 +112,29 @@ public sealed class SummaryHeaderBands : FrameworkElement
         var location = presenter.TranslatePoint(new Point(), this);
         var viewport = new Rect(location.X, location.Y, presenter.ActualWidth, 28);
         viewport.Intersect(new Rect(0, 0, ActualWidth, ActualHeight));
-        SetGeometry(viewport, SummaryHeaderLayout.Build(
-            visible.Select(c => new SummaryHeaderLayout.Column(c.SortMemberPath, c.ActualWidth)), origin).ToArray());
+        // LayoutUpdated also fires for unrelated row/edit/selection layout.
+        // Keep the last column geometry when its inputs are unchanged.
+        var columns = visible.Select(c => new SummaryHeaderLayout.Column(c.SortMemberPath, c.ActualWidth)).ToArray();
+        if (_runs.Length != 0 && _lastOrigin == origin && _lastColumns.AsSpan().SequenceEqual(columns))
+        {
+            SetGeometry(viewport, _runs);
+            return;
+        }
+        _lastColumns = columns;
+        _lastOrigin = origin;
+        SetGeometry(viewport, SummaryHeaderLayout.Build(columns, origin).ToArray());
     }
 
     private void SetGeometry(Rect viewport, SummaryHeaderLayout.Run[] runs)
     {
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        if (_viewport == viewport && _dpi == dpi && _runs.SequenceEqual(runs)) return;
+        var family = SourceGrid?.FontFamily;
+        if (_viewport == viewport && _dpi == dpi && Equals(_renderFamily, family) &&
+            (ReferenceEquals(_runs, runs) || _runs.SequenceEqual(runs))) return;
         _viewport = viewport;
         _runs = runs;
         _dpi = dpi;
+        _renderFamily = family;
         InvalidateVisual();
     }
 
@@ -147,7 +163,23 @@ public sealed class SummaryHeaderBands : FrameworkElement
         [SummaryHeaderLayout.Band.Total] = new("ИТОГО ПО ПОЗИЦИИ", MakeBrush("#DDEFE2"), MakeBrush("#2E7547"),
             Icon("M12 3 3 8l9 5 9-5z M3 13l9 5 9-5"), MakeBrush("#24934C"))
     };
-    private static readonly Pen Separator = new(MakeBrush("#CBD8E9"), 1);
+    private static Pen FrozenPen(Brush brush, double width, bool round = false)
+    {
+        var pen = new Pen(brush, width);
+        if (round)
+        {
+            pen.StartLineCap = PenLineCap.Round;
+            pen.EndLineCap = PenLineCap.Round;
+            pen.LineJoin = PenLineJoin.Round;
+        }
+        pen.Freeze();
+        return pen;
+    }
+
+    private static readonly Pen Separator = FrozenPen(MakeBrush("#CBD8E9"), 1);
+    private static readonly Dictionary<SummaryHeaderLayout.Band, Pen> GlyphPens = Designs
+        .Where(pair => pair.Value.Glyph is not null)
+        .ToDictionary(pair => pair.Key, pair => FrozenPen(pair.Value.Icon, 1.9, round: true));
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -172,8 +204,7 @@ public sealed class SummaryHeaderBands : FrameworkElement
             {
                 dc.PushTransform(new TranslateTransform(left, rect.Top + (rect.Height - 18) / 2));
                 dc.PushTransform(new ScaleTransform(.75, .75));
-                dc.DrawGeometry(null, new Pen(design.Icon, 1.9)
-                { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round }, design.Glyph);
+                dc.DrawGeometry(null, GlyphPens[run.Group], design.Glyph);
                 dc.Pop();
                 dc.Pop();
             }

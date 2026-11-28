@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -29,6 +30,11 @@ internal sealed class LegacyCostColumnFit
         grid.Loaded += (_, _) => Request();
         grid.Unloaded += (_, _) => Suspended = false;
         grid.IsVisibleChanged += (_, _) => Request();
+        CollectionChangedEventManager.AddHandler(grid.Items, (_, _) => Invalidate());
+        grid.CellEditEnding += (_, e) =>
+        {
+            if (e.EditAction == DataGridEditAction.Commit) Invalidate();
+        };
         grid.LayoutUpdated += (_, _) =>
         {
             if (Ready() && !Current()) Request();

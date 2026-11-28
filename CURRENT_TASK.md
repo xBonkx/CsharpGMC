@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-044.02 PARTIAL: reuse unchanged summary header geometry and pens, invalidate widths on same-source edits; 12 static checks, 3 source test cases added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — PERF-050.04 CODE READY: каталог — сначала страница, затем цены/использования; совместимые API организаций/тегов проверяют ревизию, обоснован отказ от общего кэша. 3 test cases added, not run; [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — CTX-044.01 PARTIAL: убрано чтение JSON режима ПТО при открытии меню документа, проверка при выполнении сохранена. Один source test добавлен, не запускался. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
