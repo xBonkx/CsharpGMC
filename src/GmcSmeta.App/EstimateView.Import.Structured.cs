@@ -145,23 +145,24 @@ internal sealed class ExcelAppendPreviewDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brushes.White;
 
-        var layout = new DockPanel { Margin = new Thickness(18) };
+        DynamicFormLayout.Apply(this);
+        var layout = new DockPanel();
+        layout.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormDialogMargin");
         var intro = new TextBlock
         {
             Text = "Отметь блоки Excel. Они будут добавлены в текущий КП отдельными разделами, " +
                 "с сохранением порядка, закупочных цен, СМР по позициям и комплектующих. " +
                 "Существующие позиции, суммы договора, НДС и транспорт не перезаписываются.",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12),
-            FontSize = 13
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
         };
         DockPanel.SetDock(intro, Dock.Top); layout.Children.Add(intro);
 
         var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 12, 0, 0) };
-        var cancel = new Button { Content = "Отмена", Width = 105, Height = 32 };
+        var cancel = new Button { Content = "Отмена", MinWidth = 105, MinHeight = 32, IsCancel = true };
         cancel.Click += (_, _) => { DialogResult = false; Close(); };
         bar.Children.Add(cancel);
-        var accept = new Button { Content = "Добавить разделы", Width = 155, Height = 32,
+        var accept = new Button { Content = "Добавить разделы", MinWidth = 155, MinHeight = 32, IsDefault = true,
             Margin = new Thickness(10, 0, 0, 0) };
         accept.Click += (_, _) =>
         {
@@ -183,6 +184,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
             DialogResult = true;
             Close();
         };
+        DynamicFormLayout.StyleActions(accept, cancel);
         bar.Children.Add(accept);
         DockPanel.SetDock(bar, Dock.Bottom);
         layout.Children.Add(bar);
@@ -201,6 +203,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
                     $"· {b.PositionCount} поз. · {b.Sections.Count} разделов",
                 FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 7)
             };
+            DynamicFormLayout.WrapCaption(check);
             _items.Add((check, b));
             body.Children.Add(check);
             body.Children.Add(new TextBlock
@@ -209,6 +212,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
                     $"Итого {b.DeclaredTotal ?? b.CalculatedTotal:N2} ₽ · " +
                     (b.Ok ? "✓ суммы сходятся" : "⚠ требуется сверка"),
                 Foreground = b.Ok ? Brushes.DarkGreen : Brushes.DarkRed,
+                TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(20, 0, 0, 5)
             });
             foreach (var s in b.Sections.Take(12))
@@ -220,7 +224,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
             foreach (var warning in b.Warnings.Take(6))
                 body.Children.Add(new TextBlock { Text = "⚠ " + warning,
                     TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20, 3, 0, 0),
-                    Foreground = Brushes.DarkOrange });
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x92, 0x40, 0x0E)) });
             foreach (var checkResult in b.Checks.Where(c => !c.Passed).Take(4))
                 body.Children.Add(new TextBlock { Text = "✗ " + checkResult.Description,
                     TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20, 3, 0, 0),

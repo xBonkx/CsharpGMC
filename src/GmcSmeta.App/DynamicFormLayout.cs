@@ -32,7 +32,7 @@ internal static class DynamicFormLayout
         body.Margin = new Thickness(0);
         var root = new DockPanel { LastChildFill = true };
         root.SetResourceReference(FrameworkElement.MarginProperty, marginKey);
-        footer.Margin = new Thickness(0, 10, 0, 0);
+        footer.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
         DockPanel.SetDock(footer, Dock.Bottom);
         root.Children.Add(footer);
         root.Children.Add(new ScrollViewer

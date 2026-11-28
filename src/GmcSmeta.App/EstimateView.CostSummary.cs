@@ -1222,17 +1222,19 @@ public sealed class SummaryMarkupDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
         Background = Brushes.White;
-        var root = new StackPanel { Margin = new Thickness(22, 18, 22, 16) };
+        DynamicFormLayout.Apply(this);
+        var root = new StackPanel();
         root.Children.Add(new TextBlock
         {
             Text = prompt + "\nНаценка, %",
-            TextWrapping = TextWrapping.Wrap, FontSize = 14, Margin = new Thickness(0, 0, 0, 10),
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
         });
         _percent = new TextBox
         {
-            Text = "50", Width = 120, HorizontalAlignment = HorizontalAlignment.Left,
+            Text = "50", MaxWidth = 240, HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Right,
         };
+        DynamicFormLayout.Field(_percent);
         root.Children.Add(_percent);
         var row = new StackPanel
         {
@@ -1248,8 +1250,8 @@ public sealed class SummaryMarkupDialog : Window
         ok.Click += (_, _) => Apply();
         row.Children.Add(cancel);
         row.Children.Add(ok);
-        root.Children.Add(row);
-        Content = root;
+        DynamicFormLayout.StyleActions(ok, cancel);
+        Content = DynamicFormLayout.WithFooter(root, row);
         Loaded += (_, _) => { _percent.Focus(); _percent.SelectAll(); };
     }
 

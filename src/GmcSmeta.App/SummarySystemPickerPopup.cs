@@ -29,7 +29,8 @@ internal sealed class SummarySystemPickerPopup
         _changed = changed;
         _popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom,
             VerticalOffset = 4, StaysOpen = false, AllowsTransparency = true };
-        var root = new DockPanel { Width = 440, MaxHeight = 560, LastChildFill = true };
+        var root = new DockPanel { Width = Math.Min(440, Math.Max(240, SystemParameters.WorkArea.Width - 40)),
+            MaxHeight = Math.Min(560, Math.Max(240, SystemParameters.WorkArea.Height - 80)), LastChildFill = true };
         var frame = new Border { Background = Brushes.White, BorderBrush = Brush("#DAE3EF"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
             Padding = new Thickness(10), Child = root };
@@ -41,12 +42,14 @@ internal sealed class SummarySystemPickerPopup
 
         var searchBar = new DockPanel { Margin = new Thickness(0, 0, 0, 8), LastChildFill = true };
         DockPanel.SetDock(searchBar, Dock.Top);
-        var clear = new Button { Content = "×", Width = 30, Height = 34, Margin = new Thickness(6, 0, 0, 0),
+        var clear = new Button { Content = "Очистить", Width = 30, MinHeight = 34, Margin = new Thickness(6, 0, 0, 0),
             ToolTip = "Очистить поиск" };
         StyleFor(clear, "PythonToolbarButton");
+        clear.SetResourceReference(ContentControl.ContentTemplateProperty, "IconOnlyX");
+        System.Windows.Automation.AutomationProperties.SetName(clear, "Очистить поиск");
         DockPanel.SetDock(clear, Dock.Right);
         searchBar.Children.Add(clear);
-        _search = new TextBox { Height = 34, VerticalContentAlignment = VerticalAlignment.Center,
+        _search = new TextBox { MinHeight = 34, VerticalContentAlignment = VerticalAlignment.Center,
             ToolTip = "Найти систему: В1, ВЕ, ДП…" };
         StyleFor(_search, "PythonSearch");
         var searchGrid = new Grid();
@@ -110,6 +113,7 @@ internal sealed class SummarySystemPickerPopup
             var choice = new CheckBox { Content = label, MinHeight = 28,
                 Margin = new Thickness(parents.ContainsKey(id) ? 20 : 4, 0, 4, 0),
                 ToolTip = label, VerticalContentAlignment = VerticalAlignment.Center };
+            DynamicFormLayout.WrapCaption(choice);
             _choices.Add((id, label, choice));
             list.Children.Add(choice);
             choice.Click += (_, _) =>
@@ -123,7 +127,7 @@ internal sealed class SummarySystemPickerPopup
         root.Children.Add(new Border { BorderBrush = Brush("#DAE3EF"), BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(7), Child = new ScrollViewer
             {
-                Content = list, Height = 290, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = list, MaxHeight = 290, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
             } });
         _search.TextChanged += (_, _) =>

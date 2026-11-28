@@ -35,12 +35,12 @@ public partial class MainWindow
 
     private void ObjectCardsPrevious_Click(object sender, RoutedEventArgs e)
     {
-        if (!_objectCardTransitionPending) PublishObjectCardPage(_objectCardPage - 1, true);
+        if (!_objectCardTransitionPending && ReferenceEquals(PageHost.Content, ObjectPage) && _selectedObject?.Id == _displayedObjectId && _displayedObjectId is not null) PublishObjectCardPage(_objectCardPage - 1, true);
     }
 
     private void ObjectCardsNext_Click(object sender, RoutedEventArgs e)
     {
-        if (!_objectCardTransitionPending) PublishObjectCardPage(_objectCardPage + 1, true);
+        if (!_objectCardTransitionPending && ReferenceEquals(PageHost.Content, ObjectPage) && _selectedObject?.Id == _displayedObjectId && _displayedObjectId is not null) PublishObjectCardPage(_objectCardPage + 1, true);
     }
 
     private void ObjectPage_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateObjectTotalsVisibility();

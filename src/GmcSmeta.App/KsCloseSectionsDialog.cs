@@ -18,7 +18,8 @@ internal static class KsCloseSectionsDialog
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = Window.GetWindow(owner),
         };
-        var panel = new StackPanel { Margin = new Thickness(16) };
+        DynamicFormLayout.Apply(dialog);
+        var panel = new StackPanel();
         panel.Children.Add(new TextBlock
         {
             Text = $"Отмеченные разделы попадут в КС-2 №{actNumber} всем остатком (100 %). " +
@@ -35,6 +36,7 @@ internal static class KsCloseSectionsDialog
                 ? $"{top.Label}   —   остаток {Money.Format(rest)} ₽"
                 : $"{top.Label}   —   уже сдан";
             var check = new CheckBox { Content = text, IsChecked = rest > 0.005m, Margin = new Thickness(0, 0, 0, 4) };
+            DynamicFormLayout.WrapCaption(check);
             checks[top.SystemId] = check;
             list.Children.Add(check);
         }
@@ -76,8 +78,7 @@ internal static class KsCloseSectionsDialog
         var cancel = new Button { Content = "Отмена", Style = (Style)owner.FindResource("PythonToolbarButton") };
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
-        panel.Children.Add(buttons);
-        dialog.Content = panel;
+        dialog.Content = DynamicFormLayout.WithFooter(panel, buttons);
         bool? accepted = null;
         ok.Click += (_, _) => { accepted = true; dialog.DialogResult = true; };
         cancel.Click += (_, _) => { accepted = false; dialog.DialogResult = false; };

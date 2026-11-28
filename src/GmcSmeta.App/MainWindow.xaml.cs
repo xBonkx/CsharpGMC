@@ -543,8 +543,11 @@ public partial class MainWindow : Window
         EndPageRename();
         _openDocumentId = null;
         _selectedObject = null;
-        DocumentCards.ItemsSource = null;
+        _objectCardItems = Array.Empty<object>();
+        PublishObjectCardPage(0, true);
         ObjectTotals.DataContext = null;
+        _objectTotalsUserVisible = null;
+        UpdateObjectTotalsVisibility();
     }
 
     private void ShowPage(FrameworkElement? page)

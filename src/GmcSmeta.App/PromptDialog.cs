@@ -82,7 +82,9 @@ public sealed class PromptDialog : Window
             else if (e.Key == Key.Escape) { DialogResult = false; e.Handled = true; }
         };
         form.Children.Add(Box);
-        root.Children.Add(form);
+        root.Children.Add(new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        DynamicFormLayout.Apply(this);
         Content = root;
         Loaded += (_, _) => { Box.Focus(); Box.SelectAll(); };
     }

@@ -930,9 +930,10 @@ public partial class EstimateView
         var heading = new TextBlock
         {
             Text = "Вставить строки из Excel?",
-            FontSize = 20, FontWeight = FontWeights.SemiBold,
+            FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap,
             Foreground = ExcelPasteBrush("#0F172A")
         };
+        heading.SetResourceReference(TextBlock.FontSizeProperty, "UiValueSize");
         body.Children.Add(heading);
         body.Children.Add(new TextBlock
         {
@@ -989,11 +990,9 @@ public partial class EstimateView
     {
         SetStatus("Ошибка вставки: " + message, true);
         var window = CreateExcelPasteWindow("Ошибка вставки", out var body);
-        body.Children.Add(new TextBlock
-        {
-            Text = "Не удалось подтвердить вставку", FontSize = 19,
-            FontWeight = FontWeights.SemiBold, Foreground = ExcelPasteBrush("#991B1B")
-        });
+        var heading = WorkspaceWindowUi.Heading("Не удалось подтвердить вставку");
+        heading.Foreground = ExcelPasteBrush("#991B1B");
+        body.Children.Add(heading);
         body.Children.Add(new ScrollViewer
         {
             MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -1018,6 +1017,7 @@ public partial class EstimateView
             FontSize = (double)FindResource("UiBodySize"),
             Foreground = ExcelPasteBrush("#0F172A"), UseLayoutRounding = true
         };
+        DynamicFormLayout.Apply(window);
         body = new StackPanel();
         var chrome = new Border
         {
@@ -1062,7 +1062,9 @@ public partial class EstimateView
         };
         accept.Click += (_, _) => window.DialogResult = true;
         footer.Children.Add(accept);
-        body.Children.Add(footer);
+        var chrome = (Border)window.Content;
+        chrome.Child = null;
+        chrome.Child = DynamicFormLayout.WithFooter(body, footer, "LayoutNoInset");
     }
 
     private static SolidColorBrush ExcelPasteBrush(string hex) =>

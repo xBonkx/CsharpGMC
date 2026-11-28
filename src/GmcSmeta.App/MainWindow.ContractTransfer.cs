@@ -26,14 +26,17 @@ public partial class MainWindow
             if(candidates.Count==0) throw new InvalidOperationException("Нет другой действующей карточки.");
             var dialog=new Window{Owner=this,Title="Перенос приложения",Width=530,SizeToContent=SizeToContent.Height,
                 ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner};
-            var panel=new StackPanel{Margin=new Thickness(20)};
-            panel.Children.Add(new TextBlock{Text=AgreementPresentation.FullAnnexTitle(doc),FontSize=17,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
+            DynamicFormLayout.Apply(dialog);
+            var panel=new StackPanel();
+            panel.Children.Add(WorkspaceWindowUi.Heading(AgreementPresentation.FullAnnexTitle(doc)));
             panel.Children.Add(new TextBlock{Text=$"Из карточки «{snapshot.SourceName}». Документов к переносу: {snapshot.DocumentIds.Count}.",
                 Margin=new Thickness(0,8,0,12),TextWrapping=TextWrapping.Wrap});
             if(snapshot.LegalCaption.Length>0)
                 panel.Children.Add(new TextBlock{Text="Юридический договор: "+snapshot.LegalCaption,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,8)});
             panel.Children.Add(new TextBlock{Text="Карточка назначения",Margin=new Thickness(0,0,0,4)});
-            var picker=new ComboBox{ItemsSource=candidates,DisplayMemberPath="Name",SelectedIndex=-1,MinHeight=34};
+            var picker=new ComboBox{ItemsSource=candidates,DisplayMemberPath="Name",SelectedIndex=-1};
+            DynamicFormLayout.Field(picker);
+            picker.SetBinding(FrameworkElement.ToolTipProperty, new System.Windows.Data.Binding("SelectedItem.Name") { Source = picker });
             panel.Children.Add(picker);
             panel.Children.Add(new TextBlock{Text="Переносятся только выбранное приложение и связанные с ним ДС. Другие приложения останутся в прежней карточке. КС, сметы, вложения и идентификаторы переносятся вместе с документами, но состав общей КС-3 может измениться: он зависит от карточки и номера договора. При наличии связанных этапов или ведомостей выдачи перенос будет отклонён.",
                 TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,10,0,12)});
@@ -44,8 +47,9 @@ public partial class MainWindow
             var confirm=new Button{Content="Перенести",IsDefault=true,IsEnabled=false,MinWidth=110};
             picker.SelectionChanged+=(_,_)=>confirm.IsEnabled=picker.SelectedItem is ObjectRow;
             confirm.Click+=(_,_)=>dialog.DialogResult=true;
-            actions.Children.Add(cancel);actions.Children.Add(confirm);panel.Children.Add(actions);
-            dialog.Content=panel;
+            DynamicFormLayout.StyleActions(confirm,cancel);
+            actions.Children.Add(cancel);actions.Children.Add(confirm);
+            dialog.Content=DynamicFormLayout.WithFooter(panel,actions);
             if(dialog.ShowDialog()!=true||picker.SelectedItem is not ObjectRow target ||
                 !ObjectMutationCurrent(parent, captured) || !DocumentLocallyCurrent(doc) ||
                 !_objects.Any(o => Equals(o, target))) return;
