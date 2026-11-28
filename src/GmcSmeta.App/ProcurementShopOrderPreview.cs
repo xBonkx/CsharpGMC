@@ -49,11 +49,11 @@ internal sealed class ProcurementShopOrderPreview : Window
         root.RowDefinitions.Add(new RowDefinition());
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Content = root;
-        var top = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var top = new StackPanel();
+        top.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupSeparatorGap");
         var title = ProcurementDialogChrome.Heading("Заявка в цех");
         top.Children.Add(title);
-        top.Children.Add(new TextBlock { Text = document.ObjectName + " · " + document.Title,
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
+        top.Children.Add(DynamicFormLayout.Secondary(document.ObjectName + " · " + document.Title, "LayoutFormLabelFieldGap"));
         top.Children.Add(new TextBlock
         {
             Text = (selectedOnly ? "Выбранные позиции цеха" : "Все ожидающие изготовления позиции") +
@@ -61,12 +61,14 @@ internal sealed class ProcurementShopOrderPreview : Window
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
         });
         root.Children.Add(top);
-        var form = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var form = new WrapPanel();
+        form.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupSeparatorGap");
         void Field(string caption, TextBox field)
         {
             var pair = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
-            pair.Children.Add(new TextBlock { Text = caption, Margin = new Thickness(0, 0, 0, 4) });
-            field.MinHeight = 30;
+            pair.Children.Add(DynamicFormLayout.Secondary(caption, "LayoutDialogListItemGap"));
+            DynamicFormLayout.Field(field);
+            System.Windows.Automation.AutomationProperties.SetName(field, caption);
             pair.Children.Add(field);
             form.Children.Add(pair);
         }
@@ -78,7 +80,8 @@ internal sealed class ProcurementShopOrderPreview : Window
         {
             ItemsSource = _rows, AutoGenerateColumns = false, CanUserAddRows = false,
             CanUserDeleteRows = false, EnableRowVirtualization = true,
-            SelectionUnit = DataGridSelectionUnit.FullRow, SelectionMode = DataGridSelectionMode.Extended,
+            SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended,
+            ClipboardCopyMode = DataGridClipboardCopyMode.ExcludeHeader,
             HeadersVisibility = DataGridHeadersVisibility.Column, MinRowHeight = 24
         };
         ProcurementDialogChrome.Table(_grid);
@@ -104,12 +107,12 @@ internal sealed class ProcurementShopOrderPreview : Window
         TableColumnMenu.SetKey(_grid, "procurement-shop-preview");
         Grid.SetRow(_grid, 2);
         root.Children.Add(_grid);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        actions.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
         var print = new Button { Content = "Сохранить PDF", MinWidth = 144, IsDefault = true };
         print.Click += Accept;
-        var cancel = new Button { Content = "Отмена", MinWidth = 90, IsCancel = true,
-            Margin = new Thickness(8, 0, 0, 0) };
+        var cancel = new Button { Content = "Отмена", MinWidth = 90, IsCancel = true };
+        print.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         ProcurementDialogChrome.Buttons(print, cancel);
         actions.Children.Add(print);
         actions.Children.Add(cancel);
