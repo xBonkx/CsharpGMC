@@ -26,7 +26,7 @@
                 <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" TextChanged="Search_Changed"
                          Padding="32,5,32,5" AutomationProperties.Name="Найти строку…" ToolTip="Найти строку…"/>
                 <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                <TextBlock Text="Найти строку…" Foreground="#94A3B8" Margin="32,0,32,0" VerticalAlignment="Center"
+                <TextBlock Text="Найти строку…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -70,6 +70,6 @@
                 <ContextMenu x:Name="StageMenu"/>
             </DataGrid.ContextMenu>
         </DataGrid>
-        <TextBlock x:Name="StatusText" Grid.Row="3" Foreground="#64748B" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <TextBlock x:Name="StatusText" Grid.Row="3" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
     </Grid>
 </Window>
