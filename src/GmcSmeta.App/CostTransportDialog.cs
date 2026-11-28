@@ -43,11 +43,11 @@ public sealed class CostTransportDialog : Window
         Height = Math.Min(750, 330 + 37 * suppliers.Count);
         MinWidth = 550;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var root = new StackPanel { Margin = new Thickness(20) };
-        Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        DynamicFormLayout.Apply(this);
+        var root = new StackPanel();
         root.Children.Add(new TextBlock {
             Text = "Транспорт учитывается в итогах документа только один раз",
-            FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10)
+            FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10)
         });
         var customerRow = new DockPanel { Margin = new Thickness(0, 2, 0, 8) };
         customerRow.Children.Add(new TextBlock {
@@ -78,7 +78,7 @@ public sealed class CostTransportDialog : Window
         });
         root.Children.Add(new TextBlock {
             Text = "ПОСЧИТАТЬ ОТ ЗАКУПА У ПОСТАВЩИКА",
-            FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 6)
+            FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6)
         });
         if (suppliers.Count == 0)
             root.Children.Add(new TextBlock { Text = "В смете нет строк с закупом." });
@@ -110,6 +110,7 @@ public sealed class CostTransportDialog : Window
                 IsChecked = oldNames.Contains(supplier.Name),
                 Margin = new Thickness(0, 2, 0, 4),
             };
+            DynamicFormLayout.WrapCaption(check);
             check.Checked += (_, _) => Recalculate();
             check.Unchecked += (_, _) => Recalculate();
             _suppliers.Add((supplier, check));
@@ -181,9 +182,10 @@ public sealed class CostTransportDialog : Window
                 });
             DialogResult = true;
         };
+        DynamicFormLayout.StyleActions(save, cancel);
         buttons.Children.Add(cancel);
         buttons.Children.Add(save);
-        root.Children.Add(buttons);
+        Content = DynamicFormLayout.WithFooter(root, buttons, "LayoutCompareDialogMargin");
         Recalculate();
     }
 

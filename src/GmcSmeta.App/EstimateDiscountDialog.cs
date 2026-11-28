@@ -10,12 +10,12 @@ internal sealed class EstimateDiscountDialog : Window
 {
     private readonly EstimateDiscountInput.State _state;
     private readonly ComboBox _mode=new(){MinHeight=34};
-    private readonly TextBox _percent=new(){MinHeight=34,MinWidth=230,Padding=new Thickness(8,4,8,4),MaxLength=32};
-    private readonly TextBox _target=new(){MinHeight=34,MinWidth=230,Padding=new Thickness(8,4,8,4),MaxLength=32};
+    private readonly TextBox _percent=new(){MinHeight=34,Padding=new Thickness(8,4,8,4),MaxLength=32};
+    private readonly TextBox _target=new(){MinHeight=34,Padding=new Thickness(8,4,8,4),MaxLength=32};
     private readonly CheckBox _smr=new(){Content="Скидка и на монтаж (СМР)",IsChecked=true};
     private readonly CheckBox _whole=new(){Content="Округлять расценки до целых рублей"};
-    private readonly TextBlock _description=new(){TextWrapping=TextWrapping.Wrap,Foreground=Brushes.DimGray};
-    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,LineHeight=24};
+    private readonly TextBlock _description=new(){TextWrapping=TextWrapping.Wrap};
+    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,LineStackingStrategy=LineStackingStrategy.MaxHeight};
     private readonly Button _apply=new(){Content="Применить скидку",MinWidth=150,MinHeight=34,IsDefault=true,IsEnabled=false};
     private bool _busy;
     private bool _onTotal;
@@ -27,8 +27,14 @@ internal sealed class EstimateDiscountDialog : Window
         _preview.SetResourceReference(TextBlock.FontSizeProperty, "UiMoneyInputSize");
         Title="Скидка на всю смету";Width=590;MinWidth=520;SizeToContent=SizeToContent.Height;
         WindowStartupLocation=WindowStartupLocation.CenterOwner;ResizeMode=ResizeMode.NoResize;
-        var root=new StackPanel{Margin=new Thickness(22,18,22,18)};
-        root.Children.Add(new TextBlock{Text=Title,FontSize=(double)FindResource("UiH2Size"),FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,10)});
+        DynamicFormLayout.Apply(this);
+        _description.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
+        DynamicFormLayout.WrapCaption(_smr);
+        DynamicFormLayout.WrapCaption(_whole);
+        var root=new StackPanel();
+        var heading=WorkspaceWindowUi.Heading(Title);
+        heading.Margin=new Thickness(0,0,0,10);
+        root.Children.Add(heading);
         if(state.SupportsTotal)_mode.Items.Add("На итог — отдельной строкой");
         _mode.Items.Add("На расценки — изменить цены позиций");
         root.Children.Add(_mode);
@@ -37,7 +43,7 @@ internal sealed class EstimateDiscountDialog : Window
         {
             var grid=new Grid{Margin=new Thickness(0,0,0,8)};
             grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
-            grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(260)});
+            grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
             grid.Children.Add(new TextBlock{Text=caption,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap});
             Grid.SetColumn(box,1);grid.Children.Add(box);root.Children.Add(grid);
         }
@@ -52,8 +58,8 @@ internal sealed class EstimateDiscountDialog : Window
         var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100,MinHeight=34,Margin=new Thickness(0,0,8,0)};
         if(TryFindResource("PythonToolbarPrimary") is Style primary)_apply.Style=primary;
         if(TryFindResource("PythonToolbarButton") is Style standard)cancel.Style=standard;
-        actions.Children.Add(cancel);actions.Children.Add(_apply);root.Children.Add(actions);
-        Content=root;
+        actions.Children.Add(cancel);actions.Children.Add(_apply);
+        Content=DynamicFormLayout.WithFooter(root,actions);
         _mode.SelectionChanged+=(_,_)=>SwitchMode();
         _percent.TextChanged+=(_,_)=>Refresh(false);
         _target.TextChanged+=(_,_)=>Refresh(true);

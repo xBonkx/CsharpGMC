@@ -23,11 +23,14 @@ public sealed class SectionPickerDialog : Window
         Width = 480;
         SizeToContent = SizeToContent.Height;
         Background = System.Windows.Media.Brushes.White;
-        var root = new StackPanel { Margin = new Thickness(22) };
+        DynamicFormLayout.Apply(this);
+        var root = new StackPanel();
         root.Children.Add(new TextBlock { Text = "Куда перенести позицию вместе с комплектующими?",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
-        _sections = new ComboBox { MinWidth = 380, Padding = new Thickness(7),
+        _sections = new ComboBox { Padding = new Thickness(7),
             ItemsSource = sections.Select(x => new Choice(x.Id, x.Label)).ToArray(), SelectedIndex = 0 };
+        DynamicFormLayout.Field(_sections);
+        _sections.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("SelectedItem.Label") { Source = _sections });
         root.Children.Add(_sections);
         var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 18, 0, 0) };
@@ -37,7 +40,7 @@ public sealed class SectionPickerDialog : Window
         ok.Click += (_, _) => DialogResult = SelectedSectionId is not null;
         bar.Children.Add(cancel);
         bar.Children.Add(ok);
-        root.Children.Add(bar);
-        Content = root;
+        DynamicFormLayout.StyleActions(ok, cancel);
+        Content = DynamicFormLayout.WithFooter(root, bar);
     }
 }

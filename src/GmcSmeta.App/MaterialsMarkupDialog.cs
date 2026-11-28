@@ -30,12 +30,11 @@ public sealed class MaterialsMarkupDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
         Background = Brushes.White;
-        var root = new StackPanel { Margin = new Thickness(22, 18, 22, 16) };
-        root.Children.Add(new TextBlock
-        {
-            Text = $"Наценка для выделенных строк: {count}",
-            FontWeight = FontWeights.SemiBold, FontSize = 17, Margin = new Thickness(0, 0, 0, 12),
-        });
+        DynamicFormLayout.Apply(this);
+        var root = new StackPanel();
+        var heading = WorkspaceWindowUi.Heading($"Наценка для выделенных строк: {count}");
+        heading.Margin = new Thickness(0, 0, 0, 12);
+        root.Children.Add(heading);
         _toPrice = new RadioButton
         {
             Content = "Посчитать цену клиенту из закупа:  цена = закуп × коэффициент",
@@ -46,31 +45,39 @@ public sealed class MaterialsMarkupDialog : Window
             Content = "Посчитать закуп из цены клиенту:  закуп = цена ÷ коэффициент",
             Margin = new Thickness(0, 0, 0, 10),
         };
+        DynamicFormLayout.WrapCaption(_toPrice);
+        DynamicFormLayout.WrapCaption(_toCost);
         root.Children.Add(_toPrice);
         root.Children.Add(_toCost);
-        var grid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _factor = new TextBox { Text = "1,44", Width = 110, HorizontalContentAlignment = HorizontalAlignment.Right };
-        _percent = new TextBox { Text = "44", Width = 110, HorizontalContentAlignment = HorizontalAlignment.Right };
+        // Python MarkupDialog uses two QFormLayout rows.
+        _factor = new TextBox { Text = "1,44", HorizontalContentAlignment = HorizontalAlignment.Right,
+            ToolTip = "Например: 1,44 = закуп × 1,2 × 1,2; 2 = закуп × 2" };
+        _percent = new TextBox { Text = "44", HorizontalContentAlignment = HorizontalAlignment.Right };
         _factor.TextChanged += FactorChanged;
         _percent.TextChanged += PercentChanged;
-        var left = new StackPanel { Orientation = Orientation.Horizontal };
-        left.Children.Add(new TextBlock { Text = "Коэффициент   ", VerticalAlignment = VerticalAlignment.Center });
-        left.Children.Add(_factor);
-        var right = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 0, 0, 0) };
-        right.Children.Add(new TextBlock { Text = "или наценка, %   ", VerticalAlignment = VerticalAlignment.Center });
-        right.Children.Add(_percent);
-        Grid.SetColumn(left, 0);
-        Grid.SetColumn(right, 1);
-        grid.Children.Add(left);
-        grid.Children.Add(right);
-        root.Children.Add(grid);
+        void AddField(string caption, TextBox input)
+        {
+            var field = new Grid();
+            field.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+            field.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+            field.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+            var label = new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            label.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormColumnGap");
+            field.Children.Add(label);
+            DynamicFormLayout.Field(input);
+            Grid.SetColumn(input, 1);
+            field.Children.Add(input);
+            root.Children.Add(field);
+        }
+        AddField("Коэффициент", _factor);
+        AddField("или наценка, %", _percent);
         _onlyEmpty = new CheckBox
         {
             Content = "Только там, где цена (или закуп) ещё не указана", Margin = new Thickness(0, 0, 0, 6),
         };
         _round = new CheckBox { Content = "Округлить цену до целых рублей", IsChecked = true };
+        DynamicFormLayout.WrapCaption(_onlyEmpty);
+        DynamicFormLayout.WrapCaption(_round);
         root.Children.Add(_onlyEmpty);
         root.Children.Add(_round);
         var row = new StackPanel
@@ -88,8 +95,8 @@ public sealed class MaterialsMarkupDialog : Window
         apply.Click += (_, _) => Apply();
         row.Children.Add(cancel);
         row.Children.Add(apply);
-        root.Children.Add(row);
-        Content = root;
+        DynamicFormLayout.StyleActions(apply, cancel);
+        Content = DynamicFormLayout.WithFooter(root, row);
         Loaded += (_, _) => _factor.Focus();
     }
 

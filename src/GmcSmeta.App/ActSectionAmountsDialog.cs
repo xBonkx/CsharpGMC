@@ -35,7 +35,14 @@ internal sealed class ActSectionAmountsDialog : Window
         _snapshot=snapshot;_pos=snapshot.SmrMode=="pos";_actualSmr=actualSmr;
         Title="СМР и транспорт по разделам";Width=1180;Height=600;MinWidth=760;MinHeight=400;
         WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        var root=new DockPanel{Margin=new Thickness(20)};
+        DynamicFormLayout.Apply(this);
+        WorkspaceWindowUi.StyleTable(_grid);
+        _grid.EnableColumnVirtualization=true;
+        VirtualizingPanel.SetVirtualizationMode(_grid,VirtualizationMode.Recycling);
+        ScrollViewer.SetHorizontalScrollBarVisibility(_grid,ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(_grid,ScrollBarVisibility.Auto);
+        var root=new DockPanel();
+        root.SetResourceReference(FrameworkElement.MarginProperty,"LayoutCompareDialogMargin");
         var top=new StackPanel{Margin=new Thickness(0,0,0,12)};
         top.Children.Add(new TextBlock{Text=$"Доступно в этом акте: СМР {Fmt(snapshot.Remaining.Smr)} ₽ · транспорт {Fmt(snapshot.Remaining.Transport)} ₽.",
             FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
@@ -47,7 +54,9 @@ internal sealed class ActSectionAmountsDialog : Window
         var bottom=new StackPanel();
         bottom.Children.Add(_summary);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        buttons.Children.Add(new Button{Content="Отмена",MinWidth=100,MinHeight=34,IsCancel=true,Margin=new Thickness(0,0,8,0)});
+        var cancel=new Button{Content="Отмена",MinWidth=100,MinHeight=34,IsCancel=true,Margin=new Thickness(0,0,8,0)};
+        DynamicFormLayout.StyleActions(_save,cancel);
+        buttons.Children.Add(cancel);
         buttons.Children.Add(_save);bottom.Children.Add(buttons);
         DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
         foreach(var s in snapshot.Systems)
@@ -56,9 +65,11 @@ internal sealed class ActSectionAmountsDialog : Window
         _rows.Add(new Entry{Id=0,Name="Без привязки к разделу",Plan="—",Limit="—"});
         void Column(string header,string property,DataGridLength width,bool readOnly)
         {
-            _grid.Columns.Add(new DataGridTextColumn{Header=header,Binding=new Binding(property)
+            var column=new DataGridTextColumn{Header=header,Binding=new Binding(property)
                 {UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged,Mode=readOnly?BindingMode.OneWay:BindingMode.TwoWay},
-                Width=width,MinWidth=readOnly?100:205,IsReadOnly=readOnly});
+                Width=width,MinWidth=readOnly?100:205,IsReadOnly=readOnly};
+            WorkspaceWindowUi.StyleColumn(column,property==nameof(Entry.Name)?TextAlignment.Left:TextAlignment.Right);
+            _grid.Columns.Add(column);
         }
         Column("Раздел",nameof(Entry.Name),new DataGridLength(1,DataGridLengthUnitType.Star),true);
         Column("СМР по смете",nameof(Entry.Plan),new DataGridLength(140),true);

@@ -21,13 +21,17 @@ internal sealed class ActDiscountDialog : Window
         _gross=gross;_contractRate=contractRate;_original=original;
         Title="Корректировка акта КС-2";Width=560;SizeToContent=SizeToContent.Height;
         ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        var panel=new StackPanel{Margin=new Thickness(22,18,22,18)};
-        panel.Children.Add(new TextBlock{Text="До скидки с НДС: "+Fmt(gross)+" ₽",FontSize=(double)FindResource("UiValueSize"),FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,12)});
+        DynamicFormLayout.Apply(this);
+        var panel=new StackPanel();
+        var heading=WorkspaceWindowUi.Heading("До скидки с НДС: "+Fmt(gross)+" ₽");
+        heading.SetResourceReference(TextBlock.FontSizeProperty, "UiValueSize");
+        heading.Margin=new Thickness(0,0,0,12);
+        panel.Children.Add(heading);
         foreach(var label in new[]{"Скидка по договору","Индивидуальная скидка, %","Установить итоговую сумму вручную"})_mode.Items.Add(label);
         panel.Children.Add(_mode);
         void Field(string title,TextBox input)
         {
-            panel.Children.Add(new TextBlock{Text=title,Margin=new Thickness(0,9,0,4)});
+            panel.Children.Add(new TextBlock{Text=title,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,9,0,4)});
             panel.Children.Add(input);
         }
         _percent.Text=original.Percent.ToString("0.#########",CultureInfo.GetCultureInfo("ru-RU"));
@@ -35,8 +39,10 @@ internal sealed class ActDiscountDialog : Window
         Field("Скидка, %",_percent);Field("Итог с НДС, ₽",_amount);
         panel.Children.Add(_preview);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        buttons.Children.Add(new Button{Content="Отмена",MinWidth=100,MinHeight=34,IsCancel=true,Margin=new Thickness(0,0,8,0)});
-        buttons.Children.Add(_save);panel.Children.Add(buttons);Content=panel;
+        var cancel=new Button{Content="Отмена",MinWidth=100,MinHeight=34,IsCancel=true,Margin=new Thickness(0,0,8,0)};
+        DynamicFormLayout.StyleActions(_save,cancel);
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(_save);Content=DynamicFormLayout.WithFooter(panel,buttons);
         _mode.SelectionChanged+=(_,_)=>Refresh();
         _percent.TextChanged+=(_,_)=>Refresh();
         _amount.TextChanged+=(_,_)=>Refresh();

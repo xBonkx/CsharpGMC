@@ -18,14 +18,18 @@ internal static class KsActPropertiesDialog
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = Window.GetWindow(owner),
         };
-        var grid = new Grid { Margin = new Thickness(16) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        DynamicFormLayout.Apply(dialog);
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
         var row = 0;
         TextBox Field(string caption, string text)
         {
-            var label = new Label { Content = caption, VerticalAlignment = VerticalAlignment.Center };
-            var box = new TextBox { Text = text, Margin = new Thickness(0, 4, 0, 0) };
+            var label = new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            label.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormLabelMargin");
+            var box = new TextBox { Text = text };
+            box.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+            DynamicFormLayout.Field(box);
             Grid.SetRow(label, row);
             Grid.SetColumn(label, 0);
             Grid.SetRow(box, row);
@@ -47,7 +51,10 @@ internal static class KsActPropertiesDialog
             dsDate = Field("от", details.DsDate);
             dsExtra = Field("Другие ДС (если есть)", details.DsExtra);
             dsExtra.AcceptsReturn = true;
-            dsExtra.Height = 64;
+            dsExtra.MinHeight = 64;
+            dsExtra.MaxHeight = 180;
+            dsExtra.TextWrapping = TextWrapping.Wrap;
+            dsExtra.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         }
         var buttons = new StackPanel
         {
@@ -65,11 +72,7 @@ internal static class KsActPropertiesDialog
             Margin = new Thickness(8, 0, 0, 0) };
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);
-        Grid.SetRow(buttons, row);
-        Grid.SetColumnSpan(buttons, 2);
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.Children.Add(buttons);
-        dialog.Content = grid;
+        dialog.Content = DynamicFormLayout.WithFooter(grid, buttons);
 
         SqlServerActs.ActDraftEdit? edit = null;
         string message = "";

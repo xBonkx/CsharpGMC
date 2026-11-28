@@ -19,6 +19,7 @@ internal static class VisualAuditChecks
         RunSharedGlyphCatalogChecks();
         RunDirectorTextLayoutChecks();
         RunSharedTypographyChecks();
+        RunDynamicFormLayoutChecks();
         RunSharedSpacingChecks();
         RunEstimateScrollLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
@@ -147,6 +148,29 @@ internal static class VisualAuditChecks
             tile.TextWrapping == TextWrapping.Wrap && tile.DesiredSize.Height > tile.FontSize,
             "Money tile text must grow rather than trim");
         Console.WriteLine("Shared typography roles and natural line heights checked (no SQL).");
+    }
+
+    private static void RunDynamicFormLayoutChecks()
+    {
+        var body = new StackPanel();
+        for (var i = 0; i < 16; i++)
+            body.Children.Add(new TextBlock { Text = "Строка " + i, Height = 32 });
+        var footer = new Button { Content = "Сохранить", Height = 34 };
+        var root = DynamicFormLayout.WithFooter(body, footer);
+        Layout(root, 440, 240);
+        var scroll = (ScrollViewer)root.Children[1];
+        Require(scroll.ScrollableHeight > 0, "Long form body must scroll at small height");
+        Require(footer.ActualHeight >= 34 && LayoutInformation.GetLayoutSlot(footer).Bottom <= root.ActualHeight + .1,
+            "Commit footer must remain inside the dialog viewport");
+        var caption = new CheckBox { Content = "Длинное описание параметра с переносом на несколько строк" };
+        DynamicFormLayout.WrapCaption(caption);
+        Require(caption.Content is TextBlock { TextWrapping: TextWrapping.Wrap }, "Wrap long check captions");
+        var window = new Window();
+        DynamicFormLayout.Apply(window);
+        Require(window.FontFamily.Source == ((FontFamily)Application.Current.FindResource("UiFontFamily")).Source &&
+            TextOptions.GetTextFormattingMode(window) == TextFormattingMode.Display &&
+            window.UseLayoutRounding, "Dynamic window uses application typography");
+        window.Close();
     }
 
     private static void RunSharedSpacingChecks()
