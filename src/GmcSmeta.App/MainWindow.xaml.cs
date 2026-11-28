@@ -50,7 +50,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<int, TreeViewItem> _objectNodes = new();
     private readonly Dictionary<int, PendingNavigationDocuments> _pendingNavigationDocuments = new();
     private static readonly object NavigationPlaceholder = new();
-    private sealed record PendingNavigationDocuments(IReadOnlyList<DocRow> Documents, HashSet<string>? Opened);
+    private sealed record PendingNavigationDocuments(IReadOnlyList<DocRow> Documents, HashSet<string>? Opened, HashSet<string>? Known);
     // На время поиска временно раскрываем совпадения, затем возвращаем состояние пользователя.
     private Dictionary<TreeViewItem, bool>? _searchExpansionSnapshot;
     private System.Windows.Threading.DispatcherTimer? _navigationSearchTimer;
@@ -334,121 +334,6 @@ public partial class MainWindow : Window
     // Python Nav: 16 DIP per level, 7 DIP vertical padding.
     // Indent only the row content, not its ItemsPresenter.
     private static Thickness NavigationRowPadding(int depth) => new(16 * Math.Max(0, depth), 7, 4, 7);
-
-    private void RefreshNavigation()
-    {
-        using var treeTiming = StartupTrace.Measure("navigation_tree_rebuild");
-        UpdateNavigationCaptions();
-        _navigationSearchTimer?.Stop();
-        // Сохраняем реальное состояние пользователя, а не раскрытые поиском узлы.
-        RestoreNavigationSearchExpansion();
-        if (_shownMode is { } previous)
-            _expanded[previous] = Descendants(NavigationTree.Items).Where(n => n.IsExpanded)
-                .Select(NodeKey).ToHashSet();
-        NavigationTree.Items.Clear();
-        _documentNodes.Clear();
-        _objectNodes.Clear();
-        _pendingNavigationDocuments.Clear();
-        IReadOnlyList<NavigationYear> years;
-        using (StartupTrace.Measure("navigation_tree_projection"))
-            years = Navigation.Years(_objects, _docs, CurrentMode, DateTime.Today.Year);
-        using (StartupTrace.Measure("navigation_search_index"))
-            _navigationSearchIndex = new NavigationSearchIndex(years.SelectMany(y => y.Objects));
-        _expanded.TryGetValue(CurrentMode, out var opened);
-        foreach (var year in years)
-        {
-            var yearNode = new TreeViewItem
-            {
-                Header = year.Year, Tag = year.Year, FontWeight = FontWeights.SemiBold,
-                Padding = NavigationRowPadding(0),
-                HeaderTemplate = (DataTemplate)FindResource("YearNavigationTemplate")
-            };
-            yearNode.IsExpanded = opened?.Contains(NodeKey(yearNode)) ??
-                (CurrentMode == NavigationMode.Archive || year == years[0]);
-            foreach (var group in year.Objects)
-            {
-                var node = new TreeViewItem
-                {
-                    Header = group.Object.Name, Tag = group.Object,
-                    Padding = NavigationRowPadding(1),
-                    HeaderTemplate = (DataTemplate)FindResource("ObjectNavigationTemplate"),
-                    FontWeight = FontWeights.SemiBold, ToolTip = group.Object.Name
-                };
-                _objectNodes[group.Object.Id] = node;
-                if (group.Documents.Count > 0)
-                {
-                    _pendingNavigationDocuments[group.Object.Id] = new(group.Documents, opened);
-                    // Keep the usual WPF expand arrow without creating any
-                    // real document containers for a collapsed object.
-                    node.Items.Add(new TreeViewItem
-                    {
-                        Tag = NavigationPlaceholder,
-                        Visibility = Visibility.Collapsed,
-                        Focusable = false,
-                        IsEnabled = false,
-                    });
-                    node.Expanded += ObjectNavigation_Expanded;
-                }
-                yearNode.Items.Add(node);
-                node.IsExpanded = opened?.Contains(NodeKey(node)) ?? false;
-                if (node.IsExpanded) EnsureObjectDocuments(node);
-            }
-            NavigationTree.Items.Add(yearNode);
-        }
-        _shownMode = CurrentMode;
-        ApplyNavigationFilter();
-        StartupTrace.Sample("navigation_tree_nodes", _objectNodes.Count, _documentNodes.Count);
-    }
-
-    private void ObjectNavigation_Expanded(object sender, RoutedEventArgs e)
-    {
-        // Expanded is a bubbling event; child document expansion is unrelated.
-        if (sender is TreeViewItem node && ReferenceEquals(e.OriginalSource, node))
-            EnsureObjectDocuments(node);
-    }
-
-    private void EnsureObjectDocuments(TreeViewItem node)
-    {
-        if (node.Tag is not ObjectRow obj ||
-            !_pendingNavigationDocuments.TryGetValue(obj.Id, out var pending) ||
-            !_objectNodes.TryGetValue(obj.Id, out var current) || !ReferenceEquals(node, current))
-            return;
-
-        // Build locally before replacing the placeholder. The existing
-        // Navigation.Documents projection retains stage hierarchy and order.
-        using var timing = StartupTrace.Measure("navigation_lazy_documents");
-        var opened = pending.Opened;
-        var shortTitle = CurrentMode != NavigationMode.Kp &&
-            AgreementPresentation.Resolve(pending.Documents) is not null;
-        var children = Navigation.Documents(pending.Documents)
-            .Select(doc => DocumentNode(doc, opened, 2, shortTitle)).ToList();
-        _pendingNavigationDocuments.Remove(obj.Id);
-        node.Expanded -= ObjectNavigation_Expanded;
-        node.Items.Clear();
-        foreach (var child in children) node.Items.Add(child);
-    }
-
-    private TreeViewItem DocumentNode(NavigationDocument entry, HashSet<string>? opened, int depth, bool shortTitle = false)
-    {
-        var header = new NavigationDocumentHeader(entry.Document, depth > 2, entry.Children.Count > 0)
-            { ShortAgreementTitle = shortTitle };
-        var node = new TreeViewItem
-        {
-            Header = header, Tag = entry.Document,
-            Padding = NavigationRowPadding(depth),
-            HeaderTemplate = (DataTemplate)FindResource("DocumentNavigationTemplate"),
-            ToolTip = entry.Document.NavigationTip,
-            FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal
-        };
-        System.Windows.Automation.AutomationProperties.SetName(node, header.DisplayName);
-        node.IsExpanded = entry.Children.Count > 0 || opened?.Contains(NodeKey(node)) == true;
-        _documentNodes[entry.Document.Id] = node;
-        // A collapsed object's documents may first be created by search.
-        // Capture their initial state before any search-time user expansion.
-        _searchExpansionSnapshot?.TryAdd(node, node.IsExpanded);
-        foreach (var child in entry.Children) node.Items.Add(DocumentNode(child, opened, depth + 1, shortTitle));
-        return node;
-    }
 
     private void ApplyNavigationFilter()
     {
