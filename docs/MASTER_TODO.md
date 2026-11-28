@@ -8,6 +8,8 @@
 
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 — FONT-10/SPACE-18/19 follow-up: reference logo placeholder, attachment hint, reference rule labels and metal register status now use common muted text resource; two named spacing roles and four source regression cases added (bfa57b7), readback confirmed no legacy SlateGray in those four files. No build/test execution or canonical promotion. Design summary includes SUM-VIS-01 in addition to the 14 remaining primary visual TODO IDs: 15 PARTIAL in total.
+
 28.11.2026 — NAV-20/SPACE-14/FONT-12 CODE READY: actual navigation mode/tree fixture, 46 XAML/211 rows audit, intentional spacer exceptions, pinned dynamic form actions and whole-app numeric font guard. Tests authored, not run; physical acceptance remains pending. Design 238/253 CODE READY, 15 PARTIAL; +3. [Evidence](DESIGN_PASS_20261128_GRID_ROWS_NAVIGATION_TYPOGRAPHY.md).
 
 28.11.2026 — shared text role coverage: 34 XAML and four dynamic estimate C# files updated; 119 direct text foreground references consolidated, all 46 XAML files statically audited, stage money and batch deletion scroll/pinned footer corrected, six source tests authored. FONT-10/08/12/13 and SPACE-14/15/18/19 receive additional partial evidence; GRID-19 limited preview evidence. No canonical promotion or Windows acceptance. [Evidence](DESIGN_PASS_20261128_SHARED_TEXT_COVERAGE.md).
