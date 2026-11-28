@@ -46,19 +46,26 @@ public partial class ConfirmDeleteDialog : Window
         }
     }
 
-    private void AnswerBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
-        DeleteButton.IsEnabled = AnswerBox.Text.Trim() == _answer;
+    private bool AnswerConfirmed => !string.IsNullOrEmpty(_answer) && AnswerBox.Text.Trim() == _answer;
+
+    private void AnswerBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (DeleteButton is not null) DeleteButton.IsEnabled = AnswerConfirmed;
+    }
 
     private void AnswerBox_KeyDown(object sender, KeyEventArgs e)
     {
         // returnPressed: Enter подтверждает только при правильном ответе.
-        if (e.Key == Key.Enter && DeleteButton.IsEnabled)
+        if (e.Key == Key.Enter && AnswerConfirmed && DeleteButton.IsEnabled)
         {
             DialogResult = true;
             e.Handled = true;
         }
     }
 
-    private void Delete_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+    private void Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if (AnswerConfirmed && DeleteButton.IsEnabled) DialogResult = true;
+    }
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 }

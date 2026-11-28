@@ -50,7 +50,7 @@ public sealed class EstimateDocumentActionsSourceTests
         Assert.Contains("main.OpenEstimateObjectTool(this, _doc, _publishedEstimateRevision, orders: true)", header);
         var main = Source("MainWindow.xaml.cs");
         Assert.Contains("expectedRevision: revision", main);
-        Assert.Contains("confirmedRevision != expectedRevision", main);
+        Assert.Contains("captured.Revision != expectedRevision", Source("MainWindow.Deletion.cs"));
         var sql = Source("MainWindow.SqlServer.cs");
         Assert.Contains("revision != expectedRevision", sql);
         Assert.Contains("!CanStartDocumentMutation(source)", sql);

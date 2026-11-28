@@ -168,7 +168,15 @@ public static partial class SqlServerTrash
             if (intoObjectId is null && !Exists(conn, tx, "objects", oldObjectId))
                 intoObjectId = InsertReplacementObject(conn, tx,
                     string.IsNullOrEmpty(objectName) ? "Восстановленный объект" : objectName);
-            maps["objects"][oldObjectId] = intoObjectId ?? oldObjectId;
+            var destinationId = intoObjectId ?? oldObjectId;
+            using (var active = new SqlCommand(
+                "SELECT COUNT_BIG(*) FROM dbo.objects WITH (UPDLOCK,HOLDLOCK) WHERE id=@id AND archived=0", conn, tx))
+            {
+                active.Parameters.Add("@id", SqlDbType.BigInt).Value = destinationId;
+                if (Convert.ToInt64(active.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                    throw new InvalidOperationException("Восстановление в архивную карточку запрещено.");
+            }
+            maps["objects"][oldObjectId] = destinationId;
         }
 
         // Keep the original ownership before foreign keys are rewritten in-place.

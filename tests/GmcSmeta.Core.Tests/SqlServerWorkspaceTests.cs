@@ -217,4 +217,14 @@ public sealed class SqlServerWorkspaceTests
         Assert.Throws<ArgumentException>(() => SqlServerWorkspace.UpdateContract(pilot, 1,
             new ContractProperties(VatRate: -1), "rev"));
     }
+
+    [Fact]
+    public void DeletePreviewsRejectProductionWithoutConnecting()
+    {
+        const string connection = "Server=localhost;Database=Production;Integrated Security=true";
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlServerWorkspace.PrepareObjectDelete(connection, 1, "rev"));
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlServerWorkspace.PrepareContractDelete(connection, 1, 2, "rev"));
+    }
 }

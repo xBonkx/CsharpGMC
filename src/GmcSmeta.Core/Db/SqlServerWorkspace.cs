@@ -910,13 +910,17 @@ public static partial class SqlServerWorkspace
     /// записей детьми первыми (на ON DELETE CASCADE не полагаемся) — одна транзакция
     /// (services.delete_object). Связи без каскада (metal_entries, price_history) очищаются.
     /// </summary>
-    public static void DeleteObject(string connectionString, long objectId, string expectedRevision)
+    public static void DeleteObject(string connectionString, long objectId, string expectedRevision,
+        IReadOnlyList<long>? expectedDocuments = null)
     {
         RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         CheckRevision(conn, tx, expectedRevision);
         var info = DescribeObjectForDelete(conn, tx, objectId);
+        if (expectedDocuments is not null &&
+            !ReadDeletionDocumentIds(conn, tx, objectId).SequenceEqual(expectedDocuments.OrderBy(id => id)))
+            throw new DBConcurrencyException("Состав документов изменился после подтверждения.");
         SqlServerTrash.KeepObject(conn, tx, objectId);
         // Журнал до удаления: после DELETE владелец уже не определяется.
         Log(conn, tx, "object", objectId, "delete", info.Name, null, objectId);
@@ -964,20 +968,21 @@ public static partial class SqlServerWorkspace
             Execute(conn, tx, "DELETE dbo.agreement_files WHERE agreement_id IN (SELECT id FROM dbo.agreements WHERE object_id=@id)", objectId);
             Execute(conn, tx, "DELETE dbo.agreements WHERE object_id=@id", objectId);
         }
-        Execute(conn, tx, "DELETE dbo.objects WHERE id=@id", objectId);
+        RequireSingleDeletion(conn, tx, "objects", objectId);
         BumpRevision(conn, tx);
-        tx.Commit();
+        CommitDeletion(tx);
     }
 
     /// <summary>Удалить документ: полная копия в корзину, журнал и явное удаление зависимых записей — одна транзакция (services.delete_contract).</summary>
-    public static void DeleteContract(string connectionString, long contractId, string expectedRevision)
+    public static void DeleteContract(string connectionString, long contractId, string expectedRevision,
+        long? expectedObjectId = null)
     {
         RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         CheckRevision(conn, tx, expectedRevision);
         var info = DescribeContractForDelete(conn, tx, contractId);
-        SqlServerTrash.KeepContract(conn, tx, contractId);
+        SqlServerTrash.KeepContract(conn, tx, contractId, expectedObjectId: expectedObjectId);
         Log(conn, tx, "contract", contractId, "delete", $"{info.ObjectName}: {info.Title}", contractId, null);
 
         // Порядок как в Python delete_sql_document_tree: строки актов раньше позиций
@@ -1001,9 +1006,9 @@ public static partial class SqlServerWorkspace
         Execute(conn, tx, "DELETE dbo.smr_costs WHERE contract_id=@id", contractId);
         Execute(conn, tx, "DELETE dbo.attachments WHERE contract_id=@id", contractId);
         Execute(conn, tx, "DELETE dbo.spec_revisions WHERE contract_id=@id", contractId);
-        Execute(conn, tx, "DELETE dbo.contracts WHERE id=@id", contractId);
+        RequireSingleDeletion(conn, tx, "contracts", contractId);
         BumpRevision(conn, tx);
-        tx.Commit();
+        CommitDeletion(tx);
     }
 
     private static void Execute(SqlConnection conn, SqlTransaction tx, string sql, long id)

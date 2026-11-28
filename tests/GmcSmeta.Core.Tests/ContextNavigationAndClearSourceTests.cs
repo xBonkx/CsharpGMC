@@ -22,7 +22,7 @@ public sealed class ContextNavigationAndClearSourceTests
         Assert.Contains("ReferenceEquals(currentNode, target)", main);
         Assert.Contains("Equals(fresh, selected)", main);
         Assert.Contains("Equals(current, doc)", main);
-        Assert.Contains("RunDocumentCommand(() => DeleteSqlServerContractFlow(doc))", main);
+        Assert.Contains("RunDocumentWrite(() => DeleteSqlServerContractFlow(doc))", main);
         Assert.Contains("AddDocumentFileMenu(menu, doc, ValidDocumentTarget)", main);
         Assert.Contains("menuTarget?.Invoke() != false", main);
     }

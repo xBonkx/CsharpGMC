@@ -634,7 +634,8 @@ public partial class MainWindow : Window
             menu.Items.Add(year);
         }
         menu.Items.Add(new Separator());
-        var delete = ContextMenuIcons.Create("Удалить карточку и все документы…", "Trash", SqlWritesEnabled, danger: true);
+        var delete = ContextMenuIcons.Create("Удалить карточку и все документы…", "Trash",
+            SqlWritesEnabled && !obj.Archived && !_workspaceDeletionBusy && !_workspaceDeletionUncertain, danger: true);
         delete.Click += (_, _) => Run(DeleteSqlServerObjectFlow);
         menu.Items.Add(delete);
         menu.PlacementTarget = anchor;
@@ -735,115 +736,6 @@ public partial class MainWindow : Window
         }
         ReloadAndSelect(obj.Id);
         StatusText.Text = $"Объект перенесён в архив {dialog.Year} года";
-    }
-
-    /// <summary>Удалить объект: два подтверждения, копия в корзину — main_window.delete_object эталона.</summary>
-    private void DeleteSqlServerObjectFlow(ObjectRow obj)
-    {
-        if (!SqlWritesEnabled)
-        {
-            StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
-            return;
-        }
-        if (CaptureObjectMutation(obj) is not { } target) return;
-        SqlServerWorkspace.ObjectDeleteInfo info;
-        var confirmedRevision = target.Revision;
-        try
-        {
-            info = SqlServerWorkspace.DescribeObjectForDelete(_serverConn!, null, obj.Id);
-            if (string.IsNullOrWhiteSpace(confirmedRevision) ||
-                confirmedRevision != SqlServerDatabase.Revision(_serverConn!))
-                throw new InvalidOperationException("Данные изменились во время проверки. Повторите операцию после обновления.");
-        }
-        catch (Exception ex)
-        {
-            LogError(ex);
-            MessageBox.Show(this, ex.Message, "Не удалось открыть объект", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        var bullets = string.Join("\n", info.Details.Select(d => "• " + d));
-        var question = $"Удалить карточку «{info.Name}» и все её документы?\n\n" + (bullets.Length > 0 ? bullets : "Карточка пуста.") +
-            "\n\nЕсли работы завершены — лучше «Завершить карточку (в архив)».";
-        if (MessageBox.Show(this, question, "Удаление карточки", MessageBoxButton.YesNo,
-                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        if (new ConfirmDeleteDialog(info.Name, info.Details, "карточка") { Owner = this }.ShowDialog() != true ||
-            !ObjectMutationCurrent(obj, target)) return;
-        try
-        {
-            SqlServerWorkspace.DeleteObject(
-                target.Connection, obj.Id, confirmedRevision);
-        }
-        catch (Exception ex)
-        {
-            LogError(ex);
-            MessageBox.Show(this, ex.Message, "Не удалось удалить объект", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        // Python: tree.setCurrentItem(None); refresh(None) — пустой список и главная страница.
-        _syncingNavigation = true;
-        try { if (NavigationTree.SelectedItem is TreeViewItem selected) selected.IsSelected = false; }
-        finally { _syncingNavigation = false; }
-        _selectedObject = null;
-        ReloadNavigationData();
-        RefreshNavigation();
-        ShowEmptyPage();
-    }
-
-    /// <summary>Удалить документ: вопросы и копия в корзину — kp_editor.delete_contract эталона.</summary>
-    private void DeleteSqlServerContractFlow(DocRow doc, string? expectedRevision = null)
-    {
-        if (!SqlWritesEnabled)
-        {
-            StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
-            return;
-        }
-        if (doc.IsStage || doc.StageRest)
-        {
-            StatusText.Text = "Удаление этапов выполняется в режиме распределения этапов.";
-            return;
-        }
-        if (_objects.FirstOrDefault(row => row.Id == doc.ObjectId) is not { } parent ||
-            CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc)) return;
-        SqlServerWorkspace.ContractDeleteInfo info;
-        var confirmedRevision = captured.Revision;
-        try
-        {
-            if (!DocumentMatchesServer(doc, confirmedRevision) ||
-                (expectedRevision is not null && confirmedRevision != expectedRevision))
-                throw new InvalidOperationException("Документ изменился. Обновите список.");
-            info = SqlServerWorkspace.DescribeContractForDelete(_serverConn!, null, doc.Id);
-            if (string.IsNullOrWhiteSpace(confirmedRevision) ||
-                confirmedRevision != SqlServerDatabase.Revision(_serverConn!))
-                throw new InvalidOperationException("Данные изменились во время проверки. Повторите операцию после обновления.");
-        }
-        catch (Exception ex)
-        {
-            LogError(ex);
-            MessageBox.Show(this, ex.Message, "Не удалось открыть документ", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        var question = $"Удалить «{info.Title}» из объекта «{info.ObjectName}»?\n" +
-            "Все системы и позиции документа будут удалены.";
-        if (MessageBox.Show(this, question, "Удаление", MessageBoxButton.YesNo,
-                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        if (info.Details.Count > 0 &&
-            new ConfirmDeleteDialog(info.Title, info.Details, "документ") { Owner = this }.ShowDialog() != true) return;
-        if (!ObjectMutationCurrent(parent, captured) || !DocumentLocallyCurrent(doc) ||
-            !CanStartDocumentMutation(doc)) return;
-        try
-        {
-            SqlServerWorkspace.DeleteContract(
-                captured.Connection, doc.Id, confirmedRevision);
-        }
-        catch (Exception ex)
-        {
-            LogError(ex);
-            MessageBox.Show(this, ex.Message, "Не удалось удалить документ", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        // Python: structure_changed.emit(("obj", oid)) — страница объекта без удалённого документа.
-        ReloadAndSelect(doc.ObjectId);
-        StatusText.Text = $"Документ удалён: «{info.Title}». Копия хранится 30 дней в корзине";
     }
 
     // ---------------------------------------------------------------- переименование на месте
@@ -1228,7 +1120,8 @@ public partial class MainWindow : Window
             if (selected.Archived)
                 AddObjectCommand("Изменить год в архиве…", ChangeSqlServerObjectArchiveYear, "History");
             menu.Items.Add(new Separator());
-            AddObjectCommand("Удалить карточку и все документы…", DeleteSqlServerObjectFlow, "Trash", danger: true);
+            AddObjectCommand("Удалить карточку и все документы…", DeleteSqlServerObjectFlow, "Trash",
+                !selected.Archived && !_workspaceDeletionBusy && !_workspaceDeletionUncertain, danger: true);
         }
         else if (target is { Tag: DocRow doc })
         {
@@ -1329,7 +1222,8 @@ public partial class MainWindow : Window
             menu.Items.Add(new Separator());
             var delete = ContextMenuIcons.Create(
                 doc.Kind switch { "main" => "Удалить приложение…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
-                "Trash", SqlWritesEnabled && !doc.IsStage && !doc.StageRest, danger: true);
+                "Trash", SqlWritesEnabled && !doc.Locked && !doc.IsStage && !doc.StageRest &&
+                    parent?.Archived == false && !_workspaceDeletionBusy && !_workspaceDeletionUncertain, danger: true);
             delete.Click += (_, _) => RunDocumentWrite(() => DeleteSqlServerContractFlow(doc));
             menu.Items.Add(delete);
         }

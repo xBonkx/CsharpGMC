@@ -1,3 +1,4 @@
+using System.Data;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
@@ -77,7 +78,18 @@ internal static class AgreementAcceptance
         }
         var original=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)trashObject));
         var previousTrash=SqlServerTrash.List(connection).Select(t=>t.Id).ToHashSet();
-        SqlServerWorkspace.DeleteObject(connection,trashObject,Revision());
+        var deleteRevision=Revision();
+        var deletePreview=SqlServerWorkspace.PrepareObjectDelete(connection,trashObject,deleteRevision);
+        if(deletePreview.DocumentIds.Count!=0 || Revision()!=deleteRevision ||
+            SqlServerTrash.List(connection).Any(t=>!previousTrash.Contains(t.Id)))
+            throw new Exception("Delete preview changed data or unexpectedly found documents.");
+        var wrongScopeRejected=false;
+        try { SqlServerWorkspace.DeleteObject(connection,trashObject,deleteRevision,new long[]{long.MaxValue}); }
+        catch(DBConcurrencyException) { wrongScopeRejected=true; }
+        if(!wrongScopeRejected||Revision()!=deleteRevision||
+            SqlServerTrash.List(connection).Any(t=>!previousTrash.Contains(t.Id)))
+            throw new Exception("Unconfirmed delete scope modified data.");
+        SqlServerWorkspace.DeleteObject(connection,trashObject,deleteRevision,deletePreview.DocumentIds);
         var trash=SqlServerTrash.List(connection).Single(t=>!previousTrash.Contains(t.Id)&&t.Title==original.Properties.Name);
         var trashRevision=Revision();
         var forgetRejected=false;

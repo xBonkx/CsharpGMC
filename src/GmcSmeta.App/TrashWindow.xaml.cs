@@ -16,6 +16,7 @@ namespace GmcSmeta.App;
 public partial class TrashWindow : Window
 {
     private readonly string _connectionString;
+    private readonly bool _canWrite;
     private string _revision = "";
     private bool _commitUncertain;
     private bool _mutationBusy;
@@ -27,6 +28,8 @@ public partial class TrashWindow : Window
     public TrashWindow(string connectionString)
     {
         _connectionString = connectionString;
+        var builder = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connectionString);
+        _canWrite = SqlSchemaCompatibility.IsWritablePilot(builder.InitialCatalog, builder.DataSource);
         InitializeComponent();
         RestoreButton.IsEnabled = ForgetButton.IsEnabled = false;
         EmptyText.Text = "Загрузка корзины…";
@@ -65,7 +68,7 @@ public partial class TrashWindow : Window
             EmptyText.Text = "Корзина пуста — ничего не удаляли.";
             EmptyText.Visibility = hasData ? Visibility.Collapsed : Visibility.Visible;
             if (hasData) TrashGrid.SelectedIndex = 0;
-            if (!_commitUncertain)
+            if (!_commitUncertain && _canWrite)
             {
                 _revision = snapshot.Revision;
                 RestoreButton.IsEnabled = ForgetButton.IsEnabled = hasData;
@@ -117,7 +120,10 @@ public partial class TrashWindow : Window
 
     private async Task RestoreAsync()
     {
-        if (_mutationBusy || _commitUncertain || string.IsNullOrWhiteSpace(_revision) || CurrentId() is not long id) return;
+        if (!_canWrite || !IsLoaded || _loadCancellation is not null || _mutationBusy || _commitUncertain ||
+            string.IsNullOrWhiteSpace(_revision) || TrashGrid.SelectedItems.Count != 1 ||
+            TrashGrid.SelectedItem is not Row row) return;
+        var id = row.Id;
         var revision = _revision;
         BeginMutation();
         try
@@ -141,13 +147,16 @@ public partial class TrashWindow : Window
 
     private async Task ForgetAsync()
     {
-        if (_mutationBusy || _commitUncertain || string.IsNullOrWhiteSpace(_revision) ||
+        if (!_canWrite || !IsLoaded || _loadCancellation is not null || _mutationBusy || _commitUncertain ||
+            string.IsNullOrWhiteSpace(_revision) || TrashGrid.SelectedItems.Count != 1 ||
             TrashGrid.SelectedItem is not Row row) return;
         var id = row.Id;
         var revision = _revision;
         if (MessageBox.Show(this, $"Удалить навсегда «{row.Title}»? Вернуть будет уже нельзя.",
-                "Удалить навсегда", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        if (_mutationBusy || _revision != revision || CurrentId() != id || _commitUncertain) return;
+                "Удалить навсегда", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (!_canWrite || !IsLoaded || _loadCancellation is not null || _mutationBusy ||
+            _revision != revision || TrashGrid.SelectedItems.Count != 1 ||
+            !ReferenceEquals(TrashGrid.SelectedItem, row) || _commitUncertain) return;
         BeginMutation();
         try
         {

@@ -24,7 +24,16 @@ public static partial class SqlServerTrash
     {
         var name = ScalarText(conn, tx,
             "SELECT name FROM dbo.objects WHERE id=@id", objectId) ?? "";
+        var dump = BuildObjectDump(conn, tx, objectId);
+        return Store(conn, tx, "object", name, name, dump);
+    }
 
+    internal static void ValidateObjectDeletion(SqlConnection conn, SqlTransaction tx, long objectId) =>
+        _ = BuildObjectDump(conn, tx, objectId);
+
+    private static Dictionary<string, object?> BuildObjectDump(SqlConnection conn, SqlTransaction tx, long objectId)
+    {
+        SqlServerWorkspace.RequireDeletionScope(conn, tx, objectId, wholeObject: true);
         var contractIds = IdList(conn, tx,
             "SELECT id FROM dbo.contracts WHERE object_id=@id ORDER BY [order],id", objectId);
         var dump = DumpContracts(conn, tx, contractIds);
@@ -53,11 +62,12 @@ public static partial class SqlServerTrash
         // Fail closed BEFORE the caller deletes rows in its transaction: only a
         // lossless, independently restorable open snapshot may enter the trash.
         TrashRestoreSafety.ValidateSnapshot(JsonSerializer.SerializeToElement(dump, JsonOptions), "object");
-        return Store(conn, tx, "object", name, name, dump);
+        return dump;
     }
 
     /// <summary>Полная копия документа перед удалением (trash.keep_contract). Возвращает id записи корзины.</summary>
-    public static long KeepContract(SqlConnection conn, SqlTransaction tx, long contractId, bool allowStage = false)
+    public static long KeepContract(SqlConnection conn, SqlTransaction tx, long contractId, bool allowStage = false,
+        long? expectedObjectId = null)
     {
         string title, objectName;
         using (var cmd = new SqlCommand(
@@ -72,11 +82,22 @@ public static partial class SqlServerTrash
             objectName = Text(4);
         }
 
+        var dump = BuildContractDump(conn, tx, contractId, allowStage, expectedObjectId);
+        return Store(conn, tx, "contract", title, objectName, dump);
+    }
+
+    internal static void ValidateContractDeletion(SqlConnection conn, SqlTransaction tx, long contractId, long objectId) =>
+        _ = BuildContractDump(conn, tx, contractId, allowStage: false, expectedObjectId: objectId);
+
+    private static Dictionary<string, object?> BuildContractDump(SqlConnection conn, SqlTransaction tx,
+        long contractId, bool allowStage, long? expectedObjectId)
+    {
+        if (!allowStage) SqlServerWorkspace.RequireDeletionScope(conn, tx, contractId, wholeObject: false,
+            expectedObjectId: expectedObjectId);
         var dump = DumpContracts(conn, tx, new List<long> { contractId });
-        // KeepContract is called before SqlServerWorkspace deletes acts/movements.
         // Do not allow irreversible loss that the current restore cannot recover.
         TrashRestoreSafety.ValidateSnapshot(JsonSerializer.SerializeToElement(dump, JsonOptions), "contract", allowStage);
-        return Store(conn, tx, "contract", title, objectName, dump);
+        return dump;
     }
 
     /// <summary>Дата, когда запись корзины будет удалена (trash.days_left).</summary>

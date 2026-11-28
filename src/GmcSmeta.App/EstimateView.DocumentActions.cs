@@ -103,7 +103,7 @@ public partial class EstimateView
         Add("Пересортировать строки КП (запись)…", Sort_Click, "Sort",
             () => ordinary && Write(false) && primary is EditableEstimateRow && SelectionCurrent());
         menu.Items.Add(new Separator());
-        Add("Удалить документ…", DeleteContract_Click, "Trash", () => ordinary && Write(true), danger: true);
+        Add("Удалить документ…", DeleteContract_Click, "Trash", () => ordinary && Write(false), danger: true);
 
         _documentActionsMenu = menu;
         menu.Closed += (_, _) =>

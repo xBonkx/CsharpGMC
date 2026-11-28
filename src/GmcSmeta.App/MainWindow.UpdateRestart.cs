@@ -9,6 +9,7 @@ public partial class MainWindow
     // operation or blocked save must postpone an automatic restart.
     internal bool CanRestartForUpdate =>
         _ready && !_startupClosed && !_startupInProgress && IsEnabled &&
+        !_workspaceDeletionBusy && !_workspaceDeletionUncertain &&
         ObjectRenameBox.Visibility != Visibility.Visible &&
         (_peopleWorkspace is null || _peopleWorkspace.CanRestart) &&
         _estimateCacheValidation is null &&

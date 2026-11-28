@@ -107,4 +107,92 @@ public static partial class SqlServerWorkspace
         return new(name, details);
     }
 
+
+    public sealed record ObjectDeletePreview(ObjectDeleteInfo Info, IReadOnlyList<long> DocumentIds);
+
+    // Read-only preflight uses exactly the same snapshot policy as the writer.
+    // The short transaction is disposed without any INSERT/UPDATE/DELETE.
+    public static ObjectDeletePreview PrepareObjectDelete(string connection, long id, string revision)
+    {
+        RequirePilotDatabase(connection);
+        using var conn = SqlServerDatabase.Open(connection);
+        using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
+        CheckRevision(conn, tx, revision);
+        SqlServerTrash.ValidateObjectDeletion(conn, tx, id);
+        return new(DescribeObjectForDelete(conn, tx, id), ReadDeletionDocumentIds(conn, tx, id));
+    }
+
+    public static ContractDeleteInfo PrepareContractDelete(string connection, long id, long objectId, string revision)
+    {
+        RequirePilotDatabase(connection);
+        using var conn = SqlServerDatabase.Open(connection);
+        using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
+        CheckRevision(conn, tx, revision);
+        SqlServerTrash.ValidateContractDeletion(conn, tx, id, objectId);
+        return DescribeContractForDelete(conn, tx, id);
+    }
+
+    internal static long[] ReadDeletionDocumentIds(SqlConnection conn, SqlTransaction tx, long objectId)
+    {
+        using var cmd = new SqlCommand("SELECT id FROM dbo.contracts WHERE object_id=@id ORDER BY id", conn, tx);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
+        using var reader = cmd.ExecuteReader();
+        var ids = new List<long>();
+        while (reader.Read()) ids.Add(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture));
+        return ids.ToArray();
+    }
+
+    internal static void RequireDeletionScope(SqlConnection conn, SqlTransaction tx, long id,
+        bool wholeObject, long? expectedObjectId = null)
+    {
+        var root = wholeObject
+            ? "SELECT COUNT_BIG(*) FROM dbo.objects WHERE id=@id AND archived=0"
+            : "SELECT COUNT_BIG(*) FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
+              "WHERE c.id=@id AND o.archived=0 AND c.locked=0 AND c.stage_of IS NULL AND ISNULL(c.stage_rest,0)=0 " +
+              "AND (@object IS NULL OR c.object_id=@object)";
+        using (var cmd = new SqlCommand(root, conn, tx))
+        {
+            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            if (!wholeObject) cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = (object?)expectedObjectId ?? DBNull.Value;
+            if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                throw new InvalidOperationException("Карточка архивная, документ заблокирован, является этапом или не принадлежит выбранной карточке.");
+        }
+
+        // These inbound references are not part of a standalone trash snapshot.
+        // Reject them even if a future SQL FK uses SET NULL or CASCADE.
+        var contracts = wholeObject ? "SELECT id FROM dbo.contracts WHERE object_id=@id" : "SELECT id FROM dbo.contracts WHERE id=@id";
+        var systems = $"SELECT id FROM dbo.systems WHERE contract_id IN ({contracts})";
+        var positions = $"SELECT id FROM dbo.positions WHERE system_id IN ({systems})";
+        var checks = new[]
+        {
+            $"SELECT 1 FROM dbo.contracts WHERE id NOT IN ({contracts}) AND (stage_of IN ({contracts}) OR base_contract_id IN ({contracts}))",
+            $"SELECT 1 FROM dbo.systems WHERE id NOT IN ({systems}) AND (parent_id IN ({systems}) OR stage_sys_src IN ({systems}))",
+            $"SELECT 1 FROM dbo.positions WHERE id NOT IN ({positions}) AND (parent_id IN ({positions}) OR stage_src IN ({positions}))",
+            $"SELECT 1 FROM dbo.act_lines al JOIN dbo.acts a ON a.id=al.act_id WHERE a.contract_id NOT IN ({contracts}) AND al.position_id IN ({positions})"
+        };
+        foreach (var check in checks)
+        {
+            using var cmd = new SqlCommand("SELECT CASE WHEN EXISTS(" + check + ") THEN 1 ELSE 0 END", conn, tx);
+            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            if (Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+                throw new InvalidOperationException("Есть ссылки из других документов. Удаление без потери связей невозможно.");
+        }
+    }
+
+    private static void RequireSingleDeletion(SqlConnection conn, SqlTransaction tx, string table, long id)
+    {
+        if (table is not ("objects" or "contracts")) throw new ArgumentException(nameof(table));
+        using var cmd = new SqlCommand($"DELETE dbo.[{table}] WHERE id=@id", conn, tx);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        if (cmd.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Удаляемая запись изменилась.");
+    }
+
+    private static void CommitDeletion(SqlTransaction tx)
+    {
+        try { tx.Commit(); }
+        catch (Exception ex) when (ex is SqlException or InvalidOperationException or TimeoutException)
+        {
+            throw new TrashCommitUnknownException(ex);
+        }
+    }
 }
