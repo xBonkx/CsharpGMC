@@ -20,7 +20,8 @@ public sealed class ScopedExportSourceTests
         Assert.DoesNotContain("TagRules.Load(conn)", source);
         Assert.Contains("requisites.RawSmrPercent", source);
         Assert.Contains("estimate.PrintManualNumbering", source);
-        Assert.Contains("LoadKpPrintData(connectionString, doc.Id)", source);
+        Assert.Contains("LoadKpPrintData(connectionString, expected.Id, expectedRevision)", source);
+        Assert.Contains("LoadKpPrintData(connectionString, doc, expectedRevision)", source);
         Assert.Contains("if (_kpExportInProgress ||", source);
         Assert.Contains("finally { _kpExportInProgress = false; }", source);
     }

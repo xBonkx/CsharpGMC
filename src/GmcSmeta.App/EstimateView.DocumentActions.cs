@@ -27,7 +27,8 @@ public partial class EstimateView
         bool Current() => !_detached && IsLoaded && IsEnabled &&
             ReferenceEquals(snapshot, _estimate) && revision == _serverRevision &&
             main.IsCurrentEstimatePage(_contractId, _objectId, this);
-        bool Settled() => Current() && CanTransferDocument && !_serverConflict;
+        bool Settled() => Current() && CanTransferDocument && !_serverConflict &&
+            !string.IsNullOrWhiteSpace(revision) && revision == _publishedEstimateRevision;
         bool Write(bool allowLocked) => Current() && CanChangeHeader(snapshot, revision, allowLocked);
         bool SelectionCurrent() => ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
             EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()

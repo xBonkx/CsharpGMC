@@ -271,6 +271,19 @@ public partial class MainWindow
                 _docs.FirstOrDefault(d => d.Id == _openDocumentId) is { } doc &&
                 _objects.Any(o => o.Id == doc.ObjectId))
             {
+                if (!estimate.MatchesDocumentIdentity(doc))
+                {
+                    if (!estimate.CanTransferDocument)
+                    {
+                        StatusText.Text = "Документ изменился. Дождитесь сверки и повторите F5.";
+                        return;
+                    }
+                    _estimateCache.Remove(doc.Id);
+                    _estimateCacheOrder.Remove(doc.Id);
+                    _openDocumentId = null;
+                    OpenEstimate(doc.Id);
+                    return;
+                }
                 if (changed) SynchronizeNavigation(doc, rebuildTree: true);
                 estimate.RequestRefresh();
                 StatusText.Text = $"{doc.Title}  ·  список объектов и документов обновлён";

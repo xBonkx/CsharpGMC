@@ -347,8 +347,15 @@ public partial class MainWindow
                 _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
                 CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc) ||
                 !DocumentMatchesServer(doc, captured.Revision)) return;
-            var dialog = new RateTransferDialog(captured.Connection, doc.Id, doc.Title) { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.ResultData is not { } result) return;
+            var dialog = new RateTransferDialog(captured.Connection, doc.Id, doc.Title, captured.Revision,
+                () => ObjectMutationCurrent(parent, captured) && DocumentLocallyCurrent(doc) &&
+                    CanStartDocumentMutation(doc)) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.ResultData is not { } result)
+            {
+                if (dialog.WriteAttempted && _estimateCache.TryGetValue(doc.Id, out var cached))
+                    cached.RequestRefresh();
+                return;
+            }
 
             ReloadAndSelect(doc.ObjectId);
             OpenEstimate(doc.Id);

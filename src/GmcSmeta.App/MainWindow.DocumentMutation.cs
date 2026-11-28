@@ -42,6 +42,23 @@ public partial class MainWindow
         ReferenceEquals(PageHost.Content, page) &&
         _docs.Any(d => d.Id == documentId && d.ObjectId == objectId);
 
+    internal void PublishEstimateMetadata(EstimateView page, DocRow metadata)
+    {
+        if (!IsCurrentEstimatePage(metadata.Id, metadata.ObjectId, page)) return;
+        var index = _docs.FindIndex(row => row.Id == metadata.Id);
+        if (index < 0 || !_objects.Any(o => o.Id == metadata.ObjectId)) return;
+        var previous = _docs[index];
+        if (Equals(DocumentMetadata(previous), DocumentMetadata(metadata))) return;
+        var updated = metadata with
+        {
+            Materials = previous.Materials, Smr = previous.Smr,
+            Total = previous.Total, Positions = previous.Positions
+        };
+        ++_navigationDataGeneration;
+        _docs[index] = updated;
+        SynchronizeNavigation(updated, rebuildTree: true);
+    }
+
     internal bool CanEditEstimateHeader(int documentId, int objectId) =>
         SqlWritesEnabled && !_startupClosed && _openDocumentId == documentId &&
         _objects.Any(o => o.Id == objectId && !o.Archived) &&

@@ -37,6 +37,9 @@ public partial class RateTransferDialog : Window
 {
     private readonly int _targetId;
     private readonly string _connectionString;
+    private readonly string _expectedRevision;
+    private readonly Func<bool> _canApply;
+    public bool WriteAttempted { get; private set; }
     private readonly List<(int Id, int ObjectId, string Title)> _docs = new();
     private TransferData? _data;
     private List<TransferRow> _rows = new();
@@ -49,10 +52,13 @@ public partial class RateTransferDialog : Window
     /// <summary>Итог переноса: перенесённых цен, позиций, СМР работ после переноса.</summary>
     public (int Prices, int Positions, double WorkTotal)? ResultData { get; private set; }
 
-    public RateTransferDialog(string connectionString, int targetId, string targetTitle)
+    public RateTransferDialog(string connectionString, int targetId, string targetTitle,
+        string expectedRevision, Func<bool> canApply)
     {
         _connectionString = connectionString;
         _targetId = targetId;
+        _expectedRevision = expectedRevision;
+        _canApply = canApply;
         InitializeComponent();
         TargetText.Text = "В: " + targetTitle;
         LoadDocs();
@@ -159,6 +165,8 @@ public partial class RateTransferDialog : Window
         {
             using var conn = SqlServerDatabase.Open(_connectionString);
             var revision = SqlServerDatabase.Revision(conn);
+            if (string.IsNullOrWhiteSpace(revision) || revision != _expectedRevision || !_canApply())
+                throw new InvalidOperationException("Документ изменился. Закройте диалог и обновите смету.");
             var data = SqlServerRateTransfer.ReadTransfer(_connectionString, sourceId.Value, _targetId,
                 MaterialsCheck.IsChecked == true);
             if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
@@ -331,8 +339,15 @@ public partial class RateTransferDialog : Window
                 "Подтвердить замену цен", MessageBoxButton.YesNo, MessageBoxImage.Question,
                 MessageBoxResult.No) != MessageBoxResult.Yes) return;
         if (!ReferenceEquals(_data, data) || _revision != revision) return;
+        if (revision != _expectedRevision || !_canApply())
+        {
+            Invalidate();
+            InfoText.Text = "Документ изменился. Закройте диалог и обновите смету.";
+            return;
+        }
         try
         {
+            WriteAttempted = true;
             var result = SqlServerRateTransfer.ApplyTransfer(_connectionString, data, _fields,
                 OverwriteCheck.IsChecked == true, _manual, _excluded, _allowZero, revision);
             ResultData = result;
@@ -343,6 +358,7 @@ public partial class RateTransferDialog : Window
             MessageBox.Show(this, "Перенос не подтверждён: " + error.Message +
                 "\nПроверьте смету перед повтором.", "Перенос расценок",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
+            DialogResult = false;
             return;
         }
         DialogResult = true;

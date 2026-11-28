@@ -58,4 +58,39 @@ public sealed class EstimateHeaderMutationSourceTests
         Assert.Contains("SaveHeaderMutationAsync(snapshot, revision, false, () =>", code);
         Assert.Contains("CanChangeHeader(snapshot, _serverRevision, false)", code);
     }
+
+    [Fact]
+    public void MetadataAndEstimateAreReconciledAtTheSameRevision()
+    {
+        var view = Source("GmcSmeta.App", "EstimateView.xaml.cs");
+        Assert.Contains("Workspace.ReadDocumentMetadata(read, _contractId)", view);
+        Assert.Contains("Metadata: (DocRow?)metadata", view);
+        Assert.Contains("if (!identityChanged) _doc = metadata;", view);
+        Assert.Contains("if (identityChanged) IsEnabled = false;", view);
+        Assert.Contains("main.PublishEstimateMetadata(this, metadata);", view);
+        var main = Source("GmcSmeta.App", "MainWindow.DocumentMutation.cs");
+        Assert.Contains("Materials = previous.Materials", main);
+        Assert.Contains("++_navigationDataGeneration;", main);
+        Assert.Contains("SynchronizeNavigation(updated, rebuildTree: true);", main);
+        Assert.Contains("cached.MatchesDocumentMetadata(doc) && cached.CanReuseCacheRevision(revision)",
+            Source("GmcSmeta.App", "MainWindow.xaml.cs"));
+        Assert.Contains("if (!estimate.MatchesDocumentIdentity(doc))",
+            Source("GmcSmeta.App", "MainWindow.Navigation.cs"));
+    }
+
+    [Fact]
+    public void TransferAndExportKeepTheRevisionThatOpenedTheCommand()
+    {
+        var header = Source("GmcSmeta.App", "EstimateView.Header.cs");
+        Assert.Contains("revision, () => CanChangeHeader(snapshot, revision, false)", header);
+        Assert.Contains("if (!dialog.WriteAttempted) return;", header);
+        Assert.Contains("pdf: pdf, expectedRevision: revision", header);
+        var dialog = Source("GmcSmeta.App", "RateTransferDialog.xaml.cs");
+        Assert.Contains("revision != _expectedRevision || !_canApply()", dialog);
+        Assert.Contains("WriteAttempted = true;", dialog);
+        Assert.Contains("DialogResult = false;", dialog);
+        var export = Source("GmcSmeta.App", "MainWindow.ContractExport.cs");
+        Assert.Contains("startRevision != expectedRevision", export);
+        Assert.Contains("LoadKpPrintData(connectionString, doc, expectedRevision)", export);
+    }
 }

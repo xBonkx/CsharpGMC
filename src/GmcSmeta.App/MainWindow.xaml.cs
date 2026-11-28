@@ -1469,7 +1469,7 @@ public partial class MainWindow : Window
                     if (cached.CacheReadOrWriteInProgress || cached.HasUnsettledCacheWrites)
                         continue;
                     StartupTrace.Mark("estimate_cache_validation_end");
-                    if (cached.CanReuseCacheRevision(revision))
+                    if (cached.MatchesDocumentMetadata(doc) && cached.CanReuseCacheRevision(revision))
                     {
                         _estimateCacheOrder.Remove(contractId);
                         _estimateCacheOrder.AddFirst(contractId);

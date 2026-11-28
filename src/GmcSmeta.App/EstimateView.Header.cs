@@ -162,28 +162,44 @@ public partial class EstimateView
     // ---------------------------------------------------------------- Скопировать расценки (btn_transfer_rates)
     private void TransferRates_Click(object sender, RoutedEventArgs e)
     {
-        if (_estimate is not { } snapshot || !_isKp || _doc.IsStage ||
-            !CanChangeHeader(snapshot, _serverRevision, false)) return;
-        var dialog = new RateTransferDialog(_sqlConnectionString, _contractId, snapshot.Title)
+        if (_estimate is not { } snapshot || !_isKp || _doc.IsStage) return;
+        var revision = _publishedEstimateRevision;
+        if (!CanChangeHeader(snapshot, revision, false)) return;
+        var dialog = new RateTransferDialog(_sqlConnectionString, _contractId, snapshot.Title,
+            revision, () => CanChangeHeader(snapshot, revision, false))
         {
             Owner = Window.GetWindow(this)
         };
-        if (dialog.ShowDialog() != true) return;
+        var accepted = dialog.ShowDialog() == true;
+        if (!dialog.WriteAttempted) return;
         _serverConflict = true;
         _saveAwaitingReadback = true;
+        if (!accepted) _saveError = "Перенос расценок не подтверждён.";
+        AttachSaveCloseGuard();
         RequestRefresh();
     }
 
     // ---------------------------------------------------------------- Сохранить в Excel / PDF (btn_export)
     private void ExportExcelPdf_Click(object sender, RoutedEventArgs e)
     {
-        if (_doc is null) return;
+        if (_estimate is not { } snapshot || Window.GetWindow(this) is not MainWindow main) return;
+        var revision = _publishedEstimateRevision;
+        var document = _doc;
+        bool Current() => !_detached && IsLoaded && IsEnabled && !_serverConflict &&
+            CanTransferDocument && ReferenceEquals(snapshot, _estimate) && ReferenceEquals(document, _doc) &&
+            !string.IsNullOrWhiteSpace(revision) && revision == _serverRevision &&
+            revision == _publishedEstimateRevision && main.IsCurrentEstimatePage(_contractId, _objectId, this);
+        if (!Current()) return;
         var menu = new ContextMenu { PlacementTarget = sender as Button, Placement = PlacementMode.Bottom };
         void Item(string header, bool pdf, bool internalPrices = false, bool positional = false)
         {
-            var item = new MenuItem { Header = header };
-            item.Click += (_, _) => (Window.GetWindow(this) as MainWindow)?.ExportKpDocument(_doc,
-                internalPrices: internalPrices, positional: positional, pdf: pdf);
+            var item = new MenuItem { Header = header, IsEnabled = !positional || snapshot.SmrMode == "pos" };
+            item.Click += (_, _) =>
+            {
+                if (!Current()) { SetStatus("Смета изменилась. Откройте меню экспорта снова.", true); return; }
+                main.ExportKpDocument(document, internalPrices: internalPrices, positional: positional,
+                    pdf: pdf, expectedRevision: revision);
+            };
             menu.Items.Add(item);
         }
         Item("Excel — КП для заказчика", pdf: false);

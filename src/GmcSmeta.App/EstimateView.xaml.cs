@@ -59,13 +59,21 @@ public partial class EstimateView : UserControl
 
     internal bool CanReuseCacheRevision(string revision) => _estimate is not null && !_serverConflict &&
         !CacheReadOrWriteInProgress && !HasUnsettledCacheWrites &&
-        !string.IsNullOrEmpty(_serverRevision) && string.Equals(_serverRevision, revision, StringComparison.Ordinal);
+        !string.IsNullOrEmpty(_serverRevision) && _publishedEstimateRevision == _serverRevision &&
+        string.Equals(_serverRevision, revision, StringComparison.Ordinal);
     private bool _serverConflict;
     private readonly int _contractId;
     private readonly int _objectId;
     private readonly bool _isContract;
     private readonly bool _isKp;
-    private readonly DocRow _doc;
+    private DocRow _doc;
+    internal bool MatchesDocumentIdentity(DocRow row) =>
+        row.Id == _contractId && row.ObjectId == _objectId && row.Kind == _doc.Kind &&
+        row.StageOf == _doc.StageOf && row.StageRest == _doc.StageRest;
+    internal bool MatchesDocumentMetadata(DocRow row) =>
+        MatchesDocumentIdentity(row) && Equals(
+            _doc with { Materials = 0m, Smr = 0m, Total = 0m, Positions = 0 },
+            row with { Materials = 0m, Smr = 0m, Total = 0m, Positions = 0 });
     private readonly HashSet<int> _collapsedSectionIds = new();
     // Shared with other open estimate windows for this SQL contract.
     // The wrapper adds the lazy undo baseline while the lock is held.
@@ -816,11 +824,13 @@ public partial class EstimateView : UserControl
                             if (EstimateReloadGate.CanReusePublishedRevision(
                                 reusableRevision, localRevisionAtStart, before, needUndoCheckpoint))
                                 return (Estimate: (EstimateDocument?)null, Revision: before,
-                                    Undo: (UndoSnapshot?)null, SpecHead: (SpecRevisionHead?)null);
+                                    Undo: (UndoSnapshot?)null, SpecHead: (SpecRevisionHead?)null, Metadata: (DocRow?)null);
                             StartupTrace.Mark("estimate_read_begin");
                             var document = await EstimateReader.LoadSqlAsync(read, _contractId, token).ConfigureAwait(false);
                             StartupTrace.Mark("estimate_read_end");
                             token.ThrowIfCancellationRequested();
+                            var metadata = Workspace.ReadDocumentMetadata(read, _contractId)
+                                ?? throw new InvalidOperationException("Документ удалён. Обновите список.");
                             var specHead = SqlServerSpecUpdate.LatestRevision(read, null, _contractId);
                             token.ThrowIfCancellationRequested();
                             UndoSnapshot? checkpoint = null;
@@ -833,7 +843,7 @@ public partial class EstimateView : UserControl
                             var after = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
                             if (before == after)
                                 return (Estimate: (EstimateDocument?)document, Revision: after,
-                                    Undo: checkpoint, SpecHead: specHead);
+                                    Undo: checkpoint, SpecHead: specHead, Metadata: (DocRow?)metadata);
                         }
                         throw new InvalidOperationException(
                             "Смета изменилась во время чтения. Повтори обновление.");
@@ -879,8 +889,12 @@ public partial class EstimateView : UserControl
                     MainWindow.Undo?.Forget(_contractId);
                     Interlocked.Exchange(ref _undoCheckpointNeeded, 0);
                 }
+                var metadata = loaded.Metadata ?? throw new InvalidOperationException("Нет реквизитов документа.");
+                var identityChanged = !MatchesDocumentIdentity(metadata);
+                if (!identityChanged) _doc = metadata;
                 _serverRevision = loaded.Revision;
-                _serverConflict = false;
+                _serverConflict = identityChanged;
+                if (identityChanged) IsEnabled = false;
                 var firstLoad = _estimate is null;
                 _publishedEstimateRevision = "";
                 StartupTrace.Mark("estimate_publish_begin");
@@ -912,9 +926,16 @@ public partial class EstimateView : UserControl
                 _saveAwaitingReadback = false;
                 _saveError = null;
                 SelectPositionFromSearch();
-                _publishedEstimateRevision = loaded.Revision;
+                _publishedEstimateRevision = identityChanged ? "" : loaded.Revision;
+                if (identityChanged)
+                    SetStatus("Тип или принадлежность документа изменились. Нажмите F5 для повторного открытия.", true);
                 // The cache entry was initially added before its rows arrived.
-                if (Window.GetWindow(this) is MainWindow main) main.ScheduleEstimateCacheTrim();
+                if (Window.GetWindow(this) is MainWindow main)
+                {
+                    if (!identityChanged && !_detached)
+                        main.PublishEstimateMetadata(this, metadata);
+                    main.ScheduleEstimateCacheTrim();
+                }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {

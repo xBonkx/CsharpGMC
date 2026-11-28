@@ -15,12 +15,14 @@ public partial class MainWindow
 
     private bool _kpExportInProgress;
 
-    private static KpSnapshot LoadKpPrintData(string connectionString, int contractId)
+    private static KpSnapshot LoadKpPrintData(string connectionString, int contractId, string? expectedRevision)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
         var startRevision = SqlServerDatabase.Revision(conn);
         if (string.IsNullOrWhiteSpace(startRevision))
             throw new InvalidOperationException("Не удалось прочитать ревизию SQL Server.");
+        if (expectedRevision is not null && startRevision != expectedRevision)
+            throw new InvalidOperationException("Смета изменилась. Обновите документ перед экспортом.");
         var header = Workspace.ReadDocumentMetadata(conn, contractId)
             ?? throw new InvalidOperationException("Документ для экспорта не найден.");
         var estimate = EstimateReader.Load(conn, contractId);
@@ -70,9 +72,9 @@ public partial class MainWindow
         return new KpSnapshot(estimate, header, systemSmr, requisites, percent, manualNumbering);
     }
 
-    private static KpSnapshot LoadKpPrintData(string connectionString, DocRow expected)
+    private static KpSnapshot LoadKpPrintData(string connectionString, DocRow expected, string? expectedRevision)
     {
-        var snapshot = LoadKpPrintData(connectionString, expected.Id);
+        var snapshot = LoadKpPrintData(connectionString, expected.Id, expectedRevision);
         if (!Equals(DocumentMetadata(expected), DocumentMetadata(snapshot.Header)))
             throw new InvalidOperationException("Реквизиты документа изменились. Обновите список перед экспортом.");
         return snapshot;
@@ -80,11 +82,11 @@ public partial class MainWindow
 
     /// <summary>Экспорт КП из редактора сметы (btn_export: «Сохранить в Excel / PDF»).</summary>
     internal void ExportKpDocument(DocRow doc, bool internalPrices = false,
-        bool positional = false, bool pdf = false, bool vatLine = false) =>
-        ExportKpDocumentCore(doc, internalPrices, positional, pdf, vatLine);
+        bool positional = false, bool pdf = false, bool vatLine = false, string? expectedRevision = null) =>
+        ExportKpDocumentCore(doc, internalPrices, positional, pdf, vatLine, expectedRevision);
 
     private async void ExportKpDocumentCore(DocRow doc, bool internalPrices = false,
-        bool positional = false, bool pdf = false, bool vatLine = false)
+        bool positional = false, bool pdf = false, bool vatLine = false, string? expectedRevision = null)
     {
         if (_kpExportInProgress || _sqlConnectionString is not { } connectionString) return;
         if (!CanStartDocumentMutation(doc) || !DocumentLocallyCurrent(doc))
@@ -112,7 +114,7 @@ public partial class MainWindow
             {
                 await ContractDocumentSave.PdfAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(connectionString, doc);
+                    var snapshot = LoadKpPrintData(connectionString, doc, expectedRevision);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
@@ -126,7 +128,7 @@ public partial class MainWindow
             {
                 await ContractDocumentSave.XlsxAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(connectionString, doc);
+                    var snapshot = LoadKpPrintData(connectionString, doc, expectedRevision);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
