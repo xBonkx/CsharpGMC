@@ -153,6 +153,8 @@ public partial class EstimateView : UserControl
         {
             _detached = true;
             _summaryExcelCancellation?.Cancel();
+            _reloadAfterAttach |= _inlineStagesLoading;
+            _inlineStagesReadCancellation?.Cancel();
             _estimateSearchTimer.Stop();
             if (!HasUnsettledCacheWrites)
             {

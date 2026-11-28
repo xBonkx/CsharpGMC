@@ -21,12 +21,16 @@ public partial class EstimateView
         new SqlConnectionStringBuilder(_sqlConnectionString).InitialCatalog
             .StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase);
 
-    private IReadOnlyList<long> SelectedStageSourceIds()
-    {
-        if (_inlineStagesData is not { } data || EstimateGrid is null)
-            return Array.Empty<long>();
+    private InlineStagesSnapshot? _selectionButtonsSnapshot;
 
+    private IReadOnlyList<long> SelectedStageSourceIds() =>
+        SelectedStageSourceSet().OrderBy(id => id).ToArray();
+
+    private HashSet<long> SelectedStageSourceSet()
+    {
         var ids = new HashSet<long>();
+        if (_inlineStagesData is not { } data || EstimateGrid is null)
+            return ids;
         foreach (var row in EstimateGrid.SelectedItems.OfType<EditableEstimateRow>())
         {
             if (row.IsTypeHeader) continue; // type headings are not positions
@@ -40,8 +44,7 @@ public partial class EstimateView
             {
                 // Python picked(): selecting a system means all its real
                 // top-level positions (not virtual headings or child rows).
-                foreach (var p in data.Rows.Values)
-                    if (p.SystemId == row.Source.SystemId) ids.Add(p.SrcId);
+                ids.UnionWith(data.SourcesBySystem[row.Source.SystemId]);
             }
             else if (row.IsSub && row.Source.ParentPositionId is int parent)
             {
@@ -52,7 +55,7 @@ public partial class EstimateView
                 ids.Add(row.Id);
             }
         }
-        return ids.OrderBy(id => id).ToArray();
+        return ids;
     }
 
     private void InlineStagesGrid_SelectionChanged(object sender,
@@ -67,15 +70,15 @@ public partial class EstimateView
         RefreshInlineStageCommandButtons();
         if (InlineStagesSelectionButtons is null || InlineStagesSelectionInfo is null)
             return;
-        InlineStagesSelectionButtons.Children.Clear();
         var data = _inlineStagesData;
         if (!_inlineStagesOn || data is null)
         {
+            ClearInlineSelectionButtons();
             InlineStagesSelectionInfo.Text = "";
             return;
         }
 
-        var ids = SelectedStageSourceIds();
+        var ids = SelectedStageSourceSet();
         var editable = BulkStageAllowed;
         InlineStagesSelectionInfo.Text = !new SqlConnectionStringBuilder(_sqlConnectionString)
             .InitialCatalog.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase)
@@ -85,7 +88,21 @@ public partial class EstimateView
 
         // No inactive button wall before selection; signed stages remain
         // visible in the cards and grid but are not allocation targets.
-        if (ids.Count == 0) return;
+        if (ids.Count == 0)
+        {
+            ClearInlineSelectionButtons();
+            return;
+        }
+        // Buttons capture only a stage ID; the command resolves current selection
+        // and checks the current authoritative snapshot again on every click.
+        if (ReferenceEquals(_selectionButtonsSnapshot, data))
+        {
+            foreach (var child in InlineStagesSelectionButtons.Children.OfType<Button>())
+                child.IsEnabled = editable;
+            return;
+        }
+        ClearInlineSelectionButtons();
+        _selectionButtonsSnapshot = data;
         for (var i = 0; i < data.Stages.Count; i++)
         {
             var stage = data.Stages[i];
@@ -121,6 +138,12 @@ public partial class EstimateView
         remove.Click += async (_, _) => await RunSelectedStageBatchAsync(
             StageBatchPlanner.Action.ReturnSelected, null);
         InlineStagesSelectionButtons.Children.Add(remove);
+    }
+
+    private void ClearInlineSelectionButtons()
+    {
+        _selectionButtonsSnapshot = null;
+        InlineStagesSelectionButtons.Children.Clear();
     }
 
     private async Task RunSelectedStageBatchAsync(StageBatchPlanner.Action action,

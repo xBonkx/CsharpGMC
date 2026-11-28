@@ -103,7 +103,7 @@ public sealed class StagesDialogLifecycleTests
         var zoom = Source("GmcSmeta.App/EstimateView.TemporaryView.cs");
         Assert.Contains("column.HeaderStyle = CreateInlineStageHeaderStyle(stageIndex", zoom);
         var batch = Source("GmcSmeta.App/EstimateView.InlineStages.Batch.cs");
-        Assert.Contains("if (ids.Count == 0) return;", batch);
+        Assert.Contains("if (ids.Count == 0)", batch);
         Assert.Contains("if (stage.Locked) continue;", batch);
         var xaml = Source("GmcSmeta.App/EstimateView.xaml");
         Assert.Contains("MaxHeight=\"144\"", xaml);
@@ -155,7 +155,7 @@ public sealed class StagesDialogLifecycleTests
     public void InlineTotalsAreLimitedToStagesAndRemainderWithinRevisionFence()
     {
         var code = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
-        Assert.Contains("Totals.ReadSelected(conn, stageIds)", code);
+        Assert.Contains("Totals.ReadSelected(conn, stageIds, token)", code);
         Assert.Contains("stageIds.Append(checked((int)rest.Id))", code);
         Assert.DoesNotContain("Totals.ReadAll(conn)", code);
         Assert.Contains("revisionBefore != SqlServerDatabase.Revision(conn)", code);
@@ -187,5 +187,34 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("var stageFormulas = new string[stages.Count];", sql);
         Assert.Contains("stageFormulas[i] = formulas[stages[i].Id].GetValueOrDefault(srcId, \"\");", sql);
         Assert.Contains("StageFormulas = stageFormulas", sql);
+    }
+
+    [Fact]
+    public void InlineStageReadCancelsSupersededWorkAndSerializesSqlPhases()
+    {
+        var code = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
+        Assert.Contains("_inlineStagesReadCancellation?.Cancel();", code);
+        Assert.Contains("await _inlineStagesReadGate.WaitAsync(token)", code);
+        Assert.Contains("finally { _inlineStagesReadGate.Release(); }", code);
+        Assert.Contains("token.IsCancellationRequested || version != _inlineStagesVersion", code);
+        Assert.Contains("ReferenceEquals(_inlineStagesReadCancellation, cancellation)", code);
+        Assert.Contains("var metrics = data.Metrics;", code);
+        var estimate = Source("GmcSmeta.App/EstimateView.xaml.cs");
+        Assert.Contains("_reloadAfterAttach |= _inlineStagesLoading;", estimate);
+        Assert.Contains("_inlineStagesReadCancellation?.Cancel();", estimate);
+    }
+
+    [Fact]
+    public void SelectionReusesIndexedSourcesAndButtonsButCommandsReadLiveSelection()
+    {
+        var code = Source("GmcSmeta.App/EstimateView.InlineStages.Batch.cs");
+        Assert.Contains("ids.UnionWith(data.SourcesBySystem[row.Source.SystemId]);", code);
+        Assert.DoesNotContain("foreach (var p in data.Rows.Values)", code);
+        Assert.Contains("SelectedStageSourceSet().OrderBy(id => id).ToArray()", code);
+        Assert.Contains("ReferenceEquals(_selectionButtonsSnapshot, data)", code);
+        Assert.Contains("child.IsEnabled = editable;", code);
+        Assert.Contains("var selected = SelectedStageSourceIds();", code);
+        Assert.Contains("!SelectedStageSourceIds().SequenceEqual(selected)", code);
+        Assert.Contains("_selectionButtonsSnapshot = null;", code);
     }
 }

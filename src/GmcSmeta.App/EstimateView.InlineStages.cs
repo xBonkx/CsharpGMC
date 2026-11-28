@@ -20,7 +20,8 @@ public partial class EstimateView
         List<SqlServerStages.StageInfo> Stages,
         Dictionary<int, SqlServerStages.StageTableRow> Rows,
         SqlServerStages.StageInfo? Rest,
-        Dictionary<long, decimal> DocumentTotals, string Revision);
+        Dictionary<long, decimal> DocumentTotals, string Revision,
+        ILookup<long, long> SourcesBySystem, StageAllocationPresentation.Metrics Metrics);
 
     private bool _inlineStagesOn;
     private bool _requestInlineStages;
@@ -28,6 +29,8 @@ public partial class EstimateView
     private bool _inlineStageCommandBusy;
     private bool _inlineStagesLoading;
     private int _inlineStagesVersion;
+    private CancellationTokenSource? _inlineStagesReadCancellation;
+    private readonly SemaphoreSlim _inlineStagesReadGate = new(1, 1);
     private InlineStagesSnapshot? _inlineStagesData;
     private string _inlineStagesFilter = StageAllocationPresentation.All;
     private readonly List<DataGridColumn> _inlineStageColumns = new();
@@ -103,6 +106,7 @@ public partial class EstimateView
         _revealInlineStageColumns = false;
         _inlineStagesLoading = false;
         _inlineStagesVersion++; // discard any read finishing after exit
+        _inlineStagesReadCancellation?.Cancel();
         _inlineStagesData = null;
         _inlineStagesFilter = StageAllocationPresentation.All;
         if (InlineStagesFilter is not null) InlineStagesFilter.SelectedIndex = 0;
@@ -114,6 +118,8 @@ public partial class EstimateView
         _hiddenInlineStageIds.Clear();
         _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
         _blankStageLabels = Array.Empty<string>();
+        RefreshInlineStagesSelectionButtons();
+        InlineStagesCards.Children.Clear();
         foreach (var row in _rows)
         {
             row.StageDisplay = Array.Empty<string>();
@@ -130,41 +136,59 @@ public partial class EstimateView
     {
         if (!_inlineStagesOn || _estimate is null || _detached) return false;
         var version = ++_inlineStagesVersion;
+        _inlineStagesReadCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _inlineStagesReadCancellation = cancellation;
+        var token = cancellation.Token;
         _inlineStagesLoading = true;
         _inlineStagesData = null; // No stale allocation may remain writable after a failed read.
-        RefreshInlineStageCommandButtons();
+        RefreshInlineStagesSelectionButtons();
         InlineStagesSummary.Text = "Читаю распределение из SQL Server…";
         try
         {
-            var data = await Task.Run(() =>
+            var data = await Task.Run(async () =>
             {
-                using var conn = SqlServerDatabase.Open(_sqlConnectionString);
-                var revisionBefore = SqlServerDatabase.Revision(conn);
-                var full = SqlServerStages.FullOf(conn, _contractId);
-                if (full != _contractId)
-                    throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
-                var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full);
+                await _inlineStagesReadGate.WaitAsync(token).ConfigureAwait(false);
+                try
+                {
+                    token.ThrowIfCancellationRequested();
+                    using var conn = SqlServerDatabase.Open(_sqlConnectionString);
+                    token.ThrowIfCancellationRequested();
+                    var revisionBefore = SqlServerDatabase.Revision(conn);
+                    var full = SqlServerStages.FullOf(conn, _contractId);
+                    if (full != _contractId)
+                        throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
+                    token.ThrowIfCancellationRequested();
+                    var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full);
+                    token.ThrowIfCancellationRequested();
 
-                // Scope the shared totals calculation to this KP's stage documents.
-                // The enclosing revision fence covers every bounded batch.
-                var stageIds = stages.Select(s => checked((int)s.Id));
-                if (rest is not null) stageIds = stageIds.Append(checked((int)rest.Id));
-                var allTotals = Totals.ReadSelected(conn, stageIds)
-                    .ToDictionary(t => (long)t.Id, t => t.Total);
-                var totals = new Dictionary<long, decimal>();
-                foreach (var stage in stages)
-                    totals[stage.Id] = allTotals.GetValueOrDefault(stage.Id);
-                if (rest is not null)
-                    totals[rest.Id] = allTotals.GetValueOrDefault(rest.Id);
+                    // Scope the shared totals calculation to this KP's stage documents.
+                    // The enclosing revision fence covers every bounded batch.
+                    var stageIds = stages.Select(s => checked((int)s.Id));
+                    if (rest is not null) stageIds = stageIds.Append(checked((int)rest.Id));
+                    var allTotals = Totals.ReadSelected(conn, stageIds, token)
+                        .ToDictionary(t => (long)t.Id, t => t.Total);
+                    var totals = new Dictionary<long, decimal>();
+                    foreach (var stage in stages)
+                        totals[stage.Id] = allTotals.GetValueOrDefault(stage.Id);
+                    if (rest is not null)
+                        totals[rest.Id] = allTotals.GetValueOrDefault(rest.Id);
 
-                if (string.IsNullOrWhiteSpace(revisionBefore) || revisionBefore != SqlServerDatabase.Revision(conn))
-                    throw new InvalidOperationException(
-                        "Распределение изменилось во время чтения. Обнови смету.");
-                return new InlineStagesSnapshot(stages,
-                    rows.ToDictionary(r => checked((int)r.SrcId)),
-                    rest, totals, revisionBefore);
-            });
-            if (!_inlineStagesOn || _detached || version != _inlineStagesVersion) return false;
+                    if (string.IsNullOrWhiteSpace(revisionBefore) || revisionBefore != SqlServerDatabase.Revision(conn))
+                        throw new InvalidOperationException(
+                            "Распределение изменилось во время чтения. Обнови смету.");
+                    token.ThrowIfCancellationRequested();
+                    var index = StageAllocationPresentation.IndexSourcesBySystem(rows.Select(r => (r.SystemId, r.SrcId)));
+                    var metrics = StageAllocationPresentation.Summarize(stages.Count,
+                        rows.Select(r => (r.Price, r.Rest, (IReadOnlyList<decimal>)r.PerStage)));
+                    token.ThrowIfCancellationRequested();
+                    return new InlineStagesSnapshot(stages,
+                        rows.ToDictionary(r => checked((int)r.SrcId)),
+                        rest, totals, revisionBefore, index, metrics);
+                }
+                finally { _inlineStagesReadGate.Release(); }
+            }, token);
+            if (!_inlineStagesOn || _detached || token.IsCancellationRequested || version != _inlineStagesVersion) return false;
             if (data.Revision != _serverRevision)
             {
                 InlineStagesSummary.Text = "Смета изменилась, обновляем распределение…";
@@ -180,9 +204,10 @@ public partial class EstimateView
             if (_revealInlineStageColumns) RevealInlineStageColumns(data);
             return true;
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { return false; }
         catch (Exception ex)
         {
-            if (_inlineStagesOn && version == _inlineStagesVersion)
+            if (_inlineStagesOn && !_detached && !token.IsCancellationRequested && version == _inlineStagesVersion)
             {
                 SetStatus("Этапы: " + ex.Message, true);
                 InlineStagesSummary.Text = "Ошибка чтения этапов: " + ex.Message;
@@ -191,10 +216,11 @@ public partial class EstimateView
         }
         finally
         {
+            if (ReferenceEquals(_inlineStagesReadCancellation, cancellation)) _inlineStagesReadCancellation = null;
             if (version == _inlineStagesVersion)
             {
                 _inlineStagesLoading = false;
-                RefreshInlineStagesSelectionButtons();
+                if (!_detached) RefreshInlineStagesSelectionButtons();
             }
         }
     }
@@ -314,8 +340,7 @@ public partial class EstimateView
                 Foreground = StageBrush("#64748B"), Margin = new Thickness(3)
             });
         }
-        var metrics = StageAllocationPresentation.Summarize(data.Stages.Count,
-            data.Rows.Values.Select(r => (r.Price, r.Rest, (IReadOnlyList<decimal>)r.PerStage)));
+        var metrics = data.Metrics;
         for (var i = 0; i < data.Stages.Count; i++)
         {
             var stage = data.Stages[i];

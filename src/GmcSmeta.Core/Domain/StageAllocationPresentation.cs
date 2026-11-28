@@ -62,6 +62,10 @@ public static class StageAllocationPresentation
         return Array.AsReadOnly(result);
     }
 
+    /// <summary>Index actual top-level allocation sources once per snapshot, preserving membership.</summary>
+    public static ILookup<long, long> IndexSourcesBySystem(IEnumerable<(long SystemId, long SourceId)> rows) =>
+        rows.ToLookup(row => row.SystemId, row => row.SourceId);
+
     public sealed record Metrics(IReadOnlyList<int> AssignedCounts, int UnassignedCount,
         int OverrunCount, decimal RemainingAmount);
 

@@ -55,4 +55,19 @@ public sealed class StageParityStressTests
             SqlServerStages.SaveStageSystems("not-a-connection", 1, 2,
                 new Dictionary<long, decimal> { [13] = -1m }, "rev"));
     }
+
+    [Fact]
+    public void IndexedSystemSelectionMatchesFullScansAcrossTwentyFiveThousandRows()
+    {
+        var rows = Enumerable.Range(1, 25000)
+            .Select(i => (SystemId: (long)(i % 251), SourceId: (long)i)).ToArray();
+        var index = StageAllocationPresentation.IndexSourcesBySystem(rows);
+        var selectedSystems = new long[] { 0, 7, 42, 42, 250, 999 };
+        var expected = selectedSystems.SelectMany(id => rows.Where(r => r.SystemId == id)
+            .Select(r => r.SourceId)).Distinct().OrderBy(id => id);
+        var actual = new HashSet<long>();
+        foreach (var id in selectedSystems) actual.UnionWith(index[id]);
+        Assert.Equal(expected, actual.OrderBy(id => id));
+        Assert.Empty(index[999]);
+    }
 }
