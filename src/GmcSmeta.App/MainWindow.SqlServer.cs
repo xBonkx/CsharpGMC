@@ -117,16 +117,18 @@ public partial class MainWindow
         }
     }
 
-    private void SaveSqlServerObjectRename(int objectId, string name)
+    private void SaveSqlServerObjectRename(int objectId, string name, string expectedRevision)
     {
         if (_serverConn is null || _sqlConnectionString is null || !SqlWritesEnabled)
             throw new InvalidOperationException("Доступна только тестовая SQL Server база GmcSmetaPilot_*.");
         if (_objects.Any(o => o.Id == objectId && o.Archived))
             throw new InvalidOperationException("Архивный объект нельзя переименовать.");
-        var revision = SqlServerDatabase.Revision(_serverConn);
+        if (string.IsNullOrWhiteSpace(expectedRevision) ||
+            SqlServerDatabase.Revision(_serverConn) != expectedRevision)
+            throw new InvalidOperationException("Объект изменился во время переименования. Обновите список.");
         var current = SqlServerWorkspace.ReadObject(_serverConn, objectId);
         SqlServerWorkspace.UpdateObject(_sqlConnectionString, objectId,
-            current with { Name = name }, revision);
+            current with { Name = name }, expectedRevision);
     }
 
     /// <summary>Смета документа в Excel (kp_export): разделы, строки, количества, цены, суммы.</summary>

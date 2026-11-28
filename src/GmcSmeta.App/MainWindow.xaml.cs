@@ -637,6 +637,39 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
+    // Confirm the exact object before displaying a mutation dialog; keep this
+    // revision until the writer commits, rather than accepting a new revision
+    // after a colleague has changed the record while the dialog is open.
+    private (string Connection, string Revision, NavigationMode Mode)? CaptureObjectMutation(ObjectRow obj)
+    {
+        if (!SqlWritesEnabled || _serverConn is null || _sqlConnectionString is not { } connection)
+            return null;
+        try
+        {
+            var revision = SqlServerDatabase.Revision(_serverConn);
+            var fresh = Workspace.Objects(_serverConn).FirstOrDefault(row => row.Id == obj.Id);
+            if (string.IsNullOrWhiteSpace(revision) || !Equals(fresh, obj) ||
+                revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Объект изменился. Обновите список перед операцией.");
+            return (connection, revision, CurrentMode);
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            StatusText.Text = "Операция отменена: " + ex.Message;
+            return null;
+        }
+    }
+
+    private bool ObjectMutationCurrent(ObjectRow obj,
+        (string Connection, string Revision, NavigationMode Mode) target)
+    {
+        if (SqlWritesEnabled && target.Connection == _sqlConnectionString &&
+            target.Mode == CurrentMode && _objects.Any(row => Equals(row, obj))) return true;
+        StatusText.Text = "Объект или режим изменились. Повторите операцию.";
+        return false;
+    }
+
     /// <summary>Завершить объект (в архив) или вернуть в работу — finish_object эталона.</summary>
     private void FinishSqlServerObject(ObjectRow obj)
     {
@@ -645,17 +678,19 @@ public partial class MainWindow : Window
             StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
             return;
         }
+        if (CaptureObjectMutation(obj) is not { } target) return;
         if (!obj.Archived)
         {
             var question = $"Завершить карточку «{obj.Name}» и отправить все её документы в архив?\n\nОн уйдёт в «Архив» (вкладка над списком объектов), " +
                 $"в {DateTime.Today.Year} год. Ничего не удаляется, вернуть можно в любой момент.";
             if (MessageBox.Show(this, question, "Завершить карточку", MessageBoxButton.YesNo,
-                    MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                    MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
+        if (!ObjectMutationCurrent(obj, target)) return;
         try
         {
             SqlServerWorkspace.SetObjectArchived(
-                _sqlConnectionString!, obj.Id, !obj.Archived, SqlServerDatabase.Revision(_serverConn!));
+                target.Connection, obj.Id, !obj.Archived, target.Revision);
         }
         catch (Exception ex)
         {
@@ -676,14 +711,16 @@ public partial class MainWindow : Window
             StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
             return;
         }
+        if (CaptureObjectMutation(obj) is not { } target) return;
         var current = obj.ArchivedOn.Length >= 4 && int.TryParse(obj.ArchivedOn[..4], out var year)
             ? year : DateTime.Today.Year;
         var dialog = new ArchiveYearDialog(obj.Name, current, DateTime.Today.Year) { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Year == current) return;
+        if (dialog.ShowDialog() != true || dialog.Year == current ||
+            !ObjectMutationCurrent(obj, target)) return;
         try
         {
             SqlServerWorkspace.ChangeArchiveYear(
-                _sqlConnectionString!, obj.Id, dialog.Year, SqlServerDatabase.Revision(_serverConn!));
+                target.Connection, obj.Id, dialog.Year, target.Revision);
         }
         catch (Exception ex)
         {
@@ -703,11 +740,11 @@ public partial class MainWindow : Window
             StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
             return;
         }
+        if (CaptureObjectMutation(obj) is not { } target) return;
         SqlServerWorkspace.ObjectDeleteInfo info;
-        string confirmedRevision;
+        var confirmedRevision = target.Revision;
         try
         {
-            confirmedRevision = SqlServerDatabase.Revision(_serverConn!);
             info = SqlServerWorkspace.DescribeObjectForDelete(_serverConn!, null, obj.Id);
             if (string.IsNullOrWhiteSpace(confirmedRevision) ||
                 confirmedRevision != SqlServerDatabase.Revision(_serverConn!))
@@ -723,12 +760,13 @@ public partial class MainWindow : Window
         var question = $"Удалить карточку «{info.Name}» и все её документы?\n\n" + (bullets.Length > 0 ? bullets : "Карточка пуста.") +
             "\n\nЕсли работы завершены — лучше «Завершить карточку (в архив)».";
         if (MessageBox.Show(this, question, "Удаление карточки", MessageBoxButton.YesNo,
-                MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        if (new ConfirmDeleteDialog(info.Name, info.Details, "карточка") { Owner = this }.ShowDialog() != true) return;
+                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (new ConfirmDeleteDialog(info.Name, info.Details, "карточка") { Owner = this }.ShowDialog() != true ||
+            !ObjectMutationCurrent(obj, target)) return;
         try
         {
             SqlServerWorkspace.DeleteObject(
-                _sqlConnectionString!, obj.Id, confirmedRevision);
+                target.Connection, obj.Id, confirmedRevision);
         }
         catch (Exception ex)
         {
@@ -773,7 +811,7 @@ public partial class MainWindow : Window
         var question = $"Удалить «{info.Title}» из объекта «{info.ObjectName}»?\n" +
             "Все системы и позиции документа будут удалены.";
         if (MessageBox.Show(this, question, "Удаление", MessageBoxButton.YesNo,
-                MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         if (info.Details.Count > 0 &&
             new ConfirmDeleteDialog(info.Title, info.Details, "документ") { Owner = this }.ShowDialog() != true) return;
         try
@@ -795,11 +833,11 @@ public partial class MainWindow : Window
     // ---------------------------------------------------------------- переименование на месте
 
     /// <summary>Переименовать объект через новую запись и обновить списки — Python rename_object.</summary>
-    private void SaveObjectRename(int objectId, string name)
+    private void SaveObjectRename(int objectId, string name, string expectedRevision)
     {
         try
         {
-            SaveSqlServerObjectRename(objectId, name);
+            SaveSqlServerObjectRename(objectId, name, expectedRevision);
         }
         catch (Exception ex)
         {
@@ -826,10 +864,13 @@ public partial class MainWindow : Window
         if (_selectedObject is not null) BeginPageRename();
     }
 
+    private (ObjectRow Object, string Connection, string Revision, NavigationMode Mode)? _pageRenameTarget;
+
     private void BeginPageRename()
     {
-        if (_selectedObject is not { } obj) return;
-        if (_serverConn is not null && (!SqlWritesEnabled || obj.Archived)) return;
+        if (_selectedObject is not { } obj || obj.Archived ||
+            CaptureObjectMutation(obj) is not { } target) return;
+        _pageRenameTarget = (obj, target.Connection, target.Revision, target.Mode);
         ObjectRenameBox.Text = obj.Name;
         ObjectTitle.Visibility = ObjectRenameButton.Visibility = Visibility.Collapsed;
         ObjectRenameBox.Visibility = Visibility.Visible;
@@ -839,6 +880,7 @@ public partial class MainWindow : Window
 
     private void EndPageRename()
     {
+        _pageRenameTarget = null;
         if (ObjectRenameBox.Visibility != Visibility.Visible) return;
         ObjectRenameBox.Visibility = Visibility.Collapsed;
         ObjectTitle.Visibility = ObjectRenameButton.Visibility = Visibility.Visible;
@@ -861,10 +903,14 @@ public partial class MainWindow : Window
     /// <summary>returnPressed/editingFinished: пустое или совпадающее имя ничего не пишет.</summary>
     private void SavePageRename()
     {
-        if (ObjectRenameBox.Visibility != Visibility.Visible || _selectedObject is not { } obj) return;
+        if (ObjectRenameBox.Visibility != Visibility.Visible) return;
+        var target = _pageRenameTarget;
         var name = ObjectRenameBox.Text.Trim();
         EndPageRename();
-        if (name.Length > 0 && name != obj.Name) SaveObjectRename(obj.Id, name);
+        if (target is not { } captured || _selectedObject?.Id != captured.Object.Id ||
+            !ObjectMutationCurrent(captured.Object, (captured.Connection, captured.Revision, captured.Mode))) return;
+        if (name.Length > 0 && name != captured.Object.Name)
+            SaveObjectRename(captured.Object.Id, name, captured.Revision);
     }
 
     private void DocumentCard_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -1072,9 +1118,11 @@ public partial class MainWindow : Window
     {
         if (!SqlWritesEnabled || target is null ||
             _objects.FirstOrDefault(obj => obj.Id == target.Id && !obj.Archived) is not { } obj) return;
+        if (CaptureObjectMutation(obj) is not { } captured) return;
         var dialog = new PromptDialog("Переименовать объект", "Название объекта", obj.Name) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Value.Length > 0 && dialog.Value != obj.Name)
-            SaveObjectRename(obj.Id, dialog.Value);
+        if (dialog.ShowDialog() == true && dialog.Value.Trim().Length > 0 &&
+            dialog.Value.Trim() != obj.Name && ObjectMutationCurrent(obj, captured))
+            SaveObjectRename(obj.Id, dialog.Value.Trim(), captured.Revision);
     }
 
     // ---------------------------------------------------------------- контекстное меню дерева
@@ -1096,8 +1144,10 @@ public partial class MainWindow : Window
             : NavigationNodeUnderMouse();
         var menu = new ContextMenu();
         var menuMode = CurrentMode;
+        var menuConnection = _sqlConnectionString;
+        bool MenuCurrent() => SqlWritesEnabled && CurrentMode == menuMode && menuConnection == _sqlConnectionString;
         var create = ContextMenuIcons.Create(NavigationModeCaptions.For(CurrentMode).Create + "…", "FolderPlus");
-        create.Click += (_, _) => { if (SqlWritesEnabled && CurrentMode == menuMode) EditObjectProperties(null); };
+        create.Click += (_, _) => { if (MenuCurrent()) EditObjectProperties(null); };
         menu.Items.Add(create);
         // Global history and trash already live in the main menu (Python).
         // Keep only target-specific commands here.
@@ -1112,7 +1162,7 @@ public partial class MainWindow : Window
                 var item = ContextMenuIcons.Create(title, glyph, enabled, shortcut, danger);
                 item.Click += (_, _) =>
                 {
-                    if (!SqlWritesEnabled || CurrentMode != menuMode ||
+                    if (!MenuCurrent() ||
                         !_objectNodes.TryGetValue(selected.Id, out var currentNode) ||
                         !ReferenceEquals(currentNode, target) ||
                         _objects.FirstOrDefault(obj => obj.Id == selected.Id) is not { } fresh ||
@@ -1145,7 +1195,9 @@ public partial class MainWindow : Window
         }
         else if (target is { Tag: DocRow doc })
         {
-            bool ValidDocumentTarget() => SqlWritesEnabled && CurrentMode == menuMode &&
+            var parent = _objects.FirstOrDefault(row => row.Id == doc.ObjectId);
+            bool ValidDocumentTarget() => MenuCurrent() && parent is not null &&
+                _objects.Any(row => Equals(row, parent)) &&
                 _documentNodes.TryGetValue(doc.Id, out var currentNode) &&
                 ReferenceEquals(currentNode, target) &&
                 _docs.Any(current => current.Id == doc.Id && Equals(current, doc));
@@ -1157,13 +1209,14 @@ public partial class MainWindow : Window
             menu.Items.Add(new Separator());
             if (doc.Kind == "kp")
             {
-                var make = ContextMenuIcons.Create("Оформить как приложение…", "Check");
+                var editable = parent is { Archived: false } && !doc.Locked && !doc.StageRest;
+                var make = ContextMenuIcons.Create("Оформить как приложение…", "Check", editable);
                 make.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc, makeContract: true));
                 menu.Items.Add(make);
                 var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate");
                 copy.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id));
                 menu.Items.Add(copy);
-                var rates = ContextMenuIcons.Create("Скопировать расценки…", "Copy");
+                var rates = ContextMenuIcons.Create("Скопировать расценки…", "Copy", editable);
                 rates.Click += (_, _) => RunDocumentCommand(() => TransferRates(doc));
                 menu.Items.Add(rates);
                 var stages = ContextMenuIcons.Create("Этапы (разбивка)…", "Stage");
@@ -1172,10 +1225,10 @@ public partial class MainWindow : Window
             }
             else if (doc.Kind == "main")
             {
-                var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus");
+                var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus", parent is { Archived: false });
                 dop.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id));
                 menu.Items.Add(dop);
-                var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", SqlWritesEnabled);
+                var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", parent is { Archived: false });
                 move.Click += (_, _) => RunDocumentCommand(() => MoveCurrentContract(doc));
                 menu.Items.Add(move);
             }
