@@ -21,7 +21,7 @@
 
         <DockPanel Grid.Row="1" Margin="0,10,0,0">
             <Grid DockPanel.Dock="Right" Width="300" Margin="10,0,0,0" VerticalAlignment="Center">
-                <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" Height="32"
+                <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}"
                          Background="#FFFFFF" BorderBrush="#D0D7E2" Padding="32,5,32,5"
                          VerticalContentAlignment="Center"
                          ToolTip="Ctrl+F — поиск. Кто, что, действие, название строки. Несколько слов — все должны совпасть."

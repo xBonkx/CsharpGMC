@@ -112,9 +112,9 @@
                             <DockPanel Margin="0,0,0,8">
                                 <Button Style="{StaticResource PythonToolbarButton}" Content="Подставить" DockPanel.Dock="Right" Click="Catalogue_Click"
                                         Margin="8,0,0,0" Padding="12,5"/>
-                                <ComboBox x:Name="CatalogueBox" MinWidth="130" Height="32"/>
+                                <ComboBox x:Name="CatalogueBox" MinWidth="130" MinHeight="{StaticResource LayoutFieldMinHeight}"/>
                             </DockPanel>
-                            <ComboBox x:Name="SectionCombo" Height="32" Margin="0,0,0,8" SelectionChanged="Section_Changed"/>
+                            <ComboBox x:Name="SectionCombo" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,0,0,8" SelectionChanged="Section_Changed"/>
                         </StackPanel>
                         <DataGrid local:TableColumnMenu.Key="passport-equipment" local:TableColumnMenu.Protect="Параметр" x:Name="EquipmentGrid" AutoGenerateColumns="False"
                                   HeadersVisibility="Column" CanUserAddRows="False"

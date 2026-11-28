@@ -11,6 +11,11 @@
     <PathGeometry x:Key="GlyphMenu" Figures="M4 6h16M4 12h16M4 18h16"/>
     <PathGeometry x:Key="GlyphChevronLeft" Figures="M11 6l-6 6 6 6M19 6l-6 6 6 6"/>
     <PathGeometry x:Key="GlyphSearch" Figures="M18 11A7 7 0 1 0 4 11A7 7 0 1 0 18 11 M20 20l-3.5-3.5"/>
+    <!-- Python theme.py materials paths; independent contours start at absolute M. -->
+    <PathGeometry x:Key="GlyphMaterials" Figures="M12 2l5 3-5 3-5-3z M7 5v5l5 3 5-3V5 M12 8v5 M6 11l5 3-5 3-5-3z M1 14v5l5 3 5-3v-5 M6 17v5 M18 11l5 3-5 3-5-3z M13 14v5l5 3 5-3v-5 M18 17v5"/>
+    <!-- WPF status/transport roles: original geometry, not a Python SVG claim. -->
+    <PathGeometry x:Key="GlyphLock" Figures="M6 11H18V21H6Z M8 11V7a4 4 0 0 1 8 0v4 M12 15v2"/>
+    <PathGeometry x:Key="GlyphTruck" Figures="M3 5H15V17H3Z M15 9H19l3 4v4H15 M7 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4 M18 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4"/>
     <PathGeometry x:Key="GlyphPlus" Figures="M12 5v14M5 12h14"/>
     <!-- Exact Python theme.py row-plus geometry (aa6b34d). -->
     <PathGeometry x:Key="GlyphRowPlus" Figures="M4 6h16M4 12h9M4 18h9 M18 14v6M15 17h6"/>
@@ -57,6 +62,36 @@
         <Setter Property="StrokeLineJoin" Value="Round"/>
         <Setter Property="IsHitTestVisible" Value="False"/>
     </Style>
+    <DataTemplate x:Key="IconLabelMaterials">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                <Canvas Width="24" Height="24">
+                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphMaterials}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
+                </Canvas>
+            </Viewbox>
+            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+        </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="IconLabelWrench">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                <Canvas Width="24" Height="24">
+                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphWrench}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
+                </Canvas>
+            </Viewbox>
+            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+        </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="IconLabelTruck">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                <Canvas Width="24" Height="24">
+                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphTruck}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
+                </Canvas>
+            </Viewbox>
+            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+        </StackPanel>
+    </DataTemplate>
     <DataTemplate x:Key="IconLabelPlus">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">

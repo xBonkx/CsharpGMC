@@ -64,7 +64,7 @@
     <Thickness x:Key="LayoutHeaderChipGap">6,0,0,0</Thickness>
     <Thickness x:Key="LayoutHeaderChipPadding">9,2</Thickness>
     <CornerRadius x:Key="LayoutHeaderChipRadius">9</CornerRadius>
-    <Thickness x:Key="LayoutHeaderTitleGap">0,4,0,0</Thickness>
+    <Thickness x:Key="LayoutHeaderTitleGap">0,2,0,0</Thickness>
     <sys:Double x:Key="LayoutHeaderChipMinHeight">20</sys:Double>
     <sys:Double x:Key="LayoutSidebarActionMinHeight">32</sys:Double>
     <sys:Double x:Key="LayoutObjectTileGap">10</sys:Double>

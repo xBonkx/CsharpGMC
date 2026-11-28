@@ -438,8 +438,15 @@
                         <Border DockPanel.Dock="Right" x:Name="LockChip" Margin="{StaticResource LayoutHeaderChipGap}" Background="#FEF3E2"
                             CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center" Visibility="Collapsed"
                             ToolTip="Смета подписана и заблокирована">
-                        <TextBlock Text="🔒 Подписан" VerticalAlignment="Center" Foreground="#B45309"
-                                   FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="13" Height="13" Margin="0,0,4,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLock}" Stroke="#B45309"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Подписан" VerticalAlignment="Center" Foreground="#B45309"
+                                       FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                        </StackPanel>
                     </Border>
                         <Border DockPanel.Dock="Right" x:Name="CompanyChip" Margin="{StaticResource LayoutHeaderChipGap}" Background="#F1F4F9"
                             CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center">
@@ -452,9 +459,9 @@
                         <TextBlock x:Name="DocumentKindText" VerticalAlignment="Center" Foreground="#1D4ED8"
                                    FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                     </Border>
-                        <TextBlock x:Name="SubtitleText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                        <TextBlock x:Name="SubtitleText" MaxWidth="300" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                               Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
+                               Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiBodySize}"/>
                     </DockPanel>
                     <DockPanel HorizontalAlignment="Left" LastChildFill="True" Margin="{StaticResource LayoutHeaderTitleGap}">
                         <Button x:Name="EditTitleButton" DockPanel.Dock="Right" Click="EditTitle_Click" Margin="4,0,0,0"
@@ -466,8 +473,15 @@
                     </DockPanel>
                     <Border x:Name="SourceCheckChip" HorizontalAlignment="Left" Background="#FEE2E2"
                             CornerRadius="8" Padding="8,3" Margin="0,4,0,0" Visibility="Collapsed">
-                        <TextBlock Text="✗ Не сходится с файлом" Foreground="#B91C1C"
-                                   FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Width="13" Height="13" Margin="0,0,4,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                                <Canvas Width="24" Height="24">
+                                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphX}" Stroke="#B91C1C"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Не сходится с файлом" VerticalAlignment="Center" Foreground="#B91C1C"
+                                       FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
+                        </StackPanel>
                     </Border>
                 </StackPanel>
                 <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
@@ -492,7 +506,7 @@
                                  Content="Смета" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource DocumentMainTab}" IsChecked="True"
                                  Checked="ViewMode_Checked"/>
                     <RadioButton x:Name="MaterialsModeTab" GroupName="EstimatePage" Tag="materials"
-                                 Content="Материалы" ContentTemplate="{StaticResource IconLabelBuilding}" Style="{StaticResource DocumentMainTab}"
+                                 Content="Материалы" ContentTemplate="{StaticResource IconLabelMaterials}" Style="{StaticResource DocumentMainTab}"
                                  Checked="ViewMode_Checked"/>
                     <RadioButton x:Name="SummaryModeTab" GroupName="EstimatePage" Tag="summary"
                                  Content="Сводная" Style="{StaticResource DocumentMainTab}"

@@ -45,7 +45,7 @@
             <Button Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Style="{StaticResource PythonToolbarButton}" Click="Refresh_Click"/>
         </WrapPanel>
         <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,9">
-            <Grid Width="260" Height="32">
+            <Grid Width="260" MinHeight="{StaticResource LayoutFieldMinHeight}">
                 <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Padding="32,5,32,5"
                          VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
                          AutomationProperties.Name="Найти акт или приложение" ToolTip="Найти акт или приложение…"/>

@@ -81,7 +81,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="Ответственный" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="PersonBox" Height="32" MinWidth="440"
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="PersonBox" MinHeight="{StaticResource LayoutFieldMinHeight}" MinWidth="0"
                               SelectionChanged="Person_Changed">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
@@ -111,7 +111,7 @@
                     <TextBlock Grid.Row="2" Text="Дата приказов" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
                     <DatePicker Grid.Row="2" Grid.Column="1" x:Name="DayPicker"
-                                SelectedDateChanged="Date_Changed" Height="32" HorizontalAlignment="Left"/>
+                                SelectedDateChanged="Date_Changed" MinHeight="{StaticResource LayoutFieldMinHeight}" HorizontalAlignment="Left"/>
                     <TextBlock Grid.Row="3" Text="Номер первого" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
                     <TextBox Grid.Row="3" Grid.Column="1" x:Name="NumberBox" MinHeight="{StaticResource LayoutFieldMinHeight}"
@@ -122,7 +122,7 @@
                              Padding="7,5" ToolTip="№8 от 02 марта 2026 г."/>
                     <TextBlock Grid.Row="5" Text="Объект" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="SiteBox" Height="64" ToolTip="Как объект называется в приказах. Берётся из «Свойств объекта» → «Стройка»"
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="SiteBox" MinHeight="64" VerticalScrollBarVisibility="Auto" ToolTip="Как объект называется в приказах. Берётся из «Свойств объекта» → «Стройка»"
                              Padding="7,5" AcceptsReturn="True" TextWrapping="Wrap"/>
                 </Grid>
                 <TextBlock Text="КАКИЕ ПРИКАЗЫ" FontWeight="Bold" FontSize="{StaticResource UiSectionSize}" Foreground="#94A3B8"
