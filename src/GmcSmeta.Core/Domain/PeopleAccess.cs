@@ -31,7 +31,14 @@ public sealed record OrderSnapshot(long PersonId, string Person, IReadOnlyList<s
 public sealed record AccessCompany(long Id, string Name, string Address, string InnKpp,
     string SignerPost, string SignerName);
 public sealed record AccessSite(long Id, string Name, string Address, string SiteFull,
-    string WorkTitle, string Folder, string Customer, string ContractNumber, string ContractDate);
+    string WorkTitle, string Folder, string Customer, string ContractNumber, string ContractDate)
+{
+    // Only populated for order-specific legal context; ordinary access lists
+    // and historic object/technical documents retain their object scope.
+    public bool LegalAgreementRequired { get; init; }
+    public long? AgreementId { get; init; }
+    public long? AgreementCompanyId { get; init; }
+}
 
 public static class PeopleRules
 {

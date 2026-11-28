@@ -11,7 +11,7 @@ internal static class OrderIssueService
 {
     internal sealed record Template(string Path, string Title);
 
-    internal sealed record Request(long ObjectId, AccessSite SiteSnapshot,
+    internal sealed record Request(long ObjectId, long? DocumentId, AccessSite SiteSnapshot,
         IReadOnlyList<AccessCompany> Companies, PeoplePerson Person, DateTime Day,
         string Number, string OriginalNumber, string Contract, string SiteName,
         string Folder, string Revision, IReadOnlyList<Template> Templates, Guid Operation);
@@ -25,16 +25,15 @@ internal static class OrderIssueService
         var number = request.Number;
         try
         {
-            Directory.CreateDirectory(request.Folder);
-            var company = request.Companies.FirstOrDefault(c =>
-                c.Name.Contains("ГМЦ", StringComparison.OrdinalIgnoreCase)) ?? request.Companies.FirstOrDefault();
+            var company = OrderAgreementPolicy.Company(request.SiteSnapshot, request.Companies);
 
             // Validate the captured revision and directory before generating files.
             var latest = db.Load(false);
-            if (latest.Revision != request.Revision || db.Site(request.ObjectId) != request.SiteSnapshot ||
+            if (latest.Revision != request.Revision || db.OrderSite(request.ObjectId, request.DocumentId) != request.SiteSnapshot ||
                 !db.Companies().SequenceEqual(request.Companies))
                 throw new System.Data.DBConcurrencyException("Сотрудники, объект или реквизиты изменились. Перезапустите окно.");
 
+            Directory.CreateDirectory(request.Folder);
             foreach (var choice in request.Templates)
             {
                 if (!File.Exists(choice.Path))

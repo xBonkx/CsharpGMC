@@ -21,7 +21,8 @@ public sealed class OrdersInitialReadLifecycleTests
             source.IndexOf("private static long? LastResponsible", StringComparison.Ordinal)];
         Assert.Contains("await Task.Run", initial);
         Assert.Contains("db.Load(false, token)", initial);
-        Assert.Contains("db.Site(_objectId, token)", initial);
+        Assert.Contains("db.OrderSite(_objectId, _documentId, token)", initial);
+        Assert.Contains("OrderAgreementPolicy.BlockReason(_site, _companies)", initial);
         Assert.Contains("db.Companies(token)", initial);
         Assert.Equal(1, initial.Split("db.History(", StringSplitOptions.None).Length - 1);
         Assert.Contains("LastResponsible(snapshot.History)", initial);

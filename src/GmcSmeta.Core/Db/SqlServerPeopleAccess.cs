@@ -10,7 +10,7 @@ namespace GmcSmeta.Core.Db;
 /// No parallel employee database. All mutations require a verified pilot, serialized revision
 /// lock and one SQL transaction. Data from other objects is never returned in object history.
 /// </summary>
-public sealed class SqlServerPeopleAccess
+public sealed partial class SqlServerPeopleAccess
 {
     private readonly string _connectionString;
     public SqlServerPeopleAccess(string connectionString, CancellationToken token = default)

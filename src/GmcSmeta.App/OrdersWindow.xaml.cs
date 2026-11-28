@@ -18,6 +18,7 @@ public partial class OrdersWindow : Window
     private CancellationTokenSource? _historyOpenCancellation;
     private bool _closed;
     private readonly long _objectId;
+    private readonly long? _documentId;
     private AccessSite _site = null!;
     private List<PeoplePerson> _people = new();
     private List<AccessCompany> _companies = new();
@@ -40,15 +41,16 @@ public partial class OrdersWindow : Window
     }
     private sealed record OrderHistoryItem(AccessHistory History, string Label);
 
-    public OrdersWindow(string connectionString, long objectId)
-        : this(token => new SqlServerPeopleAccess(connectionString, token), objectId) { }
+    public OrdersWindow(string connectionString, long objectId, long? documentId = null)
+        : this(token => new SqlServerPeopleAccess(connectionString, token), objectId, documentId) { }
 
     public OrdersWindow(SqlServerPeopleAccess database, long objectId)
-        : this(_ => database, objectId) { }
+        : this(_ => database, objectId, null) { }
 
-    private OrdersWindow(Func<CancellationToken, SqlServerPeopleAccess> createDatabase, long objectId)
+    private OrdersWindow(Func<CancellationToken, SqlServerPeopleAccess> createDatabase, long objectId, long? documentId)
     {
         _objectId = objectId;
+        _documentId = documentId;
         InitializeComponent();
         OrderContent.IsEnabled = false;
         MakeButton.IsEnabled = false;
@@ -75,7 +77,7 @@ public partial class OrdersWindow : Window
             {
                 token.ThrowIfCancellationRequested();
                 var db = createDatabase(token);
-                var site = db.Site(_objectId, token);
+                var site = db.OrderSite(_objectId, _documentId, token);
                 var directory = db.Load(false, token);
                 var people = directory.People.Where(p => p.Active).ToList();
                 var companies = db.Companies(token).ToList();
@@ -124,7 +126,9 @@ public partial class OrdersWindow : Window
             _initializing = false;
             UpdateInflection();
             OrderContent.IsEnabled = true;
-            MakeButton.IsEnabled = _people.Count > 0;
+            var blocked = OrderAgreementPolicy.BlockReason(_site, _companies);
+            MakeButton.IsEnabled = _people.Count > 0 && blocked is null;
+            if (blocked is not null) StatusInfo.Text = blocked;
         }
         catch (Exception ex)
         {
@@ -276,6 +280,7 @@ public partial class OrdersWindow : Window
         if (_closed || _initializing || string.IsNullOrWhiteSpace(_revision)) return;
         if (_historyOpenCancellation is not null) return;
         if (_issuing) return;
+        if (OrderAgreementPolicy.BlockReason(_site, _companies) is { } blocked) { Error(blocked); return; }
         if (_registrationUncertain) { Error("Проверьте журнал и файлы, затем заново откройте окно."); return; }
         var chosen = _templates.Where(x => x.Checked)
             .Select(x => new OrderIssueService.Template(x.Path, x.Title)).ToArray();
@@ -286,7 +291,7 @@ public partial class OrdersWindow : Window
         if (!Regex.IsMatch(number, @"\d+\D*$")) { Error("Номер должен заканчиваться числом."); return; }
         var site = PeopleRules.Clean(SiteBox.Text);
         if (site.Length == 0) { Error("Укажите объект в приказе."); return; }
-        var request = new OrderIssueService.Request(_objectId, _site, _companies.ToArray(),
+        var request = new OrderIssueService.Request(_objectId, _documentId, _site, _companies.ToArray(),
             person with { }, when, number, NumberBox.Text, ContractBox.Text.Trim(), site,
             _folder, _revision, chosen, Guid.NewGuid());
 
