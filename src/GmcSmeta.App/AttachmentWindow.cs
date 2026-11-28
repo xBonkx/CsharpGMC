@@ -91,7 +91,8 @@ public sealed class AttachmentWindow : Window
         Content = root;
         var heading = WorkspaceWindowUi.Heading(Title);
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
-        var hint = new TextBlock { Text = "Файлы относятся только к выбранному сметному документу (приложению, ДС или КП), а не ко всему договору. Новые файлы — в общей UNC-папке (отдельный каталог тестовой базы). Отметка PDF не проверяет электронную подпись. Старые относительные пути требуют переноса. Удаление из списка не удаляет файл.", Foreground = System.Windows.Media.Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+        var hint = new TextBlock { Text = "Файлы относятся только к выбранному сметному документу (приложению, ДС или КП), а не ко всему договору. Новые файлы — в общей UNC-папке (отдельный каталог тестовой базы). Отметка PDF не проверяет электронную подпись. Старые относительные пути требуют переноса. Удаление из списка не удаляет файл.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
         DockPanel.SetDock(hint, Dock.Top); root.Children.Add(hint);
 
         var footer = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
