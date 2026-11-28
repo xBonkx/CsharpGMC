@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Data;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,7 +16,8 @@ namespace GmcSmeta.App;
 internal sealed class DocumentColumnFit
 {
     internal sealed record Input(DataGridColumn Column, string Path, string Header,
-        double Preferred, string? Format, CultureInfo Culture, double Extra);
+        double Preferred, string? Format, CultureInfo Culture, double Extra,
+        IValueConverter? Converter = null, object? Parameter = null);
     private readonly DataGrid _grid;
     private readonly Func<DataGridColumn, double?> _preferred;
     private WeakReference<object>? _source;
@@ -58,20 +60,28 @@ internal sealed class DocumentColumnFit
                 _preferred(column) is not { } width || !double.IsFinite(width) || width <= 0) continue;
             var culture = _grid.Language.GetSpecificCulture();
             string? format = null;
+            IValueConverter? converter = null;
+            object? parameter = null;
             if (column is DataGridTextColumn)
             {
                 if (column is not DataGridTextColumn { Binding: Binding binding } ||
-                    binding.Path?.Path != path || binding.Converter is not null ||
+                    binding.Path?.Path != path || binding.Converter is not null && !ApprovedConverter(binding.Converter) ||
                     binding.Source is not null || binding.RelativeSource is not null ||
                     !string.IsNullOrEmpty(binding.ElementName)) continue;
                 culture = binding.ConverterCulture ?? culture;
                 format = binding.StringFormat;
+                converter = binding.Converter;
+                parameter = binding.ConverterParameter;
             }
             else if (column is not DataGridTemplateColumn) continue;
             yield return new Input(column, path, TableColumnMenu.Title(column), width, format, culture,
-                TableColumnMenu.GetFitExtra(column));
+                TableColumnMenu.GetFitExtra(column), converter, parameter);
         }
     }
+
+    // Only known display-only converters are eligible; never call ConvertBack.
+    private static bool ApprovedConverter(IValueConverter converter) =>
+        converter is MetalAreaConverter or MetalPaidTextConverter or KsActValueConverter;
 
     private static bool IsSimplePath(string path) => path.Length > 0 &&
         (char.IsAsciiLetter(path[0]) || path[0] == '_') &&
@@ -123,7 +133,8 @@ internal sealed class DocumentColumnFit
         if (inputs.Length == 0 || grid.ItemsSource is not { } source) return widths;
         // Cache public scalar property descriptors by type for this pass only.
         // The metadata is an explicit opt-in on each column; never walk a
-        // nested path or invoke a value converter.
+        // nested path or invoke arbitrary converters. DataRowView descriptors
+        // are instance/schema specific, so use the named table field directly.
         var descriptors = new Dictionary<Type, PropertyDescriptor?[]>();
         foreach (var item in source)
         {
@@ -136,10 +147,23 @@ internal sealed class DocumentColumnFit
             }
             for (int i = 0; i < inputs.Length; i++)
             {
+                var input = inputs[i];
                 var property = properties[i];
-                if (property is null) continue;
                 string display;
-                try { display = Display(property.GetValue(item), inputs[i].Format, inputs[i].Culture); }
+                try
+                {
+                    object? value;
+                    if (item is DataRowView row && row.DataView.Table?.Columns.Contains(input.Path) == true)
+                        value = row[input.Path];
+                    else if (property is not null) value = property.GetValue(item);
+                    else continue;
+                    if (input.Converter is { } converter)
+                    {
+                        if (!ApprovedConverter(converter)) continue;
+                        value = converter.Convert(value!, typeof(string), input.Parameter!, input.Culture);
+                    }
+                    display = Display(value, input.Format, input.Culture);
+                }
                 catch (Exception ex) when (ex is OverflowException or System.Reflection.TargetInvocationException)
                 { continue; }
                 widths[i] = Math.Max(widths[i], measure.Cell(display, inputs[i].Extra));

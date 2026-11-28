@@ -52,6 +52,9 @@ internal static class WorkspaceWindowUi
         column.HeaderStyle = (Style)Application.Current.FindResource(
             alignment == TextAlignment.Right ? "CompactCostMoneyHeader" :
             alignment == TextAlignment.Center ? "CompactCostHeader" : "CompactCostTextHeader");
+        if (alignment != TextAlignment.Left && column.Binding is Binding binding &&
+            binding.Path?.Path is { Length: > 0 } path)
+            TableColumnMenu.SetFitDisplayPath(column, path);
     }
 
     public static void StyleButton(Button button, bool primary = false, string? icon = null)

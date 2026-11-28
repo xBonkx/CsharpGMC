@@ -32,7 +32,7 @@ public sealed class DocumentColumnFitSourceTests
     [InlineData("PassportsWindow.xaml", 2)]
     [InlineData("LettersWindow.xaml", 3)]
     [InlineData("HistoryWindow.xaml", 1)]
-    [InlineData("MetalWarehouseWindow.xaml", 8)]
+    [InlineData("MetalWarehouseWindow.xaml", 29)]
     public void OptInColumnsReferToTheirActualDisplayBinding(string file, int count)
     {
         var doc = XDocument.Load(Path.Combine(App(), file));
@@ -53,7 +53,11 @@ public sealed class DocumentColumnFitSourceTests
             {
                 var binding = (string?)column.Attribute("Binding");
                 Assert.True(IsBinding(binding), file + ": " + path + " does not match the text binding");
-                Assert.DoesNotContain("Converter=", binding!);
+                if (binding!.Contains("Converter=", StringComparison.Ordinal))
+                {
+                    Assert.Equal("MetalWarehouseWindow.xaml", file);
+                    Assert.True(binding.Contains("{StaticResource Area}") || binding.Contains("{StaticResource MetalPaidText}"));
+                }
             }
             else
             {

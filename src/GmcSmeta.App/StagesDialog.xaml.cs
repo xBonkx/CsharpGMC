@@ -210,7 +210,7 @@ public partial class StagesDialog : Window
         // stages_dialog.py: names left, unit centered, stage quantities right.
         var text = binding is "SystemName" or "Name";
         var unit = binding == "Unit";
-        return new DataGridTextColumn
+        var column = new DataGridTextColumn
         {
             Header = header,
             Binding = new System.Windows.Data.Binding(binding) { Mode = readOnly
@@ -221,6 +221,8 @@ public partial class StagesDialog : Window
             HeaderStyle = (Style)FindResource(text ? "KsTextHeader" : unit ? "KsQuantityHeader" : "KsMoneyHeader"),
             EditingElementStyle = (Style)FindResource(text ? "CompactCostEditor" : unit ? "CompactCostCenterEditor" : "CompactCostMoneyEditor"),
         };
+        if (!text) TableColumnMenu.SetFitDisplayPath(column, binding);
+        return column;
     }
 
     private void Search_Changed(object sender, TextChangedEventArgs e) => QueueSearch();

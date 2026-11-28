@@ -400,7 +400,7 @@ public partial class ContractActsWorkspace : UserControl
         foreach (var act in ordered)
         {
             // заголовок столбца — только номер акта (дата — в заголовке листа сводной)
-            SummaryGrid.Columns.Add(new DataGridTextColumn
+            var column = new DataGridTextColumn
             {
                 Header = "№ " + act.Number,
                 Binding = new Binding(nameof(KsSummaryVm.PerAct))
@@ -412,7 +412,9 @@ public partial class ContractActsWorkspace : UserControl
                 IsReadOnly = true,
                 ElementStyle = (Style)FindResource("CompactCostCenter"),
                 HeaderStyle = (Style)FindResource("KsQuantityHeader"),
-            });
+            };
+            TableColumnMenu.SetFitDisplayPath(column, nameof(KsSummaryVm.PerAct));
+            SummaryGrid.Columns.Add(column);
         }
         AddTextColumn("Сдано всего", nameof(KsSummaryVm.Done), 96);
         AddTextColumn("Остаток", nameof(KsSummaryVm.Left), 84);
@@ -423,7 +425,7 @@ public partial class ContractActsWorkspace : UserControl
 
     private void AddTextColumn(string header, string property, double width, bool right = false)
     {
-        SummaryGrid.Columns.Add(new DataGridTextColumn
+        var column = new DataGridTextColumn
         {
             Header = header,
             Binding = new Binding(property),
@@ -431,7 +433,9 @@ public partial class ContractActsWorkspace : UserControl
             IsReadOnly = true,
             ElementStyle = (Style)FindResource(right ? "CompactCostMoney" : "CompactCostCenter"),
             HeaderStyle = (Style)FindResource(right ? "KsMoneyHeader" : "KsQuantityHeader"),
-        });
+        };
+        TableColumnMenu.SetFitDisplayPath(column, property);
+        SummaryGrid.Columns.Add(column);
     }
 
     private static string QtyText(decimal v) => v == decimal.Truncate(v)

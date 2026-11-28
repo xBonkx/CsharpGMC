@@ -134,15 +134,15 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="95" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="*" MinWidth="150" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                            <DataGridTextColumn Header="У нас, м²" Binding="{Binding Ours,Converter={StaticResource Area}}" Width="105" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Ours" Header="У нас, м²" Binding="{Binding Ours,Converter={StaticResource Area}}" Width="105" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="OursPieces" Header="У нас, шт." Binding="{Binding OursPieces}" Width="84" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
-                            <DataGridTextColumn Header="У поставщиков, м²" Binding="{Binding Supplier,Converter={StaticResource Area}}" Width="118" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalSupplierCell}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Supplier" Header="У поставщиков, м²" Binding="{Binding Supplier,Converter={StaticResource Area}}" Width="118" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalSupplierCell}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="SupplierPieces" Header="У поставщиков, шт." Binding="{Binding SupplierPieces}" Width="106" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalSupplierCell}"/>
-                            <DataGridTextColumn Header="Ещё нужно, м²" Binding="{Binding RemainingDemand,Converter={StaticResource Area}}" Width="103" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="В резерве, м²" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="100" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="Можно выдать, м²" Binding="{Binding Available,Converter={StaticResource Area}}" Width="112" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
-                            <DataGridTextColumn Header="Излишек, м²" Binding="{Binding Surplus,Converter={StaticResource Area}}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="Дефицит, м²" Binding="{Binding Deficit,Converter={StaticResource Area}}" Width="94" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalDeficitCell}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="RemainingDemand" Header="Ещё нужно, м²" Binding="{Binding RemainingDemand,Converter={StaticResource Area}}" Width="103" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Reserved" Header="В резерве, м²" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="100" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Available" Header="Можно выдать, м²" Binding="{Binding Available,Converter={StaticResource Area}}" Width="112" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Surplus" Header="Излишек, м²" Binding="{Binding Surplus,Converter={StaticResource Area}}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Deficit" Header="Дефицит, м²" Binding="{Binding Deficit,Converter={StaticResource Area}}" Width="94" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalDeficitCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock x:Name="DetailTitle" Grid.Row="3" Text="Выберите материал" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,9,0,6"/>
@@ -157,7 +157,7 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Место хранения" Binding="{Binding Place}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                                 <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Pieces" Header="Бухты, шт." Binding="{Binding Pieces}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                                <DataGridTextColumn Header="Площадь, м²" Binding="{Binding Area,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Area" Header="Площадь, м²" Binding="{Binding Area,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                             </TabItem>
@@ -165,10 +165,10 @@
                         <DataGrid local:TableColumnMenu.Key="metal-material-objects" x:Name="MaterialObjectsGrid">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Объект" Binding="{Binding ObjectName}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                                <DataGridTextColumn Header="Потребность" Binding="{Binding Demand,Converter={StaticResource Area}}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                                <DataGridTextColumn Header="Резерв" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="70" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                                <DataGridTextColumn Header="Выдано" Binding="{Binding Issued,Converter={StaticResource Area}}" Width="70" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                                <DataGridTextColumn Header="Осталось" Binding="{Binding Remaining,Converter={StaticResource Area}}" Width="80" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Demand" Header="Потребность" Binding="{Binding Demand,Converter={StaticResource Area}}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Reserved" Header="Резерв" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="70" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Issued" Header="Выдано" Binding="{Binding Issued,Converter={StaticResource Area}}" Width="70" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Remaining" Header="Осталось" Binding="{Binding Remaining,Converter={StaticResource Area}}" Width="80" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                             </TabItem>
@@ -191,10 +191,10 @@
                         <DataGridTextColumn Header="Объект" Binding="{Binding ObjectName}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                         <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="120" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                         <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="180" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                        <DataGridTextColumn Header="Потребность, м²" Binding="{Binding Demand,Converter={StaticResource Area}}" Width="120" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                        <DataGridTextColumn Header="Резерв, м²" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                        <DataGridTextColumn Header="Выдано, м²" Binding="{Binding Issued,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                        <DataGridTextColumn Header="Осталось, м²" Binding="{Binding Remaining,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Demand" Header="Потребность, м²" Binding="{Binding Demand,Converter={StaticResource Area}}" Width="120" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Reserved" Header="Резерв, м²" Binding="{Binding Reserved,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Issued" Header="Выдано, м²" Binding="{Binding Issued,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Remaining" Header="Осталось, м²" Binding="{Binding Remaining,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
@@ -228,7 +228,7 @@
                             <DataGridTextColumn Header="Операция" Binding="{Binding Kind}" Width="120" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="90" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="90" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                            <DataGridTextColumn Header="м²" Binding="{Binding Area,Converter={StaticResource Area}}" Width="75" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Area" Header="м²" Binding="{Binding Area,Converter={StaticResource Area}}" Width="75" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Pieces" Header="шт." Binding="{Binding Pieces}" Width="55" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn Header="Откуда" Binding="{Binding Source}" Width="115" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Куда" Binding="{Binding Destination}" Width="115" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
@@ -253,13 +253,13 @@
                             <DataGridTextColumn Header="Поставщик" Binding="{Binding Supplier}" Width="180" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Счёт" Binding="{Binding Invoice}" Width="130" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                            <DataGridTextColumn Header="Площадь, м²" Binding="{Binding Ordered,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Ordered" Header="Площадь, м²" Binding="{Binding Ordered,Converter={StaticResource Area}}" Width="110" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="OrderedPieces" Header="Заказано, шт." Binding="{Binding OrderedPieces}" Width="100" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="Оплачено" Binding="{Binding Paid, Converter={StaticResource MetalPaidText}}" Width="110"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Paid" Header="Оплачено" Binding="{Binding Paid, Converter={StaticResource MetalPaidText}}" Width="110"
                                                 ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                            <DataGridTextColumn Header="Получено, м²" Binding="{Binding Received,Converter={StaticResource Area}}" Width="107" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Received" Header="Получено, м²" Binding="{Binding Received,Converter={StaticResource Area}}" Width="107" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="ReceivedPieces" Header="Получено, шт." Binding="{Binding ReceivedPieces}" Width="95" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="На хранении, м²" Binding="{Binding AtSupplier,Converter={StaticResource Area}}" Width="125" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="AtSupplier" Header="На хранении, м²" Binding="{Binding AtSupplier,Converter={StaticResource Area}}" Width="125" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="PiecesAtSupplier" Header="На хранении, шт." Binding="{Binding PiecesAtSupplier}" Width="115" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                         </DataGrid.Columns>
                     </DataGrid>
