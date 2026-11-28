@@ -8,7 +8,7 @@ namespace GmcSmeta.App;
 /// group the full available width. Children own their own wrapping.</summary>
 public sealed class ResponsiveToolbarPanel : Panel
 {
-    private const double Gap = 6;
+    private const double Gap = 10;
     private double _leftWidth;
     private double _rightWidth;
     private bool _stacked;

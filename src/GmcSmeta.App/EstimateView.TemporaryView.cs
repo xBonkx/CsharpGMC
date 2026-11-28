@@ -421,7 +421,7 @@ public partial class EstimateView
         }
         else
         {
-            // Restore the standard white toolbar chrome, not a transparent button.
+            // Restore the local flat toolbar chrome; only the active view has a blue border.
             button.ClearValue(Control.BackgroundProperty);
             button.ClearValue(Control.BorderBrushProperty);
             button.ClearValue(Control.ForegroundProperty);

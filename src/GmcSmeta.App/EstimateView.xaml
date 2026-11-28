@@ -38,7 +38,10 @@
             <Setter Property="MinWidth" Value="96"/>
         </Style>
         <!-- Compact document toolbar: preserve the existing command handlers and hit targets. -->
-        <Style x:Key="DocumentFlatTool" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+        <Style x:Key="DocumentEstimateTool" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="MinHeight" Value="34"/>
+        </Style>
+        <Style x:Key="DocumentFlatTool" TargetType="Button" BasedOn="{StaticResource DocumentEstimateTool}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Padding" Value="9,6"/>
@@ -47,7 +50,12 @@
             <Setter Property="MinHeight" Value="26"/>
             <Setter Property="Padding" Value="4,2"/>
         </Style>
+        <Style x:Key="DocumentPhaseTool" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="MinHeight" Value="34"/>
+        </Style>
         <Style x:Key="DocumentSplitLeft" TargetType="Button" BasedOn="{StaticResource PythonToolbarMain}">
+            <Setter Property="MinHeight" Value="34"/>
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -66,7 +74,7 @@
             </Setter>
         </Style>
         <Style x:Key="DocumentSplitRight" TargetType="Button" BasedOn="{StaticResource DocumentSplitLeft}">
-            <Setter Property="MinWidth" Value="18"/>
+            <Setter Property="MinWidth" Value="24"/>
             <Setter Property="Padding" Value="2,4"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -391,37 +399,9 @@
             <Setter Property="Margin" Value="0,2,0,0"/>
         </Style>
         <!-- Python QToolButton[checkable=true]: purchase column is a compact button, not a square checkbox. -->
-        <Style x:Key="PythonToolbarToggle" TargetType="CheckBox">
-            <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
-            <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
-            <Setter Property="Foreground" Value="#0F172A"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="MinHeight" Value="32"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Border x:Name="ToggleChrome" Background="#FFFFFF" BorderBrush="#E4E8EF"
-                                BorderThickness="1" CornerRadius="8" Padding="10,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ToggleChrome" Property="Background" Value="#F1F4F9"/>
-                                <Setter TargetName="ToggleChrome" Property="BorderBrush" Value="#C9D3E1"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ToggleChrome" Property="Background" Value="#E8F0FE"/>
-                                <Setter TargetName="ToggleChrome" Property="BorderBrush" Value="#2563EB"/>
-                                <Setter Property="Foreground" Value="#1E40AF"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="PythonToolbarToggle" TargetType="CheckBox" BasedOn="{StaticResource PythonToolToggle}">
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="9,6"/>
         </Style>
     </UserControl.Resources>
 
@@ -468,7 +448,7 @@
                     <DockPanel HorizontalAlignment="Left" LastChildFill="True" Margin="0,2,0,0">
                         <Button x:Name="EditTitleButton" DockPanel.Dock="Right" Click="EditTitle_Click" Margin="4,0,0,0"
                                 ToolTip="Номер, дата и название документа. Двойной щелчок — изменить"
-                                Style="{StaticResource DocumentTitleEdit}" Content="Изменить" ContentTemplate="{StaticResource IconOnlyEdit}" AutomationProperties.Name="Изменить реквизиты документа"/>
+                                Style="{StaticResource DocumentTitleEdit}" Content="Изменить" ContentTemplate="{StaticResource IconLabelEdit}" AutomationProperties.Name="Изменить реквизиты документа"/>
                         <TextBlock x:Name="TitleText" FontSize="{StaticResource UiValueSize}" VerticalAlignment="Center" FontWeight="Bold"
                                    Foreground="#0F172A" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
@@ -511,7 +491,7 @@
                                  Checked="ViewMode_Checked"/>
                     <!-- Python kp_editor: phase selector «1 · Объёмы ▾» (kp_workflow.PHASES)
                          and «Скопировать расценки» sit right after the tabs for a plain KP. -->
-                    <Button x:Name="PhaseButton" Style="{StaticResource PythonToolbarButton}"
+                    <Button x:Name="PhaseButton" Style="{StaticResource DocumentPhaseTool}"
                             Click="Phase_Click" Visibility="Collapsed" Margin="8,0,6,6" MinWidth="0"
                             ToolTip="Подготовка КП. Нажмите, чтобы передать на следующий этап">
                         <StackPanel Orientation="Horizontal">
@@ -519,7 +499,7 @@
                              <TextBlock x:Name="PhaseButtonText" Text="Этап ▾" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="TransferRatesButton" Style="{StaticResource PythonToolbarButton}"
+                    <Button x:Name="TransferRatesButton" Style="{StaticResource DocumentPhaseTool}"
                             Content="Скопировать расценки" ContentTemplate="{StaticResource IconLabelCopy}" Click="TransferRates_Click" Visibility="Collapsed"
                             Margin="0,0,6,6" MinWidth="0"
                             ToolTip="Скопировать цены из другого КП: СМР или материалы"/>
@@ -580,7 +560,7 @@
                     <Button x:Name="AddRowButton" Style="{StaticResource DocumentSplitLeft}" Click="AddRow_Click"
                             Content="+ Строка" ContentTemplate="{StaticResource IconLabelRowPlus}" IsEnabled="False"
                             AutomationProperties.Name="Добавить строку" ToolTip="Добавить строку (Insert)"/>
-                    <Button Style="{StaticResource DocumentSplitRight}" Click="AddOptions_Click"
+                    <Button x:Name="AddOptionsButton" Style="{StaticResource DocumentSplitRight}" Click="AddOptions_Click"
                             AutomationProperties.Name="Варианты добавления"
                             ToolTip="Добавить систему, подраздел, комплектующее или строки из Excel"
                             IsEnabled="{Binding IsEnabled, ElementName=AddRowButton}">
@@ -588,22 +568,22 @@
                     </Button>
                 </StackPanel>
                 <Button Content="Из справочника" ContentTemplate="{StaticResource IconLabelBook}"
-                        Style="{StaticResource PythonToolbarButton}" Click="AddFromCatalog_Click"
+                        Style="{StaticResource DocumentEstimateTool}" Click="AddFromCatalog_Click"
                         IsEnabled="{Binding IsEnabled, ElementName=AddRowButton}" Margin="0,0,10,4"
                         ToolTip="Добавить позиции из справочника (Ctrl+K)"/>
                 <Border Width="1" Height="22" Background="#E4E8EF" VerticalAlignment="Center" Margin="0,0,6,4"/>
                 <!-- Python common.view_button: «Группировка» and «Сортировка» — two buttons,
                      each with its own menu; only the on-screen look changes, not the KP order. -->
-                <Button x:Name="GroupButton" Style="{StaticResource PythonToolbarButton}" Content="Группировка" ContentTemplate="{StaticResource IconLabelLayers}"
+                <Button x:Name="GroupButton" Style="{StaticResource DocumentFlatTool}" Content="Группировка" ContentTemplate="{StaticResource IconLabelLayers}"
                         Click="GroupMenu_Click" Margin="0,0,6,4"
                         ToolTip="Как показать строки: по системам, одинаковые вместе, по типу, списком. Порядок строк в КП не меняется"/>
-                <Button x:Name="SortButton" Style="{StaticResource PythonToolbarButton}" Content="Сортировка" ContentTemplate="{StaticResource IconLabelSort}"
+                <Button x:Name="SortButton" Style="{StaticResource DocumentFlatTool}" Content="Сортировка" ContentTemplate="{StaticResource IconLabelSort}"
                         Click="SortMenu_Click" Margin="0,0,2,4"
                         ToolTip="Порядок строк на экране: как в КП, по названию, сумме, цене, количеству"/>
-                <Button x:Name="NoPriceFilterButton" Style="{StaticResource PythonToolbarButton}" Content="Без цены" ContentTemplate="{StaticResource IconLabelAlert}" Click="NoPriceFilter_Click"
+                <Button x:Name="NoPriceFilterButton" Style="{StaticResource DocumentEstimateTool}" Content="Без цены" ContentTemplate="{StaticResource IconLabelAlert}" Click="NoPriceFilter_Click"
                         Margin="0,0,2,4" Visibility="Collapsed"
                         ToolTip="Показать только позиции без цены. Проставленная цена убирает строку из фильтра"/>
-                <Button x:Name="ResetViewButton" Style="{StaticResource PythonToolbarButton}" Content="Как в КП" ContentTemplate="{StaticResource IconLabelX}" Click="ResetView_Click"
+                <Button x:Name="ResetViewButton" Style="{StaticResource DocumentEstimateTool}" Content="Как в КП" ContentTemplate="{StaticResource IconLabelX}" Click="ResetView_Click"
                         Margin="0,0,2,4" Visibility="Collapsed"
                         ToolTip="Вернуть исходный вид, порядок, фильтр и группировку"/>
             </WrapPanel>
@@ -611,7 +591,7 @@
                 <CheckBox x:Name="PurchaseToggle" Style="{StaticResource PythonToolbarToggle}" Content="Закуп" ContentTemplate="{StaticResource IconLabelBuilding}" VerticalAlignment="Center" Margin="0,0,2,4"
                 Checked="PurchaseToggle_Changed" Unchecked="PurchaseToggle_Changed"
                 ToolTip="Показать закупочную цену рядом с ценой заказчика. Видна только нам"/>
-                <Button x:Name="EstimateColumnsButton" Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource PythonToolbarButton}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>
+                <Button x:Name="EstimateColumnsButton" Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource DocumentEstimateTool}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>
                 <Grid Width="170" MinHeight="34" Margin="0,0,0,4">
                 <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonIconSearch}" TextChanged="EstimateSearch_TextChanged"
                          ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете"/>
