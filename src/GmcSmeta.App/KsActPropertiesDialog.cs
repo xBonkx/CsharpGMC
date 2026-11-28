@@ -95,7 +95,6 @@ internal static class KsActPropertiesDialog
                 MessageBox.Show(dialog, ex.Message, "Дата", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
-        cancel.Click += (_, _) => dialog.Close();
         return dialog.ShowDialog() == true && edit is not null ? (edit, message) : null;
     }
 }
