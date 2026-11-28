@@ -4,5 +4,8 @@
         Title="Выдача на объект" Width="1420" Height="760" MinWidth="1000" MinHeight="480"
         WindowStartupLocation="CenterOwner" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}">
+    <Window.Resources>
+        <Thickness x:Key="LayoutShipmentsPaneMargin">22,18,22,16</Thickness>
+    </Window.Resources>
     <ContentControl x:Name="InlinePaneHost"/>
 </Window>

@@ -27,42 +27,42 @@
         <Button x:Name="MaterialsMarkupButton" Style="{StaticResource PythonToolbarMain}" 
                 Margin="0,0,2,0" ToolTip="Выделите строки (можно целую систему) и посчитайте цену клиенту из закупа — например, закуп × 1,44 (или наоборот)">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphList}" Stroke="#2563EB"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphList}" Stroke="#2563EB"/></Canvas></Viewbox>
                 <TextBlock Text="Наценка выделенным…" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Button x:Name="MaterialsCatalogButton" Style="{StaticResource PythonToolbarMain}" 
                 Margin="0,0,2,0" ToolTip="Где закупочная цена пустая — подставить последнюю цену из справочника">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBook}" Stroke="#2563EB"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBook}" Stroke="#2563EB"/></Canvas></Viewbox>
                 <TextBlock Text="Закуп из справочника" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Button x:Name="MaterialsRequestButton" Style="{StaticResource PythonToolbarPrimary}"  Margin="0,0,10,0"
                 ToolTip="Excel-заявка поставщику: выберите его в окне — в заявку пойдут все его позиции по договору, одинаковые сложены, количество общее">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="White"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="White"/></Canvas></Viewbox>
                 <TextBlock Text="Заявка поставщику" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Button x:Name="MaterialsColorButton" Style="{StaticResource PythonToolbarButton}" 
                 Margin="0,0,2,0" ToolTip="Покрасить выделенные строки, как заливку в Excel">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="#64748B"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="#64748B"/></Canvas></Viewbox>
                 <TextBlock Text="Цвет" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Button x:Name="MaterialsGroupingButton" Style="{StaticResource PythonToolbarButton}" 
                 Margin="0,0,2,0" ToolTip="Как показать строки: группировка и сортировка. Только на экране — порядок строк в КП, Excel и печати не меняется">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#64748B"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#64748B"/></Canvas></Viewbox>
                 <TextBlock Text="Группировка" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Button x:Name="MaterialsSortingButton" Style="{StaticResource PythonToolbarButton}" 
                 Margin="0,0,6,0" ToolTip="Порядок строк на экране">
             <StackPanel Orientation="Horizontal">
-                <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSort}" Stroke="#64748B"/></Canvas></Viewbox>
+                <Viewbox Width="18" Height="18" StretchDirection="Both" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSort}" Stroke="#64748B"/></Canvas></Viewbox>
                 <TextBlock Text="Сортировка" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>

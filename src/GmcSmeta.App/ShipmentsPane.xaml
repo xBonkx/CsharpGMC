@@ -259,7 +259,7 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid Margin="{StaticResource LayoutEmbeddedPageMargin}">
+    <Grid Margin="{DynamicResource LayoutShipmentsPaneMargin}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="210"/>
             <ColumnDefinition Width="12"/>

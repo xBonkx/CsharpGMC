@@ -147,7 +147,7 @@
         <Grid Width="200" MinHeight="34"><TextBox x:Name="SummarySearch" Style="{StaticResource PythonIconSearch}" AutomationProperties.Name="Найти позицию"
                  TextChanged="SummarySearch_TextChanged"
                  ToolTip="Только строки с этим в названии (или системе / поставщике) — например «решетк»"/>
-            <Viewbox Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
+            <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
             <TextBlock Text="Найти позицию…" Foreground="#64748B" Margin="30,0,32,0"
                        VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                 <TextBlock.Style>

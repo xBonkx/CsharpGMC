@@ -168,7 +168,7 @@
             <Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#DCE8FA"/></Trigger></Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid Margin="{StaticResource LayoutEmbeddedPageMargin}">
+    <Grid Margin="{DynamicResource LayoutProcurementPaneMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>

@@ -10,6 +10,7 @@ import html
 import json
 import re
 from pathlib import Path
+import design_audit
 
 # Narrow candidate set: exclude ordinary punctuation, money/degree signs,
 # and status text unless it occurs in a UI-label assignment.
@@ -36,8 +37,11 @@ def candidates(source, suffix):
             continue
         symbols = "".join(dict.fromkeys(GLYPH.findall(label)))
         if symbols:
+            # Keep explanatory/formula labels out of the action-icon review queue.
+            lead = GLYPH.match(label.lstrip()) is not None
+            status = "REVIEW" if lead else "SEMANTIC_OR_EMBEDDED"
             yield {"line": source.count("\n", 0, offset) + 1,
-                   "symbols": symbols, "label": label, "status": "REVIEW"}
+                   "symbols": symbols, "label": label, "status": status}
 
 def write_csv(path, fields, rows):
     with path.open("w", encoding="utf-8-sig", newline="") as stream:
@@ -91,7 +95,8 @@ def matrices(output):
                 for scale in ((100, 110, 120) if resolution == "1920x1080" else (100,)):
                     case = f"{page}-{resolution}-dpi{dpi}-scale{scale}"
                     captures.append(dict(case=case, page=page, state=state, resolution=resolution,
-                        dpi=dpi, scale=scale, fixture_id="", role="", smr_mode="", columns_profile="",
+                        dpi=dpi, scale=scale, fixture_id="", object_id="", document_id="", database="", data_fingerprint="",
+                        role="", permissions="", signed="", smr_mode="", columns_profile="", table_zoom="",
                         python_sha="", csharp_sha="", python_png="", csharp_png="",
                         actual_dpi="", diff_json="", status="NOT_RUN", notes=""))
     write_csv(output / "paired-captures.csv", list(captures[0]), captures)
@@ -125,6 +130,7 @@ def main():
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     self_test()
+    design_audit.self_test()
     if args.self_test and args.out is None:
         print("Static scanner self-test passed.")
         return
@@ -134,6 +140,7 @@ def main():
     args.out.mkdir(parents=True, exist_ok=False)
     count = scan(args.root, args.out)
     result = matrices(args.out)
+    result.update(design_audit.inventory(args.root, args.out))
     (args.out / "inventory.json").write_text(json.dumps(
         {"icon_candidates": count, **result, "status": "NOT_RUN",
          "scope": "heuristic literal labels; comments/false positives possible; dynamic strings not exhaustive"},

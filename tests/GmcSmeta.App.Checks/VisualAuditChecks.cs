@@ -310,7 +310,7 @@ internal static class VisualAuditChecks
             encoder.Save(stream);
 
         using var writer = new StreamWriter(Path.Combine(directory, name + ".tsv"));
-        writer.WriteLine("path\ttype\tname\tvisibility\tx\ty\twidth\theight\tdesiredWidth\tdesiredHeight\tmargin\tpadding\tfontSize\tfontFamily\tactualDpiX\tactualDpiY");
+        writer.WriteLine("path\ttype\tname\tvisibility\tx\ty\twidth\theight\tdesiredWidth\tdesiredHeight\tmargin\tpadding\tfontSize\tfontFamily\tactualDpiX\tactualDpiY\tpaintBoundsX\tpaintBoundsY\tpaintBoundsWidth\tpaintBoundsHeight\tmarginSource\tpaddingSource\ttemplatedParent");
         Dump(root, root, "0", writer);
     }
 
@@ -327,11 +327,24 @@ internal static class VisualAuditChecks
                 TextBlock text => text.Padding.ToString(),
                 _ => ""
             };
+            var bounds = ReferenceEquals(visual, root) ? new Rect(element.RenderSize) :
+                visual.TransformToAncestor(root).TransformBounds(new Rect(element.RenderSize));
+            var paddingProperty = element switch
+            {
+                Control => Control.PaddingProperty,
+                Border => Border.PaddingProperty,
+                TextBlock => TextBlock.PaddingProperty,
+                _ => null
+            };
+            var marginSource = DependencyPropertyHelper.GetValueSource(element, FrameworkElement.MarginProperty).BaseValueSource;
+            var paddingSource = paddingProperty is null ? "" :
+                DependencyPropertyHelper.GetValueSource(element, paddingProperty).BaseValueSource.ToString();
+            var templatedParent = element.TemplatedParent?.GetType().Name ?? "";
             var fontSize = (double)element.GetValue(TextElementFontSize);
             var font = (FontFamily)element.GetValue(TextElementFontFamily);
             var dpi = VisualTreeHelper.GetDpi(visual);
             writer.WriteLine(FormattableString.Invariant(
-                $"{path}\t{element.GetType().Name}\t{element.Name}\t{element.Visibility}\t{offset.X:0.##}\t{offset.Y:0.##}\t{element.ActualWidth:0.##}\t{element.ActualHeight:0.##}\t{element.DesiredSize.Width:0.##}\t{element.DesiredSize.Height:0.##}\t{element.Margin.ToString()}\t{padding}\t{fontSize:0.##}\t{font.Source}\t{dpi.PixelsPerInchX:0.##}\t{dpi.PixelsPerInchY:0.##}"));
+                $"{path}\t{element.GetType().Name}\t{element.Name}\t{element.Visibility}\t{offset.X:0.##}\t{offset.Y:0.##}\t{element.ActualWidth:0.##}\t{element.ActualHeight:0.##}\t{element.DesiredSize.Width:0.##}\t{element.DesiredSize.Height:0.##}\t{element.Margin.ToString()}\t{padding}\t{fontSize:0.##}\t{font.Source}\t{dpi.PixelsPerInchX:0.##}\t{dpi.PixelsPerInchY:0.##}\t{bounds.X:0.##}\t{bounds.Y:0.##}\t{bounds.Width:0.##}\t{bounds.Height:0.##}\t{marginSource}\t{paddingSource}\t{templatedParent}"));
         }
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(visual); i++)
             if (VisualTreeHelper.GetChild(visual, i) is Visual child)

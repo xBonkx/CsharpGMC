@@ -14,13 +14,21 @@ public sealed class SharedLayoutMetricsTests
     }
 
     [Theory]
-    [InlineData("ProcurementPane.xaml")]
-    [InlineData("ShipmentsPane.xaml")]
     [InlineData("ContractActsWorkspace.xaml")]
     [InlineData("EstimateView.xaml")]
     public void EmbeddedPagesShareOuterMetrics(string file)
     {
         Assert.Contains("Margin=\"{StaticResource LayoutEmbeddedPageMargin}\"", Source(file));
+    }
+
+    [Theory]
+    [InlineData("ProcurementPane.xaml", "ProcurementWindow.xaml", "LayoutProcurementPaneMargin")]
+    [InlineData("ShipmentsPane.xaml", "ShipmentsWindow.xaml", "LayoutShipmentsPaneMargin")]
+    public void StandaloneHostOverridesOnlyItsOwnPaneMargin(string pane, string window, string key)
+    {
+        Assert.Contains("Margin=\"{DynamicResource " + key + "}\"", Source(pane));
+        Assert.Contains("<Thickness x:Key=\"" + key + "\">22,18,22,16</Thickness>", Source(window));
+        Assert.Contains("<Thickness x:Key=\"" + key + "\">24,6,24,14</Thickness>", Source("Theme/LayoutMetrics.xaml"));
     }
 
     [Fact]

@@ -14,6 +14,8 @@
     <Thickness x:Key="LayoutDocumentToolbarMargin">24,6,24,0</Thickness>
     <Thickness x:Key="LayoutEmbeddedPageMargin">24,6,24,14</Thickness>
     <Thickness x:Key="LayoutCostPaneMargin">24,6,24,14</Thickness>
+    <Thickness x:Key="LayoutProcurementPaneMargin">24,6,24,14</Thickness>
+    <Thickness x:Key="LayoutShipmentsPaneMargin">24,6,24,14</Thickness>
     <!-- Python cost_totals_view.py: max content width1060, tile spacing10,
          vertical spacing12, row34; 4px white space below the last row. -->
     <sys:Double x:Key="LayoutTotalsMaxWidth">1060</sys:Double>
