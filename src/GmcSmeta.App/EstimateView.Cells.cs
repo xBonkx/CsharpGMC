@@ -316,7 +316,7 @@ public partial class EstimateView
     // Resolve by the owning system ID, never by row order or the displayed name.
     private EditableEstimateRow? CopySourceSystem(EditableEstimateRow? selected)
     {
-        if (selected is null || selected.IsVirtual) return null;
+        if (selected is null || selected.IsVirtual || !_rows.Contains(selected)) return null;
         var id = SystemCopySource.Resolve(selected.Source, _rows
             .Where(r => r.IsSystem && !r.IsVirtual).Select(r => r.Source));
         return id is int systemId

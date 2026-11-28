@@ -27,7 +27,7 @@ public partial class EstimateView
 
     private async Task AddSectionAsync(bool subsection)
     {
-        if (_estimate?.Locked == true)
+        if (_estimate?.Locked != false)
             return;
         if (_serverConflict)
         {
@@ -35,8 +35,12 @@ public partial class EstimateView
             return;
         }
 
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
+        var revision = _serverRevision;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites) return;
+        var primary = EstimateGrid.SelectedItem;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
         if (selected?.IsVirtual == true)
         {
@@ -62,21 +66,28 @@ public partial class EstimateView
             return;
         }
 
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+            !ReferenceEquals(primary, EstimateGrid.SelectedItem) ||
+            !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) ||
+            (selected is not null && !_rows.Contains(selected))) return;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Создание раздела… ({count})", false);
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict) throw new InvalidOperationException("Смета устарела; обнови её.");
+            if (_serverConflict || _detached || _estimate?.Locked != false || revision != _serverRevision)
+                throw new InvalidOperationException("Смета устарела; обнови её.");
             var result = await Task.Run(() => SqlServerDatabase.AddSection(
-                _sqlConnectionString, _contractId, name, subsection, anchorId, _serverRevision));
+                _sqlConnectionString, _contractId, name, subsection, anchorId, revision));
             if (!result.Saved)
             {
                 _serverConflict = true;
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил создание раздела.");
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             _focusSystemAfterReload = checked((int)result.SystemId!.Value);
             if (!string.IsNullOrEmpty(EstimateSearch.Text)) EstimateSearch.Clear();
         }
@@ -99,15 +110,19 @@ public partial class EstimateView
 
     private async void RenameSection_Click(object sender, RoutedEventArgs e)
     {
-        if (_estimate?.Locked == true)
+        if (_estimate?.Locked != false)
             return;
         if (_serverConflict)
         {
             SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
             return;
         }
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
+        var revision = _serverRevision;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites) return;
+        var primary = EstimateGrid.SelectedItem;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         if (EstimateGrid.SelectedItem is not EditableEstimateRow selected ||
             !selected.IsSystem || selected.IsVirtual)
         {
@@ -126,21 +141,28 @@ public partial class EstimateView
         }
         if (string.Equals(selected.Name, name, StringComparison.Ordinal)) return;
 
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+            !ReferenceEquals(primary, EstimateGrid.SelectedItem) ||
+            !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) ||
+            (selected is not null && !_rows.Contains(selected))) return;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Переименование… ({count})", false);
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict) throw new InvalidOperationException("Смета устарела; обнови её.");
+            if (_serverConflict || _detached || _estimate?.Locked != false || revision != _serverRevision)
+                throw new InvalidOperationException("Смета устарела; обнови её.");
             var result = await Task.Run(() => SqlServerDatabase.RenameSection(
-                _sqlConnectionString, _contractId, systemId, name, _serverRevision));
+                _sqlConnectionString, _contractId, systemId, name, revision));
             if (!result.Saved)
             {
                 _serverConflict = true;
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил переименование.");
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             _focusSystemAfterReload = systemId;
         }
         catch (Exception ex)
@@ -634,7 +656,9 @@ public partial class EstimateView
             SetStatus("Выбери заголовок раздела или подраздела.", true);
             return;
         }
-        if (_serverConflict) { SetStatus("Сначала обнови смету.", true); return; }
+        var revision = _serverRevision;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+            EstimateGrid.SelectedItems.Count != 1 || !_rows.Contains(selected)) return;
         var sectionId = selected.Source.SystemId;
         if (MessageBox.Show(Window.GetWindow(this),
             $"Удалить раздел «{selected.Name}»?\n\n" +
@@ -642,9 +666,14 @@ public partial class EstimateView
             "Если есть КС-2 или проведённые выдачи, удаление будет запрещено.\n\nЭто действие нельзя отменить.",
             "Удаление раздела", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
             != MessageBoxResult.Yes) return;
-        await RunSectionCommandAsync(rev => SqlServerDatabase.DeleteSection(
-            _sqlConnectionString, _contractId, sectionId, rev), "Удаление раздела", "Раздел удалён",
-            () => { _focusAfterReload = null; _focusSystemAfterReload = null; });
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+            !ReferenceEquals(EstimateGrid.SelectedItem, selected) ||
+            EstimateGrid.SelectedItems.Count != 1 || !_rows.Contains(selected)) return;
+        await RunSectionCommandAsync(rev => rev != revision
+                ? SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повтори удаление.", rev)
+                : SqlServerDatabase.DeleteSection(_sqlConnectionString, _contractId, sectionId, revision),
+            "Удаление раздела", "Раздел удалён",
+            () => { _focusAfterReload = null; _focusSystemAfterReload = null; }, showDeleteFailure: true);
     }
 
     /// <summary>
@@ -705,8 +734,13 @@ public partial class EstimateView
             SetStatus("В документе нет другого доступного раздела.", true);
             return;
         }
+        var revision = _serverRevision;
+        var selectedRows = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var picker = new SectionPickerDialog(targets) { Owner = Window.GetWindow(this) };
         if (picker.ShowDialog() != true || picker.SelectedSectionId is not long to) return;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites || !CanPlaceEstimateRows ||
+            !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selectedRows, ReferenceEqualityComparer.Instance) ||
+            !targets.Any(target => target.Item1 == to) || !roots.All(row => row is not null && _rows.Contains(row))) return;
 
         // The drag planner interprets null as insertion at the start. To match
         // Python's 'move_to_system' we explicitly anchor after the last root.
@@ -714,8 +748,9 @@ public partial class EstimateView
                 r.Source.SystemId == to && !picked.Contains(r.Id))
             .OrderBy(r => r.SortKey).LastOrDefault();
         long? anchor = last?.Id;
-        await RunSectionCommandAsync(rev => SqlServerDatabase.DragPositions(
-            _sqlConnectionString, _contractId, picked, to, anchor, rev),
+        await RunSectionCommandAsync(rev => rev != revision
+            ? SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повтори перенос.", rev)
+            : SqlServerDatabase.DragPositions(_sqlConnectionString, _contractId, picked, to, anchor, revision),
             $"Перенос {picked.Length} позиций", $"Перенесено позиций: {picked.Length}",
             () =>
             {

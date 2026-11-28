@@ -24,7 +24,8 @@ public partial class EstimateView
         if (EstimateGrid is null) return;
         var targetCell = ContextMenuTarget.TargetCell(EstimateGrid, e);
         var hit = ContextMenuTarget.SelectRow<EditableEstimateRow>(EstimateGrid, e);
-        if (hit is null && EstimateGrid.Items.Count > 0)
+        if (hit is null && (EstimateGrid.Items.Count > 0 || _rows.Count > 0 ||
+            EstimateGrid.SelectedItems.Count > 0))
         {
             e.Handled = true;
             return;
@@ -34,11 +35,25 @@ public partial class EstimateView
         var sameAnchor = ReferenceEquals(selected, primary);
         var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var revision = _serverRevision;
-        bool CanWrite() => _estimate?.Locked == false && !_serverConflict &&
-            System.Threading.Volatile.Read(ref _pendingWrites) == 0;
+        var document = _estimate;
+        bool SelectionCurrent() => !_detached && ReferenceEquals(document, _estimate) &&
+            ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
+                .SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
+            (selected is null || EstimateGrid.Items.Contains(selected)) &&
+            selection.All(row => row.IsVirtual || _rows.Contains(row));
+        bool CanWrite() => CanAppendImport(revision) && !HasUnsettledCacheWrites;
         var canWrite = CanWrite();
-        var realSelected = selected is { IsVirtual: false };
+        var realSelected = selected is { IsVirtual: false } && _rows.Contains(selected);
+        var allReal = selection.Length > 0 && selection.All(row =>
+            !row.IsVirtual && _rows.Contains(row));
         var nSel = selection.Count(r => !r.IsVirtual);
+        var singleReal = realSelected && allReal && selection.Length == 1;
+        var positionsOnly = allReal && selection.All(row => !row.IsSystem && !row.IsAreaSummary && row.Id > 0);
+        var rootsOnly = positionsOnly && selection.All(row =>
+            row.Source.ParentPositionId is null && !row.Source.OutOfKp);
+        var ordinaryAnchor = singleReal && !selected!.IsAreaSummary;
+        var emptyDocument = hit is null && _rows.Count == 0 && selection.Length == 0;
         var menu = new ContextMenu();
         MenuItem Add(string title, Action action, bool enabled = true, string shortcut = "",
             bool write = true, bool needsAnchor = true, string? glyph = null, bool danger = false)
@@ -52,9 +67,8 @@ public partial class EstimateView
             item.Click += (_, _) =>
             {
                 // No action may silently retarget after a refresh or selection change.
-                if ((write && (!CanWrite() || revision != _serverRevision)) ||
-                    !ReferenceEquals(primary, EstimateGrid.SelectedItem) ||
-                    !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection))
+                if (!item.IsEnabled || !SelectionCurrent() ||
+                    (write && (!CanWrite() || revision != _serverRevision)))
                 {
                     SetStatus("Выбор или данные изменились. Откройте меню снова.", true);
                     return;
@@ -84,8 +98,7 @@ public partial class EstimateView
                 EstimateGrid.CurrentCell = targetCell;
             }
             if (!EstimateGrid.CurrentCell.Equals(targetCell) || !CanWrite() ||
-                revision != _serverRevision ||
-                !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection))
+                revision != _serverRevision || !SelectionCurrent())
             {
                 SetStatus("Ячейка или данные изменились. Повторите вставку.", true);
                 return;
@@ -93,7 +106,7 @@ public partial class EstimateView
             PasteRows_Click(this, new RoutedEventArgs());
         }
         // Python kp_editor._context_menu: тот же порядок и те же подписи.
-        Add("Добавить строку", () => AddRow_Click(this, new RoutedEventArgs()), canWrite, "Insert", glyph: "Plus");
+        Add("Добавить строку", () => AddRow_Click(this, new RoutedEventArgs()), canWrite && ordinaryAnchor, "Insert", glyph: "Plus");
         if (realSelected)
         {
             Add("Переместить вверх", () => MoveUp_Click(this, new RoutedEventArgs()),
@@ -104,17 +117,17 @@ public partial class EstimateView
         if (realSelected && selected is { IsSystem: false })
             Add("Добавить комплектующее (без цены)",
                 () => AddComponent_Click(this, new RoutedEventArgs()),
-                canWrite && selected is { IsSystem: false }, "Shift+Insert", glyph: "Plus");
-        Add("Из справочника…", () => AddFromCatalog_Click(this, new RoutedEventArgs()), canWrite, "Ctrl+K", glyph: "Book");
-        Add("Добавить систему", () => AddSection_Click(this, new RoutedEventArgs()), canWrite,
+                canWrite && ordinaryAnchor && selected is { IsSystem: false }, "Shift+Insert", glyph: "Plus");
+        Add("Из справочника…", () => AddFromCatalog_Click(this, new RoutedEventArgs()), canWrite && ordinaryAnchor, "Ctrl+K", glyph: "Book");
+        Add("Добавить систему", () => AddSection_Click(this, new RoutedEventArgs()), canWrite && (ordinaryAnchor || emptyDocument),
             "Ctrl+Shift+Insert", needsAnchor: false, glyph: "FolderPlus");
         if (realSelected)
             Add("Добавить подраздел в систему", () => AddSubsection_Click(this, new RoutedEventArgs()),
-                canWrite && realSelected, "Ctrl+Alt+Insert", glyph: "FolderPlus");
+                canWrite && ordinaryAnchor, "Ctrl+Alt+Insert", glyph: "FolderPlus");
         menu.Items.Add(new Separator());
         if (realSelected)
             Add(nSel > 1 ? $"Копировать строки ({nSel})" : "Копировать", CopySelectedRows,
-                _estimate?.Locked == false, "Ctrl+C", write: false, needsAnchor: false, glyph: "Copy");
+                _estimate?.Locked == false && allReal, "Ctrl+C", write: false, needsAnchor: false, glyph: "Copy");
         var excelClip = false;
         var ownClip = false;
         try
@@ -126,20 +139,20 @@ public partial class EstimateView
         catch (System.Runtime.InteropServices.ExternalException) { /* буфер занят */ }
         if (excelClip)
         {
-            Add("Вставить из Excel", PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Download");
-            if (realSelected && nSel > 0 && !selected!.IsSystem)
+            Add("Вставить из Excel", PasteAtTarget, canWrite && ordinaryAnchor && targetCell.IsValid, "Ctrl+V", glyph: "Download");
+            if (realSelected && rootsOnly && !selected!.IsSystem)
                 Add(nSel > 1 ? $"Заменить выделенные ({nSel}) строками из Excel"
                         : "Заменить эту строку строками из Excel",
                     () => ReplaceRows_Click(this, new RoutedEventArgs()), canWrite, "Ctrl+Shift+V", needsAnchor: false, glyph: "Copy");
         }
         else if (ownClip && ClipboardRows.Count > 0)
             Add($"Вставить скопированные ({ClipboardRows.Count})",
-                PasteAtTarget, canWrite && targetCell.IsValid, "Ctrl+V", glyph: "Download");
+                PasteAtTarget, canWrite && ordinaryAnchor && targetCell.IsValid, "Ctrl+V", glyph: "Download");
         if (realSelected && selected is { IsSystem: false })
         {
             Add(nSel > 1 ? $"Дублировать выделенные ({nSel})" : "Копия строки",
                 () => Duplicate_Click(this, new RoutedEventArgs()),
-                canWrite && selected is { IsSystem: false }, "Ctrl+D", needsAnchor: false, glyph: "Duplicate");
+                canWrite && positionsOnly, "Ctrl+D", needsAnchor: false, glyph: "Duplicate");
             var canIndent = canWrite && CanPlaceEstimateRows && selection.Length == 1 &&
                 !selected.IsAreaSummary && !selected.Source.OutOfKp;
             if (selected.Source.ParentPositionId is null)
@@ -151,10 +164,12 @@ public partial class EstimateView
             else
                 Add("Сделать обычной строкой", () => _ = IndentSelectedAsync(false),
                     canIndent, "Ctrl+[", glyph: "Outdent");
-            Add("Превратить в раздел", () => ToSections_Click(this, new RoutedEventArgs()), canWrite, needsAnchor: false, glyph: "Layers");
+            Add("Превратить в раздел", () => ToSections_Click(this, new RoutedEventArgs()),
+                canWrite && rootsOnly && selection.All(row => row.Source.SystemId == selected.Source.SystemId),
+                needsAnchor: false, glyph: "Layers");
             Add("Перенести в другую систему…", () => MoveSection_Click(this, new RoutedEventArgs()),
-                canWrite && selected is { IsSystem: false }, "Ctrl+M", needsAnchor: false, glyph: "Layers");
-            if (canWrite && CanStartPriceLike() && sameAnchor && !selected.IsSub &&
+                canWrite && positionsOnly && CanPlaceEstimateRows, "Ctrl+M", needsAnchor: false, glyph: "Layers");
+            if (canWrite && CanStartPriceLike() && ordinaryAnchor && sameAnchor && !selected.IsSub &&
                 selected.Source.ParentPositionId is null && _estimate is { } snapshot)
             {
                 var preview = PriceLikeBatchPlan.Preview(snapshot.PositionsInOrder, selected.Id);
@@ -174,18 +189,17 @@ public partial class EstimateView
         if (realSelected)
         {
             Add("Копировать систему…", () => CopySection_Click(this, new RoutedEventArgs()),
-                canWrite && CopySourceSystem(selected) is not null, glyph: "Copy");
+                canWrite && ordinaryAnchor && CopySourceSystem(selected) is not null, glyph: "Copy");
             if (selected is { IsSystem: true, IsVirtual: false })
-                Add("Переименовать систему", () => RenameSection_Click(this, new RoutedEventArgs()), canWrite, "F2", glyph: "Edit");
+                Add("Переименовать систему", () => RenameSection_Click(this, new RoutedEventArgs()), canWrite && ordinaryAnchor, "F2", glyph: "Edit");
         }
         if (selected is { IsAreaSummary: true, IsVirtual: false })
-            Add("Развернуть эту строку м² обратно", () => ExpandArea(selected.Id), canWrite, glyph: "Undo");
+            Add("Развернуть эту строку м² обратно", () => ExpandArea(selected.Id), canWrite && singleReal, glyph: "Undo");
         menu.Items.Add(new Separator());
         if (realSelected)
         {
-            var bulkPositions = nSel > 1 && selection.All(r =>
-                !r.IsSystem && !r.IsVirtual && !r.IsAreaSummary);
-            var singleRow = selection.Length == 1 && nSel == 1 && !selection[0].IsAreaSummary;
+            var bulkPositions = nSel > 1 && positionsOnly;
+            var singleRow = ordinaryAnchor;
             Add(bulkPositions ? $"Удалить выделенные ({nSel})…" : "Удалить",
                 singleRow && selected is { IsSystem: true }
                     ? () => DeleteSection_Click(this, new RoutedEventArgs())
