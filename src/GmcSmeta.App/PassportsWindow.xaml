@@ -15,18 +15,18 @@
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" Padding="11,6" Margin="0,0,7,5" Click="Root_Click"/>
             </WrapPanel>
             <WrapPanel>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить" Padding="11,6" Margin="0,0,7,5" Click="Add_Click"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelPlus}" Click="Add_Click"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Список систем…" Padding="11,6" Margin="0,0,7,5" Click="Batch_Click"/>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать" Padding="11,6" Margin="0,0,7,5" Click="Duplicate_Click"/>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить" Padding="11,6" Margin="0,0,7,5" Click="Delete_Click"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelCopy}" Click="Duplicate_Click"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelTrash}" Click="Delete_Click"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Ранее созданные PDF…" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click"/>
             </WrapPanel>
             </StackPanel>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button Style="{StaticResource PythonToolbarButton}" x:Name="SaveButton" IsEnabled="False" Content="Сохранить" Padding="14,8" Margin="0,0,8,0" Click="Save_Click"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportSelectedButton" IsEnabled="False" Content="PDF выбранных" Padding="14,8" Margin="0,0,8,0" Click="ExportSelected_Click"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportAllButton" IsEnabled="False" Content="PDF всех" Padding="14,8" Margin="0,0,8,0" Click="ExportAll_Click"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportSelectedButton" IsEnabled="False" Content="PDF выбранных" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportSelected_Click"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportAllButton" IsEnabled="False" Content="PDF всех" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportAll_Click"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Padding="14,8" Click="Close_Click"/>
         </WrapPanel>
         <Grid x:Name="WorkspaceGrid" IsEnabled="False">
@@ -38,7 +38,7 @@
             <DataGrid local:TableColumnMenu.Key="passports" Grid.Row="0" x:Name="PassportList" AutoGenerateColumns="False" CanUserAddRows="False"
                       HeadersVisibility="Column" IsReadOnly="True" SelectionUnit="FullRow"
                       SelectionMode="Extended" MinRowHeight="27" AlternationCount="0" RowStyle="{StaticResource PythonTableRow}" GridLinesVisibility="All"
-                      Background="White" SelectionChanged="PassportList_SelectionChanged" Style="{StaticResource DocumentTable}">
+                      Background="White" SelectionChanged="PassportList_SelectionChanged" Style="{StaticResource DocumentTable}" CanUserResizeRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Система" Width="125" Binding="{Binding System}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                     <DataGridTextColumn Header="Назначение" Width="*" Binding="{Binding Purpose}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>

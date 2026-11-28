@@ -16,7 +16,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="TitleText" Text="Журнал изменений" FontWeight="SemiBold"
+        <TextBlock x:Name="TitleText" Text="Журнал изменений" TextWrapping="Wrap" FontWeight="SemiBold"
                    FontSize="{StaticResource UiH2Size}" Foreground="#0F172A"/>
 
         <DockPanel Grid.Row="1" Margin="0,10,0,0">
@@ -79,7 +79,7 @@
                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                   CanUserDeleteRows="False" CanUserReorderColumns="False" SelectionMode="Single"
                   SelectionUnit="FullRow" RowHeaderWidth="0" GridLinesVisibility="All"
-                  HeadersVisibility="Column" VirtualizingPanel.VirtualizationMode="Recycling" Style="{StaticResource DocumentTable}">
+                  HeadersVisibility="Column" VirtualizingPanel.VirtualizationMode="Recycling" Style="{StaticResource DocumentTable}" CanUserResizeRows="False">
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
                     <Setter Property="Background" Value="{Binding RowBrush}"/>
@@ -90,7 +90,7 @@
                 <DataGridTextColumn Header="Кто" Binding="{Binding Who}" Width="110" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Что" Binding="{Binding What}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Действие" Binding="{Binding Action}" Width="150" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Подробности" Binding="{Binding Details}" Width="*" HeaderStyle="{StaticResource KsTextHeader}">
+                <DataGridTextColumn Header="Подробности" Binding="{Binding Details}" Width="*" MinWidth="180" HeaderStyle="{StaticResource KsTextHeader}">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostText}">
                             <Setter Property="ToolTip" Value="{Binding Details}"/>

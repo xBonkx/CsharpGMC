@@ -54,7 +54,7 @@
     </Window.Resources>
     <DockPanel Margin="22,18,22,16">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <TextBlock Text="Приказы на объект" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
+            <TextBlock Text="Приказы на объект" TextWrapping="Wrap" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
                        Foreground="#0F172A"/>
             <TextBlock x:Name="ObjectName" Margin="0,10,0,0" Foreground="#64748B"
                        TextWrapping="Wrap"/>
@@ -114,11 +114,11 @@
                                 SelectedDateChanged="Date_Changed" Height="32" HorizontalAlignment="Left"/>
                     <TextBlock Grid.Row="3" Text="Номер первого" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="NumberBox" Height="32"
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="NumberBox" MinHeight="{StaticResource LayoutFieldMinHeight}"
                              Padding="7,5" ToolTip="Следующим приказам автоматически назначатся номера …-02, …-03"/>
                     <TextBlock Grid.Row="4" Text="Договор подряда" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
-                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="ContractBox" Height="32"
+                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="ContractBox" MinHeight="{StaticResource LayoutFieldMinHeight}"
                              Padding="7,5" ToolTip="№8 от 02 марта 2026 г."/>
                     <TextBlock Grid.Row="5" Text="Объект" HorizontalAlignment="Right"
                                Margin="0,8,14,0"/>
@@ -146,7 +146,7 @@
                 </WrapPanel>
                 <TextBlock x:Name="StatusInfo" TextWrapping="Wrap" Foreground="#64748B"
                            Margin="0,6,0,8"/>
-                <TextBlock Text="ИСТОРИЯ ПРИКАЗОВ ЭТОГО ОБЪЕКТА" FontWeight="SemiBold"
+                <TextBlock Text="ИСТОРИЯ ПРИКАЗОВ ЭТОГО ОБЪЕКТА" TextWrapping="Wrap" FontWeight="SemiBold"
                            Foreground="#475569" Margin="0,14,0,7"/>
                 <ListBox x:Name="OrderHistory" Height="120" DisplayMemberPath="Label"
                          SelectionChanged="History_SelectionChanged"/>

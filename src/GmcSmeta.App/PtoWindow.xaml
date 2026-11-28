@@ -9,9 +9,9 @@
     <StackPanel DockPanel.Dock="Top">
       <TextBlock x:Name="ArchiveLabel" Margin="0,0,0,10" Foreground="#64748B" TextWrapping="Wrap"/>
       <WrapPanel Margin="0,0,0,6">
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Создать комплект" Click="Create_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="Edit_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать акт" Click="Copy_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Создать комплект" ContentTemplate="{StaticResource IconLabelPlus}" Click="Create_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" ContentTemplate="{StaticResource IconLabelOpen}" Click="Edit_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать акт" ContentTemplate="{StaticResource IconLabelCopy}" Click="Copy_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить" ContentTemplate="{StaticResource IconLabelTrash}" Click="Delete_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Карточка объекта" Click="ObjectCard_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Сертификаты…" Click="Certificates_Click" Padding="14,6" Margin="0,0,6,6"/>
@@ -29,11 +29,12 @@
         </Grid.ColumnDefinitions>
         <Grid Margin="0,0,8,0">
           <TextBox x:Name="Search" Style="{StaticResource PythonSearch}" Height="32"
-            Background="White" BorderBrush="#D0D7E2" Padding="10,5" VerticalContentAlignment="Center"
+            Background="White" BorderBrush="#D0D7E2" Padding="32,5,10,5" VerticalContentAlignment="Center"
             AutomationProperties.Name="Поиск комплектов"
             ToolTip="Поиск объекта, договора, акта или замечаний" TextChanged="Filter_Changed"/>
-          <TextBlock Text="Найти комплект по объекту, договору или номеру акта"
-            Foreground="#94A3B8" Margin="10,0" VerticalAlignment="Center"
+          <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                    <TextBlock Text="Найти комплект по объекту, договору или номеру акта"
+            Foreground="#94A3B8" Margin="32,0,10,0" VerticalAlignment="Center"
             IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
             <TextBlock.Style>
               <Style TargetType="TextBlock">
@@ -58,7 +59,7 @@
     </StackPanel>
     <DataGrid local:TableColumnMenu.Key="pto-packages" x:Name="Packages" AutoGenerateColumns="False" IsReadOnly="True"
         Background="White" MinRowHeight="27" AlternationCount="0" RowStyle="{StaticResource PythonTableRow}" GridLinesVisibility="All"
-        SelectionMode="Single" SelectionUnit="FullRow" MouseDoubleClick="Packages_DoubleClick" Style="{StaticResource DocumentTable}">
+        SelectionMode="Single" SelectionUnit="FullRow" MouseDoubleClick="Packages_DoubleClick" Style="{StaticResource DocumentTable}" CanUserResizeRows="False" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
       <DataGrid.Columns>
         <DataGridTextColumn Header="Объект / договор" Binding="{Binding ObjectLabel}" Width="3*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
         <DataGridTextColumn Header="Раздел" Binding="{Binding Section}" Width="1.3*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>

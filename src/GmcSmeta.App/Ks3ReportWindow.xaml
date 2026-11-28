@@ -19,7 +19,7 @@
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Расчёт КС-3" Foreground="#0F172A" FontWeight="Bold"
+                <TextBlock Text="Расчёт КС-3" TextWrapping="Wrap" Foreground="#0F172A" FontWeight="Bold"
                            FontSize="{StaticResource UiH1Size}"/>
                 <TextBlock x:Name="ActInfoText" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
             </StackPanel>
@@ -73,9 +73,9 @@
                           ColumnHeaderStyle="{StaticResource KsQuantityHeader}" MinRowHeight="27"
                           GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                          RowStyle="{StaticResource KsReportRow}" AlternationCount="2" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+                          RowStyle="{StaticResource KsReportRow}" AlternationCount="2" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" CanUserResizeRows="False">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Акт КС-2" Binding="{Binding Title}" Width="*" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
+                        <DataGridTextColumn Header="Акт КС-2" Binding="{Binding Title}" Width="*" MinWidth="150" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                         <DataGridTextColumn Header="Без НДС, ₽" Binding="{Binding Net, StringFormat={}{0:N2}}"
                                             Width="190" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                     </DataGrid.Columns>
@@ -102,7 +102,7 @@
                     </LinearGradientBrush>
                 </Border.Background>
                 <StackPanel>
-                    <TextBlock Text="Итого за период · с НДС" Style="{StaticResource PythonTileLabel}" Foreground="White"/>
+                    <TextBlock Text="Итого за период · с НДС" TextWrapping="Wrap" Style="{StaticResource PythonTileLabel}" Foreground="White"/>
                     <TextBlock x:Name="TotalText" Text="—" FontWeight="Bold"
                                FontSize="{StaticResource UiH2Size}" Foreground="#FFFFFF" TextWrapping="Wrap"/>
                 </StackPanel>

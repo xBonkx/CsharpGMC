@@ -9,9 +9,9 @@
         <TextBlock x:Name="StatusText" DockPanel.Dock="Top" Margin="2,0,0,12"
                    Foreground="#64748B" TextWrapping="Wrap"/>
         <WrapPanel x:Name="EditorActions" DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" Click="Save_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр PDF" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="BuildButton" Content="Собрать выдачу…" Click="Build_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр PDF" ContentTemplate="{StaticResource IconLabelFile}" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="BuildButton" Content="Собрать выдачу…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Build_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" x:Name="SendButton" Content="Отметить отправленным…" Click="Sent_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="История…" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>

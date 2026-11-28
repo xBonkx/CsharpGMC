@@ -14,7 +14,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Реквизиты для КС-2 и КС-3"
+            <TextBlock Text="Реквизиты для КС-2 и КС-3" TextWrapping="Wrap"
                        FontSize="{StaticResource UiH1Size}" FontWeight="SemiBold"
                        Foreground="#1E3A5F"/>
             <TextBlock x:Name="ObjectTitle" Text="Данные объекта и подписантов"
@@ -24,7 +24,7 @@
                 BorderThickness="1" CornerRadius="12">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
                 <StackPanel x:Name="RequisitesFields" IsEnabled="False">
-                    <TextBlock Text="Стройка и договор" FontWeight="Bold"
+                    <TextBlock Text="Стройка и договор" TextWrapping="Wrap" FontWeight="Bold"
                                Foreground="#2563EB" Margin="0,0,0,7"/>
                     <TextBlock Text="Заказчик (с адресом)" Foreground="#475569"/>
                     <TextBox x:Name="CustomerFullBox" Height="54" VerticalScrollBarVisibility="Auto" Margin="0,4,0,9"
@@ -33,9 +33,9 @@
                     <TextBox x:Name="SiteFullBox" Height="54" VerticalScrollBarVisibility="Auto" Margin="0,4,0,9"
                              AcceptsReturn="True" TextWrapping="Wrap"/>
                     <TextBlock Text="Часть объекта в КС-2" Foreground="#475569"/>
-                    <TextBox MinHeight="32" x:Name="SitePartBox" Margin="0,4,0,13"/>
+                    <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="SitePartBox" Margin="0,4,0,13"/>
                     <Separator Margin="0,0,0,10"/>
-                    <TextBlock Text="Подписывает со стороны заказчика" FontWeight="Bold"
+                    <TextBlock Text="Подписывает со стороны заказчика" TextWrapping="Wrap" FontWeight="Bold"
                                Foreground="#2563EB" Margin="0,0,0,7"/>
                     <Grid Margin="0,0,0,9">
                         <Grid.ColumnDefinitions>
@@ -45,22 +45,22 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
                             <TextBlock Text="Организация"/>
-                            <TextBox MinHeight="32" x:Name="CustOrgBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="CustOrgBox" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="0,0,8,0">
                             <TextBlock Text="Должность"/>
-                            <TextBox MinHeight="32" x:Name="CustPostBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="CustPostBox" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="ФИО"/>
-                            <TextBox MinHeight="32" x:Name="CustNameBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="CustNameBox" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Grid>
                     <Separator Margin="0,7,0,10"/>
-                    <TextBlock Text="Второй подписант (если есть)" FontWeight="Bold"
+                    <TextBlock Text="Второй подписант (если есть)" TextWrapping="Wrap" FontWeight="Bold"
                                Foreground="#2563EB" Margin="0,0,0,7"/>
                     <TextBlock Text="Роль: генподрядчик / технический заказчик"/>
-                    <TextBox MinHeight="32" x:Name="SecondRoleBox" Margin="0,4,0,9"/>
+                    <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="SecondRoleBox" Margin="0,4,0,9"/>
                     <Grid Margin="0,0,0,9">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -69,24 +69,24 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
                             <TextBlock Text="Организация"/>
-                            <TextBox MinHeight="32" x:Name="SecondOrgBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="SecondOrgBox" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="0,0,8,0">
                             <TextBlock Text="Должность"/>
-                            <TextBox MinHeight="32" x:Name="SecondPostBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="SecondPostBox" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="ФИО"/>
-                            <TextBox MinHeight="32" x:Name="SecondNameBox" Margin="0,4,0,0"/>
+                            <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="SecondNameBox" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Grid>
                     <Separator Margin="0,7,0,10"/>
-                    <TextBlock Text="Параметры работ" FontWeight="Bold" Foreground="#2563EB"
+                    <TextBlock Text="Параметры работ" TextWrapping="Wrap" FontWeight="Bold" Foreground="#2563EB"
                                Margin="0,0,0,7"/>
                     <TextBlock Text="Наименование работ для КС-3"/>
-                    <TextBox MinHeight="32" x:Name="WorkTitleBox" Margin="0,4,0,9"/>
+                    <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="WorkTitleBox" Margin="0,4,0,9"/>
                     <TextBlock Text="Дата начала работ · дд.мм.гггг" TextWrapping="Wrap"/>
-                    <TextBox MinHeight="32" x:Name="WorksStartBox" Margin="0,4,0,9" Width="190"
+                    <TextBox MinHeight="{StaticResource LayoutFieldMinHeight}" x:Name="WorksStartBox" Margin="0,4,0,9" Width="190"
                              HorizontalAlignment="Left"/>
                     <TextBlock Text="Общие реквизиты заказчика и подписантов сохраняются у объекта, часть объекта — у выбранного договора."
                                Foreground="#64748B" TextWrapping="Wrap" Margin="0,7,0,0"/>

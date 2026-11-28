@@ -55,10 +55,10 @@
         <StackPanel DockPanel.Dock="Top">
             <WrapPanel Orientation="Horizontal" Margin="0,0,0,8">
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Провести операцию…" Click="Operation_Click" Padding="13,7" Margin="0,0,8,0"/>
-                <Button Style="{StaticResource PythonToolbarButton}" x:Name="OpeningButton" Content="Перенести остатки из Excel…" Click="Import_Click" Padding="12,7" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource PythonToolbarButton}" x:Name="OpeningButton" Content="Перенести остатки из Excel…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Import_Click" Padding="12,7" Margin="0,0,8,0"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Учёт металла (Excel)…" ContentTemplate="{StaticResource IconLabelList}" Click="Register_Click" Padding="12,7" Margin="0,0,8,0"/>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Отчёт Excel…" Click="Export_Click" Padding="12,7" Margin="0,0,8,0"/>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" Click="Refresh_Click" Padding="12,7"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Отчёт Excel…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click" Padding="12,7" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Click="Refresh_Click" Padding="12,7"/>
             </WrapPanel>
             <TextBlock x:Name="StatusText" Text="Загрузка…" TextWrapping="Wrap" Foreground="#64748B" Margin="1,1,0,8"/>
         </StackPanel>
@@ -114,9 +114,10 @@
                         </ComboBox>
                         <Grid Width="270">
                             <TextBox x:Name="StockSearch" Style="{StaticResource PythonSearch}" Height="32" Background="White"
-                                     BorderBrush="#D0D7E2" Padding="10,5" VerticalContentAlignment="Center"
+                                     BorderBrush="#D0D7E2" Padding="32,5,10,5" VerticalContentAlignment="Center"
                                      ToolTip="Найти материал или толщину" TextChanged="StockFilter_Changed"/>
-                            <TextBlock Text="Найти материал или толщину" Foreground="#94A3B8" Margin="10,0" VerticalAlignment="Center"
+                            <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                    <TextBlock Text="Найти материал или толщину" Foreground="#94A3B8" Margin="32,0,10,0" VerticalAlignment="Center"
                                        IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                                 <TextBlock.Style><Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -130,7 +131,7 @@
                     <DataGrid local:TableColumnMenu.Key="metal-stock" local:TableColumnMenu.Protect="Материал" x:Name="StockGrid" Grid.Row="2" ColumnHeaderHeight="42" SelectionChanged="StockGrid_SelectionChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="95" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                            <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                            <DataGridTextColumn Header="Материал" Binding="{Binding Material}" Width="*" MinWidth="150" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                             <DataGridTextColumn Header="У нас, м²" Binding="{Binding Ours,Converter={StaticResource Area}}" Width="105" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
                             <DataGridTextColumn Header="У нас, шт." Binding="{Binding OursPieces}" Width="84" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalOwnedCell}"/>
                             <DataGridTextColumn Header="У поставщиков, м²" Binding="{Binding Supplier,Converter={StaticResource Area}}" Width="118" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalSupplierCell}"/>
@@ -142,7 +143,7 @@
                             <DataGridTextColumn Header="Дефицит, м²" Binding="{Binding Deficit,Converter={StaticResource Area}}" Width="94" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource MetalStockHeader}" CellStyle="{StaticResource MetalDeficitCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBlock x:Name="DetailTitle" Grid.Row="3" Text="Выберите материал" FontWeight="SemiBold" Margin="0,9,0,6"/>
+                    <TextBlock x:Name="DetailTitle" Grid.Row="3" Text="Выберите материал" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,9,0,6"/>
                     <Grid Grid.Row="4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
