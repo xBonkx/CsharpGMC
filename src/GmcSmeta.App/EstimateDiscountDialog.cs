@@ -9,14 +9,14 @@ namespace GmcSmeta.App;
 internal sealed class EstimateDiscountDialog : Window
 {
     private readonly EstimateDiscountInput.State _state;
-    private readonly ComboBox _mode=new(){MinHeight=34};
-    private readonly TextBox _percent=new(){MinHeight=34,Padding=new Thickness(8,4,8,4),MaxLength=32};
-    private readonly TextBox _target=new(){MinHeight=34,Padding=new Thickness(8,4,8,4),MaxLength=32};
+    private readonly ComboBox _mode=new();
+    private readonly TextBox _percent=new(){HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
+    private readonly TextBox _target=new(){HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
     private readonly CheckBox _smr=new(){Content="Скидка и на монтаж (СМР)",IsChecked=true};
     private readonly CheckBox _whole=new(){Content="Округлять расценки до целых рублей"};
     private readonly TextBlock _description=new(){TextWrapping=TextWrapping.Wrap};
     private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,LineStackingStrategy=LineStackingStrategy.MaxHeight};
-    private readonly Button _apply=new(){Content="Применить скидку",MinWidth=150,MinHeight=34,IsDefault=true,IsEnabled=false};
+    private readonly Button _apply=new(){Content="Применить скидку",IsDefault=true,IsEnabled=false};
     private bool _busy;
     private bool _onTotal;
     public EstimateDiscountInput.Preview? Result {get;private set;}
@@ -25,39 +25,49 @@ internal sealed class EstimateDiscountDialog : Window
     {
         _state=state;
         _preview.SetResourceReference(TextBlock.FontSizeProperty, "UiMoneyInputSize");
-        Title="Скидка на всю смету";Width=590;MinWidth=520;SizeToContent=SizeToContent.Height;
-        WindowStartupLocation=WindowStartupLocation.CenterOwner;ResizeMode=ResizeMode.NoResize;
+        Title="Скидка на всю смету";Width=590;MinWidth=360;SizeToContent=SizeToContent.Height;
+        WindowStartupLocation=WindowStartupLocation.CenterOwner;ResizeMode=ResizeMode.CanResize;
         DynamicFormLayout.Apply(this);
+        DynamicFormLayout.Field(_mode);
+        DynamicFormLayout.Field(_percent);
+        DynamicFormLayout.Field(_target);
         _description.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
         DynamicFormLayout.WrapCaption(_smr);
         DynamicFormLayout.WrapCaption(_whole);
         var root=new StackPanel();
         var heading=WorkspaceWindowUi.Heading(Title);
-        heading.Margin=new Thickness(0,0,0,10);
+        heading.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogIntroGap");
         root.Children.Add(heading);
         if(state.SupportsTotal)_mode.Items.Add("На итог — отдельной строкой");
         _mode.Items.Add("На расценки — изменить цены позиций");
         root.Children.Add(_mode);
-        _description.Margin=new Thickness(0,10,0,12);root.Children.Add(_description);
+        _description.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogListGap");root.Children.Add(_description);
         void Field(string caption,TextBox box)
         {
-            var grid=new Grid{Margin=new Thickness(0,0,0,8)};
+            var grid=new Grid();
+            grid.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormFieldMargin");
             grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
             grid.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
-            grid.Children.Add(new TextBlock{Text=caption,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap});
+            var label=new TextBlock{Text=caption,VerticalAlignment=VerticalAlignment.Center,TextWrapping=TextWrapping.Wrap};
+            label.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormColumnGap");
+            System.Windows.Automation.AutomationProperties.SetName(box,caption);
+            grid.Children.Add(label);
             Grid.SetColumn(box,1);grid.Children.Add(box);root.Children.Add(grid);
         }
         Field("Скидка, %",_percent);Field("Или итог должен быть, ₽",_target);
         _smr.IsEnabled=!state.SmrIsPercent;
-        _smr.Margin=new Thickness(0,2,0,8);_whole.Margin=new Thickness(0,0,0,10);
+        _smr.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormFieldMargin");
+        _whole.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormFieldMargin");
         root.Children.Add(_smr);root.Children.Add(_whole);
         var card=new Border{Background=new SolidColorBrush(Color.FromRgb(241,245,249)),
-            CornerRadius=new CornerRadius(8),Padding=new Thickness(12),Child=_preview,Margin=new Thickness(0,6,0,14)};
+            CornerRadius=new CornerRadius(8),Child=_preview};
+        card.SetResourceReference(Border.PaddingProperty,"LayoutFormScrollInset");
+        card.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogListGap");
         root.Children.Add(card);
-        var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100,MinHeight=34,Margin=new Thickness(0,0,8,0)};
-        if(TryFindResource("PythonToolbarPrimary") is Style primary)_apply.Style=primary;
-        if(TryFindResource("PythonToolbarButton") is Style standard)cancel.Style=standard;
+        var actions=new WrapPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
+        var cancel=new Button{Content="Отмена",IsCancel=true};
+        cancel.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogActionGap");
+        DynamicFormLayout.StyleActions(_apply,cancel);
         actions.Children.Add(cancel);actions.Children.Add(_apply);
         Content=DynamicFormLayout.WithFooter(root,actions);
         _mode.SelectionChanged+=(_,_)=>SwitchMode();
