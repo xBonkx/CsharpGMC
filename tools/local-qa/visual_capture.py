@@ -264,7 +264,7 @@ def verify_pair(before_path, after_path):
             "dpi": before["dpi_x"], "page": before["page"], "state": before["state"],
             "python_png_sha256": before["png_sha256"], "csharp_png_sha256": after["png_sha256"]}
 
-def read_capture_rgb(path):
+def read_capture_rgb(path, expected_sha=None):
     """Decode only our capture encoder's RGB8/filter-0 PNG, with bounded output."""
     width, height = png_size(path)
     if not (0 < width <= 2560 and 0 < height <= 1440):
@@ -272,6 +272,8 @@ def read_capture_rgb(path):
     if path.stat().st_size > 32_000_000:
         raise ValueError("capture PNG too large")
     data = path.read_bytes()
+    if len(data) > 32_000_000 or (expected_sha is not None and hashlib.sha256(data).hexdigest() != expected_sha):
+        raise ValueError("capture raster changed after metadata validation")
     chunks, at, finished = [], len(PNG), False
     while at + 12 <= len(data):
         length, kind = struct.unpack_from(">I4s", data, at)
@@ -296,7 +298,10 @@ def read_capture_rgb(path):
         raise ValueError("incomplete capture PNG")
     stride = width * 3 + 1
     decoder = zlib.decompressobj()
-    raw = decoder.decompress(b"".join(chunks), stride * height + 1)
+    try:
+        raw = decoder.decompress(b"".join(chunks), stride * height + 1)
+    except zlib.error as exc:
+        raise ValueError("invalid capture compression") from exc
     if len(raw) != stride * height or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
         raise ValueError("unexpected capture decompressed length")
     if any(raw[y*stride] != 0 for y in range(height)):
@@ -345,8 +350,8 @@ def rgb_png(width, height, rgb):
 
 def compare_capture_pair(before_path, after_path, output, region=None):
     meta = verify_pair(before_path, after_path)
-    w, h, before = read_capture_rgb(before_path.with_name("capture.png"))
-    aw, ah, after = read_capture_rgb(after_path.with_name("capture.png"))
+    w, h, before = read_capture_rgb(before_path.with_name("capture.png"), meta["python_png_sha256"])
+    aw, ah, after = read_capture_rgb(after_path.with_name("capture.png"), meta["csharp_png_sha256"])
     if (w,h) != (aw,ah):
         raise ValueError("capture sizes differ")
     cw, ch, before = crop_rgb(w, h, before, region)
