@@ -48,4 +48,25 @@ public sealed class MaterialsViewMenuSourceTests
         var icons = File.ReadAllText(Path.Combine(app, "Theme", "ToolbarIcons.xaml"));
         Assert.Contains("x:Key=\"GlyphX\" Figures=\"M6 6l12 12M18 6 6 18\"", icons);
     }
+    [Fact]
+    public void MaterialsHierarchyIsViewOnlyAndReportDoesNotDuplicateMembers()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "EstimateView.MaterialsHierarchy.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var hierarchy = File.ReadAllText(Path.Combine(app, "EstimateView.MaterialsHierarchy.cs"));
+        Assert.Contains("HasGridEdit(grid)", hierarchy);
+        Assert.Contains("Items.Contains(row)", hierarchy);
+        Assert.DoesNotContain("SqlServer", hierarchy);
+        var view = File.ReadAllText(Path.Combine(app, "EstimateView.Materials.cs"));
+        Assert.Contains("MaterialsMergedRows(members, labels, header)", view);
+        Assert.Contains("MaterialsPositionRow(p, \"\", labels.GetValueOrDefault(p.SystemId), group)", view);
+        Assert.Contains("export: true", view);
+        Assert.Contains("if (row.IsSystemHeader) { e.Cancel = true; return; }", view);
+        var projection = File.ReadAllText(Path.Combine(app, "MaterialsVisibleRows.cs"));
+        Assert.Contains("eligible[e.Parent] = true", projection);
+        Assert.Contains("export ? parent.IsGroup && !parent.IsSystemHeader : !parent.IsExpanded", projection);
+    }
 }

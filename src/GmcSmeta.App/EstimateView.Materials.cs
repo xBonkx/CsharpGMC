@@ -25,8 +25,23 @@ public partial class EstimateView
 {
     // ------------------------------------------------------------------ row model
     /// <summary>Строка таблицы «Материалов» (cost_view._pos_item или шапка системы/группы).</summary>
-    public sealed class MaterialsRow
+    public sealed class MaterialsRow : INotifyPropertyChanged
     {
+        internal MaterialsRow? Parent { get; init; }
+        public bool HasChildren { get; internal set; }
+        private bool _expanded = true;
+        public bool IsExpanded
+        {
+            get => _expanded;
+            internal set
+            {
+                if (_expanded == value) return;
+                _expanded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public Thickness NameIndent => new(Parent is null ? 0 : Parent.Parent is null ? 12 : 24, 0, 0, 0);
         public bool IsSystemHeader { get; init; }
         public bool IsGroup { get; init; }
         public bool IsSub { get; init; }
@@ -65,7 +80,7 @@ public partial class EstimateView
         public decimal Price { get; init; }
 
         public string NameTooltip => IsGroup
-            ? $"{Name}\n{MemberIds.Length} одинаковых строк — цена, закуп, наценка и поставщик, вписанные сюда, встанут во все."
+            ? $"{Name}\n{MemberIds.Length} одинаковых строк — цена, закуп, наценка и поставщик, вписанные сюда, встанут во все. ▸ — раскрыть."
             : $"{Name}\n{SystemLabel}\nДвойной щелчок — поправить наименование (меняется и в смете)";
         public string PriceTooltip => "";
         public string CostTooltip => HasFact
@@ -229,7 +244,7 @@ public partial class EstimateView
     private void MaterialsSystemLabel(long systemId, string value) =>
         _materialsLabels[systemId] = value;
 
-    private MaterialsRow MaterialsPositionRow(CostMaterialsPosition p, string num, string? systemLabel = null)
+    private MaterialsRow MaterialsPositionRow(CostMaterialsPosition p, string num, string? systemLabel = null, MaterialsRow? parent = null)
     {
         var cu = p.UnitCost;
         var sub = p.ParentId is not null;
@@ -278,6 +293,8 @@ public partial class EstimateView
         {
             SystemId = p.SystemId,
             PositionId = p.Id,
+            Parent = parent,
+            IsExpanded = !p.IsAreaSummary,
             IsSub = sub,
             IsWork = p.Work,
             HasFact = hasFact,
@@ -336,7 +353,7 @@ public partial class EstimateView
                 if (p.ParentId is null && cu is not null && p.Price != 0m)
                     sCov += p.Qty * p.Price;
             }
-            rows.Add(new MaterialsRow
+            var header = new MaterialsRow
             {
                 IsSystemHeader = true,
                 SystemId = id,
@@ -346,14 +363,16 @@ public partial class EstimateView
                 CostSumText = sCost != 0m ? MatMoney(Money.Round2(sCost)) : "",
                 MarginText = sCost != 0m ? MatMoney(Money.Round2(sCov - sCost)) : "",
                 RowBackground = isSub ? "#E8F5FC" : "#F1F4F9",
-            });
+            };
+            rows.Add(header);
             if (name != "Без системы") num++;
             foreach (var p in members)
             {
-                rows.Add(MaterialsPositionRow(p, num.ToString(Ru), labels.GetValueOrDefault(p.SystemId)));
+                var position = MaterialsPositionRow(p, num.ToString(Ru), labels.GetValueOrDefault(p.SystemId), header);
+                rows.Add(position);
                 if (children.TryGetValue(p.Id, out var kids))
                     foreach (var kid in kids)
-                        rows.Add(MaterialsPositionRow(kid, ""));
+                        rows.Add(MaterialsPositionRow(kid, "", parent: position));
                 num++;
             }
         }
@@ -380,21 +399,22 @@ public partial class EstimateView
         var labels = _materialsLabels;
         if (_materialsMode == "kp")
         {
+            var number = 1;
             foreach (var p in top)
-                rows.Add(MaterialsPositionRow(p, "", labels.GetValueOrDefault(p.SystemId)));
+                rows.Add(MaterialsPositionRow(p, (number++).ToString(Ru), labels.GetValueOrDefault(p.SystemId)));
             return rows;
         }
         if (_materialsMode is "sup" or "sup_same")
         {
             var groups = top.GroupBy(p => p.Supplier).ToList();
-            foreach (var g in groups.OrderBy(g => g.Key == "" ? 1 : 0).ThenBy(g => g.Key, StringComparer.CurrentCulture))
+            foreach (var g in groups.OrderBy(g => g.Key == "" ? 1 : 0).ThenBy(g => g.Key.ToLowerInvariant(), StringComparer.Ordinal))
             {
                 var members = g.ToList();
                 decimal cost = 0m;
                 foreach (var p in members)
                     if (p.UnitCost is decimal unit)
                         cost += unit * p.Qty;
-                rows.Add(new MaterialsRow
+                var header = new MaterialsRow
                 {
                     IsGroup = true,
                     IsSystemHeader = true,   // жирная шапка, не редактируется
@@ -402,15 +422,16 @@ public partial class EstimateView
                     CostSumText = cost != 0m ? MatMoney(Money.Round2(cost)) : "",
                     RowBackground = g.Key.Length == 0 ? "#FEF3C7" : "#F1F4F9",
                     MemberIds = members.Select(p => p.Id).ToArray(),
-                });
+                };
+                rows.Add(header);
                 if (_materialsMode == "sup")
                 {
                     foreach (var p in members)
-                        rows.Add(MaterialsPositionRow(p, "", labels.GetValueOrDefault(p.SystemId)));
+                        rows.Add(MaterialsPositionRow(p, "", labels.GetValueOrDefault(p.SystemId), header));
                 }
                 else
                 {
-                    rows.AddRange(MaterialsMergedRows(members, labels));
+                    rows.AddRange(MaterialsMergedRows(members, labels, header));
                 }
             }
             return rows;
@@ -420,23 +441,25 @@ public partial class EstimateView
         return rows;
     }
 
-    private List<MaterialsRow> MaterialsMergedRows(List<CostMaterialsPosition> top, Dictionary<long, string> labels)
+    private List<MaterialsRow> MaterialsMergedRows(List<CostMaterialsPosition> top, Dictionary<long, string> labels, MaterialsRow? parent = null)
     {
         var rows = new List<MaterialsRow>();
         foreach (var ps in GmcSmeta.Core.Domain.MaterialsMerge.Groups(top))
         {
             if (ps.Count == 1)
             {
-                rows.Add(MaterialsPositionRow(ps[0], "", labels.GetValueOrDefault(ps[0].SystemId)));
+                rows.Add(MaterialsPositionRow(ps[0], "", labels.GetValueOrDefault(ps[0].SystemId), parent));
                 continue;
             }
             var p0 = ps[0];
             var merged = GmcSmeta.Core.Domain.MaterialsMerge.Summarize(ps);
             var (qty, sum, costSum, cov, prices, costs, suppliers, notes, oneMarkup, markupValues) = merged;
             string Same(decimal? v) => v is decimal value ? MatMoney(value) : "";
-            rows.Add(new MaterialsRow
+            var group = new MaterialsRow
             {
                 IsGroup = true,
+                Parent = parent,
+                IsExpanded = false,
                 SystemId = p0.SystemId,
                 Name = p0.Name,
                 Unit = p0.Unit,
@@ -458,7 +481,10 @@ public partial class EstimateView
                 RowBackground = "#E8F0FE",
                 MemberIds = ps.Select(p => p.Id).ToArray(),
                 SystemLabel = labels.GetValueOrDefault(p0.SystemId),
-            });
+            };
+            rows.Add(group);
+            foreach (var p in ps)
+                rows.Add(MaterialsPositionRow(p, "", labels.GetValueOrDefault(p.SystemId), group));
         }
         return rows;
     }
@@ -643,7 +669,7 @@ public partial class EstimateView
             return;
         }
         var column = e.Column.Header?.ToString() ?? "";
-        if (row.IsSystemHeader && !row.IsGroup)
+        if (row.IsSystemHeader)
         {
             e.Cancel = true;
             return;
@@ -695,6 +721,7 @@ public partial class EstimateView
         if (e.EditAction != DataGridEditAction.Commit) return;
         if (!MaterialsSnapshotReady) { e.Cancel = true; return; }
         if (e.Row.Item is not MaterialsRow row) return;
+        if (row.IsSystemHeader) { e.Cancel = true; return; }
         var editor = MaterialsEditorTextBox(e.EditingElement);
         if (editor is null) return;
         var column = e.Column.Header?.ToString() ?? "";
@@ -943,7 +970,7 @@ public partial class EstimateView
     private void MaterialsSetView(string mode, string sort)
     {
         if (_detached || _materialsLoading || _materialsBusy || _materialsData is null) return;
-        if (MaterialsGrid?.Items is IEditableCollectionView { IsEditingItem: true })
+        if (MaterialsGrid is { } grid && HasGridEdit(grid))
         {
             SetStatus("Завершите редактирование ячейки перед изменением вида.", true);
             return;
@@ -988,6 +1015,14 @@ public partial class EstimateView
         var reset = ContextMenuIcons.Create("Вернуть как в КП", "X");
         reset.Click += (_, _) => MaterialsSetView("kp", "kp");
         menu.Items.Add(reset);
+        menu.Items.Add(new Separator());
+        Header("Свёрнутые строки");
+        var collapse = ContextMenuIcons.Create("Свернуть все вложенные строки (м², комплектующие)", "Outdent");
+        collapse.Click += (_, _) => MaterialsSetNestedExpanded(false);
+        menu.Items.Add(collapse);
+        var expand = ContextMenuIcons.Create("Развернуть всё", "Indent");
+        expand.Click += (_, _) => MaterialsSetNestedExpanded(true);
+        menu.Items.Add(expand);
         NameWrapPreference.AddMenuItem(menu);
         menu.IsOpen = true;
     }
@@ -1128,7 +1163,7 @@ public partial class EstimateView
     };
 
     private long[] MaterialsClearIds(string field) => MaterialsGrid.SelectedItems.OfType<MaterialsRow>()
-        .Where(row => !row.IsSystemHeader || row.IsGroup)
+        .Where(row => !row.IsSystemHeader)
         .Where(row => field != "price" || !row.IsSub && !row.IsWork)
         .SelectMany(row => row.IsGroup ? row.MemberIds : new[] { row.PositionId })
         .Where(id => id > 0).Distinct().OrderBy(id => id).ToArray();
@@ -1424,7 +1459,12 @@ public partial class EstimateView
 
     private void MaterialsExport_Click(object sender, RoutedEventArgs e)
     {
-        if (MaterialsGrid?.ItemsSource is not ObservableCollection<MaterialsRow> rows) return;
+        if (MaterialsGrid?.ItemsSource is not ObservableCollection<MaterialsRow>) return;
+        // Disclosure changes the screen only. Keep the report's aggregate rows
+        // without duplicating their member quantities or hiding components.
+        var rows = _materialsVisibleRows.Filter(MaterialsSearch?.Text,
+            MaterialsNoCostToggle?.IsChecked == true, MaterialsNoPriceToggle?.IsChecked == true,
+            (MaterialsSystemFilter?.SelectedItem as MatSystemOption)?.Id, export: true);
         var objectName = _estimate?.ObjectName ?? "";
         var title = _estimate?.Title ?? "";
         XlsxExport.Save(Window.GetWindow(this),

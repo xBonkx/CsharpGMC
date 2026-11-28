@@ -4,6 +4,7 @@
       xmlns:local="clr-namespace:GmcSmeta.App">
     <Grid.Resources>
         <local:SingleLineNameConverter x:Key="SingleLineName"/>
+        <BooleanToVisibilityConverter x:Key="MaterialChildrenVisibility"/>
         <Style x:Key="DocumentNameDisplay" TargetType="TextBlock">
             <Setter Property="Text" Value="{Binding Name}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
@@ -186,9 +187,31 @@
                                     CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostTextHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <TextBlock Style="{StaticResource DocumentNameDisplay}"
-                                   VerticalAlignment="Center"
-                                   ToolTip="{Binding NameTooltip}"/>
+                        <DockPanel Margin="{Binding NameIndent}">
+                            <Button DockPanel.Dock="Left" Width="22" MinWidth="22" MinHeight="24" Margin="0,0,4,0" Padding="0"
+                                    Background="Transparent" BorderThickness="0" Foreground="#475569"
+                                    Click="MaterialsToggleChildren_Click" AutomationProperties.Name="Свернуть или развернуть строки"
+                                    Visibility="{Binding HasChildren, Converter={StaticResource MaterialChildrenVisibility}}">
+                                <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="12" Height="12">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                            <Path.Style>
+                                                <Style TargetType="Path" BasedOn="{StaticResource SvgGlyphPath}">
+                                                    <Setter Property="Data" Value="{StaticResource GlyphChevronDown}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsExpanded}" Value="False">
+                                                            <Setter Property="Data" Value="{StaticResource GlyphChevronRight}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Path.Style>
+                                        </Path>
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
+                            <TextBlock Style="{StaticResource DocumentNameDisplay}"
+                                       VerticalAlignment="Center" ToolTip="{Binding NameTooltip}"/>
+                        </DockPanel>
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
                 <DataGridTemplateColumn.CellEditingTemplate>

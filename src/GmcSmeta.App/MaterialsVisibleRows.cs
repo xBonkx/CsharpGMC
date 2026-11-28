@@ -2,17 +2,42 @@ using Row = GmcSmeta.App.EstimateView.MaterialsRow;
 
 namespace GmcSmeta.App;
 
-/// <summary>Immutable search projection of the currently built materials rows.
-/// Retains the exact header/child visibility and same-field AND search rules.</summary>
+/// <summary>Preordered hierarchy of the authoritative material view.
+/// Filtering and disclosure never mutate financial rows or their order.</summary>
 internal sealed class MaterialsVisibleRows
 {
     private readonly Entry[] _entries;
-    private readonly record struct Entry(Row Row, string Name, string SystemLabel);
-    internal MaterialsVisibleRows(IEnumerable<Row> rows) =>
-        _entries = rows.Select(r => new Entry(r, r.Name.ToLowerInvariant(),
-            r.SystemLabel.ToLowerInvariant())).ToArray();
+    private readonly record struct Entry(Row Row, string Name, string SystemLabel, int Parent);
 
-    internal List<Row> Filter(string? query, bool onlyMissing, bool onlyNoPrice, long? allowedId)
+    internal MaterialsVisibleRows(IEnumerable<Row> rows)
+    {
+        var entries = new List<Entry>();
+        var indexes = new Dictionary<Row, int>();
+        foreach (var row in rows)
+        {
+            row.HasChildren = false;
+            var parent = -1;
+            if (row.Parent is { } p)
+            {
+                if (!indexes.TryGetValue(p, out parent))
+                    throw new InvalidOperationException("Родитель строки материалов отсутствует.");
+                p.HasChildren = true;
+            }
+            indexes.Add(row, entries.Count);
+            entries.Add(new Entry(row, row.Name.ToLowerInvariant(), row.SystemLabel.ToLowerInvariant(), parent));
+        }
+        _entries = entries.ToArray();
+    }
+
+    internal void SetNestedExpanded(bool expand)
+    {
+        foreach (var e in _entries)
+            if (e.Row.HasChildren)
+                e.Row.IsExpanded = expand || (e.Parent < 0 && e.Row.IsSystemHeader);
+    }
+
+    internal List<Row> Filter(string? query, bool onlyMissing, bool onlyNoPrice, long? allowedId,
+        bool export = false)
     {
         var words = (query ?? "").Split(' ',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -30,30 +55,40 @@ internal sealed class MaterialsVisibleRows
             (allowedId is null || e.Row.SystemId == allowedId) &&
             (Matches(e.Name) || Matches(e.SystemLabel));
 
-        var result = new List<Row>(_entries.Length);
-        // A header belongs to the following contiguous positions up to the
-        // next header. Delay insertion until we know whether it has children.
-        for (int i = 0; i < _entries.Length;)
+        var eligible = new bool[_entries.Length];
+        // Propagate qualifying descendants before applying disclosure. A collapsed
+        // merged group remains discoverable by its members, not just its first system.
+        for (int i = _entries.Length - 1; i >= 0; i--)
         {
-            var entry = _entries[i++];
-            var row = entry.Row;
-            if (!row.IsSystemHeader && !row.IsGroup)
-            {
-                if (PositionOk(entry)) result.Add(row);
-                continue;
-            }
+            var e = _entries[i];
+            var row = e.Row;
+            if (row.IsSystemHeader)
+                eligible[i] &= row.IsGroup || allowedId is null || allowedId == row.SystemId;
+            else if (row.IsGroup)
+                eligible[i] |= !onlyMissing && !onlyNoPrice && allowedId is null && Matches(e.Name);
+            else
+                eligible[i] |= PositionOk(e);
+            if (eligible[i] && e.Parent >= 0)
+                eligible[e.Parent] = true;
+        }
 
-            var insertAt = result.Count;
-            while (i < _entries.Length && !_entries[i].Row.IsSystemHeader && !_entries[i].Row.IsGroup)
+        var visible = new bool[_entries.Length];
+        var result = new List<Row>(_entries.Length);
+        for (int i = 0; i < _entries.Length; i++)
+        {
+            var e = _entries[i];
+            if (!eligible[i]) continue;
+            if (e.Parent >= 0)
             {
-                var child = _entries[i++];
-                if (PositionOk(child)) result.Add(child.Row);
+                if (!visible[e.Parent]) continue;
+                var parent = _entries[e.Parent].Row;
+                // The old material report contains the aggregate once, not its
+                // newly inspectable members. The normal view respects disclosure.
+                if (export ? parent.IsGroup && !parent.IsSystemHeader : !parent.IsExpanded)
+                    continue;
             }
-            var hasChildren = result.Count > insertAt;
-            var showHeader = row.IsGroup
-                ? hasChildren || (!onlyMissing && !onlyNoPrice && allowedId is null && Matches(entry.Name))
-                : hasChildren && (allowedId is null || allowedId == row.SystemId);
-            if (showHeader) result.Insert(insertAt, row);
+            visible[i] = true;
+            result.Add(e.Row);
         }
         return result;
     }

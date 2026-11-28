@@ -13,6 +13,7 @@ public sealed record CostMaterialsPosition(
 {
     /// <summary>Закупочная за единицу: факт по счёту, иначе плановый закуп (Position.cost_unit).</summary>
     public decimal? UnitCost => Fact ?? Plan;
+    public bool IsAreaSummary { get; init; }
 }
 
 /// <summary>Данные вкладки «Материалы» КП (cost_view.load): системы в порядке КП, все строки, транспорт.</summary>
@@ -54,17 +55,17 @@ public static partial class SqlServerCostSummary
             {
                 token.ThrowIfCancellationRequested();
                 systems.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     r.IsDBNull(1) ? "" : r.GetString(1),
                     !r.IsDBNull(2),
-                    r.IsDBNull(2) ? null : Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture)));
+                    r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2)));
             }
         }
 
         var positions = new List<CostMaterialsPosition>();
         using (var read = new SqlCommand(
             "SELECT p.id, p.system_id, p.parent_id, p.name, p.unit, p.qty, p.price, p.purchase_price, " +
-            "pr.cost_price, sup.name, p.cost_color, p.cost_note " +
+            "pr.cost_price, sup.name, p.cost_color, p.cost_note, p.extra_json " +
             "FROM dbo.positions p " +
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
             "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id " +
@@ -83,14 +84,17 @@ public static partial class SqlServerCostSummary
                 token.ThrowIfCancellationRequested();
                 var name = Text(3);
                 positions.Add(new CostMaterialsPosition(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                    r.IsDBNull(2) ? null : Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
+                    SqlInteger.ReadInt64(r, 1),
+                    r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2),
                     name, Text(4),
                     r.IsDBNull(5) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
                     r.IsDBNull(6) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(6), CultureInfo.InvariantCulture)),
                     Dec(7), Dec(8), Text(9), Text(10), Text(11),
-                    EstimateStatistics.IsWorkName(name)));
+                    EstimateStatistics.IsWorkName(name))
+                {
+                    IsAreaSummary = Area.IsSummary(Text(12)),
+                });
             }
         }
 
@@ -111,7 +115,7 @@ public static partial class SqlServerCostSummary
                 transportCost = r.IsDBNull(1)
                     ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
                 noteJson = r.IsDBNull(2) ? "" : r.GetString(2);
-                locked = !r.IsDBNull(3) && Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture);
+                locked = !r.IsDBNull(3) && SqlFlag.Read(r, 3);
             }
         }
         token.ThrowIfCancellationRequested();
