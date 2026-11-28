@@ -708,7 +708,7 @@
                                 <Setter TargetName="SegmentBorder" Property="Background" Value="White"/>
                                 <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="#D0D7E2"/>
                                 <Setter Property="Foreground" Value="#0F172A"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
