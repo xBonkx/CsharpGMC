@@ -42,12 +42,16 @@ internal static class OfficeLauncher
             finally { File.Delete(temporary); }
         }
 
-        CreateDesktopShortcut(local);
+        // Recheck the target after installation, before executing it.
+        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0 ||
+            (File.GetAttributes(local) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Рабочий лаунчер не может использовать перенаправленный путь.");
 
         var start = new ProcessStartInfo(local) { UseShellExecute = false };
         foreach (var argument in arguments)
             start.ArgumentList.Add(argument);
         using var child = Process.Start(start) ?? throw new InvalidOperationException("Локальный запуск не удался.");
+        CreateDesktopShortcut(local);
         return true;
     }
 

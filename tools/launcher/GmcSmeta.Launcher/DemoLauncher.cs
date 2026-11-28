@@ -110,7 +110,8 @@ internal static class DemoLauncher
                 if (!File.Exists(paths.StateFile) && !File.Exists(paths.PreviousStateFile)) return null;
                 throw new InvalidOperationException("Повреждён указатель тестовой установки.");
             }
-            DemoReleasePolicy.RequireInstalledIntegrity(installed, verifyFiles: false);
+            // Reject a modified downloaded DEMO release before executing it.
+            DemoReleasePolicy.RequireInstalledIntegrity(installed, verifyFiles: true);
             return installed;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)

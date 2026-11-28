@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL: проверка каталогов и полного seal тестового пакета, ярлык после успешного redirect; 2 regression cases added + 1 extended, not run. [Evidence](docs/DEMO_MODE_TODO_20261128.md). 0 CODE READY/DONE; бронь снята.
+
 - 29.11.2026 — PERF-050.04 CODE READY: каталог — сначала страница, затем цены/использования; совместимые API организаций/тегов проверяют ревизию, обоснован отказ от общего кэша. 3 test cases added, not run; [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — CTX-044.01 PARTIAL: убрано чтение JSON режима ПТО при открытии меню документа, проверка при выполнении сохранена. Один source test добавлен, не запускался. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
