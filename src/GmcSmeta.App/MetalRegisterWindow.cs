@@ -23,7 +23,7 @@ internal sealed class MetalRegisterWindow : Window
     private MetalRegisterSheet? _activePage;
     private bool _busy, _switchingTabs;
     private readonly TabControl _tabs = new();
-    private readonly TextBlock _status = new() { Foreground = Brushes.SlateGray };
+    private readonly TextBlock _status = new();
     private XLWorkbook? _book;
     private long? _version;
     private bool _dirty;
@@ -52,6 +52,7 @@ internal sealed class MetalRegisterWindow : Window
         Button("Выгрузить Excel…",Export_Click);
         Button("Сверка для склада…",Opening_Click);
         Button("Обновить",Refresh_Click);
+        _status.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
         _status.TextWrapping = TextWrapping.Wrap;
         _status.Margin = new Thickness(0,8,0,0);
         DockPanel.SetDock(_status,Dock.Bottom);
