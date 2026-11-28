@@ -192,15 +192,13 @@ public partial class EstimateView : UserControl
                 RequestRefresh();
             }
             else if (_visibleEstimateMode == "summary" && _estimate is not null &&
-                string.IsNullOrWhiteSpace(_summaryRevision) && !HasUnsettledCacheWrites)
+                !_summaryBusy && !HasUnsettledCacheWrites)
                 _ = LoadCostSummaryAsync();
             else if (_visibleEstimateMode == "materials" && _estimate is not null &&
-                !_materialsBusy && !HasUnsettledCacheWrites &&
-                (string.IsNullOrWhiteSpace(_materialsRevision) || _materialsRevision != _serverRevision))
+                !_materialsBusy && !HasUnsettledCacheWrites)
                 _ = LoadMaterialsAsync();
             else if (_visibleEstimateMode == "totals" && _estimate is not null &&
-                !_totalsBusy && !HasUnsettledCacheWrites &&
-                (string.IsNullOrWhiteSpace(_totalsRevision) || _totalsRevision != _serverRevision))
+                !_totalsBusy && !HasUnsettledCacheWrites)
                 _ = LoadCostTotalsAsync();
         };
         SetStatus("Загрузка сметы из SQL Server…", false);
@@ -430,6 +428,7 @@ public partial class EstimateView : UserControl
         var was = _activeContractWorkspace;
         _contractTabs.SelectPage(page);
         _visibleEstimateMode = _contractTabs.VisibleMode;
+        CancelInactiveCostReads(_visibleEstimateMode);
         var estimate = page == "estimate";
         var acts = page == "acts";
         EstimateTablePanel.Visibility = estimate ? Visibility.Visible : Visibility.Collapsed;
@@ -511,11 +510,37 @@ public partial class EstimateView : UserControl
         ApplyEstimateMode(mode);
     }
 
+    // Never adopt a revision on behalf of an old estimate or local draft.
+    private bool ConfirmCostTabRevision(string expected, string observed)
+    {
+        var pending = Volatile.Read(ref _pendingWrites);
+        if (CostTabRevisionPolicy.CanPublish(expected, _serverRevision, observed, pending)) return true;
+        if (CostTabRevisionPolicy.NeedsParentReadback(_serverRevision, observed, pending))
+        {
+            _serverConflict = true;
+            _publishedEstimateRevision = "";
+            SetStatus("Данные на сервере изменились. Выполняется сверка сметы…", false);
+            RequestRefresh();
+        }
+        return false;
+    }
+
+    private void CancelInactiveCostReads(string active)
+    {
+        if (active != "summary" && !_summaryBusy) CancelSummaryRead();
+        if (active != "materials") CancelMaterialsRead();
+        if (active != "totals") CancelTotalsRead();
+    }
+
+    private bool HasActiveCostGridEdit() =>
+        HasGridEdit(SummaryGrid) || HasGridEdit(MaterialsGrid) || HasGridEdit(TotalsGrid);
+
     private void ApplyEstimateMode(string mode)
     {
         if (EstimateTablePanel is null || MaterialsPanel is null ||
             SummaryPanel is null || TotalsPanel is null)
             return;
+        CancelInactiveCostReads(mode);
         _visibleEstimateMode = mode;
         EstimateTablePanel.Visibility = _visibleEstimateMode == "estimate" ? Visibility.Visible : Visibility.Collapsed;
         MaterialsPanel.Visibility = _visibleEstimateMode == "materials" ? Visibility.Visible : Visibility.Collapsed;
@@ -781,7 +806,7 @@ public partial class EstimateView : UserControl
             _reloadTimer.Start();
             return;
         }
-        if (Keyboard.FocusedElement is TextBox editor && IsInside(editor, EstimateGrid))
+        if (HasActiveCostGridEdit() || Keyboard.FocusedElement is TextBox editor && IsInside(editor, EstimateGrid))
         {
             _reloadTimer.Start();
             return;
@@ -826,7 +851,7 @@ public partial class EstimateView : UserControl
             await _reloadLock.WaitAsync(token);
             acquired = true;
             if (!_reloadGate.IsLatest(request)) return;
-            if (Volatile.Read(ref _pendingWrites) > 0 || HasActiveEstimateEdit())
+            if (Volatile.Read(ref _pendingWrites) > 0 || HasActiveEstimateEdit() || HasActiveCostGridEdit())
             {
                 _reloadTimer.Start(); // Last writer will re-arm this timer.
                 return;
@@ -913,7 +938,7 @@ public partial class EstimateView : UserControl
                 }, token);
 
                 token.ThrowIfCancellationRequested();
-                if (HasActiveEstimateEdit())
+                if (HasActiveEstimateEdit() || HasActiveCostGridEdit())
                 {
                     if (_reloadGate.IsLatest(request)) _reloadTimer.Start();
                     return;

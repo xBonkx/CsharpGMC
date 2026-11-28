@@ -197,12 +197,9 @@ public partial class EstimateView
             EnsureSummaryView(SummaryPanel, this);
         }
         if (_summaryLoading) return;
-        if (!force && _costSummaryData is not null && !string.IsNullOrWhiteSpace(_summaryRevision) &&
-            _summaryRevision == _serverRevision)
-        {
-            SummaryRebuild();
-            return;
-        }
+        if (!force && (HasGridEdit(SummaryGrid) || _summaryBusy)) return;
+        var expected = _serverRevision;
+        var ownRevision = _costSummaryData is not null ? _summaryRevision : "";
         var cachedSummary = !force && TotalsSnapshotReady ? _totalsSourceSummary : null;
         var cachedRevision = cachedSummary is null ? "" : _totalsRevision;
         _summaryLoading = true;
@@ -217,6 +214,10 @@ public partial class EstimateView
             {
                 using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
                 var before = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(before)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
+                if (before != expected || CostTabRevisionPolicy.CanReuse(expected, ownRevision, before, force))
+                    return (Data: (CostSummaryData?)null, Revision: before, Missing: (CostMissingPriceIndex?)null,
+                        Labels: (Dictionary<long, string>?)null, Search: (CostSummarySearchIndex?)null);
                 var data = CostFinancialSnapshot.CanReuse(cachedSummary, cachedRevision, before)
                     ? cachedSummary! : SqlServerCostSummary.Summary(conn, _contractId, token);
                 if (string.IsNullOrWhiteSpace(before) ||
@@ -228,13 +229,21 @@ public partial class EstimateView
                 token.ThrowIfCancellationRequested();
                 var search = new CostSummarySearchIndex(data.Rows, labels);
                 token.ThrowIfCancellationRequested();
-                return (Data: data, Revision: before, Missing: missing, Labels: labels, Search: search);
+                return (Data: (CostSummaryData?)data, Revision: before, Missing: (CostMissingPriceIndex?)missing,
+                    Labels: (Dictionary<long, string>?)labels, Search: (CostSummarySearchIndex?)search);
             }, token);
-            if (token.IsCancellationRequested || version != _summaryLoadVersion || _detached) return;
+            if (token.IsCancellationRequested || version != _summaryLoadVersion || _detached ||
+                !ConfirmCostTabRevision(expected, snapshot.Revision)) return;
+            if (snapshot.Data is null)
+            {
+                _summaryRevision = snapshot.Revision;
+                StartupTrace.Mark("embedded_summary_revision_hit");
+                return;
+            }
             _costSummaryData = snapshot.Data;
-            _summaryMissingIndex = snapshot.Missing;
-            _summaryLabels = snapshot.Labels;
-            _summarySearchIndex = snapshot.Search;
+            _summaryMissingIndex = snapshot.Missing!;
+            _summaryLabels = snapshot.Labels!;
+            _summarySearchIndex = snapshot.Search!;
             if (SummaryTransferSmrButton is not null)
                 SummaryTransferSmrButton.IsEnabled = !_estimate.Locked;
             if (SummaryExcelButton is not null) SummaryExcelButton.IsEnabled = _summaryExcelCancellation is null;

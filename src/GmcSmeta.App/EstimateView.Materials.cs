@@ -94,7 +94,7 @@ public partial class EstimateView
     private bool _materialsBusy;
     private string _materialsRevision = "";
     private bool MaterialsSnapshotReady => !_materialsLoading && !_materialsBusy &&
-        !string.IsNullOrWhiteSpace(_materialsRevision) && !_serverConflict &&
+        !_detached && !string.IsNullOrWhiteSpace(_materialsRevision) && _materialsRevision == _serverRevision && !_serverConflict &&
         System.Threading.Volatile.Read(ref _pendingWrites) == 0;
 
     private static readonly (string Name, string Hex)[] MatRowColors =
@@ -123,13 +123,9 @@ public partial class EstimateView
         if (_estimate is null || MaterialsPanel is null || (_detached && !_materialsBusy)) return;
         if (_materialsLoading) return;
         if (MaterialsView is null && _visibleEstimateMode != "materials") return;
-        if (!force && _materialsData is not null && !string.IsNullOrWhiteSpace(_materialsRevision) &&
-            _materialsRevision == _serverRevision)
-        {
-            // A cached read must not replace the live editor or its row.
-            if (MaterialsGrid?.Items is not IEditableCollectionView { IsEditingItem: true }) MaterialsRebuild();
-            return;
-        }
+        if (!force && (HasGridEdit(MaterialsGrid) || _materialsBusy)) return;
+        var expected = _serverRevision;
+        var ownRevision = _materialsData is not null ? _materialsRevision : "";
         _materialsLoading = true;
         _materialsRevision = "";
         var version = ++_materialsLoadVersion;
@@ -143,15 +139,24 @@ public partial class EstimateView
             {
                 using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
                 var revision = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(revision)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
+                if (revision != expected || CostTabRevisionPolicy.CanReuse(expected, ownRevision, revision, force))
+                    return (data: (CostMaterialsData?)null, revision);
                 var data = SqlServerCostSummary.MaterialsData(conn, _contractId, token);
                 if (string.IsNullOrWhiteSpace(revision) ||
                     revision != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились во время чтения материалов. Повторите обновление.");
                 token.ThrowIfCancellationRequested();
-                return (data, revision);
+                return (data: (CostMaterialsData?)data, revision);
             }, token);
             if (token.IsCancellationRequested || version != _materialsLoadVersion ||
-                (_detached && !_materialsBusy)) return;
+                (_detached && !_materialsBusy) || !ConfirmCostTabRevision(expected, snapshot.revision)) return;
+            if (snapshot.data is null)
+            {
+                _materialsRevision = snapshot.revision;
+                StartupTrace.Mark("embedded_materials_revision_hit");
+                return;
+            }
             _materialsData = snapshot.data;
             MaterialsPrepareCache();
             MaterialsRebuild();

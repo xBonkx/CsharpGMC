@@ -125,7 +125,9 @@ public partial class EstimateView
         if (_totalsLoading) return;
         // Refreshes and cache checks must not instantiate an unopened tab.
         if (TotalsView is null && _visibleEstimateMode != "totals") return;
-        if (!force && _costTotalsData is not null && TotalsSnapshotReady) return;
+        if (!force && (HasGridEdit(TotalsGrid) || _totalsBusy)) return;
+        var expected = _serverRevision;
+        var ownRevision = _costTotalsData is not null ? _totalsRevision : "";
         var cachedSummary = !force && SummarySnapshotReady && !HasUnsettledCacheWrites
             ? _costSummaryData : null;
         var cachedRevision = cachedSummary is null ? "" : _summaryRevision;
@@ -139,14 +141,28 @@ public partial class EstimateView
         try
         {
             EnsureTotalsView();
-            var snapshot = await Task.Run(() => CostFinancialSnapshot.ReadTotalsAsync(
-                _sqlConnectionString, _contractId, cachedSummary, cachedRevision, token), token);
+            var result = await Task.Run(async () =>
+            {
+                using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
+                var observed = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(observed)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
+                if (observed != expected || CostTabRevisionPolicy.CanReuse(expected, ownRevision, observed, force))
+                    return (Snapshot: (CostFinancialSnapshot?)null, Revision: observed);
+                var snapshot = await CostFinancialSnapshot.ReadTotalsAsync(conn, _contractId, cachedSummary, cachedRevision, token).ConfigureAwait(false);
+                return (Snapshot: (CostFinancialSnapshot?)snapshot, Revision: snapshot.Revision);
+            }, token);
             if (token.IsCancellationRequested || version != _totalsLoadVersion ||
-                (_detached && !(force && _totalsBusy))) return;
-            _costTotalsData = snapshot.Totals;
-            _totalsSourceSummary = snapshot.Summary;
+                (_detached && !(force && _totalsBusy)) || !ConfirmCostTabRevision(expected, result.Revision)) return;
+            if (result.Snapshot is null)
+            {
+                _totalsRevision = result.Revision;
+                StartupTrace.Mark("embedded_totals_revision_hit");
+                return;
+            }
+            _costTotalsData = result.Snapshot.Totals;
+            _totalsSourceSummary = result.Snapshot.Summary;
             TotalsShow();
-            _totalsRevision = snapshot.Revision;
+            _totalsRevision = result.Revision;
         }
         catch (Exception) when (token.IsCancellationRequested)
         {

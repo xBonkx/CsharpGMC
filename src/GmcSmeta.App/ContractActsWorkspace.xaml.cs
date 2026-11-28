@@ -87,10 +87,12 @@ public partial class ContractActsWorkspace : UserControl
     private string _title = "";
     private int _contractId;
     private int _summaryVersion;
+    private string _summaryRevision = "";
     private CancellationTokenSource? _summaryCancellation;
     private bool _bound;
     private bool _syncingList;
-    internal bool HasCacheActivity => EmbeddedEditor.HasCacheActivity;
+    internal bool HasCacheActivity => EmbeddedEditor.HasCacheActivity ||
+        _summaryCancellation is not null || _summaryExportCancellation is not null;
     private IReadOnlyList<SqlServerActs.ExtraRow> _extras = Array.Empty<SqlServerActs.ExtraRow>();
     private ContractTotals? _totals;
     private List<SqlServerActs.ActInfo> _acts = new();
@@ -116,8 +118,7 @@ public partial class ContractActsWorkspace : UserControl
             // A cached contract tab can be collapsed without being unloaded.
             if (!IsVisible)
             {
-                if (_summaryCancellation is not null || _summary is not null)
-                    InvalidateSummary();
+                CancelSummaryRead();
             }
             else ResumeSummaryIfNeeded();
         };
@@ -268,7 +269,7 @@ public partial class ContractActsWorkspace : UserControl
         SummaryPage.Visibility = progress ? Visibility.Visible : Visibility.Collapsed;
         SummaryBarPanel.Visibility = progress ? Visibility.Visible : Visibility.Collapsed;
         if (progress && _bound && IsLoaded) _ = RefreshSummaryAsync();
-        else if (!progress) InvalidateSummary();
+        else if (!progress) CancelSummaryRead();
     }
 
     // ------------------------------------------------------------------ сводная
@@ -276,17 +277,28 @@ public partial class ContractActsWorkspace : UserControl
     private void ResumeSummaryIfNeeded()
     {
         if (_bound && IsLoaded && IsVisible && SummaryPage.Visibility == Visibility.Visible &&
-            _summary is null && _summaryCancellation is null)
+            _summaryCancellation is null)
             _ = RefreshSummaryAsync();
     }
 
-    private void InvalidateSummary()
+    private void CancelSummaryRead()
     {
         _summaryExportCancellation?.Cancel();
         ++_summaryVersion;
         var cancellation = _summaryCancellation;
         _summaryCancellation = null;
         cancellation?.Cancel();
+    }
+
+    private void InvalidateSummary()
+    {
+        CancelSummaryRead();
+        ClearSummarySnapshot();
+    }
+
+    private void ClearSummarySnapshot()
+    {
+        _summaryRevision = "";
         _summary = null;
         _totals = null;
         _extras = Array.Empty<SqlServerActs.ExtraRow>();
@@ -303,8 +315,9 @@ public partial class ContractActsWorkspace : UserControl
     {
         if (!_bound || !IsLoaded || !IsVisible || SummaryPage.Visibility != Visibility.Visible ||
             _summaryCancellation is not null) return;
-        InvalidateSummary();
-        var version = _summaryVersion;
+        var knownRevision = _summary is null ? "" : _summaryRevision;
+        _summaryExportCancellation?.Cancel();
+        var version = ++_summaryVersion;
         using var cancellation = new CancellationTokenSource();
         _summaryCancellation = cancellation;
         var token = cancellation.Token;
@@ -313,13 +326,16 @@ public partial class ContractActsWorkspace : UserControl
         var cached = EmbeddedEditor.CaptureReadContext(connectionString, contractId);
         try
         {
-            var (summary, extras, totals) = await Task.Run(async () =>
+            var (summary, extras, totals, revision) = await Task.Run(async () =>
             {
                 using var conn = await SqlServerDatabase.OpenAsync(connectionString, token).ConfigureAwait(false);
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
                     token.ThrowIfCancellationRequested();
                     var before = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(before) && before == knownRevision)
+                        return (Sheet: (SqlServerActs.SummaryData?)null, Extra: (IReadOnlyList<SqlServerActs.ExtraRow>?)null,
+                            Totals: (ContractTotals?)null, Revision: before);
                     var common = cached is not null && cached.Revision == before &&
                         !string.IsNullOrWhiteSpace(before) ? cached : null;
                     ContractTotals? totals;
@@ -332,16 +348,23 @@ public partial class ContractActsWorkspace : UserControl
                     var after = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
                     if (!string.IsNullOrEmpty(before) && before == after)
-                        return (sheet, extra, totals);
+                        return (Sheet: (SqlServerActs.SummaryData?)sheet, Extra: (IReadOnlyList<SqlServerActs.ExtraRow>?)extra, Totals: totals, Revision: before);
                 }
                 throw new InvalidOperationException("Данные КС изменились во время чтения. Повторите загрузку.");
             }, token);
             if (token.IsCancellationRequested || version != _summaryVersion || !IsLoaded || !IsVisible ||
                 contractId != _contractId ||
                 connectionString != _connectionString || SummaryPage.Visibility != Visibility.Visible) return;
+            if (summary is null)
+            {
+                StartupTrace.Mark("ks_progress_revision_hit");
+                return;
+            }
+            ClearSummarySnapshot();
             _summary = summary;
-            _extras = extras;
+            _extras = extras!;
             _totals = totals;
+            _summaryRevision = revision;
             _summaryActs = summary.Acts.ToList();
             BuildSummaryColumns();
             FillSummaryTiles();

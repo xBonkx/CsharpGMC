@@ -12,7 +12,8 @@ public partial class ContractActsWorkspace
 
     private async void SummaryExport_Click(object sender, RoutedEventArgs e)
     {
-        if (_summaryExportCancellation is not null) return;
+        if (_summaryExportCancellation is not null || _summaryCancellation is not null ||
+            !IsVisible || SummaryPage.Visibility != Visibility.Visible || string.IsNullOrWhiteSpace(_summaryRevision)) return;
         var summary = _summary;
         var totals = _totals;
         if (summary is null || totals is null || _summaryActs.Count == 0)
