@@ -23,7 +23,7 @@
 4. Финальным коммитом кода/доказательств снять только свои `☑` (вернуть `☐`), записать итоговый статус, короткое evidence и пересчитать счётчики. Если прервались без результата — отдельным коммитом снять свою бронь и восстановить прежний статус либо PARTIAL/BLOCKED с причиной. Продолжение того же агента использует прежний уникальный ID сессии. Не снимать чужую бронь по возрасту автоматически: только после подтверждения её владельцем/координатором, с записью причины. При длительном блоке обновить время/чекпоинт.
 5. Если доступен только read-only GitHub, нет прав записи или бронь не подтверждена, не менять код по этим ID. Сообщить блокер. Галочки — кооперативная блокировка через Git, а не техническая блокировка локальных файлов.
 
-Счётчик занятости (обновлять по строкам): **0 из 184** (28.11: AGR-11.01, BUG-F54.06 закрыты ранее — [T_TEST_PASS_20261128](T_TEST_PASS_20261128.md); BUG-F54.01–05, BUG-F54.07, CTX-049.01 закрыты и удалены — [BUG_F54_SCALAR_PASS_20261128](BUG_F54_SCALAR_PASS_20261128.md)). Свободно не означает готово к реализации: учитывать статус, приоритет, зависимости, блокеры и BACKLOG.
+Счётчик занятости (обновлять по строкам): **6 из 184** (28.11: AGR-11.01, BUG-F54.06 закрыты ранее — [T_TEST_PASS_20261128](T_TEST_PASS_20261128.md); BUG-F54.01–05, BUG-F54.07, CTX-049.01 закрыты и удалены — [BUG_F54_SCALAR_PASS_20261128](BUG_F54_SCALAR_PASS_20261128.md)). Свободно не означает готово к реализации: учитывать статус, приоритет, зависимости, блокеры и BACKLOG.
 
 ## Начальный учёт
 
@@ -50,13 +50,13 @@
 
 | ID | Приоритет | Тип | Конкретный пакет | Критерий окончания | Статус | Evidence / агент | Бронь |
 |---|---|---|---|---|---|---|---|
-| PERF-007.01 | P1 | C | Стартовые DTO объектов/документов | Пакетный набор полей, архивный scope, независимая сверка DTO; устранить только подтверждённые лишние чтения. | UNVERIFIED | — | ☐ |
-| PERF-007.02 | P1 | C | Карточки выбранного объекта | Не читать скрытые необязательные детали; доказать корректность итогов и отмены. | UNVERIFIED | — | ☐ |
-| PERF-007.03 | P1 | C | Post-write/F5 | Тяжёлое чтение не блокирует UI; обязательный readback и защита ревизии сохранены. | UNVERIFIED | — | ☐ |
+| PERF-007.01 | P1 | C | Стартовые DTO объектов/документов | Пакетный набор полей, архивный scope, независимая сверка DTO; устранить только подтверждённые лишние чтения. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.Core/Db/Workspace.cs, EstimateReader*, src/GmcSmeta.App/MainWindow*, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-007.02 | P1 | C | Карточки выбранного объекта | Не читать скрытые необязательные детали; доказать корректность итогов и отмены. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.Core/Db/EstimateReader.Cards.cs, MainWindow.ObjectCards.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-007.03 | P1 | C | Post-write/F5 | Тяжёлое чтение не блокирует UI; обязательный readback и защита ревизии сохранены. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/MainWindow.Navigation.cs, EstimateView.xaml.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
 | PERF-007.04 | P1 | A | Старт и открытие на 10/50/200 документах | Фактические планы, payload, времена и архивный scope на Pilot. | UNVERIFIED | — | ☐ |
-| PERF-014.01 | P1 | C | Классификация полей сметы | Явный whitelist безопасного sparse readback и fallback для остальных полей. | UNVERIFIED | — | ☐ |
-| PERF-014.02 | P1 | C | Одиночное изменение | Затронутые строки и авторитетные итоги совпадают с полным reload; revision fence. | UNVERIFIED | — | ☐ |
-| PERF-014.03 | P1 | C | Пакет, формулы, вставка, удаление, Undo | Fallback корректен, FIFO и выбор сохранены; не оптимизировать структурные операции без доказательств. | UNVERIFIED | — | ☐ |
+| PERF-014.01 | P1 | C | Классификация полей сметы | Явный whitelist безопасного sparse readback и fallback для остальных полей. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, src/GmcSmeta.Core/Db/EstimateReader*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-014.02 | P1 | C | Одиночное изменение | Затронутые строки и авторитетные итоги совпадают с полным reload; revision fence. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-014.03 | P1 | C | Пакет, формулы, вставка, удаление, Undo | Fallback корректен, FIFO и выбор сохранены; не оптимизировать структурные операции без доказательств. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
 | PERF-014.04 | P1 | A | Нагрузочная приёмка sparse/full | 300/2500/10000/25000 строк, два клиента, время и совпадение итогов. | UNVERIFIED | — | ☐ |
 | PERF-042.01 | P1 | C | Инвентарь всех DataGrid | Каждая XAML/динамическая таблица имеет bounded host, row/column virtualization, Recycling или объяснённое исключение. | UNVERIFIED | — | ☐ |
 | PERF-042.02 | P1 | C | Группировка и динамические таблицы | Устранены подтверждённые бесконечные размеры и отключение виртуализации; targeted fixture. | UNVERIFIED | — | ☐ |
