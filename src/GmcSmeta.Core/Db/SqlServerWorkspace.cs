@@ -73,17 +73,23 @@ public static partial class SqlServerWorkspace
         return tags;
     }
 
-    public static IReadOnlyList<CompanyInfo> Companies(SqlConnection conn)
+    public static IReadOnlyList<CompanyInfo> Companies(SqlConnection conn, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT id,name,vat_rate FROM dbo.companies ORDER BY [order],id", conn);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var list = new List<CompanyInfo>();
         while (r.Read())
+        {
+            token.ThrowIfCancellationRequested();
             list.Add(new CompanyInfo(
                 Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                 r.IsDBNull(1) ? "" : r.GetString(1),
                 r.IsDBNull(2) ? 0m : Convert.ToDecimal(r.GetValue(2), CultureInfo.InvariantCulture)));
+        }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 

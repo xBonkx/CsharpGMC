@@ -52,7 +52,7 @@ public partial class Ks3ReportWindow : Window
         {
             ActInfoText.Text += " · загрузка SQL Server…";
             var token = _exportLifetime.Token;
-            var report = await Task.Run(() => SqlServerActs.Ks3Figures(_connectionString, _actId), token);
+            var report = await Task.Run(() => SqlServerActs.Ks3Figures(_connectionString, _actId, token), token);
             if (_closed || !IsLoaded) return;
             _report = report;
             ActInfoText.Text = _actInfo;

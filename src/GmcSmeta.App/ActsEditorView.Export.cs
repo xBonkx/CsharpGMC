@@ -17,6 +17,8 @@ namespace GmcSmeta.App;
 
 public partial class ActsEditorView
 {
+    private CancellationTokenSource? _actExportCancellation;
+
     // -------------------------------------------------------------- выгрузки (меню «Ещё»)
 
     private static string SafeName(string name)
@@ -41,12 +43,10 @@ public partial class ActsEditorView
         if (dlg.ShowDialog() != true) return;
         var isPdf = dlg.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
         await ExportActFileAsync(target, dlg.FileName, "КС-2 и КС-3",
-            () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
-            (package, stream) =>
-            {
-                if (isPdf) stream.Write(KsPdfForms.Create(package));
-                else SaveKsWorkbook(stream, () => KsCustomerForms.Create(package));
-            });
+            token => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision, token),
+            (package, stream, token) => isPdf
+                ? SaveKsPdf(stream, () => KsPdfForms.Create(package), token)
+                : SaveKsWorkbook(stream, () => KsCustomerForms.Create(package), token));
     }
 
     /// <summary>«Ведомость объёмов работ (ВОР) по этому акту…».</summary>
@@ -63,8 +63,8 @@ public partial class ActsEditorView
         };
         if (dlg.ShowDialog() != true) return;
         await ExportActFileAsync(target, dlg.FileName, "ВОР",
-            () => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision),
-            (package, stream) => SaveKsWorkbook(stream, () => KsVorForms.Create(package, target.ActId)));
+            token => SqlServerKsPrintData.ReadSingle(target.ConnectionString, target.ContractId, target.ActId, target.Revision, token),
+            (package, stream, token) => SaveKsWorkbook(stream, () => KsVorForms.Create(package, target.ActId), token));
     }
 
     /// <summary>All acts of this document, in one workbook (Python export_all).</summary>
@@ -80,25 +80,51 @@ public partial class ActsEditorView
         };
         if (dlg.ShowDialog() != true) return;
         await ExportActFileAsync(target, dlg.FileName, "всех актов",
-            () => SqlServerKsPrintData.ReadAll(target.ConnectionString, target.ContractId, target.Revision),
-            (packages, stream) => SaveKsWorkbook(stream, () => KsCustomerForms.CreateAll(packages)));
+            token => SqlServerKsPrintData.ReadAll(target.ConnectionString, target.ContractId, target.Revision, token),
+            (packages, stream, token) => SaveKsWorkbook(stream, () => KsCustomerForms.CreateAll(packages), token));
     }
 
-    private static void SaveKsWorkbook(Stream stream, Func<ClosedXML.Excel.XLWorkbook> create)
+    private static (long BuildMs, long SaveMs) SaveKsWorkbook(Stream stream,
+        Func<ClosedXML.Excel.XLWorkbook> create, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
         using var book = create();
+        var build = timer.ElapsedMilliseconds;
         if (book.Worksheets.Count == 0)
             throw new InvalidDataException("В книге нет листов.");
+        token.ThrowIfCancellationRequested();
+        timer.Restart();
         book.SaveAs(stream);
+        token.ThrowIfCancellationRequested();
+        return (build, timer.ElapsedMilliseconds);
+    }
+
+    private static (long BuildMs, long SaveMs) SaveKsPdf(Stream stream, Func<byte[]> create,
+        CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var bytes = create();
+        var build = timer.ElapsedMilliseconds;
+        token.ThrowIfCancellationRequested();
+        timer.Restart();
+        stream.Write(bytes);
+        token.ThrowIfCancellationRequested();
+        return (build, timer.ElapsedMilliseconds);
     }
 
     // The snapshot and output are independent of the live UI. Recheck the
     // editor context after each await and publish only a complete staged file.
     private async Task ExportActFileAsync<T>(ActCommandTarget target, string destination,
-        string label, Func<T> read, Action<T, Stream> render)
+        string label, Func<CancellationToken, T> read,
+        Func<T, Stream, CancellationToken, (long BuildMs, long SaveMs)> render)
     {
         if (_exportInProgress) return;
         _exportInProgress = true;
+        using var cancellation = new CancellationTokenSource();
+        _actExportCancellation = cancellation;
+        var token = cancellation.Token;
         SaveButton.IsEnabled = false;
         var generation = _actLoadGeneration;
         var attachment = _exportAttachmentGeneration;
@@ -106,6 +132,7 @@ public partial class ActsEditorView
             generation == _actLoadGeneration && attachment == _exportAttachmentGeneration;
         void RequireExportContext()
         {
+            token.ThrowIfCancellationRequested();
             if (!IsSameView()) throw new OperationCanceledException();
             RequireCurrentActCommand(target);
         }
@@ -117,13 +144,19 @@ public partial class ActsEditorView
             RequireExportContext();
             SetStatus("Подготовка " + label + "…");
             timings.Start();
-            var snapshot = await Task.Run(read);
+            var snapshot = await Task.Run(() => read(token), token);
             var sqlMs = timings.ElapsedMilliseconds;
             RequireExportContext();
 
             timings.Restart();
+            var phases = (BuildMs: 0L, SaveMs: 0L);
             prepared = await Task.Run(() => ExportFilePublication.Stage(destination,
-                stream => render(snapshot, stream)));
+                stream =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    phases = render(snapshot, stream, token);
+                    token.ThrowIfCancellationRequested();
+                }), token);
             var renderMs = timings.ElapsedMilliseconds;
             RequireExportContext();
 
@@ -131,7 +164,7 @@ public partial class ActsEditorView
             // prepared file may be published even if the user navigates away.
             timings.Restart();
             await Task.Run(prepared.Publish);
-            System.Diagnostics.Trace.WriteLine($"KS export: SQL={sqlMs}ms; render+stage={renderMs}ms; publish={timings.ElapsedMilliseconds}ms");
+            System.Diagnostics.Trace.WriteLine($"KS export: SQL={sqlMs}ms; build={phases.BuildMs}ms; save={phases.SaveMs}ms; render+stage={renderMs}ms; publish={timings.ElapsedMilliseconds}ms");
             if (IsSameView() && IsCurrentActCommand(target))
                 SetStatus("Сохранено: " + Path.GetFileName(destination));
         }
@@ -141,13 +174,15 @@ public partial class ActsEditorView
         }
         catch (Exception ex)
         {
-            if (IsSameView()) SetStatus("Ошибка сохранения: " + ex.Message, true);
+            if (IsSameView() && token.IsCancellationRequested) SetStatus("Экспорт отменён.");
+            else if (IsSameView()) SetStatus("Ошибка сохранения: " + ex.Message, true);
             else System.Diagnostics.Trace.WriteLine("KS export failed after navigation: " + ex.GetType().Name);
         }
         finally
         {
             if (prepared is not null)
                 await Task.Run(prepared.Dispose);
+            if (ReferenceEquals(_actExportCancellation, cancellation)) _actExportCancellation = null;
             _exportInProgress = false;
             SaveButton.IsEnabled = true;
         }

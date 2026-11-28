@@ -17,10 +17,12 @@ public sealed class KsAsyncExportSourceTests
         Assert.DoesNotContain("GetAwaiter().GetResult()", export);
         Assert.Contains("private async void ExportVor_Click(", export);
         Assert.Contains("private async void ExportAll_Click(", export);
-        Assert.Contains("await Task.Run(read)", export);
+        Assert.Contains("await Task.Run(() => read(token), token)", export);
         Assert.Contains("await Task.Run(() => ExportFilePublication.Stage(destination,", export);
-        Assert.Contains("stream => render(snapshot, stream)));", export);
-        var stage = export.IndexOf("stream => render(snapshot, stream)));", StringComparison.Ordinal);
+        Assert.Contains("phases = render(snapshot, stream, token);", export);
+        Assert.Contains("token.ThrowIfCancellationRequested();", export);
+        Assert.Contains("build={phases.BuildMs}ms; save={phases.SaveMs}ms", export);
+        var stage = export.IndexOf("phases = render(snapshot, stream, token);", StringComparison.Ordinal);
         var guard = export.IndexOf("RequireExportContext();", stage, StringComparison.Ordinal);
         var publish = export.IndexOf("await Task.Run(prepared.Publish);", StringComparison.Ordinal);
         Assert.True(stage >= 0 && guard > stage && publish > guard);
@@ -75,7 +77,7 @@ public sealed class KsAsyncExportSourceTests
         Assert.Contains("cmd.Parameters.Add(\"@obj\", SqlDbType.BigInt).Value = batch[0].ObjectId;", code);
         Assert.Contains("cmd.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = batch[i].Id;", code);
         Assert.Contains("RequireContractorCoverage(documents, contractors);", code);
-        Assert.Contains("ReadContractors(conn, scope.Documents)", package);
+        Assert.Contains("ReadContractors(conn, scope.Documents, token)", package);
         Assert.Contains("KsLegalRequisites.RequirePrintAgreement(scope, report, legalSources, groupReport)", package);
     }
 

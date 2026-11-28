@@ -96,6 +96,11 @@ public partial class ActsEditorView : UserControl
         if (ActWritePending || _actLoadRequired) return;
         if (_contractId != contractId || _connectionString != connectionString)
         {
+            _actExportCancellation?.Cancel();
+            _actLoadCancellation?.Cancel();
+            _actReadContext = null;
+            _resumeActId = null;
+            selectedActId ??= 0; // A pending ID from another document must never carry over.
             _actsRevision = "";
             _actId = 0;
             _acts = new();
@@ -137,8 +142,9 @@ public partial class ActsEditorView : UserControl
         try
         {
             var choices = _acts.Select(a => new ActItem(a)).ToList();
-            ActCombo.ItemsSource = choices;
-            ActCombo.SelectedItem = choices.FirstOrDefault(a => a.Info.Id == _actId);
+            if (ActCombo.ItemsSource is not List<ActItem> existing || !existing.SequenceEqual(choices))
+                ActCombo.ItemsSource = choices;
+            ActCombo.SelectedItem = (ActCombo.ItemsSource as List<ActItem>)?.FirstOrDefault(a => a.Info.Id == _actId);
         }
         finally { _building = previous; }
     }
@@ -800,6 +806,7 @@ public partial class ActsEditorView : UserControl
         _details = loaded.Details;
         _totals = loaded.Totals;
         _sharedExtraIds = loaded.SharedExtraIds;
+        RememberReadContext(loaded);
         var sections = ProjectActSections(sheet);
         var existingSections = _rows?.Where(r => r.IsSection).ToArray();
         if (patch is null || _rows is null || existingSections is null ||

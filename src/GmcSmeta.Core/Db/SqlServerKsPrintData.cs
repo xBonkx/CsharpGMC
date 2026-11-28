@@ -46,30 +46,30 @@ public static partial class SqlServerKsPrintData
         }
     }
 
-    public static Package Read(string connectionString, long contractId, string groupKey)
+    public static Package Read(string connectionString, long contractId, string groupKey, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var before = SqlServerDatabase.Revision(conn);
-            var scope = SqlServerKsContractScope.Read(conn, contractId);
-            var package = ReadPackage(conn, contractId, scope, KsGroupReport.Calculate(scope, groupKey), groupReport: true);
-            if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            var before = SqlReadCancellation.Revision(conn, token);
+            var scope = SqlServerKsContractScope.Read(conn, contractId, token: token);
+            var package = ReadPackage(conn, contractId, scope, KsGroupReport.Calculate(scope, groupKey), groupReport: true, token: token);
+            if (!string.IsNullOrWhiteSpace(before) && before == SqlReadCancellation.Revision(conn, token))
                 return package;
         }
         throw new InvalidOperationException("КС изменились во время подготовки экспорта. Повторите выгрузку.");
     }
 
-    public static Package ReadSingle(string connectionString, long contractId, long actId, string expectedRevision)
+    public static Package ReadSingle(string connectionString, long contractId, long actId, string expectedRevision, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
-        var before = SqlServerDatabase.Revision(conn);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
+        var before = SqlReadCancellation.Revision(conn, token);
         if (string.IsNullOrWhiteSpace(before) || before != expectedRevision)
             throw new InvalidOperationException("КС изменились. Обновите акт перед выгрузкой.");
-        var scope = SqlServerKsContractScope.Read(conn, contractId);
+        var scope = SqlServerKsContractScope.Read(conn, contractId, token: token);
         var report = KsGroupReport.CalculateSingle(scope, actId);
-        var package = ReadPackage(conn, contractId, scope, report);
-        if (before != SqlServerDatabase.Revision(conn))
+        var package = ReadPackage(conn, contractId, scope, report, token: token);
+        if (before != SqlReadCancellation.Revision(conn, token))
             throw new InvalidOperationException("КС изменились во время подготовки экспорта. Обновите акт.");
         return package;
     }
@@ -77,20 +77,20 @@ public static partial class SqlServerKsPrintData
     // Export all acts of the selected document, not all annexes of the legal agreement.
     // Read once under the same revision, while keeping the legal scope for cumulative KS-3.
     public static IReadOnlyList<Package> ReadAll(string connectionString, long contractId,
-        string expectedRevision)
+        string expectedRevision, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
-        var before = SqlServerDatabase.Revision(conn);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
+        var before = SqlReadCancellation.Revision(conn, token);
         if (string.IsNullOrWhiteSpace(before) || before != expectedRevision)
             throw new InvalidOperationException("КС изменились. Обновите акт перед выгрузкой.");
-        var scope = SqlServerKsContractScope.Read(conn, contractId);
+        var scope = SqlServerKsContractScope.Read(conn, contractId, token: token);
         var local = scope.Acts.Where(a => a.ContractId == contractId)
             .OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
         if (local.Length == 0 || local.Length > 500)
             throw new InvalidOperationException("Неверное число актов для экспорта.");
         var prepared = new KsGroupReport.Prepared(scope);
         var snapshot = ReadPackage(conn, contractId, scope,
-            prepared.Single(local[0].Id), local);
+            prepared.Single(local[0].Id), local, token: token);
         var document = scope.Documents.Single(d => d.Id == contractId);
         var objectName = snapshot.Requisites.ObjectName.Trim().ToLowerInvariant();
         var grouped = document.Form.Trim().Equals("r4", StringComparison.OrdinalIgnoreCase) &&
@@ -104,8 +104,9 @@ public static partial class SqlServerKsPrintData
         if (snapshot.LegalAgreements.Count != 0)
             foreach (var report in reports)
                 KsLegalRequisites.RequirePrintAgreement(scope, report, snapshot.LegalAgreements, grouped);
-        var packages = ScopeReports(snapshot, reports);
-        if (before != SqlServerDatabase.Revision(conn))
+        token.ThrowIfCancellationRequested();
+        var packages = ScopeReports(snapshot, reports, token);
+        if (before != SqlReadCancellation.Revision(conn, token))
             throw new InvalidOperationException("КС изменились во время подготовки экспорта. Обновите акт.");
         return packages;
     }
@@ -116,33 +117,42 @@ public static partial class SqlServerKsPrintData
     /// No SQL reads, monetary calculations, or changes to the input package.
     /// </summary>
     public static IReadOnlyList<Package> ScopeReports(Package snapshot,
-        IEnumerable<KsGroupReport> reports)
+        IEnumerable<KsGroupReport> reports, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ordered = reports.ToArray();
         var reportIndexesByAct = ordered.SelectMany((report, index) =>
             report.Acts.Select(act => act.Id).Distinct().Select(id => (Id: id, Index: index)))
             .ToLookup(x => x.Id, x => x.Index);
         var lines = ordered.Select(_ => new List<Line>()).ToArray();
         foreach (var line in snapshot.Lines)
-            foreach (var index in reportIndexesByAct[line.ActId])
-                lines[index].Add(line);
+        {
+            token.ThrowIfCancellationRequested();
+            foreach (var index in reportIndexesByAct[line.ActId]) lines[index].Add(line);
+        }
+        token.ThrowIfCancellationRequested();
         return ordered.Select((report, index) =>
             snapshot with { Report = report, Lines = lines[index].AsReadOnly() }).ToArray();
     }
 
     private static Package ReadPackage(SqlConnection conn, long contractId,
         SqlServerKsContractScope.Scope scope, KsGroupReport report,
-        IReadOnlyList<SqlServerActs.ActInfo>? readActs = null, bool groupReport = false)
+        IReadOnlyList<SqlServerActs.ActInfo>? readActs = null, bool groupReport = false, CancellationToken token = default)
     {
-        var requisites = SqlServerKsRequisites.Read(conn, contractId);
+        token.ThrowIfCancellationRequested();
+        var requisites = SqlServerKsRequisites.Read(conn, contractId, token);
         if (requisites.ObjectId != scope.Documents[0].ObjectId)
             throw new InvalidOperationException("Реквизиты не относятся к объекту выбранной КС-3.");
         var selectedActs = readActs ?? report.Acts;
         if (selectedActs.Count == 0 || selectedActs.Count > 500)
             throw new InvalidOperationException("Неверное число актов для экспорта.");
 
-        var contractors = ReadContractors(conn, scope.Documents);
+        var contractors = ReadContractors(conn, scope.Documents, token);
 
+        var scopeIds = scope.Documents.Select(d => d.Id).ToHashSet();
+        var docIds = selectedActs.Select(a => a.ContractId).Distinct().ToArray();
+        if (docIds.Any(id => !scopeIds.Contains(id)))
+            throw new InvalidOperationException("Акты не относятся к выбранному договору.");
         var ids = selectedActs.Select(a => a.Id).ToList();
         var parameters = ids.Select((id, i) => "@act" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
         var lines = new List<Line>();
@@ -154,20 +164,22 @@ public static partial class SqlServerKsPrintData
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
             "WHERE al.act_id IN (" + string.Join(",",parameters) + ") " +
             "AND sy.contract_id=a.contract_id AND a.contract_id IN (" +
-            string.Join(",", scope.Documents.Select((d,i) => "@doc"+i)) + ") " +
+            string.Join(",", docIds.Select((_,i) => "@doc"+i)) + ") " +
             "ORDER BY a.id,sy.[order],sy.id,p.[order],p.id", conn))
         {
             for (var i=0;i<ids.Count;i++)
                 command.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = ids[i];
-            for (var i=0;i<scope.Documents.Count;i++)
-                command.Parameters.Add("@doc"+i,SqlDbType.BigInt).Value = scope.Documents[i].Id;
-            using var r = command.ExecuteReader();
+            for (var i=0;i<docIds.Length;i++)
+                command.Parameters.Add("@doc"+i,SqlDbType.BigInt).Value = docIds[i];
+            using var registration = SqlReadCancellation.Register(command, token);
+            using var r = SqlReadCancellation.ExecuteReader(command, token);
             string S(int i) => r.IsDBNull(i) ? "" :
                 Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             decimal D(int i) => r.IsDBNull(i) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(i),CultureInfo.InvariantCulture));
             while(r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var basis=S(9);
                 var workCode=basis;
                 if(string.IsNullOrWhiteSpace(workCode) && !string.IsNullOrWhiteSpace(S(10)))
@@ -191,29 +203,35 @@ public static partial class SqlServerKsPrintData
         }
 
         var sections=new List<Section>();
-        var docIds=selectedActs.Select(a=>a.ContractId).Distinct().ToArray();
         using(var cmd=new SqlCommand(
             "SELECT id,contract_id,name FROM dbo.systems WHERE contract_id IN ("+
             string.Join(",",docIds.Select((_,i)=>"@d"+i))+") ORDER BY contract_id,[order],id",conn))
         {
             for(var i=0;i<docIds.Length;i++)cmd.Parameters.Add("@d"+i,SqlDbType.BigInt).Value=docIds[i];
-            using var reader=cmd.ExecuteReader();
-            while(reader.Read())sections.Add(new(Convert.ToInt64(reader.GetValue(0)),Convert.ToInt64(reader.GetValue(1)),
-                reader.IsDBNull(2)?"":reader.GetString(2)));
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var reader=SqlReadCancellation.ExecuteReader(cmd, token);
+            while(reader.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                sections.Add(new(Convert.ToInt64(reader.GetValue(0)),Convert.ToInt64(reader.GetValue(1)),
+                    reader.IsDBNull(2)?"":reader.GetString(2)));
+            }
         }
         var legalSources = new Dictionary<long, KsLegalRequisites.Agreement>();
-        if (SqlServerAgreements.Enabled(conn))
+        if (SqlServerAgreements.Enabled(conn, token: token))
         {
             var objectId = scope.Documents[0].ObjectId;
-            var cards = SqlServerAgreements.Read(conn, objectId).ToDictionary(c => c.Id);
-            var companies = SqlServerWorkspace.Companies(conn).ToDictionary(c => c.Id, c => c.Name);
+            var cards = SqlServerAgreements.Read(conn, objectId, token: token).ToDictionary(c => c.Id);
+            var companies = SqlServerWorkspace.Companies(conn, token).ToDictionary(c => c.Id, c => c.Name);
             var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
             using (var mapping = new SqlCommand("SELECT id,agreement_id FROM dbo.contracts WHERE object_id=@object AND agreement_id IS NOT NULL", conn))
             {
                 mapping.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
-                using var reader = mapping.ExecuteReader();
+                using var registration = SqlReadCancellation.Register(mapping, token);
+                using var reader = SqlReadCancellation.ExecuteReader(mapping, token);
                 while (reader.Read())
                 {
+                    token.ThrowIfCancellationRequested();
                     var id = Convert.ToInt64(reader.GetValue(0));
                     if (!documentIds.Contains(id)) continue;
                     // Missing/archived cards are rejected by the guard only when relevant to this report.
@@ -226,6 +244,7 @@ public static partial class SqlServerKsPrintData
             var legalId = KsLegalRequisites.RequirePrintAgreement(scope, report, legalSources, groupReport);
             requisites = cards[legalId].Print with { SitePart = requisites.SitePart };
         }
+        token.ThrowIfCancellationRequested();
         return new Package(scope,report,requisites,lines.AsReadOnly(),contractors)
             {Sections=sections.AsReadOnly(), LegalAgreements=legalSources};
     }

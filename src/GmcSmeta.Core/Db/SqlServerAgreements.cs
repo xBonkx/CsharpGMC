@@ -26,23 +26,26 @@ public static class SqlServerAgreements
         return Convert.ToInt32(value, CultureInfo.InvariantCulture) == 1;
     }
 
-    public static IReadOnlyList<Values> Read(SqlConnection conn, long objectId, SqlTransaction? tx = null)
+    public static IReadOnlyList<Values> Read(SqlConnection conn, long objectId, SqlTransaction? tx = null, CancellationToken token = default)
     {
-        if (!Enabled(conn, tx)) return Array.Empty<Values>();
+        if (!Enabled(conn, tx, token)) return Array.Empty<Values>();
         using var cmd = new SqlCommand("SELECT a.id,a.number,a.agreement_date,a.company_id,a.subject,a.works_end," +
             "a.customer_address,a.contractor_full,a.contractor_post,a.contractor_name,a.customer_full,o.name,o.site_full," +
             "a.cust_org,a.cust_post,a.cust_name,a.second_role,a.second_org,a.second_post,a.second_name,a.work_title,a.works_start " +
             "FROM dbo.agreements a JOIN dbo.objects o ON o.id=a.object_id WHERE a.object_id=@id AND a.archived=0 ORDER BY a.id", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         var rows = new List<Values>();
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             string S(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             string D(int i) => r.IsDBNull(i) ? "" : Convert.ToDateTime(r.GetValue(i), CultureInfo.InvariantCulture).ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
             var print = new SqlServerKsRequisites.Values(objectId, S(11), S(10), S(12), S(13), S(14), S(15), S(16), S(17), S(18), S(19), S(20), D(21), "");
             rows.Add(new(SqlInteger.ReadInt64(r, 0), objectId, S(1), D(2), r.IsDBNull(3) ? null : SqlInteger.ReadInt64(r, 3), S(4), D(5), S(6), S(7), S(8), S(9), print));
         }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 
@@ -191,18 +194,21 @@ public static class SqlServerAgreements
         if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Документ изменился.");
     }
 
-    internal static Values? ForDocument(SqlConnection conn, long documentId)
+    internal static Values? ForDocument(SqlConnection conn, long documentId, CancellationToken token = default)
     {
-        if (!Enabled(conn)) return null;
+        if (!Enabled(conn, token: token)) return null;
         long objectId; long? id;
         using (var cmd = new SqlCommand("SELECT object_id,agreement_id FROM dbo.contracts WHERE id=@id", conn))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+            var found = r.Read();
+            token.ThrowIfCancellationRequested();
+            if (!found) throw new InvalidOperationException("Документ не найден.");
             objectId = SqlInteger.ReadInt64(r, 0); id = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1);
         }
-        return id is long value ? Read(conn, objectId).SingleOrDefault(a => a.Id == value) : null;
+        return id is long value ? Read(conn, objectId, token: token).SingleOrDefault(a => a.Id == value) : null;
     }
 
     // The existing command moves an annex group, not a legal agreement or

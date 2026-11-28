@@ -32,7 +32,7 @@ public sealed class KsReportWindowLifecycleSourceTests
         var code = ReadApp("Ks3ReportWindow.xaml.cs");
         Assert.Contains("период с {from:dd.MM.yyyy} по {to:dd.MM.yyyy}", code);
         Assert.Equal(2, code.Split("ActInfoText.Text = _actInfo;", StringSplitOptions.None).Length - 1);
-        Assert.Contains("SqlServerActs.Ks3Figures(_connectionString, _actId), token)", code);
+        Assert.Contains("SqlServerActs.Ks3Figures(_connectionString, _actId, token), token)", code);
         Assert.Contains("if (_closed || !IsLoaded) return;", code);
     }
 
@@ -40,7 +40,7 @@ public sealed class KsReportWindowLifecycleSourceTests
     public void GroupOverviewCancelsQueuedReadAndPublication()
     {
         var code = ReadApp("KsGroupReportWindow.xaml.cs");
-        Assert.Contains("_connectionString,_contractId,_groupKey), token);", code);
+        Assert.Contains("_connectionString,_contractId,_groupKey, token), token);", code);
         Assert.Contains("token.ThrowIfCancellationRequested();\n                prepared.Publish();", code);
         Assert.Contains("await Task.Run(prepared.Dispose);", code);
         Assert.Contains("_lifetime.Cancel();", code);

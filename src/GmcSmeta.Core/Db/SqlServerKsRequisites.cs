@@ -20,21 +20,22 @@ public static class SqlServerKsRequisites
         return Read(conn, contractId);
     }
 
-    public static (Values Data, string Revision) ReadSnapshot(string connectionString, long contractId)
+    public static (Values Data, string Revision) ReadSnapshot(string connectionString, long contractId, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var before = SqlServerDatabase.Revision(conn);
-            var data = Read(conn, contractId);
-            if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            var before = SqlReadCancellation.Revision(conn, token);
+            var data = Read(conn, contractId, token);
+            if (!string.IsNullOrWhiteSpace(before) && before == SqlReadCancellation.Revision(conn, token))
                 return (data, before);
         }
         throw new InvalidOperationException("Реквизиты изменились во время чтения. Откройте окно повторно.");
     }
 
-    internal static Values Read(SqlConnection conn, long contractId)
+    internal static Values Read(SqlConnection conn, long contractId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var command = new SqlCommand(
             "SELECT c.object_id, o.name, o.customer_full, o.site_full, " +
             "o.cust_org, o.cust_post, o.cust_name, o.second_role, o.second_org, " +
@@ -42,15 +43,19 @@ public static class SqlServerKsRequisites
             "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
             "WHERE c.id=@id", conn);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var reader = command.ExecuteReader();
-        if (!reader.Read()) throw new InvalidOperationException("Договор не найден.");
+        using var registration = SqlReadCancellation.Register(command, token);
+        using var reader = SqlReadCancellation.ExecuteReader(command, token);
+        var found = reader.Read();
+        token.ThrowIfCancellationRequested();
+        if (!found) throw new InvalidOperationException("Договор не найден.");
         string S(int i) => reader.IsDBNull(i) ? "" :
             Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? "";
         var result = new Values(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
             S(1), S(2), S(3), S(4), S(5), S(6), S(7), S(8), S(9),
             S(10), S(11), S(12), S(13));
         reader.Close();
-        var legal = SqlServerAgreements.ForDocument(conn, contractId);
+        token.ThrowIfCancellationRequested();
+        var legal = SqlServerAgreements.ForDocument(conn, contractId, token);
         return legal is null ? result : legal.Print with { SitePart = result.SitePart };
     }
 

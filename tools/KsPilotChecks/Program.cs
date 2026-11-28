@@ -82,12 +82,25 @@ internal static class Program
             Console.WriteLine("PASS actual SQL KS finances: net="+act.Ks3Net.ToString("0.00",
                 CultureInfo.InvariantCulture)+" gross="+act.Total.ToString("0.00",CultureInfo.InvariantCulture));
 
-            var scope=SqlServerKsContractScope.Read(cs,contractId);
+            using var readCancellation = new CancellationTokenSource();
+            var scope=SqlServerKsContractScope.Read(cs,contractId,readCancellation.Token);
+            var baseline = scope.Documents.SelectMany(doc => SqlServerActs.ActsOf(conn, doc.Id)
+                .Select(a => a with { SourceName = doc.Label })).OrderBy(a => a.Date).ThenBy(a => a.Id).ToArray();
+            Check(SqlServerDatabase.Revision(conn)==revision,"Concurrent edit during KS batch parity; retry the isolated check.");
+            Check(scope.Acts.SequenceEqual(baseline),"Batched legal scope changed act amounts, IDs, or ordering.");
+            var (totals, rules) = Totals.ReadOneWithRules(conn, checked((int)contractId), readCancellation.Token);
+            var standalone = SqlServerActs.ActSheet(conn, act.Id, contractId, readCancellation.Token);
+            var shared = SqlServerActs.ActSheet(conn, act.Id, contractId, readCancellation.Token, rules, totals?.Form);
+            Check(standalone.Positions.SequenceEqual(shared.Positions) &&
+                standalone.Systems.SequenceEqual(shared.Systems) && standalone.Form == shared.Form &&
+                standalone.NumManual == shared.NumManual, "Shared rule snapshot changed act sheet.");
+            Check(SqlServerDatabase.Revision(conn)==revision,"Concurrent edit during KS shared rule check.");
+            Console.WriteLine("PASS bounded KS scope and shared rules parity");
             var key=KsWorkspaceProjection.GroupKey(act);
             var group=KsGroupReport.Calculate(scope,key);
             Check(group.PeriodGross==group.Acts.Sum(a=>a.Total),
                 "Grouped KS-3 period gross is inconsistent.");
-            var snapshot=SqlServerKsPrintData.Read(cs,contractId,key);
+            var snapshot=SqlServerKsPrintData.Read(cs,contractId,key,readCancellation.Token);
             Check(snapshot.Report.PeriodGross==group.PeriodGross,
                 "SQL document snapshot differs from KS-3.");
             Console.WriteLine("PASS SQL KS-3 and print snapshot: "+snapshot.Lines.Count+" rows");

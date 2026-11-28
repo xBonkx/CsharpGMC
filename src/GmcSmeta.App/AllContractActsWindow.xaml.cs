@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -53,6 +54,7 @@ public partial class AllContractActsWindow : Window
     private bool _updatingSelection;
     private bool _closed;
     private bool _loading;
+    private readonly CancellationTokenSource _readLifetime = new();
 
     public AllContractActsWindow(string connectionString, int contractId, string title)
     {
@@ -62,13 +64,14 @@ public partial class AllContractActsWindow : Window
         InitializeComponent();
         _initialized = true;
         Loaded += (_, _) => _ = RefreshActsAsync();
-        Closed += (_, _) => { _closed = true; _requestVersion++; };
+        Closed += (_, _) => { _closed = true; _requestVersion++; _readLifetime.Cancel(); _readLifetime.Dispose(); };
     }
 
     private async Task RefreshActsAsync()
     {
         if (!_initialized || _closed || _loading) return;
         var version = ++_requestVersion;
+        var token = _readLifetime.Token;
         _loading = true;
         UpdateSelectedButtons();
         OverviewStatus.Text = "Загружаю акты из SQL Server…";
@@ -76,17 +79,20 @@ public partial class AllContractActsWindow : Window
         {
             var (scope, groups, search, views, signed, draft) = await Task.Run(() =>
             {
-                var snapshot = SqlServerKsContractScope.ReadOverview(_connectionString, _contractId);
+                var snapshot = SqlServerKsContractScope.ReadOverview(_connectionString, _contractId, token);
                 var grouped = KsWorkspaceProjection.Build(snapshot.Acts);
                 var index = new KsOverviewSearchIndex(grouped);
                 var rows = snapshot.Acts.ToDictionary(a => a.Id, a => new Ks2RowVm(a));
                 decimal signedAmount = 0m, draftAmount = 0m;
                 foreach (var act in snapshot.Acts)
+                {
+                    token.ThrowIfCancellationRequested();
                     if (act.Signed) signedAmount += act.Total;
                     else draftAmount += act.Total;
+                }
                 return (snapshot, grouped, index, rows, signedAmount, draftAmount);
-            });
-            if (_closed || version != _requestVersion) return;
+            }, token);
+            if (token.IsCancellationRequested || _closed || version != _requestVersion) return;
             _scope = scope;
             var acts = scope.Acts;
             _acts = acts;

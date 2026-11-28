@@ -871,26 +871,26 @@ public static partial class SqlServerActs
     /// Импортированный остаток (ks3_opening marker) учитывается по историческому
     /// ключу; при неоднозначной юридической принадлежности расчёт блокируется.
     /// </summary>
-    public static Ks3Report Ks3Figures(string connectionString, long actId)
+    public static Ks3Report Ks3Figures(string connectionString, long actId, CancellationToken token = default)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var before = SqlServerDatabase.Revision(conn);
+            var before = SqlReadCancellation.Revision(conn, token);
             long contractId;
             using (var command = new SqlCommand(
                 "SELECT contract_id FROM dbo.acts WHERE id=@id", conn))
             {
                 command.Parameters.Add("@id", SqlDbType.BigInt).Value = actId;
-                var result = command.ExecuteScalar();
+                var result = SqlReadCancellation.Scalar(command, token);
                 if (result is null || result is DBNull)
                     throw new InvalidOperationException("Акт не найден.");
                 contractId = Convert.ToInt64(result, CultureInfo.InvariantCulture);
             }
-            var scope = SqlServerKsContractScope.Read(conn, contractId);
+            var scope = SqlServerKsContractScope.Read(conn, contractId, token: token);
             var report = KsGroupReport.CalculateSingle(scope, actId);
-            var ownership = SqlServerKsContractScope.ReadLegalOwnership(conn, scope);
-            if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            var ownership = SqlServerKsContractScope.ReadLegalOwnership(conn, scope, token);
+            if (!string.IsNullOrWhiteSpace(before) && before == SqlReadCancellation.Revision(conn, token))
             {
                 if (ownership is not null)
                     KsLegalScopePolicy.RequireReport(scope, report, ownership, groupReport: false);

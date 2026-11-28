@@ -26,11 +26,12 @@ public static partial class SqlServerKsPrintData
     }
 
     private static Dictionary<long, Contractor> ReadContractors(SqlConnection conn,
-        IReadOnlyList<SqlServerKsContractScope.Document> documents)
+        IReadOnlyList<SqlServerKsContractScope.Document> documents, CancellationToken token)
     {
         var contractors = new Dictionary<long, Contractor>(documents.Count);
         foreach (var batch in ContractorBatches(documents))
         {
+            token.ThrowIfCancellationRequested();
             var parameters = batch.Select((_, i) => "@id" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
             using var cmd = new SqlCommand(
                 "SELECT c.id,c.[date],co.name,co.legal_full,co.signer_post,co.signer_name " +
@@ -39,16 +40,19 @@ public static partial class SqlServerKsPrintData
             cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = batch[0].ObjectId;
             for (var i = 0; i < batch.Length; i++)
                 cmd.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = batch[i].Id;
-            using var r = cmd.ExecuteReader();
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
             string S(int i) => r.IsDBNull(i) ? "" :
                 Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 contractors.Add(id, new Contractor(id, S(1), S(2), S(3), S(4), S(5)));
             }
         }
         // A missing contract must fail the entire package, just as before.
+        token.ThrowIfCancellationRequested();
         RequireContractorCoverage(documents, contractors);
         return contractors;
     }

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using GmcSmeta.Core.Db;
 
@@ -14,6 +15,7 @@ public partial class KsRequisitesWindow : Window
     private SqlServerKsRequisites.Values? _loaded;
     private bool _saving;
     private bool _closed;
+    private readonly CancellationTokenSource _readLifetime = new();
 
     public KsRequisitesWindow(string connectionString, long contractId)
     {
@@ -29,8 +31,9 @@ public partial class KsRequisitesWindow : Window
         StatusText.Text = "Чтение реквизитов SQL Server…";
         try
         {
+            var token = _readLifetime.Token;
             var (values, revision) = await Task.Run(() =>
-                SqlServerKsRequisites.ReadSnapshot(_connectionString, _contractId));
+                SqlServerKsRequisites.ReadSnapshot(_connectionString, _contractId, token), token);
             if (_closed || !IsLoaded) return;
             _loaded = values;
             _revision = revision;
@@ -134,6 +137,8 @@ public partial class KsRequisitesWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _readLifetime.Cancel();
+        _readLifetime.Dispose();
         base.OnClosed(e);
     }
 

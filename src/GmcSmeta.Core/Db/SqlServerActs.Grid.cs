@@ -35,17 +35,18 @@ public static partial class SqlServerActs
     /// ссылки формул «КN» (act_qty.bind/display).
     /// </summary>
     public static ActSheetData ActSheet(SqlConnection conn, long actId, long contractId,
-        CancellationToken token = default)
+        CancellationToken token = default, TagRules? snapshotRules = null, string? snapshotForm = null)
     {
         token.ThrowIfCancellationRequested();
-        var form = "";
+        var form = snapshotForm ?? "";
+        if (snapshotForm is null)
         using (var read = new SqlCommand("SELECT ISNULL(form,N'') FROM dbo.contracts WHERE id=@id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             var value = token.CanBeCanceled ? read.ExecuteScalarAsync(token).GetAwaiter().GetResult() : read.ExecuteScalar();
             form = value is null or DBNull ? "" : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
-        var rules = TagRules.Load(conn, token);
+        var rules = snapshotRules ?? TagRules.Load(conn, token);
         var numManual = rules.Has(form, "num_manual");
 
         var systemRows = new List<(long Id, string Name, long Parent)>();

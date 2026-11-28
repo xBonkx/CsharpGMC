@@ -39,7 +39,7 @@ public partial class KsGroupReportWindow : Window
         {
             var token = _lifetime.Token;
             var package=await Task.Run(() => SqlServerKsPrintData.Read(
-                _connectionString,_contractId,_groupKey), token);
+                _connectionString,_contractId,_groupKey, token), token);
             if (_closed || !IsLoaded) return;
             _package=package;
             var r=package.Report;

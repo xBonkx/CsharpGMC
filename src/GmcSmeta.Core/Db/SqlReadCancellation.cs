@@ -23,4 +23,31 @@ internal static class SqlReadCancellation
             ? command.ExecuteReaderAsync(token).GetAwaiter().GetResult()
             : command.ExecuteReader();
     }
+
+    internal static SqlConnection Open(string connectionString, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        return token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+    }
+
+    internal static string Revision(SqlConnection connection, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var revision = token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(connection, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(connection);
+        token.ThrowIfCancellationRequested();
+        return revision;
+    }
+
+    internal static object? Scalar(DbCommand command, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var value = token.CanBeCanceled
+            ? command.ExecuteScalarAsync(token).GetAwaiter().GetResult() : command.ExecuteScalar();
+        token.ThrowIfCancellationRequested();
+        return value;
+    }
 }

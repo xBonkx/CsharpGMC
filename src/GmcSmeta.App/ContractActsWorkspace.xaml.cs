@@ -310,6 +310,7 @@ public partial class ContractActsWorkspace : UserControl
         var token = cancellation.Token;
         var connectionString = _connectionString;
         var contractId = _contractId;
+        var cached = EmbeddedEditor.CaptureReadContext(connectionString, contractId);
         try
         {
             var (summary, extras, totals) = await Task.Run(async () =>
@@ -319,8 +320,15 @@ public partial class ContractActsWorkspace : UserControl
                 {
                     token.ThrowIfCancellationRequested();
                     var before = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
-                    var (sheet, extra) = SqlServerActs.SummaryWithExtras(conn, contractId, token);
-                    var totals = Totals.ReadOne(conn, contractId, token);
+                    var common = cached is not null && cached.Revision == before &&
+                        !string.IsNullOrWhiteSpace(before) ? cached : null;
+                    ContractTotals? totals;
+                    TagRules? rules;
+                    if (common is { Totals: not null, Rules: not null })
+                        (totals, rules) = (common.Totals, common.Rules);
+                    else (totals, rules) = Totals.ReadOneWithRules(conn, contractId, token);
+                    var (sheet, extra) = SqlServerActs.SummaryWithExtras(conn, contractId, token,
+                        common?.Acts, rules, totals?.Form);
                     var after = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
                     if (!string.IsNullOrEmpty(before) && before == after)

@@ -24,11 +24,13 @@ public static partial class SqlServerActs
     /// с количеством по каждому акту, сдано всего, остаток (может быть
     /// отрицательным), остаток ₽, выдано на объект.
     /// </summary>
-    public static SummaryData SummarySheet(SqlConnection conn, long contractId, CancellationToken token = default)
+    public static SummaryData SummarySheet(SqlConnection conn, long contractId, CancellationToken token = default,
+        IReadOnlyList<ActInfo>? snapshotActs = null, TagRules? snapshotRules = null, string? snapshotForm = null)
     {
         token.ThrowIfCancellationRequested();
-        var acts = ActsOf(conn, contractId, token: token);
-        var form = "";
+        var acts = snapshotActs ?? ActsOf(conn, contractId, token: token);
+        var form = snapshotForm ?? "";
+        if (snapshotForm is null)
         using (var read = new SqlCommand("SELECT ISNULL(form,N'') FROM dbo.contracts WHERE id=@id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
@@ -38,13 +40,7 @@ public static partial class SqlServerActs
             form = value is null or DBNull ? "" : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
         token.ThrowIfCancellationRequested();
-        TagRules rules;
-        using (var read = new SqlCommand("SELECT [key], rules FROM tags", conn))
-        {
-            using var cancellation = SqlReadCancellation.Register(read, token);
-            using var reader = SqlReadCancellation.ExecuteReader(read, token);
-            rules = TagRules.Read(reader);
-        }
+        var rules = snapshotRules ?? TagRules.Load(conn, token);
         token.ThrowIfCancellationRequested();
         var numManual = rules.Has(form, "num_manual");
 
@@ -193,9 +189,10 @@ public static partial class SqlServerActs
     /// <summary>One act list for both projections. Caller must fence the entire
     /// read with the SQL revision, as for the individual read APIs.</summary>
     public static (SummaryData Summary, IReadOnlyList<ExtraRow> Extras) SummaryWithExtras(
-        SqlConnection conn, long contractId, CancellationToken token = default)
+        SqlConnection conn, long contractId, CancellationToken token = default,
+        IReadOnlyList<ActInfo>? snapshotActs = null, TagRules? snapshotRules = null, string? snapshotForm = null)
     {
-        var summary = SummarySheet(conn, contractId, token);
+        var summary = SummarySheet(conn, contractId, token, snapshotActs, snapshotRules, snapshotForm);
         return (summary, ReadExtraRows(conn, contractId, summary.Acts, token));
     }
 

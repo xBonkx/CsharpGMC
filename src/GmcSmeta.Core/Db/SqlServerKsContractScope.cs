@@ -54,22 +54,22 @@ public static class SqlServerKsContractScope
             .OrderBy(d => d.Id).ToList();
     }
 
-    public static Scope Read(string connectionString, long selectedDocumentId) =>
-        ReadConsistent(connectionString, selectedDocumentId, requireOverview: false);
+    public static Scope Read(string connectionString, long selectedDocumentId, CancellationToken token = default) =>
+        ReadConsistent(connectionString, selectedDocumentId, requireOverview: false, token: token);
 
     // Overview totals cover all documents/acts, unlike an individual KS-3.
-    public static Scope ReadOverview(string connectionString, long selectedDocumentId) =>
-        ReadConsistent(connectionString, selectedDocumentId, requireOverview: true);
+    public static Scope ReadOverview(string connectionString, long selectedDocumentId, CancellationToken token = default) =>
+        ReadConsistent(connectionString, selectedDocumentId, requireOverview: true, token: token);
 
-    private static Scope ReadConsistent(string connectionString, long selectedDocumentId, bool requireOverview)
+    private static Scope ReadConsistent(string connectionString, long selectedDocumentId, bool requireOverview, CancellationToken token)
     {
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var before = SqlServerDatabase.Revision(conn);
-            var result = Read(conn, selectedDocumentId);
-            var ownership = requireOverview ? ReadLegalOwnership(conn, result) : null;
-            if (!string.IsNullOrWhiteSpace(before) && before == SqlServerDatabase.Revision(conn))
+            var before = SqlReadCancellation.Revision(conn, token);
+            var result = Read(conn, selectedDocumentId, token: token);
+            var ownership = requireOverview ? ReadLegalOwnership(conn, result, token) : null;
+            if (!string.IsNullOrWhiteSpace(before) && before == SqlReadCancellation.Revision(conn, token))
             {
                 if (ownership is not null)
                     KsLegalScopePolicy.RequireOverview(result, ownership);
@@ -79,14 +79,15 @@ public static class SqlServerKsContractScope
         throw new InvalidOperationException("Данные договора изменились во время чтения КС. Повторите обновление.");
     }
 
-    internal static Scope Read(SqlConnection conn, long selectedDocumentId,int? rehearsalSchema=null)
+    internal static Scope Read(SqlConnection conn, long selectedDocumentId,int? rehearsalSchema=null, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         long objectId;
         using (var read = new SqlCommand(
             "SELECT object_id FROM dbo.contracts WHERE id=@id", conn))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = selectedDocumentId;
-            var value = read.ExecuteScalar();
+            var value = SqlReadCancellation.Scalar(read, token);
             if (value is null || value is DBNull)
                 throw new InvalidOperationException("Исходный договор не найден.");
             objectId = Convert.ToInt64(value, CultureInfo.InvariantCulture);
@@ -98,10 +99,13 @@ public static class SqlServerKsContractScope
             "FROM dbo.contracts WHERE object_id=@id AND kind IN (N'main',N'dop')", conn))
         {
             command.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
-            using var r = command.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(command, token);
+            using var r = SqlReadCancellation.ExecuteReader(command, token);
             string S(int i) => r.IsDBNull(i) ? "" :
                 Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 documents.Add(new Document(
                     Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                     Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
@@ -110,16 +114,20 @@ public static class SqlServerKsContractScope
                     S(6),
                     r.IsDBNull(7) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture)),
                     S(8), S(9)));
+            }
         }
 
         var scopeDocs = ResolveDocuments(selectedDocumentId, documents);
         var sourceDoc = documents.Single(d => d.Id == selectedDocumentId);
-        var acts = new List<SqlServerActs.ActInfo>();
-        foreach (var doc in scopeDocs)
-            acts.AddRange((rehearsalSchema is int version
-                ?SqlServerActs.ActsOfVersion(conn,doc.Id,null,version)
-                :SqlServerActs.ActsOf(conn,doc.Id))
-                .Select(a => a with { ContractId = doc.Id, SourceName = doc.Label }));
+        var labels = scopeDocs.ToDictionary(d => d.Id, d => d.Label);
+        var acts = SqlServerActs.ActsOfDocuments(conn, scopeDocs.Select(d => d.Id).ToArray(),
+            rehearsalSchema, token);
+        for (var i = 0; i < acts.Count; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            var act = acts[i];
+            acts[i] = act with { SourceName = labels[act.ContractId] };
+        }
         acts.Sort((left, right) =>
         {
             int d = left.Date.CompareTo(right.Date);
@@ -134,7 +142,7 @@ public static class SqlServerKsContractScope
         {
             marker.Parameters.Add("@key", SqlDbType.NVarChar, 512).Value =
                 $"ks3_opening:{objectId}:{agreementNumber}";
-            var json = Convert.ToString(marker.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var json = Convert.ToString(SqlReadCancellation.Scalar(marker, token), CultureInfo.InvariantCulture);
             if (!string.IsNullOrWhiteSpace(json))
                 opening = Ks3OpeningBalance.Parse(json);
         }
@@ -144,9 +152,9 @@ public static class SqlServerKsContractScope
 
     // Null means the legacy schema has no legal IDs; an empty map on schema 32
     // means there are no valid active mappings and must not bypass validation.
-    internal static IReadOnlyDictionary<long, long>? ReadLegalOwnership(SqlConnection conn, Scope scope)
+    internal static IReadOnlyDictionary<long, long>? ReadLegalOwnership(SqlConnection conn, Scope scope, CancellationToken token = default)
     {
-        if (!SqlServerAgreements.Enabled(conn)) return null;
+        if (!SqlServerAgreements.Enabled(conn, token: token)) return null;
         var selected = scope.Documents.Single(d => d.Id == scope.SelectedDocumentId);
         var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
         using var cmd = new SqlCommand(
@@ -154,14 +162,17 @@ public static class SqlServerKsContractScope
             "ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 " +
             "WHERE c.object_id=@object", conn);
         cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = selected.ObjectId;
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         var result = new Dictionary<long, long>();
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var id = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
             if (documentIds.Contains(id))
                 result.Add(id, Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture));
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

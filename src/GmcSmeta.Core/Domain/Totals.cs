@@ -131,7 +131,18 @@ public static partial class Totals
     {
         token.ThrowIfCancellationRequested();
         if (contractId <= 0) return null;
-        return ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out _, token: token).SingleOrDefault();
+        return ReadOneWithRules(conn, contractId, token).Totals;
+    }
+
+    // Both values are from the same five-result batch. The caller owns the
+    // revision fence and may reuse them only for the same document/revision.
+    public static (ContractTotals? Totals, TagRules Rules) ReadOneWithRules(
+        Microsoft.Data.SqlClient.SqlConnection conn, int contractId, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        if (contractId <= 0) return (null, new TagRules());
+        var totals = ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out var rules, token: token).SingleOrDefault();
+        return (totals, rules);
     }
 
     public static ContractTotals? ReadOne(DbConnection conn, int contractId)

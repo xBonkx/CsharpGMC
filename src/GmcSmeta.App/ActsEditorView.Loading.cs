@@ -12,9 +12,22 @@ public partial class ActsEditorView
         SqlServerActs.ActSheetData? Sheet, SqlServerActs.ActDetails? Details,
         ContractTotals? Totals, TagRules? Rules, HashSet<long> SharedExtraIds);
 
+    internal sealed record ActReadContext(string ConnectionString, int ContractId, string Revision,
+        IReadOnlyList<SqlServerActs.ActInfo> Acts, ContractTotals? Totals, TagRules? Rules);
+
+    private ActReadContext? _actReadContext;
+
+    internal ActReadContext? CaptureReadContext(string connectionString, int contractId) =>
+        _actReadContext is { } cached && cached.ConnectionString == connectionString &&
+        cached.ContractId == contractId && !string.IsNullOrWhiteSpace(cached.Revision) ? cached : null;
+
+    private void RememberReadContext(ActLoadSnapshot snapshot) =>
+        _actReadContext = new(_connectionString, _contractId, snapshot.Revision,
+            Array.AsReadOnly(snapshot.Acts.ToArray()), snapshot.Totals, snapshot.Rules);
+
     private static ActLoadSnapshot ReadActSnapshot(string connectionString, int contractId,
         long requestedId, List<SqlServerActs.ActInfo>? cachedActs, string cachedRevision,
-        CancellationToken token = default)
+        CancellationToken token = default, ActReadContext? cachedContext = null)
     {
         token.ThrowIfCancellationRequested();
         using var conn = token.CanBeCanceled
@@ -31,10 +44,21 @@ public partial class ActsEditorView
                 string.Equals(before, cachedRevision, StringComparison.Ordinal)
                 ? cachedActs : SqlServerActs.ActsOf(conn, contractId, token: token);
             var id = KsWorkspaceProjection.ResolveActId(acts, requestedId);
-            var sheet = id == 0 ? null : SqlServerActs.ActSheet(conn, id, contractId, token);
+            ContractTotals? totals = null;
+            TagRules? rules = null;
+            if (id != 0)
+            {
+                if (cachedContext is { Totals: not null, Rules: not null } common &&
+                    common.ConnectionString == connectionString && common.ContractId == contractId &&
+                    common.Revision == before && !string.IsNullOrWhiteSpace(before))
+                {
+                    totals = common.Totals;
+                    rules = common.Rules;
+                }
+                else (totals, rules) = Totals.ReadOneWithRules(conn, contractId, token);
+            }
+            var sheet = id == 0 ? null : SqlServerActs.ActSheet(conn, id, contractId, token, rules, totals?.Form);
             var details = id == 0 ? null : SqlServerActs.ReadDetails(conn, id, token);
-            var totals = id == 0 ? null : Totals.ReadOne(conn, contractId, token);
-            var rules = id == 0 ? null : TagRules.Load(conn, token);
             var sharedExtras = sheet is not null && sheet.Positions.Any(p => p.OutOfKp)
                 ? ReadSharedExtras(conn, id, token) : new HashSet<long>();
             var after = Revision();
@@ -42,6 +66,7 @@ public partial class ActsEditorView
             if (!string.IsNullOrWhiteSpace(before) && before == after)
                 return new ActLoadSnapshot(acts, id, after, sheet, details, totals, rules, sharedExtras);
             cachedActs = null; // A concurrent change invalidates the cached list too.
+            cachedContext = null;
         }
         throw new InvalidOperationException("КС-2 изменилась во время чтения. Повторите загрузку.");
     }
@@ -54,7 +79,11 @@ public partial class ActsEditorView
 
     private void UpdateActReadVisibility()
     {
-        if (!IsLoaded || !IsVisible) CancelHiddenActRead();
+        if (!IsLoaded || !IsVisible)
+        {
+            _actExportCancellation?.Cancel();
+            CancelHiddenActRead();
+        }
         else ResumeActReadIfNeeded();
     }
 
@@ -70,7 +99,7 @@ public partial class ActsEditorView
     {
         if (!IsLoaded || !IsVisible || _loadingAct || _building || ActWritePending ||
             _resumeActId is not long id) return;
-        _ = ReloadAsync(id, reuseList: false, requiredReadback: false);
+        _ = ReloadAsync(id, reuseList: true, requiredReadback: false);
     }
 
     private void BeginActLoadingPresentation()
@@ -102,6 +131,7 @@ public partial class ActsEditorView
     {
         if (_contractId == 0 || ActWritePending || _actLoadRequired) return;
         var requested = requestedActId ?? SelectedActId;
+        _actExportCancellation?.Cancel();
         if (!requiredReadback && IsLoaded && !IsVisible)
         {
             CancelHiddenActRead();
@@ -124,6 +154,7 @@ public partial class ActsEditorView
         var contractId = _contractId;
         var cachedActs = reuseList ? _acts.ToList() : null;
         var cachedRevision = _actsRevision;
+        var cachedContext = reuseList ? CaptureReadContext(connectionString, contractId) : null;
         _loadingAct = true;
         _loadFailed = false;
         _publishedActRevision = "";
@@ -135,7 +166,7 @@ public partial class ActsEditorView
         try
         {
             var loaded = await Task.Run(() => ReadActSnapshot(connectionString, contractId,
-                requested, cachedActs, cachedRevision, token), token);
+                requested, cachedActs, cachedRevision, token, cachedContext), token);
             if (token.IsCancellationRequested || generation != _actLoadGeneration || contractId != _contractId ||
                 connectionString != _connectionString) return;
             _building = true;
@@ -145,6 +176,7 @@ public partial class ActsEditorView
             _actsRevision = loaded.Revision;
             _revision = loaded.Revision;
             ApplyActSnapshot(loaded);
+            RememberReadContext(loaded);
             _publishedActId = loaded.ActId;
             _publishedActRevision = loaded.Revision;
             EndActLoadingPresentation();
@@ -160,6 +192,7 @@ public partial class ActsEditorView
             _revision = "";
             _actsRevision = "";
             _loadFailed = true;
+            _actReadContext = null;
             _actId = requested; // Retry the requested act, not the retained old one.
             ShowActUnavailable(ex.Message);
             EndActLoadingPresentation();

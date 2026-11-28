@@ -23,9 +23,46 @@ public static partial class SqlServerActs
     // Internal explicit-version projection for isolated migration finance snapshots.
     // The normal application still uses the existing guarded Open and name policy.
     internal static List<ActInfo> ActsOfVersion(SqlConnection conn,long contractId,
-        SqlTransaction? transaction,int schemaVersion, CancellationToken token = default)
+        SqlTransaction? transaction,int schemaVersion, CancellationToken token = default) =>
+        ReadActsOfVersion(conn, new[] { contractId }, transaction, schemaVersion, token);
+
+    // Keep multi-document reads bounded: the raw act lines are materialized
+    // by the established financial calculator. No arbitrary cross-object
+    // selection: the caller supplies the IDs resolved by the legal scope.
+    internal const int ActDocumentBatchSize = 32;
+
+    internal static List<ActInfo> ActsOfDocuments(SqlConnection conn,
+        IReadOnlyList<long> contractIds, int? rehearsalSchema, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (contractIds.Count == 0) return new();
+        if (contractIds.Any(id => id <= 0) || contractIds.Distinct().Count() != contractIds.Count)
+            throw new ArgumentException("Недопустимый список документов КС.");
+        var schema = rehearsalSchema ?? (SqlSchemaCompatibility.HasPreviewColumns(conn) ? 31 : 28);
+        var result = new List<ActInfo>();
+        foreach (var batch in contractIds.Chunk(ActDocumentBatchSize))
+        {
+            token.ThrowIfCancellationRequested();
+            result.AddRange(ReadActsOfVersion(conn, batch, null, schema, token));
+        }
+        token.ThrowIfCancellationRequested();
+        return result;
+    }
+
+    private static List<ActInfo> ReadActsOfVersion(SqlConnection conn, IReadOnlyList<long> contractIds,
+        SqlTransaction? transaction, int schemaVersion, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (contractIds.Count is < 1 or > ActDocumentBatchSize)
+            throw new ArgumentOutOfRangeException(nameof(contractIds));
+        var names = contractIds.Count == 1 ? new[] { "@id" } :
+            contractIds.Select((_, i) => "@id" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
+        var predicate = names.Length == 1 ? "=@id" : " IN (" + string.Join(",", names) + ")";
+        void Bind(SqlCommand command)
+        {
+            for (var i = 0; i < names.Length; i++)
+                command.Parameters.Add(names[i], SqlDbType.BigInt).Value = contractIds[i];
+        }
         var ruleJson = new Dictionary<string, string>(StringComparer.Ordinal);
         using (var rules = new SqlCommand("SELECT [key],rules FROM dbo.tags", conn, transaction))
         {
@@ -43,7 +80,7 @@ public static partial class SqlServerActs
         var raw = new List<(long Id, string Number, DateTime Date, DateTime? Start, DateTime? End,
             bool Signed, decimal Smr, decimal Transport, decimal Pnr, bool Exact,
             long Adjustment, decimal VatRate, string Form, string DsNo, string DsDate,
-            decimal Discount, bool Override, long ManualTotal, string SectionJson, bool BySystem, string DsExtra)>();
+            decimal Discount, bool Override, long ManualTotal, string SectionJson, bool BySystem, string DsExtra, long ContractId)>();
         using (var cmd = new SqlCommand(
             "SELECT a.id,a.number,a.[date],a.period_from,a.period_to,a.signed," +
             "ISNULL(a.smr_amount,0),ISNULL(a.transport_amount,0),ISNULL(a.pnr_amount,0)," +
@@ -52,11 +89,11 @@ public static partial class SqlServerActs
             (schemaVersion>=29?",a.discount_percent":",CAST(0 AS float)")+
             (schemaVersion>=31?",a.discount_override,a.manual_total_cents":",CAST(0 AS bit),CAST(-1 AS bigint)")+
             (schemaVersion>=30?",a.section_amounts_json":",CAST(N'' AS nvarchar(max))")+
-            ",a.smr_by_system,ISNULL(a.ds_extra,N'') " +
+            ",a.smr_by_system,ISNULL(a.ds_extra,N''),a.contract_id " +
             "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id " +
-            "WHERE a.contract_id=@id ORDER BY a.[date],a.id", conn, transaction))
+            "WHERE a.contract_id" + predicate + " ORDER BY a.[date],a.id", conn, transaction))
         {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+            Bind(cmd);
             using var cancellation = SqlReadCancellation.Register(cmd, token);
             using var r = SqlReadCancellation.ExecuteReader(cmd, token);
             decimal D(int k) => r.IsDBNull(k) ? 0m :
@@ -81,16 +118,16 @@ public static partial class SqlServerActs
                     !r.IsDBNull(17)?SqlInteger.ReadInt64(r, 17):-1L,
                     !r.IsDBNull(18)?r.GetString(18):"",
                     !r.IsDBNull(19)&&SqlFlag.Read(r, 19),
-                    r.GetString(20)));
+                    r.GetString(20), SqlInteger.ReadInt64(r, 21)));
             }
         }
 
         var lines = new Dictionary<long, List<(decimal Quantity, decimal Price)>>();
         using (var command = new SqlCommand(
             "SELECT al.act_id,al.qty,al.price FROM dbo.act_lines al " +
-            "JOIN dbo.acts a ON a.id=al.act_id WHERE a.contract_id=@id", conn, transaction))
+            "JOIN dbo.acts a ON a.id=al.act_id WHERE a.contract_id" + predicate, conn, transaction))
         {
-            command.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+            Bind(command);
             using var cancellation = SqlReadCancellation.Register(command, token);
             using var r = SqlReadCancellation.ExecuteReader(command, token);
             while (r.Read())
@@ -123,7 +160,7 @@ public static partial class SqlServerActs
                 a.VatRate, vatTop, a.Adjustment, a.Discount, a.ManualTotal);
             acts.Add(new ActInfo(a.Id, a.Number, a.Date, a.Start, a.End,
                 a.Signed, values.Count, sum.Gross,
-                contractId, "", sum.Ks3Net, sum.Vat, sum.Materials,
+                a.ContractId, "", sum.Ks3Net, sum.Vat, sum.Materials,
                 sum.Smr, sum.Transport, sum.Pnr, a.VatRate, vatTop, a.Adjustment,
                 a.Exact, KsFinancialPolicy.HasRule(json, "round_rows"),
                 a.DsNo, a.DsDate, a.Discount, a.Override, a.ManualTotal, a.SectionJson, a.BySystem) { DsExtra = a.DsExtra });

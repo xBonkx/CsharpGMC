@@ -19,7 +19,7 @@ public sealed class KsActReadLifecycleSourceTests
         Assert.Contains("if (_actLoadRequired || ActWritePending ||", loader);
         Assert.Contains("_resumeActId = _activeReadActId;", loader);
         Assert.Contains("_resumeActId is not long id", loader);
-        Assert.Contains("ReloadAsync(id, reuseList: false, requiredReadback: false)", loader);
+        Assert.Contains("ReloadAsync(id, reuseList: true, requiredReadback: false)", loader);
         Assert.Contains("bool requiredReadback = true", loader);
         Assert.Contains("requiredReadback ? CancellationToken.None : cancellation.Token", loader);
         Assert.Contains("if (_contractId == 0 || ActWritePending || _actLoadRequired) return;", loader);
@@ -32,6 +32,6 @@ public sealed class KsActReadLifecycleSourceTests
         Assert.Contains("await ReloadAsync(actId, reuseList: false);", editor);
         Assert.Contains("await ReloadAsync(actId, reuseList: false);", extra);
         Assert.Contains("ReadActSnapshot(connectionString, contractId,", editor);
-        Assert.Contains("actId, null, \"\"));", editor);
+        Assert.Contains("actId, null, \"\");", editor);
     }
 }
