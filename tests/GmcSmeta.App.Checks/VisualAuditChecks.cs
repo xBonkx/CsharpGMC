@@ -80,65 +80,101 @@ internal static class VisualAuditChecks
             var root = (FrameworkElement)window.FindName("RootLayout");
             var tree = (TreeView)window.FindName("NavigationTree");
             var sidebar = (ColumnDefinition)window.FindName("SidebarColumn");
-            TreeViewItem Node(object value, string template, int depth)
-                => new() { Header = value, HeaderTemplate = (DataTemplate)window.FindResource(template),
-                    Padding = new Thickness(16 * depth, 7, 4, 7), IsExpanded = true };
-            TreeViewItem Doc(int id, string kind, string title, int depth, bool nested = false,
-                bool children = false, bool remainder = false)
+            // Use the real navigation projection/reconciliation and lazy expansion.
+            // Keep _ready false: the shell's selection/mode handlers cannot launch SQL.
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic;
+            var objects = (List<GmcSmeta.Core.Domain.ObjectRow>)typeof(MainWindow).GetField("_objects", flags)!.GetValue(window)!;
+            var documents = (List<GmcSmeta.Core.Domain.DocRow>)typeof(MainWindow).GetField("_docs", flags)!.GetValue(window)!;
+            objects.AddRange(new GmcSmeta.Core.Domain.ObjectRow[]
             {
-                var document = new GmcSmeta.Core.Domain.DocRow(id, 1, kind, "", title, "", "", "", false, 0, 0, 0, 0)
-                    with { StageRest = remainder };
-                var header = new GmcSmeta.Core.Domain.NavigationDocumentHeader(document, nested, children);
-                var node = Node(header, "DocumentNavigationTemplate", depth);
-                node.FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal;
-                return node;
-            }
-            var year = Node("2026", "YearNavigationTemplate", 0);
-            var obj = Node("Договор — объект с очень длинным названием", "ObjectNavigationTemplate", 1);
-            var folder = Node("Папка документов", "ObjectNavigationTemplate", 1);
-            var archive = Node("Архив 2025", "ObjectNavigationTemplate", 1);
-            var kp = Doc(1, "kp", "Коммерческое предложение", 2);
-            var contract = Doc(2, "main", "Договор", 2);
-            var dop = Doc(3, "dop", "Дополнительное соглашение", 2);
-            var parent = Doc(4, "main", "Родитель с этапами", 2, children: true);
-            var stage = Doc(5, "main", "Этап один", 3, nested: true, children: true);
-            var deep = Doc(6, "main", "Глубокая вложенность", 4, nested: true);
-            var rest = Doc(7, "main", "Остаток", 3, nested: true, remainder: true);
-            stage.Items.Add(deep); parent.Items.Add(stage); parent.Items.Add(rest);
-            foreach (var child in new[] { kp, contract, dop, parent }) obj.Items.Add(child);
-            year.Items.Add(obj); year.Items.Add(folder); year.Items.Add(archive);
-            tree.Items.Add(year);
-            foreach (var width in new[] { 270d, 300d, 420d })
+                new(1, "Договор — объект с очень длинным названием", "", "", false, "") { CreatedAt = "2026-01-01" },
+                new(2, "Папка без документов", "", "", false, "") { CreatedAt = "2026-01-01" },
+                new(3, "Архив 2025", "", "", true, "2025-01-01")
+            });
+            GmcSmeta.Core.Domain.DocRow Doc(int id, int objectId, string kind, string name, int? parent = null,
+                int stageNo = 0, bool remainder = false)
+                => new(id, objectId, kind, kind, name, name, id.ToString(CultureInfo.InvariantCulture),
+                    "Длинное нестандартное значение даты", false, 0, 0, 0, 0)
+                    { StageOf = parent, StageNo = stageNo, StageRest = remainder, KpPhase = "review" };
+            documents.AddRange(new[]
             {
-                sidebar.Width = new GridLength(width);
-                Layout(root, 1366, 1000);
-                foreach (var item in new[] { year, obj, folder, archive, kp, contract, dop, parent, stage, deep, rest })
+                Doc(1, 1, "kp", "Коммерческое предложение"),
+                Doc(2, 1, "main", "Договор"),
+                Doc(3, 1, "dop", "Дополнительное соглашение"),
+                Doc(4, 1, "main", "Родитель с этапами"),
+                Doc(5, 1, "main", "Этап один", 4, 1),
+                Doc(6, 1, "main", "Глубокая вложенность", 5, 2),
+                Doc(7, 1, "main", "Остаток", 4, 3, true),
+                Doc(8, 3, "main", "Архивный документ")
+            });
+            var refresh = typeof(MainWindow).GetMethod("RefreshNavigation", flags)!;
+            IEnumerable<TreeViewItem> Expand(ItemCollection items)
+            {
+                foreach (var item in items.OfType<TreeViewItem>().ToArray())
                 {
-                    item.ApplyTemplate();
-                    var chrome = (Border)item.Template.FindName("HeaderBorder", item);
-                    var content = (ContentPresenter)item.Template.FindName("PART_Header", item);
-                    var mark = (Border)item.Template.FindName("SelectionMark", item);
-                    Require(chrome.ActualHeight >= 31 && content.ActualWidth > 0,
-                        "Navigation header must have a visible content area");
-                    Require(content.TransformToAncestor(chrome).TransformBounds(new Rect(content.RenderSize)).Right
-                        <= chrome.ActualWidth + 1, "Navigation content extends outside row");
-                    item.IsSelected = true;
-                    Layout(root, 1366, 1000);
-                    Require(mark.Visibility == Visibility.Visible, "Selection marker not visible");
-                    item.IsSelected = false;
-                    Layout(root, 1366, 1000);
-                    Require(mark.Visibility == Visibility.Collapsed, "Normal row must not retain selection marker");
+                    if (item.Tag is not (string or GmcSmeta.Core.Domain.ObjectRow or GmcSmeta.Core.Domain.DocRow)) continue;
+                    item.IsExpanded = true;
+                    yield return item;
+                    foreach (var child in Expand(item.Items)) yield return child;
                 }
-                parent.IsExpanded = false;
-                Layout(root, 1366, 1000);
-                Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Collapsed,
-                    "Collapsed stage group must hide descendants");
-                parent.IsExpanded = true;
-                Layout(root, 1366, 1000);
-                Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Visible,
-                    "Expanded stage group must show descendants");
-                Require(rest.FontStyle == FontStyles.Italic && stage.FontStyle == FontStyles.Normal,
-                    "Only remainder uses italic presentation");
+            }
+
+            root.IsEnabled = true;
+            foreach (var (mode, expected) in new[]
+            {
+                ("ContractsMode", new[] { 2, 3, 4, 5, 6, 7 }),
+                ("KpMode", new[] { 1 }),
+                ("ArchiveMode", new[] { 8 })
+            })
+            {
+                ((RadioButton)window.FindName(mode)).IsChecked = true;
+                refresh.Invoke(window, null);
+                var items = Expand(tree.Items).ToArray();
+                var docNodes = items.Where(n => n.Tag is GmcSmeta.Core.Domain.DocRow)
+                    .ToDictionary(n => ((GmcSmeta.Core.Domain.DocRow)n.Tag).Id);
+                Require(docNodes.Keys.Order().SequenceEqual(expected), "Wrong documents in " + mode);
+                var objectIds = items.Select(n => n.Tag).OfType<GmcSmeta.Core.Domain.ObjectRow>().Select(o => o.Id).Order();
+                Require(objectIds.SequenceEqual(mode == "KpMode" ? new[] { 1, 2 } :
+                    mode == "ArchiveMode" ? new[] { 3 } : new[] { 1 }), "Wrong object folders in " + mode);
+                foreach (var width in new[] { 270d, 300d, 420d })
+                {
+                    sidebar.Width = new GridLength(width);
+                    Layout(root, 1366, 1000);
+                    foreach (var item in items)
+                    {
+                        item.ApplyTemplate();
+                        var chrome = (Border)item.Template.FindName("HeaderBorder", item);
+                        var content = (ContentPresenter)item.Template.FindName("PART_Header", item);
+                        var mark = (Border)item.Template.FindName("SelectionMark", item);
+                        Require(chrome.ActualHeight >= 31 && content.ActualWidth > 0,
+                            "Navigation header must have a visible content area");
+                        Require(content.TransformToAncestor(chrome).TransformBounds(new Rect(content.RenderSize)).Right
+                            <= chrome.ActualWidth + 1, "Navigation content extends outside row");
+                        item.IsSelected = true;
+                        Layout(root, 1366, 1000);
+                        Require(mark.Visibility == Visibility.Visible, "Selection marker not visible");
+                        item.IsSelected = false;
+                        Layout(root, 1366, 1000);
+                        Require(mark.Visibility == Visibility.Collapsed, "Normal row must not retain selection marker");
+                    }
+                    if (mode != "ContractsMode") continue;
+                    var parent = docNodes[4];
+                    var stage = docNodes[5];
+                    var rest = docNodes[7];
+                    Require(parent.Items.Contains(stage) && parent.Items.Contains(rest) && stage.Items.Contains(docNodes[6]),
+                        "Production navigation must retain deep stage hierarchy");
+                    parent.IsExpanded = false;
+                    Layout(root, 1366, 1000);
+                    Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Collapsed,
+                        "Collapsed stage group must hide descendants");
+                    parent.IsExpanded = true;
+                    Layout(root, 1366, 1000);
+                    Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Visible,
+                        "Expanded stage group must show descendants");
+                    Require(rest.FontStyle == FontStyles.Italic && stage.FontStyle == FontStyles.Normal,
+                        "Only remainder uses italic presentation");
+                }
             }
         }
         finally { window.Close(); }
