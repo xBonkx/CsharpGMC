@@ -84,6 +84,21 @@ public sealed class DynamicFormLayoutSourceTests
     }
 
     [Fact]
+    public void DynamicFormsRefreshWorkAreaForActualMonitorAndPreserveLocalCaps()
+    {
+        var source = Source("DynamicFormLayout.cs");
+        Assert.Contains("MonitorFromWindow(handle, MonitorDefaultToNearest)", source);
+        Assert.Contains("GetMonitorInfo(monitor, ref info)", source);
+        Assert.Contains("VisualTreeHelper.GetDpi(window)", source);
+        Assert.Contains("window.SourceInitialized +=", source);
+        Assert.Contains("window.LocationChanged +=", source);
+        Assert.Contains("window.DpiChanged +=", source);
+        Assert.Contains("Math.Min(requestedMaxHeight, workArea.Height)", source);
+        Assert.Contains("Math.Min(requestedMaxWidth, workArea.Width)", source);
+        Assert.Contains("if (fitting) return;", source);
+    }
+
+    [Fact]
     public void ChromeUsesResourceBasedTypographyAndSingleFormInset()
     {
         var source = Source("DynamicFormLayout.cs");
