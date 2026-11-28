@@ -28,10 +28,10 @@ internal static class WorkspaceWindowUi
     {
         var heading = new TextBlock
         {
-            Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 7)
+            Text = title
         };
         heading.SetResourceReference(FrameworkElement.StyleProperty, "UiHeadingText");
+        heading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupHeadingGap");
         heading.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
         return heading;
     }
@@ -63,8 +63,9 @@ internal static class WorkspaceWindowUi
 
     public static TextBlock Hint(string text)
     {
-        var hint = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 12) };
+        var hint = new TextBlock { Text = text };
         hint.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
+        hint.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         return hint;
     }
 
@@ -132,7 +133,7 @@ public sealed class GlobalSearchWindow : Window
     private readonly TextBox _input = new() { MinHeight = 34,
         ToolTip = "Объект, юридический договор, приложение, ДС, КП или позиция: несколько слов в любом порядке" };
     private readonly TextBlock _status = WorkspaceWindowUi.Hint("Начните печатать — поиск по всей базе");
-    private readonly ListBox _results = new() { DisplayMemberPath = "Display" };
+    private readonly ListBox _results = new();
     private readonly DispatcherTimer _delay = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private CancellationTokenSource? _searchCancellation;
     private int _request;
@@ -146,12 +147,19 @@ public sealed class GlobalSearchWindow : Window
         MinWidth = 520; MinHeight = 360; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         WorkspaceWindowUi.ApplyChrome(this);
         _input.SetResourceReference(FrameworkElement.StyleProperty, "PythonSearch");
-        var panel = new DockPanel { Margin = new Thickness(18, 16, 18, 16) };
+        var panel = new DockPanel();
+        panel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutCompareDialogMargin");
         Content = panel;
         var search = ReferenceWindowUi.Search(_input,"Объект, договор, приложение, ДС, КП или позиция: «Махалина», «Ballu BSO», «№ 5»…");
         DockPanel.SetDock(search, Dock.Top);
         panel.Children.Add(search);
         var resultStyle = new Style(typeof(ListBoxItem));
+        resultStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        var resultText = new FrameworkElementFactory(typeof(TextBlock));
+        resultText.SetBinding(TextBlock.TextProperty, new Binding("Display"));
+        resultText.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        _results.ItemTemplate = new DataTemplate { VisualTree = resultText };
+        ScrollViewer.SetHorizontalScrollBarVisibility(_results, ScrollBarVisibility.Disabled);
         resultStyle.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(8,6,8,6)));
         resultStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,new Binding("Display")));
         _results.ItemContainerStyle = resultStyle;
