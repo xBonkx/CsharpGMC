@@ -1,5 +1,7 @@
 # Аудит размера исходников и декомпозиции — 26.11.2026
 
+28.11.2026 ChatGPT/main (base 268d63f) — ARCH-SIZE-01/08 PARTIAL: local standard-library Python 3.10+ and Git tool inventories committed tracked C#/XAML by revision, physical lines and six approved ranges, src/tests/other totals, top-30, documented exclusions and approximate partial-type whole-file totals. Optional committed baseline warns on new/growing files above 1000 (including >4000), never blocks existing debt; JSON contains complete per-file inventory. Five local Python unittest cases passed on Linux including real temporary Git history, Cyrillic filename, generated exclusions, boundary values and uncommitted changes. Full repository clone unavailable in this environment; full real inventory, syntax-aware type/dependency audit, Windows smoke and agreed future enforcement remain. No C# application, SQL, schema or release changes.
+
 28.11.2026 ChatGPT/main (base a5e61dd) — ARCH-SIZE-02/04 PARTIAL: MainWindow.xaml.cs 1744→1651 lines, new MainWindow.DocumentLinks.cs 51 lines (partial wiring only) and independent Core GmcsDocumentLink.cs 57 lines (v1 serialization and exact original ID/title/tuple fallback, no connection strings). ActsEditorView.xaml.cs 2101→2082 lines, independent Core KsBatchQuantities.cs 38 lines (selection fill-rest/issued/clear rules extracted verbatim; writes, signatures and selection order unchanged). Thirteen offline test cases and amended link source guard added, not run; build/WPF/SQL/Excel acceptance remains. Logical shell/editor still large; no DB/schema/financial/UI/icon/release changes.
 
 28.11.2026 ChatGPT/main (base 5f00f46) — ARCH-SIZE-02 PARTIAL: ActsEditorView.xaml.cs 2279→2101 physical lines; export handlers moved verbatim into ActsEditorView.Export.cs (179 lines; organization only, same partial class/state). Independent Core KsSelectionQuantity.cs (37 lines) extracts selection-only unit normalization, first-seen group ordering and formatting, retains 3-decimal midpoint-to-even after sum and current culture. Five domain tests + one source guard, existing async export guard updated to relocated source. No SQL, finance, UI design, icon, DB/schema or release changes. Build/tests not executed; actual WPF and export acceptance pending. Logical editor remains large.
@@ -31,7 +33,7 @@ Python: smeta/ui/kp_editor.py — 3961, ks_view.py — 2356, proc_view.py — 17
 
 ## Задачи
 
-### ARCH-SIZE-01 (P1) — NOT STARTED
+### ARCH-SIZE-01 (P1) — PARTIAL
 Полный инвентарь рукописных .cs/.xaml: количество, строки, топ-30, диапазоны, файлы >1000/1500/2000/4000, агрегирование по partial-типам (namespace + type), зависимости, длинные методы, смешение UI/расчётов/SQL. Отдельно src/tests, сохранить SHA, метод подсчёта, исключения и карту пересечений с действующими TODO. Приёмка: воспроизводимый отчёт с точными путями и планом рефакторинга.
 
 ### ARCH-SIZE-02 (P1) — PARTIAL
@@ -52,7 +54,7 @@ App.xaml: тематические словари ресурсов для таб
 ### ARCH-SIZE-07 (P2) — NOT STARTED
 SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить разделение запросов, маппинга, валидации, транзакций, денежной логики. Выделять компоненты без изменения SQL-контрактов, схемы, границ транзакций и защит. Приёмка: тесты SQL только на GmcSmetaPilot_*, двухклиентные сценарии, rollback, прежние суммы/остатки и защита рабочей БД.
 
-### ARCH-SIZE-08 (P2) — NOT STARTED
+### ARCH-SIZE-08 (P2) — PARTIAL
 Добавить воспроизводимый локальный скрипт отчёта размеров и проверку роста для изменённых файлов; существующий долг фиксировать baseline, не блокировать исправления из-за прежнего размера, не разрешать необоснованное разрастание. Сначала предупреждения, затем согласованный порог/исключения; не зависеть от платных GitHub Actions. Приёмка: тесты скрипта на границах диапазонов, generated/partial и понятный отчёт до/после.
 
 ## Общая приёмка и ограничения

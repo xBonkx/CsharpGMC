@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 268d63f) — ARCH-SIZE-01/08 PARTIAL: local standard-library Python 3.10+ and Git tool inventories committed tracked C#/XAML by revision, physical lines and six approved ranges, src/tests/other totals, top-30, documented exclusions and approximate partial-type whole-file totals. Optional committed baseline warns on new/growing files above 1000 (including >4000), never blocks existing debt; JSON contains complete per-file inventory. Five local Python unittest cases passed on Linux including real temporary Git history, Cyrillic filename, generated exclusions, boundary values and uncommitted changes. Full repository clone unavailable in this environment; full real inventory, syntax-aware type/dependency audit, Windows smoke and agreed future enforcement remain. No C# application, SQL, schema or release changes.
+
 28.11.2026 ChatGPT/main (base a5e61dd) — ARCH-SIZE-02/04 PARTIAL: MainWindow.xaml.cs 1744→1651 lines, new MainWindow.DocumentLinks.cs 51 lines (partial wiring only) and independent Core GmcsDocumentLink.cs 57 lines (v1 serialization and exact original ID/title/tuple fallback, no connection strings). ActsEditorView.xaml.cs 2101→2082 lines, independent Core KsBatchQuantities.cs 38 lines (selection fill-rest/issued/clear rules extracted verbatim; writes, signatures and selection order unchanged). Thirteen offline test cases and amended link source guard added, not run; build/WPF/SQL/Excel acceptance remains. Logical shell/editor still large; no DB/schema/financial/UI/icon/release changes.
 
 28.11.2026 ChatGPT/main (base 4cd1bd7) — AGR-08/11 PARTIAL: director rows retain existing object-level monetary scope and formulas; on legal schema in contract mode a same-object active agreement LEFT JOIN in existing metadata batch identifies distinct contributing legal IDs and counts missing/archived links without dropping any documents. Existing warning glyph/text/tooltip and XLSX label now flag mixed legal scopes or unlinked documents; navigation stays object-level. KP/legacy scopes and financial totals unchanged. Five offline policy cases, legacy Pilot assertions and dedicated Agreement Pilot scenario added, not run; real WPF/SQL/XLSX and multi-agreement numerical acceptance pending. No new icons, schema, DB or release changes. Independent legal financial regrouping deferred pending explicit acceptance.
@@ -796,14 +798,14 @@ PARITY-KS-FORMULA-01 закрыт после сверки вычислений �
 
 | ID | P | Задача | Статус |
 |---|---|---|---|
-| ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | NOT STARTED |
+| ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | PARTIAL |
 | ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | PARTIAL |
 | ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | NOT STARTED |
 | ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | PARTIAL |
 | ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | PARTIAL |
 | ARCH-SIZE-06 | P2 | App.xaml — тематические словари ресурсов | NOT STARTED |
 | ARCH-SIZE-07 | P2 | SqlServerStages/Acts/Workspace — аудит границ ответственности | NOT STARTED |
-| ARCH-SIZE-08 | P2 | Автоматический отчёт и контроль роста исходников | NOT STARTED |
+| ARCH-SIZE-08 | P2 | Автоматический отчёт и контроль роста исходников | PARTIAL |
 
 - 26.11.2026 — PERF-046/012, ChatGPT / main, PARTIAL (база ea873b480e4c): редактор конкретного КС отменяет обычное чтение и SQL revision probe при Unloaded/IsVisibleChanged; сохранён запрошенный ID, повторное чтение запускается только при видимости после завершения отмены, устаревшие задачи не публикуют снимок. Начатый обязательный readback защищён отдельным флагом и CancellationToken.None, смена акта/Bind не прерывает его; точечный quantity readback и SQL-записи не менялись. Перечитывание после пакетных правок/подписания/структурных изменений сохранено. Source regression guard добавлен; только статическая сверка, без Windows build/xUnit/WPF/SQL Pilot и измерений. Остаток: реальное A→B→C→A, закрытие/возврат во время обычного чтения и probe, скрытие во время обязательного readback, 2500+ строк и два клиента; закупки/выдача/eviction далее. ActsEditorView.xaml.cs 2257→2281, ActsEditorView.Loading.cs 120→166, новый KsActReadLifecycleSourceTests.cs 35 строк. Рост основного файла ограничен интеграцией lifecycle и revision probe; вспомогательные методы в тематическом loader. Рабочая БД, формулы, релиз не менялись.
 
