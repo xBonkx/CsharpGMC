@@ -41,8 +41,9 @@ public sealed class SidebarAgreementSourceTests
             (string?)e.Attribute("Content") == "Новый договор");
         Assert.Contains(markup.Descendants(), e => (string?)e.Attribute(x + "Name") == "EmptyNewObjectButton");
         var app = Path.Combine(root.FullName, "src", "GmcSmeta.App");
-        var navigation = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));
-        Assert.Contains("private void RefreshNavigation()\n    {\n        UpdateNavigationCaptions();", navigation.Replace("\r\n", "\n"));
+        var navigation = File.ReadAllText(Path.Combine(app, "MainWindow.NavigationTree.cs"));
+        Assert.Contains("private void RefreshNavigation()", navigation);
+        Assert.Contains("UpdateNavigationCaptions();", navigation);
         var captions = File.ReadAllText(Path.Combine(app, "MainWindow.NavigationCaptions.cs"));
         Assert.Contains("NewObjectButton.Content = EmptyNewObjectButton.Content = captions.Create;", captions);
     }
@@ -92,7 +93,8 @@ public sealed class SidebarAgreementSourceTests
         var source = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));
         Assert.Contains("new(16 * Math.Max(0, depth), 7, 4, 7)", source);
         Assert.Contains("FontWeight = FontWeights.SemiBold", source);
-        Assert.Contains("FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal", source);
+        var navigationTree = File.ReadAllText(Path.Combine(app, "MainWindow.NavigationTree.cs"));
+        Assert.Contains("FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal", navigationTree);
         var metrics = XDocument.Load(Path.Combine(app, "Theme", "LayoutMetrics.xaml"));
         var icon = Assert.Single(metrics.Descendants(w + "Style").Where(e => (string?)e.Attribute(x + "Key") == "LayoutNavigationIcon"));
         foreach (var dimension in new[] { "Width", "Height" })
