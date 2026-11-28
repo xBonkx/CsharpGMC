@@ -258,7 +258,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <UniformGrid Columns="3">
+                <UniformGrid Columns="3" Margin="{StaticResource LayoutTotalsTileSectionGap}">
                     <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0">
                         <StackPanel>
                             <TextBlock Text="Себестоимость — всего" Style="{StaticResource PythonTileLabel}"/>
@@ -278,7 +278,7 @@
                         </StackPanel>
                     </Border>
                 </UniformGrid>
-                <local:SummaryTableFrame Grid.Row="1" Margin="{StaticResource LayoutDirectorSectionGap}" Background="White"
+                <local:SummaryTableFrame Grid.Row="1" Background="White"
                     BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTotalsTablePadding}">
                     <DataGrid local:TableColumnMenu.Key="cost-totals" x:Name="TotalsGrid" CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsArticleRow}"
                               ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="{StaticResource LayoutTotalsRowHeight}" FontSize="{StaticResource UiTotalsTableSize}"
