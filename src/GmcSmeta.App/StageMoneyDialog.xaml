@@ -4,22 +4,31 @@
         Title="СМР и транспорт этапа" Width="490" Height="410" MinWidth="440"
         WindowStartupLocation="CenterOwner" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
-        ResizeMode="CanResize" MinHeight="410" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        ResizeMode="CanResize" MinHeight="300" MaxHeight="{Binding Height, Source={x:Static SystemParameters.WorkArea}}" UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
-    <Grid Margin="{StaticResource LayoutDialogMargin}">
+    <DockPanel Margin="{StaticResource LayoutDialogMargin}">
+        <WrapPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Margin="{StaticResource LayoutFormFooterGap}">
+            <Button Content="Отмена" Style="{StaticResource PythonToolbarButton}" IsCancel="True" MinWidth="100" Padding="12,6"
+                    Margin="0,0,8,0"/>
+            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True"
+                    MinWidth="118" Padding="12,6" Click="Save_Click"
+                    Style="{StaticResource PrimaryButton}"/>
+        </WrapPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock x:Name="StageTitle" Grid.Row="0" FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}"
                    TextWrapping="Wrap"/>
         <TextBlock x:Name="MaterialsText" Grid.Row="1" Margin="0,10,0,16"
-                   Foreground="#64748B" TextWrapping="Wrap"/>
+                   Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
         <Grid Grid.Row="2" Margin="0,0,0,12">
             <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,9,0" Text="СМР, ₽"/>
@@ -38,15 +47,10 @@
             <TextBox x:Name="TargetBox" Grid.Column="1" HorizontalContentAlignment="Right" TextAlignment="Right" MinHeight="{StaticResource LayoutFieldMinHeight}"
                      FontSize="{StaticResource UiMoneyInputSize}" Padding="{StaticResource LayoutFieldPadding}" TextChanged="TargetChanged"/>
         </Grid>
-        <TextBlock x:Name="NoteText" Grid.Row="5" Foreground="#64748B"
+        <TextBlock x:Name="NoteText" Grid.Row="5" Foreground="{StaticResource UiMutedTextBrush}"
                    TextWrapping="Wrap"/>
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right"
-                    Margin="0,16,0,0">
-            <Button Content="Отмена" Style="{StaticResource PythonToolbarButton}" IsCancel="True" MinWidth="100" Padding="12,6"
-                    Margin="0,0,8,0"/>
-            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True"
-                    MinWidth="118" Padding="12,6" Click="Save_Click"
-                    Style="{StaticResource PrimaryButton}"/>
-        </StackPanel>
-    </Grid>
+
+        </Grid>
+        </ScrollViewer>
+    </DockPanel>
 </Window>
