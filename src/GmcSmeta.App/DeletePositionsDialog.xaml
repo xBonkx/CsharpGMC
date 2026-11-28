@@ -31,7 +31,11 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="#F1F5F9"/>
                             </Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -57,7 +61,11 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="#991B1B"/>
                             </Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
