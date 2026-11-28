@@ -271,7 +271,7 @@
                     Style="{StaticResource PythonToolbarPrimary}" HorizontalAlignment="Stretch"
                     ToolTip="Пустая ведомость: потом отметьте галочками, что выдаёте"/>
             <TextBlock Grid.Row="1" Text="Ведомости объекта" FontWeight="Bold" FontSize="{StaticResource UiSectionSize}"
-                       Foreground="#94A3B8" Margin="0,6,0,6"/>
+                       Foreground="{StaticResource UiMutedTextBrush}" Margin="0,6,0,6"/>
             <ListBox x:Name="ShipmentCombo" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0"
                      HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
@@ -337,7 +337,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Border>
-                            <TextBlock Text="{Binding LineCountCaption}" Foreground="#64748B" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding LineCountCaption}" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center"/>
                         </WrapPanel>
                     </StackPanel>
                 </DataTemplate></ListBox.ItemTemplate>
@@ -393,20 +393,20 @@
         <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
             <!-- Labels stay with their input even when a second row is needed. -->
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
-                <TextBlock Text="№:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBlock Text="№:" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,7,0"/>
                 <TextBox x:Name="NumberBox" Width="84" MinHeight="{StaticResource LayoutFieldMinHeight}" MaxLength="32" KeyDown="Header_KeyDown"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
-                <TextBlock Text="Дата:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBlock Text="Дата:" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,7,0"/>
                 <DatePicker x:Name="DateBox" Style="{StaticResource ShipmentDateField}" Width="142" Height="32" SelectedDateFormat="Short"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
-                <TextBlock Text="Получатель:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBlock Text="Получатель:" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,7,0"/>
                 <TextBox x:Name="RecipientBox" Width="200" MinHeight="{StaticResource LayoutFieldMinHeight}"
                          MaxLength="255" KeyDown="Header_KeyDown"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
-                <TextBlock Text="Выдал:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                <TextBlock Text="Выдал:" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,7,0"/>
                 <TextBox x:Name="IssuedByBox" Width="160" MinHeight="{StaticResource LayoutFieldMinHeight}"
                          MaxLength="255" KeyDown="Header_KeyDown"/>
             </StackPanel>
@@ -454,7 +454,7 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Text="Найти…" Foreground="#94A3B8" Margin="30,0,32,0"
+                <TextBlock Text="Найти…" Foreground="{StaticResource UiMutedTextBrush}" Margin="30,0,32,0"
                            VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -570,10 +570,10 @@
         <StackPanel Grid.Row="5">
             <TextBlock x:Name="StockWarningText" Foreground="#B45309" FontWeight="SemiBold"
                        TextWrapping="Wrap" Visibility="Collapsed" Margin="0,8,0,3"/>
-            <TextBlock x:Name="ShipmentHelpText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"
+            <TextBlock x:Name="ShipmentHelpText" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
                        Text="Галочка ставит столько, сколько есть на складе. Другое количество — двойной щелчок в столбце «Выдать сейчас»."
                        Visibility="Collapsed"/>
-            <TextBlock x:Name="FooterText" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap">
+            <TextBlock x:Name="FooterText" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,4,0,0" TextWrapping="Wrap">
                 <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource UiCaption}">
                     <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
                 </Style></TextBlock.Style>
