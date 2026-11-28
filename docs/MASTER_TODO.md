@@ -36,6 +36,8 @@
 
 29.11: AGR-08.01 CODE READY; AGR-07.01–03/08.04 PARTIAL, сохранена историческая группировка КС. Родители без изменения; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-financial-scope-20261129).
 
+29.11: AGR-01.01 аналитический CODE READY, AGR-03.01/06.02/08.03 PARTIAL; AGR-08.02 UNVERIFIED. Родители без изменения; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-map-transfer-20261129).
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |

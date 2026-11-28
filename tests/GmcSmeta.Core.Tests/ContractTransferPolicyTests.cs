@@ -37,6 +37,15 @@ public sealed class ContractTransferPolicyTests
         Assert.Throws<InvalidOperationException>(()=>SqlServerAgreements.ValidateTransferDestination(count,files));
 
     [Fact]
+    public void TransferCoverageRequiresEntireLegalGroup()
+    {
+        ValidateTransferCoverage(new long[] { 1, 2 }, new long[] { 2, 1 });
+        Assert.Throws<InvalidOperationException>(() => ValidateTransferCoverage(new long[] { 1 }, new long[] { 1, 2 }));
+        Assert.Throws<InvalidOperationException>(() => ValidateTransferCoverage(new long[] { 1, 2 }, new long[] { 1 }));
+        Assert.Throws<InvalidOperationException>(() => ValidateTransferCoverage(new long[] { 1, 1 }, new long[] { 1 }));
+    }
+
+    [Fact]
     public void EmptyDestinationWithoutLegalFilesAccepted() =>
         SqlServerAgreements.ValidateTransferDestination(0,false);
 

@@ -47,6 +47,15 @@ public static partial class SqlServerWorkspace
         return id;
     }
 
+    // A transfer must not silently split one legal agreement into two cards.
+    public static void ValidateTransferCoverage(IReadOnlyCollection<long> movingIds,
+        IReadOnlyCollection<long> linkedIds)
+    {
+        if (movingIds.Count == 0 || movingIds.Distinct().Count() != movingIds.Count ||
+            !movingIds.ToHashSet().SetEquals(linkedIds))
+            throw new InvalidOperationException("Юридический договор связан с другими приложениями или этапами. Частичный перенос без согласования запрещён.");
+    }
+
     private static SqlServerAgreements.Values? ReadTransferLegalContext(SqlConnection conn,SqlTransaction tx,
         IReadOnlyList<TransferDocument> group)
     {
@@ -54,6 +63,27 @@ public static partial class SqlServerWorkspace
         var cards=SqlServerAgreements.Read(conn,group[0].ObjectId,tx);
         var links=group.Select(d=>SqlServerAgreements.DocumentAgreementId(conn,d.Id,tx)).ToArray();
         var id=ValidateTransferLegalGroup(links,cards.Select(c=>c.Id).ToArray());
+        var linkedIds = new List<long>();
+        using (var linked = new SqlCommand("SELECT id FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE agreement_id=@legal", conn, tx))
+        {
+            linked.Parameters.Add("@legal", SqlDbType.BigInt).Value = id;
+            using var r = linked.ExecuteReader();
+            while (r.Read()) linkedIds.Add(SqlInteger.ReadInt64(r, 0));
+        }
+        ValidateTransferCoverage(group.Select(d => d.Id).ToArray(), linkedIds);
+        using (var files = new SqlCommand("SELECT TOP(1) id FROM dbo.agreement_files WITH (UPDLOCK,HOLDLOCK) WHERE agreement_id=@legal", conn, tx))
+        {
+            files.Parameters.Add("@legal", SqlDbType.BigInt).Value = id;
+            SqlServerAgreements.ValidateTransferDestination(0, files.ExecuteScalar() is not null);
+        }
+        using (var signed = new SqlCommand(
+            "SELECT TOP(1) c.id FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "WHERE c.agreement_id=@legal AND (c.locked=1 OR EXISTS(SELECT 1 FROM dbo.acts a WITH (UPDLOCK,HOLDLOCK) WHERE a.contract_id=c.id AND a.signed=1))", conn, tx))
+        {
+            signed.Parameters.Add("@legal", SqlDbType.BigInt).Value = id;
+            if (signed.ExecuteScalar() is not null)
+                throw new InvalidOperationException("Договор содержит подписанные документы или КС. Перенос юридического контекста запрещён.");
+        }
         return cards.Single(c=>c.Id==id);
     }
 

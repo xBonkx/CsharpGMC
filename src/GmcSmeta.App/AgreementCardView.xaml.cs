@@ -79,8 +79,12 @@ public partial class AgreementCardView : UserControl
             WorkTitleBox.Text = v.WorkTitle;
             WorksStartBox.Text = v.WorksStart;
             InitializeLegal(snapshot);
-            Fields.IsEnabled = SaveButton.IsEnabled = true;
-            StatusText.Text = "Изменения вступят в силу после сохранения. Переход на другую карточку отменяет несохранённые правки.";
+            Fields.IsEnabled = true;
+            SaveButton.IsEnabled = !snapshot.RequiresLegalSelection;
+            SetSelectionOnly(snapshot.RequiresLegalSelection);
+            StatusText.Text = snapshot.RequiresLegalSelection
+                ? "Выберите юридический договор или явно создайте новый. Сохранение пока недоступно."
+                : "Изменения вступят в силу после сохранения. Переход на другую карточку отменяет несохранённые правки.";
             return true;
         }
         catch (Exception ex)
@@ -91,6 +95,24 @@ public partial class AgreementCardView : UserControl
             return false;
         }
         finally { _loadingCard = false; }
+    }
+
+    private void SetSelectionOnly(bool selectionOnly)
+    {
+        // Keep the existing selector accessible, but do not allow edits that
+        // cannot be saved until the user chooses the actual legal card.
+        foreach (var field in new[] { NameBox, CustomerBox, AddressBox, FolderBox, NoteBox,
+            CustomerFullBox, SiteFullBox, CustOrgBox, CustPostBox, CustNameBox,
+            SecondRoleBox, SecondOrgBox, SecondPostBox, SecondNameBox, WorkTitleBox, WorksStartBox })
+            field.IsReadOnly = selectionOnly;
+        TagBox.IsEnabled = !selectionOnly;
+        LegalDetailsPanel.IsEnabled = !selectionOnly;
+        LegalCompanySelector.IsEnabled = !selectionOnly;
+        if (selectionOnly)
+        {
+            AgreementNumberBox.IsReadOnly = AgreementDateBox.IsReadOnly = true;
+            AgreementText.Text = "На объекте несколько юридических договоров. Выберите точную карточку.";
+        }
     }
 
     private ObjectProperties ReadProperties() => new(NameBox.Text, CustomerBox.Text, AddressBox.Text,
@@ -107,7 +129,7 @@ public partial class AgreementCardView : UserControl
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_saving || _loadingCard || _snapshot is not { } snapshot || !SaveButton.IsEnabled) return;
+        if (_saving || _loadingCard || _snapshot is not { } snapshot || snapshot.RequiresLegalSelection || !SaveButton.IsEnabled) return;
         var properties = ReadProperties();
         var print = ReadPrint(snapshot.Print);
         var legal = ReadLegal(print);
@@ -142,7 +164,7 @@ public partial class AgreementCardView : UserControl
             StatusText.Text = "Реквизиты сохранены, но перечитывание не удалось. Откройте карточку заново.";
     }
 
-    private bool HasUnsavedChanges() => _snapshot is { } snapshot &&
+    private bool HasUnsavedChanges() => _snapshot is { RequiresLegalSelection: false } snapshot &&
         (ReadProperties() != snapshot.Properties || ReadPrint(snapshot.Print) != snapshot.Print || LegalHasChanges(snapshot));
 
     private void EditDocument_Click(object sender, RoutedEventArgs e)
@@ -167,6 +189,7 @@ public partial class AgreementCardView : UserControl
 
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
+        if (_snapshot is not { RequiresLegalSelection: false } || _saving || _loadingCard) return;
         var dialog = new OpenFolderDialog { Title = "Папка документов", Multiselect = false };
         if (System.IO.Path.IsPathFullyQualified(FolderBox.Text) && !FolderBox.Text.StartsWith(@"\\"))
             dialog.InitialDirectory = FolderBox.Text;
