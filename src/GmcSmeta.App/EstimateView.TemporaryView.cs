@@ -159,13 +159,11 @@ public partial class EstimateView
                 !selected.IsAreaSummary && !selected.Source.OutOfKp;
             if (selected.Source.ParentPositionId is null)
                 Add("Сделать комплектующим строки выше", () => _ = IndentSelectedAsync(true),
-                    canIndent && !_rows.Any(r => !r.IsSystem && r.Source.ParentPositionId == selected.Id) &&
-                    _rows.Any(r => !r.IsSystem && r.Source.SystemId == selected.Source.SystemId &&
-                        r.Source.ParentPositionId is null && r.SortKey < selected.SortKey),
+                    canIndent && CanIndentRow(selected, true),
                     "Ctrl+]", glyph: "Indent");
             else
                 Add("Сделать обычной строкой", () => _ = IndentSelectedAsync(false),
-                    canIndent, "Ctrl+[", glyph: "Outdent");
+                    canIndent && CanIndentRow(selected, false), "Ctrl+[", glyph: "Outdent");
             Add("Превратить в раздел", () => ToSections_Click(this, new RoutedEventArgs()),
                 canWrite && rootsOnly && selection.All(row => row.Source.SystemId == selected.Source.SystemId),
                 needsAnchor: false, glyph: "Layers");

@@ -402,6 +402,21 @@ public partial class EstimateView
     /// Ctrl+] / Ctrl+[ : сделать строку компонентом строки выше (или обратно) —
     /// перенос builder.make_subposition. SQL Server версия — SqlServerDatabase.MakeSubposition.
     /// </summary>
+    private bool CanIndentRow(EditableEstimateRow selected, bool makeSub)
+    {
+        if (selected.IsSystem || selected.IsVirtual || selected.Id <= 0 ||
+            selected.IsAreaSummary || selected.Source.OutOfKp || !_rows.Contains(selected)) return false;
+        try
+        {
+            _ = IndentHierarchyPlan.Build(_rows.Where(row => !row.IsSystem && !row.IsVirtual &&
+                row.Source.SystemId == selected.Source.SystemId)
+                .Select(row => new IndentHierarchyPlan.Row(row.Id, row.Source.ParentPositionId,
+                    row.SortKey, !row.IsAreaSummary && !row.Source.OutOfKp)), selected.Id, makeSub);
+            return true;
+        }
+        catch (InvalidOperationException) { return false; }
+    }
+
     private async Task IndentSelectedAsync(bool makeSub)
     {
         if (!CanPlaceEstimateRows ||
@@ -413,9 +428,9 @@ public partial class EstimateView
             return;
         }
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        if (selected is null || selected.IsSystem || selected.IsVirtual || selected.IsAreaSummary ||
-            selected.Source.OutOfKp || EstimateGrid.SelectedItems.Count != 1 ||
-            makeSub == (selected.Source.ParentPositionId is not null))
+        if (selected is null || EstimateGrid.SelectedItems.Count != 1 ||
+            !CanIndentRow(selected, makeSub) || HasUnsettledCacheWrites ||
+            !CanAppendImport(_serverRevision))
         {
             SetStatus("Выбери обычную позицию (не раздел и не группа).", true);
             return;
@@ -425,13 +440,18 @@ public partial class EstimateView
         var contractId = _contractId;
         var connectionString = _sqlConnectionString;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Изменение вложенности… ({count})", false);
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _serverRevision != revision || _contractId != contractId ||
-                _sqlConnectionString != connectionString)
+            if (_serverConflict || _detached || _estimate?.Locked != false ||
+                _serverRevision != revision || _contractId != contractId ||
+                _sqlConnectionString != connectionString || _cellSaveQueue.Blocked ||
+                _saveAwaitingReadback || _saveError is not null ||
+                !ReferenceEquals(EstimateGrid.SelectedItem, selected) ||
+                EstimateGrid.SelectedItems.Count != 1 || !CanIndentRow(selected, makeSub))
                 throw new InvalidOperationException("Серверная смета устарела, обнови её.");
             var result = await Task.Run(() => SqlServerDatabase.MakeSubposition(
                 connectionString, contractId, selected.Id, makeSub, revision));
@@ -441,11 +461,14 @@ public partial class EstimateView
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил изменение.");
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             _focusAfterReload = selected.Id;
             if (!string.IsNullOrEmpty(EstimateSearch.Text)) EstimateSearch.Clear();
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally

@@ -17,6 +17,7 @@ internal static class PilotCases
             p.RunCase("parent-kp-stages-section-position-reorder", () => PilotParentReorderCases.Run(p));
             return;
         }
+        p.RunCase("indent-outdent-hierarchy-and-financial-safety", () => PilotIndentCases.Run(p));
         p.RunCase("2500-rows-bulk-fixture-read", () => SeedAndRead(p, p.SmallSystem, 2500));
         p.RunCase("10000-rows-bulk-fixture-read", () => SeedAndRead(p, p.LargeSystem, 10000));
         p.RunCase("two-real-sql-clients-revision-conflict", () => Concurrency(p));

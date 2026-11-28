@@ -295,21 +295,25 @@ public partial class EstimateView
             SetStatus("Сначала обнови смету: данные изменились.", true);
             return;
         }
-        var selected = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
-            .Where(r => !r.IsSystem && !r.IsVirtual &&
-                r.Source.ParentPositionId is null && !r.Source.OutOfKp)
-            .Select(r => (long)r.Id).Distinct().ToArray();
-        if (selected.Length == 0)
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
+        var revision = _serverRevision;
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites) return;
+        var rows = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        if (rows.Length == 0 || rows.Any(r => r.IsSystem || r.IsVirtual || r.IsAreaSummary ||
+            r.Id <= 0 || r.Source.ParentPositionId is not null || r.Source.OutOfKp || !_rows.Contains(r)) ||
+            rows.Select(r => r.Source.SystemId).Distinct().Count() != 1)
         {
             SetStatus("Выделите верхние строки сметы.", true);
             return;
         }
-        var first = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
-            .First(r => !r.IsSystem && !r.IsVirtual && r.Source.ParentPositionId is null);
-        var systemId = first.Source.SystemId;
+        var selected = rows.Select(r => (long)r.Id).Distinct().ToArray();
+        var systemId = rows[0].Source.SystemId;
         await RunEstimateMutationAsync("Преобразование в разделы…",
-            revision => SqlServerEditorOps.PositionsToSections(
-                _sqlConnectionString, _contractId, systemId, selected, revision),
+            currentRevision => currentRevision != revision
+                ? SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повторите преобразование.", currentRevision)
+                : SqlServerEditorOps.PositionsToSections(
+                    _sqlConnectionString, _contractId, systemId, selected, revision),
             $"Разделов создано: {selected.Length} ✓");
     }
 
