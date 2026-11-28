@@ -181,6 +181,8 @@ public partial class EstimateView : UserControl
             _detached = false;
             // Cached pages may be attached before shell selection is published.
             Dispatcher.BeginInvoke(new Action(UpdateAddToolbarVisibility), DispatcherPriority.Loaded);
+            _uiSettings.RefreshPurchasePreference();
+            ApplyPurchaseVisibility(_estimate);
             if (_inlineStagesOn && (_inlineStagesData is null || _inlineStagesLoading))
                 _reloadAfterAttach = true;
             if (_searchPending) _estimateSearchTimer.Start();
@@ -1090,7 +1092,7 @@ public partial class EstimateView : UserControl
     {
         if (PurchaseColumn is null || PurchaseToggle is null || _applyingPurchaseVisibility || !_uiSettingsReady) return;
         PurchaseColumn.Visibility = PurchaseToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        _uiSettings.PurchaseVisible = PurchaseToggle.IsChecked == true;
+        _uiSettings.ChoosePurchaseVisibility(PurchaseToggle.IsChecked == true);
         SaveEstimateUiSettings();
     }
 
@@ -1141,7 +1143,7 @@ public partial class EstimateView : UserControl
                 column.Visibility = checkItem.IsChecked ? Visibility.Visible : Visibility.Collapsed;
                 if (ReferenceEquals(column, PurchaseColumn))
                 {
-                    _uiSettings.PurchaseVisible = checkItem.IsChecked;
+                    _uiSettings.ChoosePurchaseVisibility(checkItem.IsChecked);
                     PurchaseToggle.IsChecked = checkItem.IsChecked;
                 }
                 if (ReferenceEquals(column, AreaUnitColumn)) _uiSettings.AreaUnitVisible = checkItem.IsChecked;
@@ -1167,7 +1169,7 @@ public partial class EstimateView : UserControl
                 column.Visibility = Visibility.Visible;
                 if (column == PurchaseColumn)
                 {
-                    _uiSettings.PurchaseVisible = true;
+                    _uiSettings.ChoosePurchaseVisibility(true);
                     PurchaseToggle.IsChecked = true;
                 }
                 if (column == AreaUnitColumn) _uiSettings.AreaUnitVisible = true;

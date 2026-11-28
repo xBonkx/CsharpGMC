@@ -344,6 +344,20 @@ internal static class Program
             if (!File.Exists(path))
                 throw new Exception("Valid JSON with invalid values must be retained.");
 
+            var automatic = EstimateUiSettings.LoadFromPath(path);
+            if (automatic.PurchaseVisible is not null)
+                throw new Exception("Missing purchase setting must remain automatic.");
+            var otherPage = EstimateUiSettings.LoadFromPath(path);
+            automatic.ChoosePurchaseVisibility(false);
+            automatic.SaveToPath(path);
+            otherPage.SaveToPath(path);
+            if (EstimateUiSettings.LoadFromPath(path).PurchaseVisible != false)
+                throw new Exception("Unrelated cached-view settings save overwrote explicit purchase choice.");
+            otherPage.ChoosePurchaseVisibility(true);
+            otherPage.SaveToPath(path);
+            automatic.SaveToPath(path);
+            if (EstimateUiSettings.LoadFromPath(path).PurchaseVisible != true)
+                throw new Exception("Latest purchase choice did not survive cached-view settings save.");
             File.WriteAllText(path, "{invalid-json");
             var fallback = EstimateUiSettings.LoadFromPath(path);
             if (fallback.FontScale != 1.0 || File.Exists(path) ||

@@ -20,6 +20,19 @@ internal sealed class EstimateUiSettings
     public bool KsTilesHidden { get; set; } = false;
     // null = automatic; older true/false JSON values retain the explicit choice.
     public bool? PurchaseVisible { get; set; }
+    private bool _purchaseChoiceChanged;
+
+    internal void ChoosePurchaseVisibility(bool visible)
+    {
+        PurchaseVisible = visible;
+        _purchaseChoiceChanged = true;
+    }
+
+    internal void RefreshPurchasePreference()
+    {
+        if (!_purchaseChoiceChanged && File.Exists(FilePath))
+            PurchaseVisible = LoadFromPath(FilePath).PurchaseVisible;
+    }
     public bool AreaUnitVisible { get; set; } = false;
     public bool AreaTotalVisible { get; set; } = false;
     public bool BasisVisible { get; set; } = false;
@@ -86,17 +99,24 @@ internal sealed class EstimateUiSettings
         return settings;
     }
 
-    public void Save()
+    public void Save() => SaveToPath(FilePath);
+
+    internal void SaveToPath(string path)
     {
         try
         {
             Normalize(this);
-            var directory = Path.GetDirectoryName(FilePath)!;
+            var directory = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(directory);
-            var temporary = FilePath + ".tmp";
+            // Cached views and the main window have distinct settings instances.
+            // Saving an unrelated preference must not undo the latest purchase choice.
+            if (!_purchaseChoiceChanged && File.Exists(path))
+                PurchaseVisible = LoadFromPath(path).PurchaseVisible;
+            var temporary = path + ".tmp";
             File.WriteAllText(temporary, JsonSerializer.Serialize(this,
                 new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporary, FilePath, overwrite: true);
+            File.Move(temporary, path, overwrite: true);
+            _purchaseChoiceChanged = false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

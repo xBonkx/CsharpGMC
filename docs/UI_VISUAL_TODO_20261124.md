@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 — estimate parity verification follow-up: cached views cannot overwrite the latest explicit purchase preference; added temporary-file and actual grid editor font checks, locked/active toolbar states, corrected fixture parameter type and obsolete focus source assertion. Tests not run. Canonical design statuses unchanged. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).
+
 28.11.2026 — HDR-01/HDR-02/HDR-03/HDR-20/BAR-03/BAR-16/GRID-11/GRID-15/GRID-16/FONT-03 CODE READY: ten canonical IDs, not subtasks. Estimate header one-line metadata and adaptive action layout; legal/full title policy; signed/permission catalog visibility; work/purchase preference parity; deterministic numbers and table font/zoom roles. Source and WPF fixture authored, not run; physical Windows/Python acceptance remains. Design 215/253 CODE READY, 38 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).
 
 28.11.2026 — NAV-06 and FONT-01 CODE READY after source review: explicit accessible brand tab stop + one keyboard adorner and existing startup search focus; Qt _pick_font order in WPF resource, help/history typography, source guards and resolved-family offline diagnostic. Windows build/paired screenshots/physical focus not run. Design 205/253 CODE READY, 48 PARTIAL; +2. [Details](DESIGN_PASS_20261128_DYNAMIC_FORMS.md).

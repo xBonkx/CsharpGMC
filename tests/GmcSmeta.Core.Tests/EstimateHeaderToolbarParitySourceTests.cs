@@ -43,6 +43,9 @@ public sealed class EstimateHeaderToolbarParitySourceTests
         Assert.Contains("EstimateVisualPolicy.ShowPurchase(_uiSettings.PurchaseVisible", code);
         Assert.Contains("_applyingPurchaseVisibility || !_uiSettingsReady", code);
         Assert.Contains("public bool? PurchaseVisible", Source("EstimateUiSettings.cs"));
+        Assert.Contains("ChoosePurchaseVisibility", code);
+        Assert.Contains("RefreshPurchasePreference", code);
+        Assert.Contains("if (!_purchaseChoiceChanged && File.Exists(path))", Source("EstimateUiSettings.cs"));
         Assert.Contains("CanAppendImport(revision)", Source("EstimateView.Sections.cs"));
     }
 

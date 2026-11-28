@@ -50,8 +50,8 @@ public sealed class HeaderAndSidebarCompletionTests
     public void StartupDoesNotForceBrandFocusOrRemoveTabNavigation()
     {
         var brand = Named("MainWindow.xaml", "SidebarBrandButton");
-        Assert.Null(brand.Attribute("Focusable"));
-        Assert.Null(brand.Attribute("IsTabStop"));
+        Assert.Equal("True", (string?)brand.Attribute("Focusable"));
+        Assert.Equal("True", (string?)brand.Attribute("IsTabStop"));
         Assert.Contains("ReferenceEquals(System.Windows.Input.Keyboard.FocusedElement, SidebarBrandButton)", Source("MainWindow.xaml.cs"));
         Assert.Contains("ButtonKeyboardFocusVisual", Source("MainWindow.xaml"));
     }

@@ -15,13 +15,19 @@ internal static class GridEditingChecks
     {
         GridEditInteraction.Install();
         var row = new Row();
-        var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false };
-        grid.Columns.Add(new DataGridTextColumn { Binding = new Binding(nameof(Row.Value)), Width = 240 });
+        var font = GmcSmeta.Core.Domain.EstimateVisualPolicy.TableFont(
+            (double)Application.Current.FindResource("UiBodySize"), .95, 1.2);
+        var editorStyle = (Style)Application.Current.FindResource("PythonGridEditor");
+        var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false,
+            FontSize = font.Body, FontFamily = (FontFamily)Application.Current.FindResource("UiFontFamily") };
+        grid.Columns.Add(new DataGridTextColumn { Binding = new Binding(nameof(Row.Value)), Width = 240,
+            EditingElementStyle = editorStyle });
         // Estimate Name/Price are template columns, unlike the default WPF
         // text column. Editing must focus their inner TextBox as well.
         var display = new FrameworkElementFactory(typeof(TextBlock));
         display.SetBinding(TextBlock.TextProperty, new Binding(nameof(Row.Value)));
         var input = new FrameworkElementFactory(typeof(TextBox));
+        input.SetValue(FrameworkElement.StyleProperty, editorStyle);
         input.SetBinding(TextBox.TextProperty, new Binding(nameof(Row.Value))
         {
             Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
@@ -54,6 +60,9 @@ internal static class GridEditingChecks
                     "The visible editor did not own keyboard focus after edit activation.");
                 Require(editor is not null && editor.SelectionLength == editor.Text.Length,
                     "Editor did not select the original text.");
+                Require(editor is not null && Math.Abs(editor.FontSize - grid.FontSize) < .001 &&
+                    editor.FontFamily.Source == grid.FontFamily.Source,
+                    "Text and template editors must inherit table font at the same zoom.");
                 editor!.Text = "Новый ввод";
                 grid.CancelEdit();
                 Pump();

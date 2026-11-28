@@ -222,7 +222,7 @@ internal static class VisualAuditChecks
         Layout(header, 520, 200);
         Require(LayoutInformation.GetLayoutSlot(actions).Top >= titles.DesiredSize.Height - .1,
             "Narrow header must move actions below the title");
-        foreach (UIElement child in row.Children)
+        foreach (FrameworkElement child in row.Children)
             Require(LayoutInformation.GetLayoutSlot(child).Right <= row.ActualWidth + .1,
                 "Crumb/status slot outside viewport");
 
@@ -250,6 +250,25 @@ internal static class VisualAuditChecks
             Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
                 "Normal estimate toolbar must fit at 1920px/96dpi and app scale " + scale);
         }
+        var noPrice = Tool("Без цены", "IconLabelAlert");
+        var reset = Tool("Как в КП", "IconLabelX");
+        left.Children.Add(noPrice);
+        left.Children.Add(reset);
+        foreach (var scale in new[] { .9, 1.0, 1.1, 1.2 })
+        {
+            var width = 1920 / scale - 300 - 48;
+            left.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            right.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var fits = left.DesiredSize.Width + 10 + right.DesiredSize.Width <= width;
+            Layout(toolbar, width, 160);
+            if (fits) Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
+                "Active filter captions that fit must stay on one row");
+        }
+        left.Children[0].Visibility = left.Children[1].Visibility = Visibility.Collapsed;
+        Layout(toolbar, 1920 - 300 - 48, 120);
+        Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
+            "Locked toolbar must collapse addition controls and fit");
+        left.Children[0].Visibility = left.Children[1].Visibility = Visibility.Visible;
         Layout(toolbar, 420, 160);
         Require(LayoutInformation.GetLayoutSlot(right).Top > 0, "Narrow toolbar must wrap");
     }
