@@ -616,3 +616,12 @@ Codex / main, проверенный срез `f75d466`. PERF-007/012/043/045/04
 - Passports initial list/catalogue now use cancellable SQL connection and command/reader, cooperative per-row cancellation, close invalidates result. Existing constructor schema initialization remains noncancelled; no new DDL. Archived PDF double-click resolves actual clicked item, not stale selection; existing path/hash and exclusive write rules retained.
 - PTO picker requests only its object and, when scoped, exact contract in SQL; Snapshot revalidates exact contract ID with existing revision fence. Initial scoped title read receives cancellation token through connection, legal schema probe and reader. Legacy schemas retain their conditional query. No mutation, numbering, quantities, signatory or archive format changes.
 - Source assertions updated in PassportWindowLifecycleTests and PtoArchiveLifecycleTests. Static patch inspection at dbcc4121cc32 only; tests not run. Remaining: full certificate/VOR/editor/release/archive lifecycle and 0/3000 records Windows/SQL acceptance; schema init not cancellable. 0 new CODE READY/DONE, reservation released. No working DB or release changes.
+
+
+<a id="perf-pto-finish-20261129"></a>
+
+### 29.11.2026 — PERF-047.04 PARTIAL, certificate and VOR completion pass
+
+- Certificate list SQL cancellation through connection/command/rows; deterministic tie order, null JSON rejected. Refresh is cancellable on close, writes remain exclusive. Unknown COMMIT/conflict invalidates list, only refresh enabled; successful write plus failed refresh is reported as saved, not as a failed write. Exact clicked certificate, release history and KS picker rows replace stale double-click selection. Existing hash checks and snapshot preservation retained.
+- External VOR copies XLSX to a private per-operation folder on worker before preview; the same path supplies archive attachment, original name retained and temp cleanup on Cancel/success/error. Original file may change without replacing confirmed preview bytes. Existing parsed rows, formulas and limits unchanged.
+- Source assertions updated/added; no .NET/WPF/SQL execution. Remaining: full certificate/large-workbook and archive lifecycle acceptance; known two-step VOR attachment + row save can leave attachment committed if second save fails (existing behavior, separate transaction design required). Passport schema init and ClosedXML load are not cancellable. No new CODE READY or DONE; no schema, working DB, financial formula or release change. Base 9cc74618bc52; reservation released.

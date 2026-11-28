@@ -14,13 +14,18 @@ public sealed class PtoArchiveLifecycleTests
     public void CertificateSearchUsesLocalSnapshotAndPdfOperationsUseWorker()
     {
         var code=Source("PtoCertificatesWindow.cs");
-        Assert.Contains("PtoCertificateSearch.Build(_archive.Sql.Certificates())",code);
+        Assert.Contains("PtoCertificateSearch.Build(_archive.Sql.Certificates(token:token))",code);
+        Assert.Contains("_refreshCancellation?.Cancel();",code);
+        Assert.Contains("if(_closed||token.IsCancellationRequested)return;",code);
+        Assert.Contains("if(e is PtoCommitUncertainException or DBConcurrencyException)InvalidateSnapshot();",code);
+        Assert.Contains("await RefreshAfterWriteAsync();",code);
+        Assert.Contains("ItemsControl.ContainerFromElement(_grid,source)",code);
         Assert.Contains("PtoCertificateSearch.Filter(_rows,_search.Text)",code);
         Assert.DoesNotContain("Certificates(_search.Text",code);
         Assert.Contains("await Task.Run(()=>_archive.ImportCertificate(path,cert))",code);
         Assert.Contains("await Task.Run(()=>_archive.Sql.SaveCertificate(data))",code);
         Assert.Contains("if(!_closed)Process.Start",code);
-        Assert.Contains("if(_busy)e.Cancel=true",code);
+        Assert.Contains("if(_busy&&_refreshCancellation is null)e.Cancel=true",code);
     }
 
     [Fact]

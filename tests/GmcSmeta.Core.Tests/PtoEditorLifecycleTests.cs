@@ -82,6 +82,17 @@ Assert.Contains("_allowClose=true;",code);
     }
 
     [Fact]
+    public void ExternalVorUsesSamePrivateWorkbookForPreviewAndArchive()
+    {
+        var code=Source("PtoEditorWindow.xaml.cs");
+        Assert.Contains("await Task.Run(()=>File.Copy(source,path,overwrite:false))",code);
+        Assert.Contains("new PtoVorWindow(path)",code);
+        Assert.Contains("_archive.AddAttachment(_data,path,",code);
+        Assert.Contains("Directory.CreateTempSubdirectory(\"gmc-pto-vor-\")",code);
+        Assert.DoesNotContain("new PtoVorWindow(picker.FileName)",code);
+    }
+
+    [Fact]
     public void AttachmentReadAndImportUseWorkerAndPreserveSelection()
     {
         var code=Source("PtoEditorWindow.xaml.cs");
