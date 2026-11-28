@@ -181,6 +181,7 @@ public partial class CostSummaryPane : UserControl
             _loadingCosts = false;
             _needsReloadAfterAttach = true;
             _filteredRows.Clear();
+            ResetMaterialProjection();
         };
     }
 
@@ -302,12 +303,20 @@ public partial class CostSummaryPane : UserControl
             if (!string.IsNullOrWhiteSpace(before) && before == after)
             {
                 StartupTrace.Mark("cost_snapshot_format_begin");
-                var rows = BuildSummaryPreview(summary, token);
-                var missing = new CostMissingPriceIndex(summary.Rows, token);
-                var workRows = rows.Where(r => r.Id > 0).ToList();
+                List<CostSummaryPreviewRow> rows;
+                using (StartupTrace.Measure("cost_summary_format"))
+                    rows = BuildSummaryPreview(summary, token);
+                CostMissingPriceIndex missing;
+                using (StartupTrace.Measure("cost_missing_index"))
+                    missing = new CostMissingPriceIndex(summary.Rows, token);
+                List<CostSummaryPreviewRow> workRows;
+                using (StartupTrace.Measure("cost_smr_work_projection"))
+                    workRows = rows.Where(r => r.Id > 0).ToList();
                 StartupTrace.Mark("cost_snapshot_format_end");
                 StartupTrace.Mark("cost_snapshot_group_begin");
-                var materials = BuildMaterialRows(summary, rows, materialOptions, token);
+                List<CostSummaryPreviewRow> materials;
+                using (StartupTrace.Measure("cost_material_group_projection"))
+                    materials = BuildMaterialRows(summary, rows, materialOptions, token);
                 StartupTrace.Mark("cost_snapshot_group_end");
                 token.ThrowIfCancellationRequested();
                 return new CostLoadSnapshot(summary, totals, rows, expenses, mode, after,
@@ -320,6 +329,7 @@ public partial class CostSummaryPane : UserControl
     private async Task ReloadAsync()
     {
         if (!_attached) return;
+        using var operationTiming = StartupTrace.BeginOperation();
         var generation = ++_loadGeneration;
         _costReadCancellation?.Cancel();
         _loadingCosts = true;
@@ -340,16 +350,26 @@ public partial class CostSummaryPane : UserControl
             var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, materialOptions, token), token);
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             StartupTrace.Mark("cost_snapshot_bind_begin");
+            using var bindTiming = StartupTrace.Measure("cost_snapshot_bind");
             _summaryRows = data.Summary.Rows.ToList();
+            ResetMaterialProjection();
             _summaryData = data.Summary;
             _allRows = new ObservableCollection<CostSummaryPreviewRow>(data.Rows);
             _missingPrices = data.MissingPrices;
             _filteredRows.Clear();
             ApplyFilter();
-            if (data.MaterialOptions == CaptureMaterialOptions()) ReplaceCostRows(MaterialsGrid, data.Materials);
+            if (data.MaterialOptions == CaptureMaterialOptions())
+            {
+                ReplaceCostRows(MaterialsGrid, data.Materials);
+                _lastMaterialOptions = data.MaterialOptions;
+                _lastMaterialSource = data.Materials;
+                _lastMaterialCulture = CultureInfo.CurrentCulture;
+            }
             else ReloadMaterialView();
-            ApplySmrTab(data.Expenses, data.SmrMode, data.WorkRows);
-            ApplyTotalsTab(data.Totals);
+            using (StartupTrace.Measure("cost_smr_bind"))
+                ApplySmrTab(data.Expenses, data.SmrMode, data.WorkRows);
+            using (StartupTrace.Measure("cost_totals_bind"))
+                ApplyTotalsTab(data.Totals);
             _revision = data.Revision;
             _needsReloadAfterAttach = false;
             var summary = data.Summary;
@@ -366,6 +386,7 @@ public partial class CostSummaryPane : UserControl
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             _revision = "";
             _summaryData = null;
+            ResetMaterialProjection();
             _totalsData = null;
             _loadError = "Не удалось загрузить себестоимость: " + ex.Message;
             FooterText.Text = _loadError;

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Data;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.App;
@@ -47,7 +48,9 @@ public partial class ProcurementPane
         if (_needsReloadAfterAttach)
             _ = TryReloadAsync(requiredReadback: false);
         else if (_historyNeedsResume)
-            _ = LoadSelectedMovementHistoryAsync();
+            // Revalidate the published revision before resuming history on a visible tab.
+            // The tab-return handler observes the same ordinary-reload guard.
+            _ = TryReloadAsync(allowUnchanged: true, requiredReadback: false);
     }
 
     // Default remains non-cancellable for every existing post-write caller.
@@ -67,6 +70,7 @@ public partial class ProcurementPane
         var token = cancellation?.Token ?? CancellationToken.None;
         // All network I/O is outside the WPF dispatcher. A later refresh
         // supersedes an earlier response if they finish out of order.
+        using var operationTiming = StartupTrace.BeginOperation();
         var generation = ++_reloadGeneration;
         var cachedRevision = allowUnchanged && _buySnapshotMayReuse && !_batchBusy &&
             !_needsReloadAfterAttach && _snapshotDay == DateTime.Today &&
@@ -79,6 +83,7 @@ public partial class ProcurementPane
         UpdateHistoryButtons();
         try
         {
+            using var readTiming = StartupTrace.MeasureElapsed("procurement_snapshot_read");
             var snapshot = await Task.Run(() =>
                 SqlServerProcurement.ReadBuySnapshotIfChanged(_connectionString, _contractId,
                     cachedRevision, cachedDay, token), token);
@@ -107,13 +112,17 @@ public partial class ProcurementPane
                     return true;
                 }
             }
+            readTiming?.Dispose();
             var accepted = snapshot;
+            using var projectionTiming = StartupTrace.MeasureElapsed("procurement_snapshot_prepare");
             var items = await Task.Run(() => PrepareBuyRows(accepted, token), token);
+            projectionTiming?.Dispose();
             if (token.IsCancellationRequested || generation != _reloadGeneration || !IsLoaded) return false;
             if (accepted.Day != DateTime.Today)
                 throw new InvalidOperationException("Дата изменилась во время загрузки. Обновите закупки.");
             if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
                 throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
+            using var bindTiming = StartupTrace.Measure("procurement_snapshot_bind");
             _applyingBuySnapshot = true;
             try
             {
@@ -131,6 +140,7 @@ public partial class ProcurementPane
                 _needsReloadAfterAttach = false;
             }
             finally { _applyingBuySnapshot = false; }
+            bindTiming?.Dispose();
             if (MovementHistoryExpander?.IsExpanded == true) _ = LoadSelectedMovementHistoryAsync();
             if (!preserveStatus) FooterText.Text = "";
             return true;
@@ -196,6 +206,13 @@ public partial class ProcurementPane
         MovementDetailsText.Text = "Загрузка истории из SQL Server…";
         try
         {
+            // Keyboard/group selection may emit a burst of events. No SQL opens until
+            // the target has remained selected for 150 ms. Cancellation also reaches SQL.
+            await Task.Delay(150, token);
+            if (token.IsCancellationRequested || generation != _historyLoadToken || !IsLoaded || !IsVisible ||
+                MovementHistoryExpander?.IsExpanded != true || _revision != revision ||
+                SelectedHistoryRow()?.PositionId != row.PositionId) return;
+            using var historyTiming = StartupTrace.MeasureElapsed("procurement_history_read");
             var rows = await Task.Run(() =>
             {
                 using var conn = SqlServerDatabase.OpenAsync(_connectionString, token).GetAwaiter().GetResult();
@@ -211,6 +228,7 @@ public partial class ProcurementPane
                 MovementDetailsText.Text = "История изменилась. Обновите закупки.";
                 return;
             }
+            historyTiming?.Dispose();
             _historyRevision = revision;
             MovementHistoryGrid.ItemsSource = rows;
             MovementDetailsText.Text =

@@ -52,6 +52,7 @@ public static class SqlServerCostTotals
         CostSummaryData summary, ContractTotals? totals, TagRules rules, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        using var timing = StartupTrace.Measure("cost_totals_projection_and_metadata");
         decimal matCost = 0m, smrCost = 0m;
         var noCost = 0;
         foreach (var row in summary.Rows)

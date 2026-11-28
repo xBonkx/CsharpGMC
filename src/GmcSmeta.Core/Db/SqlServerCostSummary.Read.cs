@@ -56,6 +56,7 @@ public static partial class SqlServerCostSummary
         out ContractTotals? documentTotals, out TagRules rules, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
+        using var readTiming = StartupTrace.Measure("cost_summary_sql_and_mapping");
         using var command = new SqlCommand(CostSummaryReadBatchSql, conn);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         using var cancellation = SqlReadCancellation.Register(command, token);
@@ -146,7 +147,9 @@ public static partial class SqlServerCostSummary
         // Child component costs have already been folded into their parent's MCost.
         // FinalizeRows already materializes the financial projection.
         token.ThrowIfCancellationRequested();
-        var finalized = FinalizeRows(rows);
+        IReadOnlyList<CostSummaryRow> finalized;
+        using (StartupTrace.Measure("cost_summary_financial_projection"))
+            finalized = FinalizeRows(rows);
 
         var extra = new List<(string, decimal, decimal, string)>();
         decimal other = 0m;
@@ -178,8 +181,10 @@ public static partial class SqlServerCostSummary
         // Release the reader before the existing contract totals query. No MARS required.
         token.ThrowIfCancellationRequested();
         r.Close();
+        readTiming?.Dispose();
         token.ThrowIfCancellationRequested();
         rules = new TagRules();
+        using var totalsTiming = StartupTrace.Measure("cost_summary_contract_totals");
         documentTotals = contractId > 0
             ? Totals.ReadSqlBatch(conn, new ContractReadScope(new[] { contractId }), out rules, token: token).SingleOrDefault()
             : null;

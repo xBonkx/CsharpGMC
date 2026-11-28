@@ -34,6 +34,11 @@ public sealed class CostSummaryReadCancellationSourceTests
     [InlineData("CostSummaryPane.ViewState.cs", "ReferenceEquals(grid.ItemsSource, source)")]
     [InlineData("CostSummaryPane.ViewState.cs", "target.ScrollToVerticalOffset(vertical)")]
     [InlineData("CostSummaryPane.Materials.cs", "ReplaceCostRows(MaterialsGrid, result)")]
+    [InlineData("CostSummaryPane.Materials.cs", "_materialGroups.Get(_summaryData, options.Mode, options.Sort)")]
+    [InlineData("CostSummaryPane.Materials.cs", "ReferenceEquals(MaterialsGrid.ItemsSource, _lastMaterialSource)")]
+    [InlineData("CostSummaryPane.xaml.cs", "ResetMaterialProjection();")]
+    [InlineData("CostSummaryPane.xaml.cs", "StartupTrace.Measure(\"cost_smr_bind\")")]
+    [InlineData("CostSummaryPane.xaml.cs", "StartupTrace.Measure(\"cost_totals_bind\")")]
     public void SummaryUsesCancellableProjectionAndIdentityRestore(string file, string expected)
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);

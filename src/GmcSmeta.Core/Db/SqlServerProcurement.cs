@@ -83,7 +83,15 @@ public static partial class SqlServerProcurement
         bool DirectToSite, decimal Received, decimal Issued, bool Work, bool OutOfKp,
         string[] Flags, string Source = "buy", long SystemId = 0, long? ParentSystemId = null,
         DateTime? LastIssueDate = null, string PurchaseName = "", DateTime? PaidDate = null,
-        string Responsible = "", long? ParentPositionId = null);
+        string Responsible = "", long? ParentPositionId = null,
+        long? SystemOrder = null, long? PositionOrder = null)
+    {
+        public BuyRowStructure Structure => new(PositionId, SystemId, ParentSystemId,
+            ParentPositionId, SystemOrder, PositionOrder);
+    }
+
+    public readonly record struct BuyRowStructure(long PositionId, long SystemId,
+        long? ParentSystemId, long? ParentPositionId, long? SystemOrder, long? PositionOrder);
 
     private static string[] FlagsOf(decimal qty, decimal received, decimal issued,
         string replacement, DateTime? dueDate, string dueState, bool outOfKp)
@@ -123,7 +131,7 @@ public static partial class SqlServerProcurement
         "ISNULL(pr.stage,N''), ISNULL(pr.order_ref,N''), ISNULL(pr.invoice_ref,N''), pr.cost_price, " +
         "pr.due_date, ISNULL(pr.replacement,N''), ISNULL(pr.note,N''), " +
         "ISNULL(pr.direct_to_site,0), sup.name, ISNULL(pr.source,N'buy'), sy.id, sy.parent_id, " +
-        "mv.last_issue_date, ISNULL(pr.buy_name,N''), pr.paid_date, ISNULL(pr.responsible,N''), p.parent_id, ISNULL(pp.name,N'') " +
+        "mv.last_issue_date, ISNULL(pr.buy_name,N''), pr.paid_date, ISNULL(pr.responsible,N''), p.parent_id, ISNULL(pp.name,N''), sy.[order], p.[order] " +
         "FROM dbo.positions p " +
         "JOIN dbo.systems sy ON sy.id=p.system_id " +
         "LEFT JOIN dbo.positions pp ON pp.id=p.parent_id " +
@@ -151,6 +159,7 @@ public static partial class SqlServerProcurement
         if (string.IsNullOrEmpty(committedRevision) || positionIds.Count == 0 ||
             positionIds.Count > MaxIncrementalBuyRows || positionIds.Any(id => id <= 0) ||
             positionIds.Distinct().Count() != positionIds.Count) return null;
+        var day = DateTime.Today;
         using var conn = SqlServerDatabase.Open(connectionString);
         if (SqlServerDatabase.Revision(conn) != committedRevision) return null;
         var rows = new List<BuyRow>();
@@ -160,12 +169,21 @@ public static partial class SqlServerProcurement
             for (var i = 0; i < positionIds.Count; i++)
                 read.Parameters.Add($"@pos{i}", SqlDbType.BigInt).Value = positionIds[i];
             using var reader = read.ExecuteReader();
-            var today = DateTime.Today;
-            while (reader.Read()) rows.Add(MapBuyRow(reader, today));
+            while (reader.Read()) rows.Add(MapBuyRow(reader, day));
         }
         if (SqlServerDatabase.Revision(conn) != committedRevision ||
-            rows.Count != positionIds.Count) return null;
+            !CanPublishBuyDelta(positionIds, rows.Select(row => row.PositionId).ToArray(), day, DateTime.Today)) return null;
         return rows;
+    }
+
+    // A provider returning duplicate/wrong IDs or a midnight rollover cannot authorize a sparse publication.
+    public static bool CanPublishBuyDelta(IReadOnlyList<long> requested, IReadOnlyList<long> returned,
+        DateTime capturedDay, DateTime currentDay)
+    {
+        if (capturedDay != currentDay || requested.Count == 0 || requested.Count > MaxIncrementalBuyRows ||
+            requested.Count != returned.Count || requested.Any(id => id <= 0)) return false;
+        var ids = requested.ToHashSet();
+        return ids.Count == requested.Count && returned.All(ids.Remove) && ids.Count == 0;
     }
 
     /// <summary>Строки «Закупок» документа с производными статусами и пометками.</summary>
@@ -354,7 +372,9 @@ public static partial class SqlServerProcurement
             r.FieldCount > 22 ? Text(22) : "",
             r.FieldCount > 23 && !r.IsDBNull(23) ? Convert.ToDateTime(r.GetValue(23), CultureInfo.InvariantCulture) : null,
             r.FieldCount > 24 ? Text(24) : "",
-            r.FieldCount > 25 && !r.IsDBNull(25) ? SqlInteger.ReadInt64(r, 25) : null);
+            r.FieldCount > 25 && !r.IsDBNull(25) ? SqlInteger.ReadInt64(r, 25) : null,
+            r.FieldCount > 27 && !r.IsDBNull(27) ? SqlInteger.ReadInt64(r, 27) : null,
+            r.FieldCount > 28 && !r.IsDBNull(28) ? SqlInteger.ReadInt64(r, 28) : null);
     }
 
     /// <summary>

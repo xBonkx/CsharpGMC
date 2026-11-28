@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Threading;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.App;
@@ -110,11 +111,17 @@ public partial class ProcurementPane
             BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: false }) return false;
         var attachment = _attachmentGeneration;
         var generation = _reloadGeneration;
+        var day = _snapshotDay;
+        using var operationTiming = StartupTrace.BeginOperation();
+        using var readTiming = StartupTrace.MeasureElapsed("procurement_delta_read");
         var rows = await Task.Run(() =>
             SqlServerProcurement.ReadChangedBuyRows(_connectionString, _contractId, ids, revision));
         if (!IsLoaded || attachment != _attachmentGeneration || generation != _reloadGeneration ||
-            rows is null || _snapshotDay != DateTime.Today ||
+            rows is null || _snapshotDay != day ||
+            !SqlServerProcurement.CanPublishBuyDelta(ids, rows.Select(row => row.PositionId).ToArray(), day, DateTime.Today) ||
             BuyGrid.ItemsSource is not ListCollectionView { IsEditingItem: false }) return false;
+        readTiming?.Dispose();
+        using var projectionTiming = StartupTrace.Measure("procurement_delta_prepare");
         // The full readback replaces the list and invalidates this index.
         // Incremental readback only replaces items at existing indices.
         var index = _buyRowIndex ??= _allRows.Select((row, i) => (row.PositionId, Index: i))
@@ -124,12 +131,15 @@ public partial class ProcurementPane
         {
             if (row.Work || !index.TryGetValue(row.PositionId, out var i)) return false;
             var old = _allRows[i];
-            if (old.SystemId != row.SystemId || old.ParentSystemId != row.ParentSystemId ||
+            if (old.SnapshotStructure != row.Structure ||
+                old.SystemId != row.SystemId || old.ParentSystemId != row.ParentSystemId ||
                 old.OutOfKp != row.OutOfKp || old.IsSub != (row.ParentPositionId is not null) ||
                 old.SystemName != row.SystemName || old.EstimateName != row.Name) return false;
             replacements.Add((i, BuildBuyPreview(row, old.RowNumber, old.GroupNumber, old.OriginalIndex)));
         }
         if (replacements.Count != ids.Count) return false;
+        projectionTiming?.Dispose();
+        using var bindTiming = StartupTrace.Measure("procurement_delta_bind");
         _applyingBuySnapshot = true;
         try
         {
@@ -140,6 +150,8 @@ public partial class ProcurementPane
             _revision = revision;
         }
         finally { _applyingBuySnapshot = false; }
+        bindTiming?.Dispose();
+        StartupTrace.Sample("procurement_delta_rows", ids.Count, _allRows.Count);
         if (MovementHistoryExpander?.IsExpanded == true) _ = LoadSelectedMovementHistoryAsync();
         return true;
     }
@@ -156,6 +168,7 @@ public partial class ProcurementPane
             // The write was already committed. Never repeat it because a display refresh failed.
             _revision = "";
         }
+        StartupTrace.Sample("procurement_delta_fallback", ids.Count);
         try { await ReloadAsync(preserveStatus: true); }
         catch (Exception ex)
         {

@@ -12,6 +12,18 @@ namespace GmcSmeta.App;
 public partial class CostSummaryPane
 {
     private CostSummaryData? _summaryData;
+    private readonly CostSummaryGroupingCache _materialGroups = new();
+    private MaterialOptions? _lastMaterialOptions;
+    private object? _lastMaterialSource;
+    private CultureInfo? _lastMaterialCulture;
+
+    private void ResetMaterialProjection()
+    {
+        _materialGroups.Clear();
+        _lastMaterialOptions = null;
+        _lastMaterialSource = null;
+        _lastMaterialCulture = null;
+    }
 
     private static string ViewTag(ComboBox combo, string fallback) =>
         (combo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? fallback;
@@ -29,8 +41,21 @@ public partial class CostSummaryPane
         if (_summaryData is null || MaterialsGrid is null ||
             CostViewMode is null || CostSortMode is null)
             return;
-        var result = BuildMaterialRows(_summaryData, _allRows, CaptureMaterialOptions(), CancellationToken.None);
+        var options = CaptureMaterialOptions();
+        if (_lastMaterialOptions == options && Equals(_lastMaterialCulture, CultureInfo.CurrentCulture) &&
+            _lastMaterialSource is not null && ReferenceEquals(MaterialsGrid.ItemsSource, _lastMaterialSource)) return;
+        using var operationTiming = StartupTrace.BeginOperation();
+        using var planTiming = StartupTrace.Measure("cost_material_filter_group_plan");
+        var groups = _materialGroups.Get(_summaryData, options.Mode, options.Sort);
+        planTiming?.Dispose();
+        using var filterTiming = StartupTrace.Measure("cost_material_filter_projection");
+        var result = BuildMaterialRows(_summaryData, _allRows, options, CancellationToken.None, groups);
+        filterTiming?.Dispose();
+        using var bindTiming = StartupTrace.Measure("cost_material_filter_bind");
         ReplaceCostRows(MaterialsGrid, result);
+        _lastMaterialOptions = options;
+        _lastMaterialSource = result;
+        _lastMaterialCulture = CultureInfo.CurrentCulture;
     }
 
     private sealed record MaterialOptions(string Mode, string Sort, string Search, bool NoCost, bool NoPrice);
@@ -42,10 +67,11 @@ public partial class CostSummaryPane
 
     // Plain DTOs only: may run on a worker for a fresh SQL snapshot.
     private static List<CostSummaryPreviewRow> BuildMaterialRows(CostSummaryData data,
-        IEnumerable<CostSummaryPreviewRow> allRows, MaterialOptions options, CancellationToken token)
+        IEnumerable<CostSummaryPreviewRow> allRows, MaterialOptions options, CancellationToken token,
+        IReadOnlyList<CostSummaryGrouping.Group>? preparedGroups = null)
     {
         token.ThrowIfCancellationRequested();
-        var groups = CostSummaryGrouping.Build(data, options.Mode, options.Sort);
+        var groups = preparedGroups ?? CostSummaryGrouping.Build(data, options.Mode, options.Sort);
         token.ThrowIfCancellationRequested();
         var all = allRows.Where(x => x.Id > 0).ToDictionary(x => x.Id);
         var result = new List<CostSummaryPreviewRow>();

@@ -19,6 +19,7 @@ public sealed class ProcurementPreviewRow
     public long PositionId { get; init; }
     public long SystemId { get; init; }
     public long? ParentSystemId { get; init; }
+    internal SqlServerProcurement.BuyRowStructure SnapshotStructure { get; init; }
     public string SystemName { get; init; } = "";
     public string Source { get; init; } = "buy";
     public string StatusLabel { get; init; } = "";
@@ -179,7 +180,7 @@ public partial class ProcurementPane : UserControl
     // Only the revision of the successfully applied screen snapshot can authorize a write.
     private bool _snapshotCanWrite;
     private bool CanStartReadOperation => IsLoaded && IsVisible && IsEnabled && !_batchBusy &&
-        !_needsReloadAfterAttach && !string.IsNullOrWhiteSpace(_revision);
+        !_needsReloadAfterAttach && _snapshotDay == DateTime.Today && !string.IsNullOrWhiteSpace(_revision);
     private bool CanStartOperation => CanStartReadOperation && _snapshotCanWrite;
     internal bool HasCacheActivity => _batchBusy ||
         (BuyGrid.ItemsSource is System.ComponentModel.IEditableCollectionView { IsEditingItem: true });
@@ -270,6 +271,7 @@ public partial class ProcurementPane : UserControl
             PositionId = row.PositionId,
             SystemId = row.SystemId,
             ParentSystemId = row.ParentSystemId,
+            SnapshotStructure = row.Structure,
             SystemName = row.SystemName,
             Source = row.Source,
             StatusLabel = row.StatusLabel,
@@ -505,6 +507,8 @@ public partial class ProcurementPane : UserControl
         if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true }) return;
         if (_rebuildingScopeFilters) return;
 
+        using var operationTiming = StartupTrace.BeginOperation();
+        using var filterTiming = StartupTrace.Measure("procurement_filter");
         var words = ProcurementScopeFilter.PrepareSearch(ProcurementSearchBox.Text);
         var supplierChoice =
             (ProcurementSupplierFilter.SelectedItem as ProcurementSupplierFilterChoice)?.Key;
@@ -520,6 +524,8 @@ public partial class ProcurementPane : UserControl
             rows = rows.Where(r => !r.Work && string.IsNullOrWhiteSpace(r.CostPrice));
 
         var visible = rows.ToList();
+        filterTiming?.Dispose();
+        using var groupTiming = StartupTrace.Measure("procurement_group_plan");
         var plan = ProcurementViewPlanner.Build(
             visible.Select(row => new ProcurementViewSource(
                 row.PositionId, row.SystemId, row.SystemName, row.BuyName,
@@ -541,6 +547,9 @@ public partial class ProcurementPane : UserControl
             };
             return row;
         }).ToList();
+        groupTiming?.Dispose();
+        StartupTrace.Sample("procurement_filter_rows", _allRows.Count, display.Count);
+        using var bindTiming = StartupTrace.Measure("procurement_filter_bind");
         ApplyBuyDisplay(display, !(_viewMode == "kp" && _viewSort != "kp"));
         _categoryRefreshPending = false;
     }
