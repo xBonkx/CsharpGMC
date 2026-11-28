@@ -62,7 +62,7 @@
         </Style>
         <Style x:Key="DirectorMoney" TargetType="TextBlock" BasedOn="{StaticResource DirectorText}">
             <Setter Property="TextAlignment" Value="Right"/>
-            <Style.Triggers><DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
+            <Style.Triggers><DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
         </Style>
         <Style x:Key="DirectorCenter" TargetType="TextBlock" BasedOn="{StaticResource DirectorMoney}">
             <Setter Property="TextAlignment" Value="Center"/>
@@ -71,7 +71,7 @@
             
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IncompleteCoverage}" Value="True"><Setter Property="Foreground" Value="#B45309"/></DataTrigger>
-                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger>
+                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
@@ -79,7 +79,7 @@
             
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasExtra}" Value="True"><Setter Property="Foreground" Value="#DC2626"/></DataTrigger>
-                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger>
+                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
@@ -87,20 +87,20 @@
             <Setter Property="FontWeight" Value="Bold"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding NegativeEarned}" Value="True"><Setter Property="Foreground" Value="#DC2626"/></DataTrigger>
-                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger>
+                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="DirectorLate" TargetType="TextBlock" BasedOn="{StaticResource DirectorCenter}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasLate}" Value="True"><Setter Property="Foreground" Value="#DC2626"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="ToolTip" Value="Поставки, которые не пришли в срок. Откройте карточку → «Закупки» → «Просрочено»."/></DataTrigger>
-                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
+                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="DirectorObjectText" TargetType="TextBlock" BasedOn="{StaticResource DirectorText}">
             <Setter Property="ToolTip" Value="{Binding WarningTip}"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger>
+                <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/></DataTrigger>
                 <DataTrigger Binding="{Binding Incomplete}" Value="True"><Setter Property="Foreground" Value="#B45309"/></DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
