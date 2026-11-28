@@ -619,7 +619,7 @@
                                 <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="#2563EB"/>
                             </Canvas>
                         </Viewbox>
-                        <TextBlock x:Name="EmptyNavigationHeading" Text="Выберите договор или КП слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
+                        <TextBlock x:Name="EmptyNavigationHeading" Text="Выберите договор или КП слева" Style="{StaticResource UiPageHeading}" FontSize="{StaticResource UiH1Size}"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
                         <TextBlock x:Name="EmptyNavigationHint" Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
                                    Foreground="{StaticResource UiMutedTextBrush}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
