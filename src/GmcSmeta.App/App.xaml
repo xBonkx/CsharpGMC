@@ -363,7 +363,7 @@
                                                   HorizontalAlignment="Left" VerticalAlignment="Center"
                                                   RecognizesAccessKey="True"/>
                                 <TextBlock Grid.Column="2" x:Name="ShortcutText" Text="{TemplateBinding InputGestureText}"
-                                           Foreground="#64748B" Margin="18,0,0,0"
+                                           Foreground="{StaticResource UiMutedTextBrush}" Margin="18,0,0,0"
                                            HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                 <Viewbox Grid.Column="3" x:Name="ArrowGlyph" Width="12" Height="12"
                                          HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
