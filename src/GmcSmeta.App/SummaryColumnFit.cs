@@ -18,7 +18,11 @@ internal sealed class SummaryColumnFit
     // Cache identity only: a hidden grid may replace its source without another fit.
     // Never keep a superseded collection (and all its rows) alive here.
     private WeakReference<object>? _measuredSource;
-    private double _measuredFontSize, _measuredDpi;
+    private double _measuredFontSize, _measuredDpi, _measuredPixelsPerDip;
+    private FontFamily? _measuredFamily;
+    private FontStyle _measuredStyle;
+    private FontStretch _measuredStretch;
+    private (DataGridColumn Column, string Key, string Header)[] _measuredColumns = [];
     private Dictionary<DataGridColumn, double>? _minimums;
 
     internal bool Suspended { get; set; }
@@ -32,6 +36,7 @@ internal sealed class SummaryColumnFit
         grid.Unloaded += (_, _) => Suspended = false;
         grid.IsVisibleChanged += (_, _) => Request();
         grid.SizeChanged += (_, e) => { if (e.WidthChanged) Request(); };
+        grid.Columns.CollectionChanged += (_, _) => Request();
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(ViewportChanged), true);
     }
 
@@ -121,9 +126,11 @@ internal sealed class SummaryColumnFit
         var result = columns.ToDictionary(c => c, c => BaseMinimum(c.SortMemberPath));
         foreach (var column in columns)
         {
-            if (column.Header is TextBlock header)
-                foreach (var word in header.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
-                    result[column] = Math.Max(result[column], Math.Ceiling(Measure(word) + 10));
+        {
+            var header = column.Header is TextBlock text ? text.Text : column.Header?.ToString() ?? "";
+            foreach (var word in header.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                result[column] = Math.Max(result[column], Math.Ceiling(Measure(word) + 10));
+        }
         }
         if (grid.ItemsSource is IEnumerable<EstimateView.SummaryRow> rows)
         {
@@ -166,13 +173,22 @@ internal sealed class SummaryColumnFit
     internal IReadOnlyDictionary<DataGridColumn, double> GetMinimums(double dpi, double pixelsPerDip)
     {
         var source = _grid.ItemsSource;
+        var columns = _grid.Columns.Select(c => (Column: c, Key: c.SortMemberPath,
+            Header: c.Header is TextBlock text ? text.Text : c.Header?.ToString() ?? "")).ToArray();
         if (_minimums is null || !IsMeasuredSource(source) ||
-            _measuredFontSize != _grid.FontSize || _measuredDpi != dpi)
+            _measuredFontSize != _grid.FontSize || _measuredDpi != dpi || _measuredPixelsPerDip != pixelsPerDip ||
+            !Equals(_measuredFamily, _grid.FontFamily) || _measuredStyle != _grid.FontStyle ||
+            _measuredStretch != _grid.FontStretch || !_measuredColumns.SequenceEqual(columns))
         {
             _minimums = ReadMinimums(_grid, pixelsPerDip);
             _measuredSource = source is null ? null : new WeakReference<object>(source);
             _measuredFontSize = _grid.FontSize;
             _measuredDpi = dpi;
+            _measuredPixelsPerDip = pixelsPerDip;
+            _measuredFamily = _grid.FontFamily;
+            _measuredStyle = _grid.FontStyle;
+            _measuredStretch = _grid.FontStretch;
+            _measuredColumns = columns;
         }
         return _minimums;
     }
