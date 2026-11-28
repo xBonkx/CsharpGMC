@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 7a0e57f) — PERF-054/055/058/059 PARTIAL: expanded guarded read-only RemoteSqlBench with raw per-iteration CSV and JSON evidence, source SHA/topology/runtime/schema, 25000-row samples, warm guarded open, selected totals, stage distribution and document compare, p99 only from 100 repeats, warmup excluded, revision/row-count stability and failure exit codes; benchmark included in solution and statistics/options tests linked into core tests. Not run; no actual baseline, Python/WPF, SQL IO or measurements claimed. Pilot only, no database writes/schema/release changes.
+
 28.11.2026 ChatGPT/main (base 0d65ad1) — PERF-050/052 PARTIAL: combine mandatory SQL open schema/version checks in one statement; KP export reuses loaded tag rule and requisites percent without rereading contract. Tests added, not run; see performance TODO.
 
 28.11.2026 ChatGPT/main (base 056e404) — PERF-050/047 PARTIAL: shared procurement report batch on one guarded connection; supplier/shop/control use only needed result sets, child IDs from existing parent IDs, revision/day fences retained. Tests added, not run; see performance TODO.

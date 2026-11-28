@@ -12,5 +12,6 @@
   <Folder Name="/tools/">
     <Project Path="tools/sql-migrations/GmcSmeta.SchemaRehearsal/GmcSmeta.SchemaRehearsal.csproj" />
     <Project Path="tools/release-builder/GmcSmeta.ReleaseBuilder/GmcSmeta.ReleaseBuilder.csproj" />
+    <Project Path="tools/RemoteSqlBench/RemoteSqlBench.csproj" />
   </Folder>
 </Solution>

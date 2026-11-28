@@ -24,6 +24,7 @@
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\AppVersion.cs" Link="LauncherAppVersion.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseDownloadTransfer.cs" Link="ReleaseDownloadTransfer.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\LauncherBinaryPublisher.cs" Link="LauncherBinaryPublisher.cs" />
+    <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkEvidence.cs" Link="RemoteSqlBenchmarkEvidence.cs" />
   </ItemGroup>
 
 </Project>
