@@ -42,6 +42,9 @@ public sealed class RemoteSqlBenchmarkEvidenceTests
 
     [Theory]
     [InlineData("--runs", "19")]
+    [InlineData("--runs", "29")]
+    [InlineData("--dataset", "UNSPECIFIED")]
+    [InlineData("--machine-profile", "name with spaces")]
     [InlineData("--runs", "301")]
     [InlineData("--contract-id", "0")]
     [InlineData("--sha", "not-a-sha")]
@@ -54,12 +57,16 @@ public sealed class RemoteSqlBenchmarkEvidenceTests
     public void OptionsPreserveEvidenceIdentity()
     {
         var options = BenchmarkOptions.Parse(new[] { "--runs", "100", "--contract-id", "42",
-            "--sha", "abcdef0123456789", "--topology", "LAN", "--out", "test-output" });
+            "--sha", "abcdef0123456789", "--topology", "LAN", "--out", "test-output",
+            "--dataset", "seed-v1", "--machine-profile", "pc-lan-1" });
         Assert.Equal(100, options.Runs);
         Assert.Equal(42, options.ContractId);
         Assert.Equal("LAN", options.Topology);
         Assert.Equal("abcdef0123456789", options.SourceSha);
         Assert.Equal("test-output", options.OutputDirectory);
+        Assert.Equal("seed-v1", options.Dataset);
+        Assert.Equal("pc-lan-1", options.MachineProfile);
+        Assert.Equal("SLOW", BenchmarkOptions.Parse(new[] { "--topology", "SLOW" }).Topology);
         Assert.Throws<ArgumentException>(() => BenchmarkOptions.Parse(new[] { "--runs", "30", "--runs", "40" }));
     }
 

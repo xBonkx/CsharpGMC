@@ -1,9 +1,10 @@
+using System.Diagnostics;
 using System.Globalization;
 
 namespace GmcSmeta.RemoteSqlBench;
 
 internal sealed record BenchmarkOptions(int Runs, int? ContractId, string OutputDirectory,
-    string SourceSha, string Topology, bool Diagnostics)
+    string SourceSha, string Topology, bool Diagnostics, string Dataset, string MachineProfile)
 {
     internal static BenchmarkOptions Parse(string[] args)
     {
@@ -13,6 +14,8 @@ internal sealed record BenchmarkOptions(int Runs, int? ContractId, string Output
         var sha = "UNSPECIFIED";
         var topology = "UNSPECIFIED";
         var diagnostics = false;
+        var dataset = "UNSPECIFIED";
+        var machineProfile = "UNSPECIFIED";
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Length; i += 2)
         {
@@ -22,18 +25,23 @@ internal sealed record BenchmarkOptions(int Runs, int? ContractId, string Output
             switch (args[i])
             {
                 case "--runs" when int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) &&
-                    n is >= 20 and <= 300: runs = n; break;
+                    n is >= 30 and <= 300: runs = n; break;
                 case "--contract-id" when int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) &&
                     id > 0: contract = id; break;
                 case "--out" when !string.IsNullOrWhiteSpace(value): output = value; break;
                 case "--sha" when value.Length is >= 7 and <= 64 && value.All(Uri.IsHexDigit): sha = value; break;
-                case "--topology" when value is "LAN" or "WIFI" or "LOCAL" or "VPN" or "OTHER": topology = value; break;
+                case "--topology" when value is "LAN" or "WIFI" or "LOCAL" or "VPN" or "SLOW" or "OTHER": topology = value; break;
+                case "--dataset" when ValidLabel(value): dataset = value; break;
+                case "--machine-profile" when ValidLabel(value): machineProfile = value; break;
                 case "--diagnostics" when value is "yes" or "no": diagnostics = value == "yes"; break;
                 default: throw new ArgumentException("Invalid benchmark option.");
             }
         }
-        return new BenchmarkOptions(runs, contract, output, sha, topology, diagnostics);
+        return new BenchmarkOptions(runs, contract, output, sha, topology, diagnostics, dataset, machineProfile);
     }
+
+    internal static bool ValidLabel(string? value) => value is { Length: >= 1 and <= 80 } &&
+        value != "UNSPECIFIED" && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
 }
 
 internal sealed record BenchmarkSample(int Iteration, string Status, int? Rows,
@@ -43,7 +51,27 @@ internal sealed record BenchmarkSummary(int Count, int? Rows, bool RowsStable, d
     double P50, double P95, double? P99, double Max, long MedianAllocatedBytes);
 
 internal sealed record BenchmarkCase(string Name, int? SecondContractId, string Status, string Reason,
-    IReadOnlyList<BenchmarkSample> Samples, BenchmarkSummary? Summary);
+    IReadOnlyList<BenchmarkSample> Samples, BenchmarkSummary? Summary,
+    BenchmarkResources? ResourcesBefore = null, BenchmarkResources? ResourcesAfter = null);
+
+// Outside the timed iterations; these are snapshots, not peaks or retention measurements.
+internal sealed record BenchmarkResources(double CpuMs, long PrivateBytes, long WorkingSetBytes, long ManagedBytes)
+{
+    internal static BenchmarkResources? Capture()
+    {
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            process.Refresh();
+            return new(process.TotalProcessorTime.TotalMilliseconds, process.PrivateMemorySize64,
+                process.WorkingSet64, GC.GetTotalMemory(false));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+}
 
 internal static class BenchmarkStatistics
 {

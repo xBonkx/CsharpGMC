@@ -26,6 +26,7 @@
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseCheckCache.cs" Link="ReleaseCheckCache.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\LauncherBinaryPublisher.cs" Link="LauncherBinaryPublisher.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkEvidence.cs" Link="RemoteSqlBenchmarkEvidence.cs" />
+    <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkComparison.cs" Link="RemoteSqlBenchmarkComparison.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\SqlDiagnostics.cs" Link="RemoteSqlDiagnostics.cs" />
   </ItemGroup>
 

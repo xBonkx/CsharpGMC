@@ -8,6 +8,9 @@ using GmcSmeta.Core.Domain;
 using GmcSmeta.RemoteSqlBench;
 using Microsoft.Data.SqlClient;
 
+// Offline comparison must not require SQL credentials or connect to a server.
+if (args.Length > 0 && args[0] == "--compare") return BenchmarkComparisonCli.Run(args);
+
 // Read-only LAN measurements. Never changes rows, schema, or meta.rev.
 var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
 if (string.IsNullOrWhiteSpace(cs))
@@ -143,8 +146,8 @@ catch (Exception ex)
 }
 var evidence = new
 {
-    FormatVersion = 1, RunId = runId, StartedUtc = started, FinishedUtc = DateTimeOffset.UtcNow,
-    options.SourceSha, options.Topology, options.Runs, ContractId = contractId, PositionCount = positionCount,
+    FormatVersion = 2, RunId = runId, StartedUtc = started, FinishedUtc = DateTimeOffset.UtcNow,
+    options.SourceSha, options.Topology, options.Dataset, options.MachineProfile, options.Runs, ContractId = contractId, PositionCount = positionCount,
     Runtime = RuntimeInformation.FrameworkDescription, Os = RuntimeInformation.OSDescription,
     Architecture = RuntimeInformation.ProcessArchitecture.ToString(), LogicalProcessors = Environment.ProcessorCount,
     SqlClientVersion = typeof(SqlConnection).Assembly.GetName().Version?.ToString() ?? "",
@@ -158,6 +161,9 @@ var evidence = new
     RevisionStable = databaseStable, ExitCode = exitCode, FailureType = failure,
     CacheMode = "warm process; one warmup per case; existing server cache; no cache clearing",
     DiagnosticsRequested = options.Diagnostics, Diagnostics = diagnostics,
+    FailedSamples = cases.SelectMany(c => c.Samples).Count(s => s.Status == "FAIL"),
+    TimeoutSamples = cases.SelectMany(c => c.Samples).Count(s => s.Status == "TIMEOUT"),
+    CancelledSamples = cases.SelectMany(c => c.Samples).Count(s => s.Status == "CANCELLED"),
     Cases = cases
 };
 File.WriteAllText(Path.Combine(directory, "evidence.json"),
@@ -188,6 +194,7 @@ void Skip(string label, string reason) =>
 void Measure(string label, Func<int> action, int? secondId = null)
 {
     var observations = new List<BenchmarkSample>(options.Runs + 1);
+    var resourcesBefore = BenchmarkResources.Capture();
     // Iteration 0 is warmup, recorded separately and excluded from statistics.
     for (var i = 0; i <= options.Runs; i++)
     {
@@ -203,15 +210,19 @@ void Measure(string label, Func<int> action, int? secondId = null)
         catch (Exception ex)
         {
             watch.Stop();
-            observations.Add(new BenchmarkSample(i, "FAIL", null, watch.Elapsed.TotalMilliseconds,
+            var outcome = ex is OperationCanceledException ? "CANCELLED" :
+                ex is TimeoutException or SqlException { Number: -2 } ? "TIMEOUT" : "FAIL";
+            observations.Add(new BenchmarkSample(i, outcome, null, watch.Elapsed.TotalMilliseconds,
                 GC.GetAllocatedBytesForCurrentThread() - allocated, ex.GetType().Name));
-            cases.Add(new BenchmarkCase(label, secondId, "FAIL", "stopped_on_error", observations, null));
+            cases.Add(new BenchmarkCase(label, secondId, outcome, "stopped_on_error", observations, null,
+                resourcesBefore, BenchmarkResources.Capture()));
             throw;
         }
     }
     var summary = BenchmarkStatistics.Summarize(observations);
     var status = summary.RowsStable ? "OK" : "UNSTABLE";
-    cases.Add(new BenchmarkCase(label, secondId, status, "", observations, summary));
+    cases.Add(new BenchmarkCase(label, secondId, status, "", observations, summary,
+        resourcesBefore, BenchmarkResources.Capture()));
     Console.WriteLine(FormattableString.Invariant(
         $"{label},{status},{summary.Rows},{summary.Min:F2},{summary.P50:F2},{summary.P95:F2},{summary.P99:F2},{summary.Max:F2}"));
     if (!summary.RowsStable) throw new InvalidOperationException("Row counts changed during measurement.");
