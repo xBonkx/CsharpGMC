@@ -49,6 +49,9 @@ internal sealed class ExcelImportPreviewWindow : Window
     private readonly IReadOnlyDictionary<long, IReadOnlySet<string>> _alreadyLoaded;
     private readonly List<DocRow> _docs;
     private readonly IReadOnlyList<CompanyInfo> _companies;
+    private readonly IReadOnlyList<ExcelImportLegalTarget>? _legalTargets;
+    private readonly ComboBox _legalAgreement = new() { MinWidth = 210, MinHeight = 32, DisplayMemberPath = nameof(ExcelImportLegalTarget.Caption) };
+    private readonly TextBlock _legalLabel = new() { Text = "Договор приложений:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12,0,8,0) };
     private readonly ComboBox _annexCompany = new() { MinWidth = 210, MinHeight = 32, DisplayMemberPath = nameof(CompanyInfo.Name) };
     private readonly Button _agreementDefaults = new() { Content = "Реквизиты договора", MinHeight = 32 };
     private readonly ComboBox _objects = new() { MinWidth = 240, MinHeight = 32 };
@@ -82,7 +85,8 @@ internal sealed class ExcelImportPreviewWindow : Window
             return _rows.Where(r => r.Selected)
                 .Select(r => new ExcelImportChoice(r.Block, r.Kind, r.Number.Trim(),
                     r.Date.Trim(), r.Name.Trim(), r.Kind == "dop" ? baseId : null,
-                    r.Kind == "main" ? annexCompany : r.Kind == "dop" ? baseCompany : null))
+                    r.Kind == "main" ? annexCompany : r.Kind == "dop" ? baseCompany : null)
+                    { AgreementId = r.Kind == "main" ? (_legalAgreement.SelectedItem as ExcelImportLegalTarget)?.Id : null })
                 .ToList();
         }
     }
@@ -90,12 +94,13 @@ internal sealed class ExcelImportPreviewWindow : Window
     public ExcelImportPreviewWindow(Window parent, ExcelImportResult result,
         IEnumerable<ObjectRow> objects, IEnumerable<DocRow> docs,
         long? defaultObjectId, IReadOnlyDictionary<long, IReadOnlySet<string>> alreadyLoaded,
-        IReadOnlyList<CompanyInfo> companies)
+        IReadOnlyList<CompanyInfo> companies, IReadOnlyList<ExcelImportLegalTarget>? legalTargets = null)
     {
         Owner = parent;
         _result = result;
         _docs = docs.ToList();
         _companies = companies;
+        _legalTargets = legalTargets;
         _annexCompany.ItemsSource = companies;
         _alreadyLoaded = alreadyLoaded;
         Title = "Импорт документов — " + Path.GetFileName(result.FileName);
@@ -145,6 +150,9 @@ internal sealed class ExcelImportPreviewWindow : Window
         meta.Children.Add(new TextBlock { Text = "Организация приложений:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0) });
         _annexCompany.ToolTip = "Общая организация для выбранных приложений. ДС наследуют организацию своего основания, КП — прежнее значение по умолчанию.";
         meta.Children.Add(_annexCompany);
+        meta.Children.Add(_legalLabel);
+        meta.Children.Add(_legalAgreement);
+        _legalAgreement.SelectionChanged += (_, _) => UpdateAgreementDefaultsEnabled();
         _agreementDefaults.Margin = new Thickness(8, 0, 0, 0);
         _agreementDefaults.ToolTip = "Подставить номер, дату и организацию договора в отмеченные приложения. Не меняет КП и ДС.";
         WorkspaceWindowUi.StyleButton(_agreementDefaults);
@@ -245,14 +253,31 @@ internal sealed class ExcelImportPreviewWindow : Window
         // Never attach an imported DS to the first document by list order.
         _baseDocs.SelectedIndex = -1;
         _annexCompany.SelectedIndex = -1;
-        var agreement = CurrentAgreement();
-        _agreementDefaults.IsEnabled = agreement is not null && _companies.Any(c => c.Id == agreement.CompanyId);
+        var cards = CurrentLegalCards();
+        _legalAgreement.ItemsSource = cards.Where(a => !a.Archived).ToArray();
+        _legalAgreement.SelectedIndex = -1;
+        _legalLabel.Visibility = _legalAgreement.Visibility = cards.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAgreementDefaultsEnabled();
     }
 
     private string CompanySuffix(DocRow d) => " · " + (_companies.FirstOrDefault(c => c.Id == d.CompanyId)?.Name ?? "организация не указана");
 
-    private AgreementPresentation.Requisites? CurrentAgreement() =>
-        AgreementPresentation.Resolve(_docs.Where(d => d.ObjectId == ObjectId));
+    private IReadOnlyList<ExcelImportLegalTarget> CurrentLegalCards() =>
+        _legalTargets?.Where(a => a.ObjectId == ObjectId).ToArray() ?? Array.Empty<ExcelImportLegalTarget>();
+
+    private AgreementPresentation.Requisites? CurrentAgreement()
+    {
+        if (_legalTargets is not null)
+            return _legalAgreement.SelectedItem is ExcelImportLegalTarget { CompanyId: long company } a
+                ? new(a.Number, a.Date, company) : null;
+        return AgreementPresentation.Resolve(_docs.Where(d => d.ObjectId == ObjectId));
+    }
+
+    private void UpdateAgreementDefaultsEnabled()
+    {
+        var agreement = CurrentAgreement();
+        _agreementDefaults.IsEnabled = agreement is not null && _companies.Any(c => c.Id == agreement.CompanyId);
+    }
 
     private long? SelectedBaseCompany() => _baseDocs.SelectedItem is BaseDocument b
         ? _docs.FirstOrDefault(d => d.Id == b.Id && d.ObjectId == ObjectId)?.CompanyId : null;
@@ -359,10 +384,26 @@ internal sealed class ExcelImportPreviewWindow : Window
                 "Реквизиты", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        if (_legalTargets is not null)
+        {
+            try
+            {
+                var cards = CurrentLegalCards();
+                var annexes = selections.Where(c => c.Kind == "main").ToArray();
+                foreach (var annex in annexes) ExcelImportAgreementPolicy.ValidateLegalTarget(annex, cards);
+                if (cards.Count == 0) ExcelImportAgreementPolicy.ValidateNewDraftBatch(annexes);
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Реквизиты договора", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
         if (selections.Any(c => c.Kind is "main" or "dop"))
         {
             var details = selections.Where(c => c.Kind is "main" or "dop").Select(c =>
-                $"{c.Name} · № {c.Number} от {c.Date} · {_companies.First(company => company.Id == c.CompanyId).Name}");
+                $"{c.Name} · № {c.Number} от {c.Date} · {_companies.First(company => company.Id == c.CompanyId).Name}" +
+                (c.AgreementId is long legalId ? $" · ID договора {legalId}" : ""));
             if (MessageBox.Show(this, "Проверьте реквизиты (НДС ДНС — из файла, прочие формы — по выбранной организации):\n" +
                 string.Join("\n", details) + "\nПродолжить?", "Проверка реквизитов", MessageBoxButton.YesNo,
                 MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;

@@ -8,7 +8,10 @@ using Microsoft.Data.SqlClient;
 namespace GmcSmeta.Core.Db;
 
 public sealed record ExcelImportChoice(ExcelImportBlock Block, string Kind, string Number,
-    string Date, string Name, long? BaseContractId = null, long? CompanyId = null);
+    string Date, string Name, long? BaseContractId = null, long? CompanyId = null)
+{
+    public long? AgreementId { get; init; }
+}
 
 public sealed record ExcelImportSaved(long ObjectId, IReadOnlyList<long> ContractIds, string Revision);
 
@@ -114,6 +117,17 @@ public static class SqlServerExcelImport
             objectId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
             Log(conn, tx, "object", objectId, "create", newObjectName.Trim(), null, objectId);
         }
+        // The legal schema uses explicit identities, never a match by number.
+        var legal = ReadLegalImportTargets(conn, tx);
+        var targetCards = legal?.Where(x => x.ObjectId == objectId).ToArray();
+        if (targetCards is not null)
+        {
+            var annexes = choices.Where(x => x.Kind == "main").ToArray();
+            foreach (var choice in annexes)
+                ExcelImportAgreementPolicy.ValidateLegalTarget(choice, targetCards);
+            if (targetCards.Length == 0)
+                ExcelImportAgreementPolicy.ValidateNewDraftBatch(annexes);
+        }
         // Validate every parent and every duplicate before inserting any document.
         foreach (var choice in choices.Where(c => c.Kind == "dop"))
         {
@@ -125,6 +139,12 @@ public static class SqlServerExcelImport
             var value = check.ExecuteScalar();
             var parentCompany = value is null or DBNull ? (long?)null : Convert.ToInt64(value, CultureInfo.InvariantCulture);
             ExcelImportAgreementPolicy.ValidateBaseCompany(choice, parentCompany);
+            if (targetCards is not null)
+            {
+                var parentLegal = SqlServerAgreements.DocumentAgreementId(conn, choice.BaseContractId.Value, tx);
+                if (parentLegal is null || !targetCards.Any(a => a.Id == parentLegal && !a.Archived))
+                    throw new InvalidOperationException("У основания ДС нет действующего юридического договора. Сначала проверьте его реквизиты.");
+            }
         }
         var companies = new Dictionary<long, decimal>();
         long? defaultCompanyId = null;
@@ -199,7 +219,7 @@ public static class SqlServerExcelImport
             contract.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = b.Form;
             contract.Parameters.Add("@pnr", SqlDbType.Float).Value = (double)(b.Pnr ?? 0m);
             var contractId = Convert.ToInt64(contract.ExecuteScalar(), CultureInfo.InvariantCulture);
-            SqlServerAgreements.AttachNewDocument(conn, tx, contractId);
+            SqlServerAgreements.AttachNewDocument(conn, tx, contractId, choice.AgreementId);
             created.Add(contractId);
             var sections = new Dictionary<string, long>(StringComparer.Ordinal);
             for (var sIndex = 0; sIndex < b.Sections.Count; sIndex++)
@@ -293,6 +313,21 @@ public static class SqlServerExcelImport
         tx.Commit();
         var revision = SqlServerDatabase.Revision(conn);
         return new ExcelImportSaved(objectId, created, revision);
+    }
+
+    // null = legacy schema; empty = legal schema with no cards.
+    public static IReadOnlyList<ExcelImportLegalTarget>? ReadLegalImportTargets(SqlConnection conn, SqlTransaction? tx = null)
+    {
+        if (!SqlServerAgreements.Enabled(conn, tx)) return null;
+        using var cmd = new SqlCommand(
+            "SELECT a.id,a.object_id,a.number,CONVERT(nvarchar(10),a.agreement_date,104),a.company_id,a.archived " +
+            "FROM dbo.agreements a JOIN dbo.objects o ON o.id=a.object_id WHERE o.archived=0 ORDER BY a.object_id,a.id", conn, tx);
+        using var r = cmd.ExecuteReader();
+        var rows = new List<ExcelImportLegalTarget>();
+        while (r.Read())
+            rows.Add(new(SqlInteger.ReadInt64(r,0),SqlInteger.ReadInt64(r,1),r.GetString(2),
+                r.IsDBNull(3) ? "" : r.GetString(3),r.IsDBNull(4) ? null : SqlInteger.ReadInt64(r,4),SqlFlag.Read(r,5)));
+        return rows;
     }
 
     private static DataTable NewPositionTable()

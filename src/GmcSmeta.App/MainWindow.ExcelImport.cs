@@ -91,16 +91,18 @@ public partial class MainWindow
         List<ObjectRow> objects;
         List<DocRow> documents;
         IReadOnlyList<CompanyInfo> companies;
+        IReadOnlyList<ExcelImportLegalTarget>? legalTargets;
         string revision;
         try
         {
-            (existing, objects, documents, companies, revision) = await Task.Run(() =>
+            (existing, objects, documents, companies, legalTargets, revision) = await Task.Run(() =>
             {
                 using var conn = SqlServerDatabase.Open(connection);
                 var before = SqlServerDatabase.Revision(conn);
                 var freshObjects = Workspace.Objects(conn);
                 var freshDocuments = Workspace.ReadAllDocumentMetadata(conn);
                 var freshCompanies = SqlServerWorkspace.Companies(conn);
+                var freshLegalTargets = SqlServerExcelImport.ReadLegalImportTargets(conn);
                 using var query = new SqlCommand(
                     "SELECT object_id,source_file,source_sheet FROM dbo.contracts WHERE source_file<>N''", conn);
                 using var reader = query.ExecuteReader();
@@ -116,7 +118,7 @@ public partial class MainWindow
                 reader.Close();
                 if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new InvalidOperationException("Данные изменились во время чтения. Повторите импорт.");
-                return (keys.ToDictionary(p => p.Key, p => (IReadOnlySet<string>)p.Value), freshObjects, freshDocuments, freshCompanies, before);
+                return (keys.ToDictionary(p => p.Key, p => (IReadOnlySet<string>)p.Value), freshObjects, freshDocuments, freshCompanies, freshLegalTargets, before);
             });
         }
         catch (Exception ex)
@@ -152,7 +154,7 @@ public partial class MainWindow
             if (mode != MessageBoxResult.No) return;
         }
         var preview = new ExcelImportPreviewWindow(this, result, objects, documents,
-            preferredObjectId, existing, companies);
+            preferredObjectId, existing, companies, legalTargets);
         if (preview.ShowDialog() != true || !ContextCurrent() || !FileCurrent()) return;
         var selections = preview.Choices;
         var target = preview.ObjectId;

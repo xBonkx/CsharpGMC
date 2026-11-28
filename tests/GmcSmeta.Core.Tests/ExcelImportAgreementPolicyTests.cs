@@ -28,6 +28,30 @@ public sealed class ExcelImportAgreementPolicyTests
         Assert.Throws<ArgumentException>(() => ExcelImportAgreementPolicy.Validate(Choice(kind, company, parent)));
 
     [Fact]
+    public void LegalImportRequiresExactExplicitActiveCardEvenForOneCard()
+    {
+        var cards = new[] { new ExcelImportLegalTarget(10, 1, "1", "27.11.2026", 2, false) };
+        var annex = Choice("main", 2);
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateLegalTarget(annex, cards));
+        ExcelImportAgreementPolicy.ValidateLegalTarget(annex with { AgreementId = 10 }, cards);
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateLegalTarget(annex with { AgreementId = 11 }, cards));
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateLegalTarget(annex with { AgreementId = 10, Number = "2" }, cards));
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateLegalTarget(annex with { AgreementId = 10 }, new[]{cards[0] with { Archived = true }}));
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateLegalTarget(annex with { AgreementId = 10, CompanyId = 3 }, cards));
+    }
+
+    [Fact]
+    public void EmptyCardBatchCannotMergeDistinctLegalMetadata()
+    {
+        var first = Choice("main", 2);
+        ExcelImportAgreementPolicy.ValidateLegalTarget(first, []);
+        ExcelImportAgreementPolicy.ValidateNewDraftBatch([first, first]);
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateNewDraftBatch([first, first with { Number = "2" }]));
+        Assert.Throws<InvalidOperationException>(() => ExcelImportAgreementPolicy.ValidateNewDraftBatch([first, first with { CompanyId = 3 }]));
+        Assert.Throws<ArgumentException>(() => ExcelImportAgreementPolicy.Validate(Choice("kp") with { AgreementId = 10 }));
+    }
+
+    [Fact]
     public void DsCompanyMustStillMatchItsSelectedBase()
     {
         var choice = Choice("dop", 2, 10);
