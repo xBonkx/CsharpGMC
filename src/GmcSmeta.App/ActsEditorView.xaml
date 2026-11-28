@@ -132,7 +132,7 @@
             </WrapPanel>
 
             <!-- период и ДС под шапкой -->
-            <TextBlock Grid.Row="1" x:Name="ActSub" Foreground="#64748B" Margin="0,5,0,0"
+            <TextBlock Grid.Row="1" x:Name="ActSub" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,5,0,0"
                        TextWrapping="Wrap" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
 
             <!-- панель над таблицей: закрыть/разделы/убрать, «Ещё», справа фильтры и поиск -->
@@ -172,7 +172,7 @@
                         <TextBox x:Name="SearchBox" Style="{StaticResource PythonSearch}" VerticalContentAlignment="Center" Padding="32,5,32,5" AutomationProperties.Name="Найти позицию"
                                  TextChanged="Search_Changed"/>
                         <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                        <TextBlock x:Name="SearchHint" Text="Найти позицию…" Foreground="#94A3B8" Margin="32,0,32,0" TextTrimming="CharacterEllipsis"
+                        <TextBlock x:Name="SearchHint" Text="Найти позицию…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0" TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center" IsHitTestVisible="False"/>
                         <Button Content="Очистить" ContentTemplate="{StaticResource IconOnlyX}" ToolTip="Очистить поиск"
                                 AutomationProperties.Name="Очистить поиск" Width="26" Height="26" MinWidth="0" MinHeight="0"
@@ -259,9 +259,9 @@
 
             <!-- итоги одной строкой (когда плитки свернуты) + объём выделенного -->
             <Grid Grid.Row="4" Margin="2,6,0,0">
-                <TextBlock x:Name="TotLine" Foreground="#64748B" TextWrapping="NoWrap"
+                <TextBlock x:Name="TotLine" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="NoWrap"
                            TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
-                <TextBlock x:Name="SelectionQty" Foreground="#64748B" HorizontalAlignment="Right"
+                <TextBlock x:Name="SelectionQty" Foreground="{StaticResource UiMutedTextBrush}" HorizontalAlignment="Right"
                            TextTrimming="CharacterEllipsis"/>
             </Grid>
 
@@ -355,7 +355,7 @@
                 <TextBlock x:Name="EmptyTitle" Text="Актов по этому документу ещё нет" FontSize="{StaticResource UiH1Size}"
                            FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center"/>
                 <TextBlock x:Name="EmptyDescription" Text="Нажмите «Новый акт», отметьте, что сдаёте, впишите СМР — и сохраните КС-2 и КС-3."
-                           Foreground="#64748B" TextWrapping="Wrap" HorizontalAlignment="Center"
+                           Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" HorizontalAlignment="Center"
                            Margin="0,10,0,0" TextAlignment="Center"/>
                 <Button x:Name="RetryActButton" Content="Повторить загрузку" ContentTemplate="{StaticResource IconLabelRefresh}" Visibility="Collapsed"
                         Style="{StaticResource PythonToolbarButton}" Click="RetryAct_Click"
