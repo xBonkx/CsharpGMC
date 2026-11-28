@@ -23,7 +23,25 @@ PAGES = ("navigation", "object-cards", "estimate", "materials", "cost-summary",
          "totals", "procurement", "shipments", "ks", "catalog", "metal",
          "pto-letters", "settings", "director")
 NAV_STATES = ("year", "object", "folder", "kp", "contract", "annex",
-              "stage-parent", "stage-child", "remainder", "archive", "deep-nesting")
+              "stage-parent", "stage-child", "remainder", "archive", "deep-nesting",
+              "logo", "three-stage-children", "selected-deep-child", "collapsed-parent")
+# Distinguish screens sharing a page name so a KP capture cannot silently stand in
+# for a contract annex or a different KS/PTO submodule.
+PAGE_STATES = {
+    "estimate": ("kp-estimate", "contract-estimate", "stage-estimate", "rectangular-selection", "shift-selection", "edit-to-selection"),
+    "materials": ("kp-materials", "contract-materials"),
+    "cost-summary": ("kp-summary", "contract-summary", "long-money", "narrow-viewport", "manual-widths"),
+    "totals": ("kp-totals", "contract-totals", "smr-sum", "smr-pos", "smr-percent", "smr-systems", "smr-from-stages"),
+    "procurement": ("contract-procurement",),
+    "shipments": ("contract-shipments",),
+    "ks": ("ks2-draft", "ks2-signed", "ks3", "all-contract-acts"),
+    "metal": ("stock", "lots", "journal", "register"),
+    "pto-letters": ("pto-register", "pto-editor", "vor", "certificates", "letters", "passports", "orders", "people"),
+    "catalog": ("materials-catalog", "work-rates"),
+}
+
+def states_for(page):
+    return STATES + (NAV_STATES if page == "navigation" else PAGE_STATES.get(page, ()))
 SHA = re.compile(r"[0-9a-fA-F]{40}")
 PNG = b"\x89PNG\r\n\x1a\n"
 
@@ -40,7 +58,7 @@ def digest(path):
 def validate_request(meta):
     if meta.get("page") not in PAGES:
         raise ValueError("unknown page")
-    states = STATES + (NAV_STATES if meta["page"] == "navigation" else ())
+    states = states_for(meta["page"])
     if meta.get("state") not in states:
         raise ValueError("unknown state for page")
     if type(meta.get("app_scale")) not in (int, float) or meta["app_scale"] not in (1, 1.1, 1.2):
@@ -249,7 +267,7 @@ def verify_pair(before_path, after_path):
 def matrix():
     return [{"page": page, "state": state, "resolution": f"{w}x{h}", "dpi": dpi,
              "app_scale": scale, "status": "NOT_RUN"}
-            for page in PAGES for state in STATES + (NAV_STATES if page == "navigation" else ())
+            for page in PAGES for state in states_for(page)
             for w,h in sorted(RESOLUTIONS) for dpi in sorted(DPIS)
             for scale in ((1,1.1,1.2) if (w,h)==(1920,1080) else (1,))]
 
