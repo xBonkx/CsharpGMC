@@ -44,7 +44,8 @@ public static class DemoMode
         catch { /* diagnostic only */ }
     }
     public static bool IsRequested(IEnumerable<string> args) =>
-        args.Any(arg => string.Equals(arg, "--demo", StringComparison.Ordinal));
+        args.Any(arg => string.Equals(arg, "--demo", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(arg, "--demo-launch", StringComparison.OrdinalIgnoreCase));
 
     public static string DatabaseFromArgs(IEnumerable<string> args)
     {
@@ -58,9 +59,19 @@ public static class DemoMode
 
     private static string CurrentDatabase => DatabaseFromArgs(Environment.GetCommandLineArgs().Skip(1));
 
-    public static string ProfileRoot => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "GMC-Smeta-Demo", "CSharp", CurrentDatabase);
+    // Capture the real Windows root once, before overriding process environment.
+    private static readonly Lazy<string> DemoProfileRoot = new(() => ResolveProfileRoot(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), CurrentDatabase));
+
+    public static string ProfileRoot => DemoProfileRoot.Value;
+
+    public static string ResolveProfileRoot(string localData, string database)
+    {
+        DatabaseFromArgs(["--demo", database]);
+        if (string.IsNullOrWhiteSpace(localData) || !Path.IsPathFullyQualified(localData))
+            throw new InvalidOperationException("Не найден локальный профиль Windows для тестового режима.");
+        return Path.Combine(Path.GetFullPath(localData), "GMC-Smeta-Demo", "CSharp", database);
+    }
 
     public static string ApplicationData => Active
         ? Path.Combine(ProfileRoot, "profile")
@@ -92,6 +103,8 @@ public static class DemoMode
         Directory.CreateDirectory(ApplicationData);
         Directory.CreateDirectory(LocalData);
         Environment.SetEnvironmentVariable("APPDATA", ApplicationData);
+        Environment.SetEnvironmentVariable("LOCALAPPDATA", LocalData);
+        Environment.SetEnvironmentVariable("GMC_SMETA_SQL_DATABASE", null);
         Environment.SetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION", CreateConnectionString(database));
         Environment.SetEnvironmentVariable("GMC_SMETA_HOME", null);
         Environment.SetEnvironmentVariable("GMC_SMETA_LAUNCHER", null);
@@ -108,16 +121,18 @@ public static class DemoMode
     public static void ValidateConnection(SqlConnectionStringBuilder builder,
         IEnumerable<string> args)
     {
-        if (!IsRequested(args))
+        var items = args.ToArray();
+        if (!IsRequested(items))
         {
             if (builder.InitialCatalog.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Откройте тестовую базу отдельным ярлыком --demo.");
             return;
         }
-        var database = DatabaseFromArgs(args);
+        var database = DatabaseFromArgs(items);
         if (!string.Equals(builder.InitialCatalog, database, StringComparison.Ordinal) ||
             !string.Equals(builder.DataSource, LocalServer, StringComparison.OrdinalIgnoreCase) ||
-            !builder.IntegratedSecurity || !string.IsNullOrEmpty(builder.AttachDBFilename))
+            !builder.IntegratedSecurity || !string.IsNullOrEmpty(builder.AttachDBFilename) ||
+            !string.IsNullOrEmpty(builder.FailoverPartner))
             throw new InvalidOperationException("Тестовый запуск привязан к своей локальной базе.");
     }
 

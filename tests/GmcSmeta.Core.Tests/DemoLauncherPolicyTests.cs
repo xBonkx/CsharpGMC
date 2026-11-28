@@ -11,8 +11,28 @@ public sealed class DemoLauncherPolicyTests
     {
         Assert.True(DemoReleasePolicy.IsDemoEntry([], DemoReleasePolicy.ExecutableName));
         Assert.True(DemoReleasePolicy.IsDemoEntry(["--demo-launch"], "any.exe"));
+        Assert.True(DemoReleasePolicy.IsDemoEntry(["--DEMO"], "any.exe"));
+        Assert.Throws<InvalidOperationException>(() => DemoReleasePolicy.Parse(["--demo", Db]));
         Assert.False(DemoReleasePolicy.IsDemoEntry([], "GMC-Smeta-CSharp-Start.exe"));
         Assert.Throws<InvalidOperationException>(() => DemoReleasePolicy.Parse([]));
+    }
+
+    [Fact]
+    public void TestChildDoesNotInheritOfficePathsOrSql()
+    {
+        var environment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["GMC_SMETA_SQL_CONNECTION"] = "office", ["GMC_SMETA_SQL_DATABASE"] = "office",
+            ["GMC_SMETA_HOME"] = "office", ["GMC_SMETA_LAUNCHER"] = "office",
+            ["GMC_SMETA_STARTUP_TRACE_DIR"] = "office", ["GMC_SMETA_PTO_ROOT"] = "office",
+            ["GMC_SMETA_LETTERS_ROOT"] = "office", ["GMC_SMETA_PASSPORTS_ROOT"] = "office",
+            ["GMC_SMETA_NO_UPDATE"] = "0", ["GMC_SMETA_AUTO_RESTART"] = "1", ["PATH"] = "runtime"
+        };
+        DemoReleasePolicy.PrepareChildEnvironment(environment);
+        Assert.Equal(3, environment.Count);
+        Assert.Equal("1", environment["GMC_SMETA_NO_UPDATE"]);
+        Assert.Equal("0", environment["GMC_SMETA_AUTO_RESTART"]);
+        Assert.Equal("runtime", environment["PATH"]);
     }
 
     [Fact]
