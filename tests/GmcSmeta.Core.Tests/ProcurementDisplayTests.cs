@@ -44,8 +44,8 @@ public class ProcurementDisplayTests
     [InlineData("late", "#FEE2E2", "#B91C1C")]
     [InlineData("soon", "#FEF3C7", "#B45309")]
     [InlineData("ok", "#EEF2F7", "#334155")]
-    [InlineData("done", "#F4F4F5", "#94A3B8")]
-    public void DueBadgesMatchPythonPalette(string state, string bg, string fg)
+    [InlineData("done", "#F4F4F5", "#526174")]
+    public void DueBadgesMatchReadableStatePalette(string state, string bg, string fg)
     {
         var look = ProcurementBadgePalette.Due(state);
         Assert.Equal(new ProcurementBadgeLook(bg, fg, "#46" + fg[1..]), look);
