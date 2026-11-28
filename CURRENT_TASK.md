@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — приёмка BUG-F29/F30/F51: 3 новых регрессионных сценария, не запускались. BUG-F11/F12 оставлены zcode-sess-bugf125; параллельный агент устранил merge-конфликты, повторно проверены уникальные ID. [Отчёт](docs/ACCEPTANCE_PROCUREMENT_SHIPMENT_20261129.md).
+
 - 29.11.2026 — CTX-009.01/.04 PARTIAL: явное подтверждение удаления, фокус отмены и предупреждение полного выделения; 4 source-test cases добавлены, не запущены. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). 0 CODE READY/DONE; бронь снята.
 
 - 29.11.2026 — CTX-041.01–03 PARTIAL: integrated prepared keyboard patch; 9 prior static checks, 3 source tests added (not run). [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
