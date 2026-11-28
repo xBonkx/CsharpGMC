@@ -22,6 +22,7 @@ public sealed class CompanyWindow : Window
     private long _editingId;
     private bool _loading;
     private bool _dirty;
+    private readonly ReferenceWindowOperation _operation = new();
 
     private static readonly (string Id, string Title, bool Multiline)[] Columns =
     [
@@ -107,7 +108,7 @@ public sealed class CompanyWindow : Window
 
         _list.SelectionChanged += (_, _) =>
         {
-            if (_loading || _list.SelectedItem is not SqlServerWorkspaceNavigation.CompanyEntry company) return;
+            if (_loading || _operation.IsBusy || _list.SelectedItem is not SqlServerWorkspaceNavigation.CompanyEntry company) return;
             if (_dirty)
             {
                 MessageBox.Show(this, "Сначала сохраните изменения организации или отмените их кнопкой «Обновить».",
@@ -121,8 +122,9 @@ public sealed class CompanyWindow : Window
         };
         Closing += (_, e) =>
         {
+            if (_operation.IsBusy) { e.Cancel = true; return; }
             if (_dirty && MessageBox.Show(this, "Закрыть без сохранения изменённых реквизитов?",
-                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
                 e.Cancel = true;
         };
         Loaded += async (_, _) => await LoadAsync();
@@ -130,24 +132,33 @@ public sealed class CompanyWindow : Window
 
     private async Task LoadAsync(long? selectId = null)
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null) return;
+        await LoadCoreAsync(selectId);
+    }
+
+    private async Task LoadCoreAsync(long? selectId = null)
+    {
         if (_dirty)
         {
             if (MessageBox.Show(this, "Сбросить несохранённые изменения организации?",
-                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            _dirty = false;
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
+        _revision = "";
         try
         {
             var tuple = await Task.Run(() =>
             {
+                SqlServerWorkspace.RequirePilotDatabase(_connectionString);
                 using var conn = SqlServerDatabase.Open(_connectionString);
                 var before = SqlServerDatabase.Revision(conn);
-                var rows = SqlServerWorkspaceNavigation.Companies(_connectionString);
-                if (before != SqlServerDatabase.Revision(conn))
+                var rows = SqlServerWorkspaceNavigation.ReadCompanies(conn);
+                if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new System.Data.DBConcurrencyException("Организации изменены другим клиентом. Обновите список.");
                 return (Rows: rows, Revision: before);
             });
             _loading = true;
+            _dirty = false;
             _companies = tuple.Rows;
             _revision = tuple.Revision;
             _list.ItemsSource = _companies;
@@ -157,7 +168,7 @@ public sealed class CompanyWindow : Window
             if (_list.SelectedItem is SqlServerWorkspaceNavigation.CompanyEntry selected) Show(selected);
             else New();
         }
-        catch (Exception ex) { _loading = false; WorkspaceWindowUi.Error(this, ex, "Организации"); }
+        catch (Exception ex) { _loading = false; _revision = ""; WorkspaceWindowUi.Error(this, ex, "Организации"); }
     }
 
     private void Show(SqlServerWorkspaceNavigation.CompanyEntry entry)
@@ -242,6 +253,9 @@ public sealed class CompanyWindow : Window
 
     private async Task SaveAsync()
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null || !RequireRevision()) return;
+        var revision = _revision;
         var rawVat = _fields["Vat"].Text.Trim().Replace('.', ',');
         if (!decimal.TryParse(rawVat, NumberStyles.Number, CultureInfo.GetCultureInfo("ru-RU"), out var vat))
         {
@@ -254,19 +268,35 @@ public sealed class CompanyWindow : Window
             _fields["InnKpp"].Text, _fields["Phone"].Text, _fields["Email"].Text, vat,
             _fields["LegalFull"].Text, _fields["SignerPost"].Text, _fields["SignerName"].Text,
             previous?.Order ?? _companies.Count, previous?.Uses ?? 0)
-        { Logo = _logo };
+        { Logo = _logo?.ToArray() };
         try
         {
             var saved = await Task.Run(() =>
-                SqlServerWorkspaceReferenceWrites.SaveCompany(_connectionString, company, _revision));
+                SqlServerWorkspaceReferenceWrites.SaveCompany(_connectionString, company, revision));
             _dirty = false;
-            await LoadAsync(saved);
+            _editingId = saved;
+            await LoadCoreAsync(saved);
         }
-        catch (Exception ex) { WorkspaceWindowUi.Error(this, ex, "Сохранение организации"); }
+        catch (Exception ex)
+        {
+            _revision = "";
+            WorkspaceWindowUi.Error(this, new InvalidOperationException(ex.Message +
+                "\nЗапись не подтверждена. Перед повтором обновите список и проверьте данные.", ex), "Сохранение организации");
+        }
+    }
+
+    private bool RequireRevision()
+    {
+        if (!string.IsNullOrWhiteSpace(_revision)) return true;
+        MessageBox.Show(this, "Сначала обновите список и проверьте состояние записи на сервере.", Title);
+        return false;
     }
 
     private async Task DeleteAsync()
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null || !RequireRevision()) return;
+        var revision = _revision;
         if (_dirty)
         {
             MessageBox.Show(this, "Сначала сохраните или отмените изменения.",
@@ -276,23 +306,28 @@ public sealed class CompanyWindow : Window
         if (_editingId == 0) return;
         var item = _companies.FirstOrDefault(c => c.Id == _editingId);
         if (item is null) return;
-        if (item.Uses > 0)
+        if (item.Uses > 0 || item.AgreementUses > 0)
         {
             MessageBox.Show(this,
-                $"«{item.Name}» указана в {item.Uses} документах. Удаление запрещено.",
+                $"«{item.Name}»: документов — {item.Uses}, юридических договоров — {item.AgreementUses}. Удаление запрещено.",
                 "Организации", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (MessageBox.Show(this, $"Удалить «{item.Name}»?", "Организации",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try
         {
             await Task.Run(() =>
-                SqlServerWorkspaceReferenceWrites.DeleteCompany(_connectionString, item.Id, _revision));
+                SqlServerWorkspaceReferenceWrites.DeleteCompany(_connectionString, item.Id, revision));
             _editingId = 0;
-            await LoadAsync();
+            await LoadCoreAsync();
         }
-        catch (Exception ex) { WorkspaceWindowUi.Error(this, ex, "Удаление организации"); }
+        catch (Exception ex)
+        {
+            _revision = "";
+            WorkspaceWindowUi.Error(this, new InvalidOperationException(ex.Message +
+                "\nУдаление не подтверждено. Перед повтором обновите список и проверьте данные.", ex), "Удаление организации");
+        }
     }
 }
 
@@ -311,6 +346,7 @@ public sealed class TagsWindow : Window
     private long _editingId;
     private bool _loading;
     private bool _dirty;
+    private readonly ReferenceWindowOperation _operation = new();
 
     private static readonly (string Key, string Caption)[] Rules =
     [
@@ -381,7 +417,7 @@ public sealed class TagsWindow : Window
 
         _list.SelectionChanged += (_, _) =>
         {
-            if (_loading || _list.SelectedItem is not SqlServerWorkspaceNavigation.TagEntry tag) return;
+            if (_loading || _operation.IsBusy || _list.SelectedItem is not SqlServerWorkspaceNavigation.TagEntry tag) return;
             if (_dirty)
             {
                 MessageBox.Show(this, "Сначала сохраните изменения тега или нажмите «Обновить».",
@@ -395,8 +431,9 @@ public sealed class TagsWindow : Window
         };
         Closing += (_, e) =>
         {
+            if (_operation.IsBusy) { e.Cancel = true; return; }
             if (_dirty && MessageBox.Show(this, "Закрыть без сохранения изменений тега?",
-                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
                 e.Cancel = true;
         };
         Loaded += async (_, _) => await LoadAsync();
@@ -404,24 +441,33 @@ public sealed class TagsWindow : Window
 
     private async Task LoadAsync(long? selectId = null)
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null) return;
+        await LoadCoreAsync(selectId);
+    }
+
+    private async Task LoadCoreAsync(long? selectId = null)
+    {
         if (_dirty)
         {
             if (MessageBox.Show(this, "Сбросить несохранённые изменения тега?",
-                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            _dirty = false;
+                Title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         }
+        _revision = "";
         try
         {
             var tuple = await Task.Run(() =>
             {
+                SqlServerWorkspace.RequirePilotDatabase(_connectionString);
                 using var conn = SqlServerDatabase.Open(_connectionString);
                 var before = SqlServerDatabase.Revision(conn);
-                var rows = SqlServerWorkspaceNavigation.Tags(_connectionString);
-                if (before != SqlServerDatabase.Revision(conn))
+                var rows = SqlServerWorkspaceNavigation.ReadTags(conn);
+                if (string.IsNullOrWhiteSpace(before) || before != SqlServerDatabase.Revision(conn))
                     throw new System.Data.DBConcurrencyException("Теги изменены другим клиентом. Обновите список.");
                 return (Rows: rows, Revision: before);
             });
             _loading = true;
+            _dirty = false;
             _tags = tuple.Rows; _revision = tuple.Revision;
             _list.ItemsSource = _tags;
             _list.SelectedItem = _tags.FirstOrDefault(t => t.Id == (selectId ?? _editingId)) ??
@@ -430,7 +476,7 @@ public sealed class TagsWindow : Window
             if (_list.SelectedItem is SqlServerWorkspaceNavigation.TagEntry selected) Show(selected);
             else New();
         }
-        catch (Exception ex) { _loading = false; WorkspaceWindowUi.Error(this, ex, "Теги"); }
+        catch (Exception ex) { _loading = false; _revision = ""; WorkspaceWindowUi.Error(this, ex, "Теги"); }
     }
 
     private void Show(SqlServerWorkspaceNavigation.TagEntry tag)
@@ -464,6 +510,9 @@ public sealed class TagsWindow : Window
 
     private async Task SaveAsync()
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null || !RequireRevision()) return;
+        var revision = _revision;
         var old = _tags.FirstOrDefault(t => t.Id == _editingId);
         var rules = JsonSerializer.Serialize(_rules.ToDictionary(pair => pair.Key,
             pair => pair.Value.IsChecked == true));
@@ -473,15 +522,31 @@ public sealed class TagsWindow : Window
         try
         {
             var saved = await Task.Run(() =>
-                SqlServerWorkspaceReferenceWrites.SaveTag(_connectionString, entry, _revision));
+                SqlServerWorkspaceReferenceWrites.SaveTag(_connectionString, entry, revision));
             _dirty = false;
-            await LoadAsync(saved);
+            _editingId = saved;
+            await LoadCoreAsync(saved);
         }
-        catch (Exception ex) { WorkspaceWindowUi.Error(this, ex, "Сохранение тега"); }
+        catch (Exception ex)
+        {
+            _revision = "";
+            WorkspaceWindowUi.Error(this, new InvalidOperationException(ex.Message +
+                "\nЗапись не подтверждена. Перед повтором обновите список и проверьте данные.", ex), "Сохранение тега");
+        }
+    }
+
+    private bool RequireRevision()
+    {
+        if (!string.IsNullOrWhiteSpace(_revision)) return true;
+        MessageBox.Show(this, "Сначала обновите список и проверьте состояние записи на сервере.", Title);
+        return false;
     }
 
     private async Task DeleteAsync()
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null || !RequireRevision()) return;
+        var revision = _revision;
         if (_dirty)
         {
             MessageBox.Show(this, "Сначала сохраните или отмените изменения.",
@@ -498,13 +563,18 @@ public sealed class TagsWindow : Window
         }
         if (MessageBox.Show(this,
             $"Удалить тег «{item.Name}»? У {item.Objects} объектов будет снято наследование тега.",
-            "Удаление тега", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            "Удаление тега", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         try
         {
             await Task.Run(() => SqlServerWorkspaceReferenceWrites.DeleteTag(
-                _connectionString, item.Id, _revision));
-            _editingId = 0; await LoadAsync();
+                _connectionString, item.Id, revision));
+            _editingId = 0; await LoadCoreAsync();
         }
-        catch (Exception ex) { WorkspaceWindowUi.Error(this, ex, "Удаление тега"); }
+        catch (Exception ex)
+        {
+            _revision = "";
+            WorkspaceWindowUi.Error(this, new InvalidOperationException(ex.Message +
+                "\nУдаление не подтверждено. Перед повтором обновите список и проверьте данные.", ex), "Удаление тега");
+        }
     }
 }

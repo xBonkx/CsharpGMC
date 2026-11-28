@@ -42,6 +42,7 @@ public static class SqlServerWorkspaceNavigation
         string SignerPost, string SignerName, int Order, long Uses)
     {
         public byte[]? Logo { get; init; }
+        public long AgreementUses { get; init; }
     }
 
     public sealed record TagEntry(long Id, string Key, string Name, string Rules,
@@ -295,10 +296,19 @@ public static class SqlServerWorkspaceNavigation
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
+        return ReadCompanies(conn);
+    }
+
+    // Caller owns the already guarded connection and revision fence.
+    public static IReadOnlyList<CompanyEntry> ReadCompanies(SqlConnection conn)
+    {
+        var legalUses = SqlServerAgreements.Enabled(conn)
+            ? "(SELECT COUNT_BIG(*) FROM dbo.agreements WHERE company_id=c.id)"
+            : "CAST(0 AS bigint)";
         using var cmd = new SqlCommand(
             "SELECT c.id,c.name,c.address,c.inn_kpp,c.phone,c.email,c.vat_rate," +
             "c.legal_full,c.signer_post,c.signer_name,c.[order]," +
-            "(SELECT COUNT_BIG(*) FROM dbo.contracts WHERE company_id=c.id),c.logo " +
+            "(SELECT COUNT_BIG(*) FROM dbo.contracts WHERE company_id=c.id),c.logo," + legalUses + " " +
             "FROM dbo.companies c ORDER BY c.[order],c.id", conn);
         using var r = cmd.ExecuteReader();
         var rows = new List<CompanyEntry>();
@@ -315,13 +325,21 @@ public static class SqlServerWorkspaceNavigation
             r.IsDBNull(6) ? 0 : Convert.ToDecimal(r.GetValue(6), CultureInfo.InvariantCulture),
             S(7), S(8), S(9), r.IsDBNull(10) ? 0 : Convert.ToInt32(r.GetValue(10), CultureInfo.InvariantCulture),
             Convert.ToInt64(r.GetValue(11), CultureInfo.InvariantCulture))
-            { Logo = r.IsDBNull(12) ? null : (byte[])r.GetValue(12) };
+            {
+                Logo = r.IsDBNull(12) ? null : (byte[])r.GetValue(12),
+                AgreementUses = r.FieldCount > 13 ? SqlInteger.ReadInt64(r, 13) : 0
+            };
     }
 
     public static IReadOnlyList<TagEntry> Tags(string connectionString)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
+        return ReadTags(conn);
+    }
+
+    public static IReadOnlyList<TagEntry> ReadTags(SqlConnection conn)
+    {
         using var cmd = new SqlCommand(
             "SELECT t.id,t.[key],t.name,t.rules,t.note," +
             "(SELECT COUNT_BIG(*) FROM dbo.contracts WHERE form=t.[key])," +

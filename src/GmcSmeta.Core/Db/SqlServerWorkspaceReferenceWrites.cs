@@ -104,6 +104,16 @@ public static class SqlServerWorkspaceReferenceWrites
             if (Convert.ToInt64(check.ExecuteScalar()) > 0)
                 throw new InvalidOperationException("Организация используется документами. Сначала переназначьте их вручную.");
         }
+        // Legal agreements can exist without any annex and still own the
+        // company reference. Archived agreements are historical references too.
+        if (SqlServerAgreements.Enabled(conn, tx))
+        {
+            using var check = new SqlCommand(
+                "SELECT COUNT_BIG(*) FROM dbo.agreements WITH (UPDLOCK,HOLDLOCK) WHERE company_id=@id", conn, tx);
+            check.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) > 0)
+                throw new InvalidOperationException("Организация используется юридическими договорами. Удаление запрещено.");
+        }
         using (var cmd = new SqlCommand("DELETE dbo.companies WHERE id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
