@@ -70,7 +70,22 @@ internal static class PilotFinanceBatchCases
         PilotRunner.Check(mixed.Count == 2 && mixedTotals.Count == 2 &&
             mixed[contractId] == expected && mixed[large] == all[large] && all[contractId] == expected,
             "Bounded mixed and unscoped SQL batches differ");
-        var director = SqlServerDirector.DirectorRows(p.PilotConnection, "contracts").Single(d => d.ObjectId == obj);
+        using var readCancellation = new CancellationTokenSource();
+        var cancellable = FinanceReader.ReadSelected(conn, new[] { large, contractId }, out var cancellableTotals, readCancellation.Token);
+        PilotRunner.Check(cancellable.OrderBy(p => p.Key).SequenceEqual(mixed.OrderBy(p => p.Key)) &&
+            cancellableTotals.SequenceEqual(mixedTotals), "Cancellation-aware finance changed totals or order");
+        var directorSnapshot = SqlServerDirector.ReadIfChanged(p.PilotConnection, "contracts", "", null, readCancellation.Token)!;
+        var director = directorSnapshot.Rows.Single(d => d.ObjectId == obj);
+        var originalDirector = SqlServerDirector.DirectorRows(p.PilotConnection, "contracts").Single(d => d.ObjectId == obj);
+        PilotRunner.Check((director with { LegalScope = originalDirector.LegalScope }) == originalDirector,
+            "Cancellation-aware director changed financial projection");
+        readCancellation.Cancel();
+        try
+        {
+            FinanceReader.ReadSelected(conn, new[] { contractId }, out _, readCancellation.Token);
+            throw new InvalidOperationException("Cancelled finance read did not throw.");
+        }
+        catch (OperationCanceledException) { }
         PilotRunner.Check(director.Total == totals.Single().Total && director.Closed == expected.Signed &&
             director.Revenue == expected.MaterialRevenue && director.Covered == expected.CoveredRevenue &&
             director.Cost == expected.Cost && director.OutCost == expected.OutsideCost &&

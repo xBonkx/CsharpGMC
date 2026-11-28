@@ -124,20 +124,23 @@ public static partial class FinanceReader
     /// <summary>Read only selected SQL Server documents, in bounded batches.</summary>
     public static IReadOnlyDictionary<int, ContractFinance> ReadSelected(
         Microsoft.Data.SqlClient.SqlConnection conn, IEnumerable<int> contractIds,
-        out IReadOnlyList<ContractTotals> contractTotals)
+        out IReadOnlyList<ContractTotals> contractTotals, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ids = contractIds.Distinct().OrderBy(id => id).ToArray();
         if (ids.Any(id => id <= 0)) throw new ArgumentOutOfRangeException(nameof(contractIds));
         var result = new Dictionary<int, ContractFinance>();
         var totals = new List<ContractTotals>();
         foreach (var batch in ids.Chunk(ContractReadScope.BatchSize))
         {
+            token.ThrowIfCancellationRequested();
             var scope = new ContractReadScope(batch);
-            var batchTotals = Totals.ReadSqlBatch(conn, scope, out var rules);
+            var batchTotals = Totals.ReadSqlBatch(conn, scope, out var rules, token: token);
             totals.AddRange(batchTotals);
-            foreach (var pair in ReadFinance(conn, batchTotals, rules, scope))
+            foreach (var pair in ReadFinance(conn, batchTotals, rules, scope, token))
                 result.Add(pair.Key, pair.Value);
         }
+        token.ThrowIfCancellationRequested();
         contractTotals = totals;
         return result;
     }
@@ -164,8 +167,10 @@ public static partial class FinanceReader
     }
 
     private static IReadOnlyDictionary<int, ContractFinance> ReadFinance(DbConnection conn,
-        IReadOnlyList<ContractTotals> contractTotals, TagRules rules, ContractReadScope? scope)
+        IReadOnlyList<ContractTotals> contractTotals, TagRules rules, ContractReadScope? scope,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var contracts = contractTotals.ToDictionary(c => c.Id);
         var costs = contracts.Keys.ToDictionary(id => id, _ => new Costs());
         var extraWork = costs.Keys.ToDictionary(id => id, _ => new FloatSum());
@@ -180,15 +185,16 @@ public static partial class FinanceReader
             cmd.CommandText = FinancePositionsSql(scope) + ";" + ExtraWorkSql(scope) + ";" +
                 ActsSql(scope, schema31) + ";" + ActLinesSql(scope);
             scope?.Bind(cmd);
-            using var r = cmd.ExecuteReader();
-            ReadFinancePositions(r, contracts, costs, rules);
-            NextFinanceResult(r);
-            ReadExtraWork(r, extraWork);
-            NextFinanceResult(r);
-            var headers = ReadActHeaders(r, contracts, rules, schema31);
-            NextFinanceResult(r);
-            ReadActAmounts(r, headers);
-            acts = FinishActs(headers);
+            using var cancellation = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+            ReadFinancePositions(r, contracts, costs, rules, token);
+            NextFinanceResult(r, token);
+            ReadExtraWork(r, extraWork, token);
+            NextFinanceResult(r, token);
+            var headers = ReadActHeaders(r, contracts, rules, schema31, token);
+            NextFinanceResult(r, token);
+            ReadActAmounts(r, headers, token);
+            acts = FinishActs(headers, token);
         }
         else
         {
@@ -212,18 +218,23 @@ public static partial class FinanceReader
 
         foreach (var act in acts)
         {
+            token.ThrowIfCancellationRequested();
             if (act.Signed) costs[act.ContractId].Signed += act.Total;
             else costs[act.ContractId].Pending += act.Total;
         }
+        token.ThrowIfCancellationRequested();
         return costs.ToDictionary(x => x.Key, x => new ContractFinance(x.Value.Signed, x.Value.Pending,
             Cents(x.Value.Cost.Value), Cents(x.Value.Covered.Value), Cents(x.Value.Outside.Value),
             Cents(x.Value.Work.Value + extraWork[x.Key].Value), x.Value.Missing)
         { MaterialRevenue = Cents(x.Value.Revenue.Value) });
     }
 
-    private static void NextFinanceResult(DbDataReader reader)
+    private static void NextFinanceResult(DbDataReader reader, CancellationToken token = default)
     {
-        if (!reader.NextResult())
+        token.ThrowIfCancellationRequested();
+        var hasNext = reader.NextResult();
+        token.ThrowIfCancellationRequested();
+        if (!hasNext)
             throw new InvalidOperationException("Неполный финансовый пакет SQL Server.");
     }
 
@@ -252,10 +263,12 @@ public static partial class FinanceReader
         (scope is null ? "" : " WHERE " + scope.Predicate("contract_id")) + " ORDER BY id";
 
     private static void ReadFinancePositions(DbDataReader r,
-        Dictionary<int, ContractTotals> contracts, Dictionary<int, Costs> costs, TagRules rules)
+        Dictionary<int, ContractTotals> contracts, Dictionary<int, Costs> costs, TagRules rules,
+        CancellationToken token = default)
     {
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var id = Id(r, 0);
             var c = costs[id];
             var qty = Number(r, 4);
@@ -283,10 +296,12 @@ public static partial class FinanceReader
         }
     }
 
-    private static void ReadExtraWork(DbDataReader r, Dictionary<int, FloatSum> extraWork)
+    private static void ReadExtraWork(DbDataReader r, Dictionary<int, FloatSum> extraWork,
+        CancellationToken token = default)
     {
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var id = Id(r, 0);
             var sum = extraWork[id]; sum.Add(Number(r, 1)); extraWork[id] = sum;
         }

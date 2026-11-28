@@ -43,19 +43,25 @@ public static class SqlServerDirector
         string cachedRevision, DateTime? cachedDay, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
         for (var attempt = 0; attempt < 2; attempt++)
         {
             token.ThrowIfCancellationRequested();
-            var revision = SqlServerDatabase.Revision(conn);
+            var revision = Revision();
             var day = DateTime.Today;
             token.ThrowIfCancellationRequested();
             if (attempt == 0 && CanReuseSnapshot(cachedRevision, revision, cachedDay, day) &&
                 day == DateTime.Today) return null;
             var rows = ReadRows(conn, mode, day, token);
             token.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(revision) && SqlServerDatabase.Revision(conn) == revision &&
-                day == DateTime.Today)
+            var confirmed = Revision();
+            token.ThrowIfCancellationRequested();
+            if (!string.IsNullOrWhiteSpace(revision) && confirmed == revision && day == DateTime.Today)
                 return new ReadSnapshot(rows, revision, day);
         }
         throw new InvalidOperationException("Данные сводки изменились при чтении. Обновите страницу.");
@@ -66,7 +72,7 @@ public static class SqlServerDirector
     {
         var objects = new List<(long Id, string Name)>();
         var kpOnly = mode == "kp";
-        var legalEnabled = !kpOnly && SqlServerAgreements.Enabled(conn);
+        var legalEnabled = !kpOnly && SqlServerAgreements.Enabled(conn, token: token);
         var contracts = new Dictionary<long, List<(long Id, int Order, string Kind, int? StageOf, long? LegalId)>>();
         using (var read = new SqlCommand(
             "SELECT id,name FROM dbo.objects WHERE archived=0 ORDER BY name;" +
@@ -75,13 +81,19 @@ public static class SqlServerDirector
             "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
             (legalEnabled ? "LEFT JOIN dbo.agreements a ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 " : "") +
             "WHERE o.archived=0 ORDER BY c.[order],c.id;", conn))
-        using (var r = read.ExecuteReader())
+        using (var cancellation = SqlReadCancellation.Register(read, token))
+        using (var r = SqlReadCancellation.ExecuteReader(read, token))
         {
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 objects.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1)));
+            }
+            token.ThrowIfCancellationRequested();
             if (!r.NextResult()) throw new InvalidOperationException("Нет списка договоров сводки в ответе SQL.");
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
                 if (!contracts.TryGetValue(objectId, out var list))
                     contracts[objectId] = list = new List<(long, int, string, int?, long?)>();
@@ -97,6 +109,7 @@ public static class SqlServerDirector
         token.ThrowIfCancellationRequested();
         var scopes = objects.Select(o =>
         {
+            token.ThrowIfCancellationRequested();
             var candidates = contracts.GetValueOrDefault(o.Id) ?? new();
             var docs = kpOnly
                 ? candidates.Where(c => c.Kind == "kp" && c.StageOf is null)
@@ -106,7 +119,7 @@ public static class SqlServerDirector
         }).Where(o => o.Docs.Count > 0).ToList();
         if (scopes.Count == 0) return Array.Empty<DirectorRow>();
         var selected = scopes.SelectMany(o => o.Docs).Select(d => d.Id).Distinct().ToArray();
-        var finance = FinanceReader.ReadSelected(conn, selected.Select(id => checked((int)id)), out var totals);
+        var finance = FinanceReader.ReadSelected(conn, selected.Select(id => checked((int)id)), out var totals, token);
         token.ThrowIfCancellationRequested();
         var totalsById = totals.ToDictionary(t => t.Id);
         var metrics = ReadContractMetrics(conn, selected, !kpOnly, day, token);
@@ -120,6 +133,7 @@ public static class SqlServerDirector
             var late = 0;
             foreach (var doc in docs)
             {
+                token.ThrowIfCancellationRequested();
                 if (finance.TryGetValue((int)doc.Id, out var f))
                 {
                     revenue += f.MaterialRevenue;
@@ -185,16 +199,27 @@ public static class SqlServerDirector
                 read.Parameters.Add(name, SqlDbType.BigInt).Value = batch[i];
             }
             read.CommandText = ContractMetricsSql(string.Join(",", names), countLate);
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             decimal Number(int index) => r.IsDBNull(index) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(index), CultureInfo.InvariantCulture));
             long Id(int index) => Convert.ToInt64(r.GetValue(index), CultureInfo.InvariantCulture);
 
             // Keep the two original SQL SUMs separate: each is converted to
             // decimal before the original per-contract rounding.
-            while (r.Read()) result[Id(0)].WorkCost = Number(1);
+            while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                result[Id(0)].WorkCost = Number(1);
+            }
+            token.ThrowIfCancellationRequested();
             if (!r.NextResult()) throw new InvalidOperationException("Нет затрат СМР в ответе SQL.");
-            while (r.Read()) result[Id(0)].OtherCost = Number(1);
+            while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                result[Id(0)].OtherCost = Number(1);
+            }
+            token.ThrowIfCancellationRequested();
             if (!r.NextResult()) throw new InvalidOperationException("Нет остатков в ответе SQL.");
             while (r.Read())
             {
@@ -220,6 +245,7 @@ public static class SqlServerDirector
                 }
             }
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

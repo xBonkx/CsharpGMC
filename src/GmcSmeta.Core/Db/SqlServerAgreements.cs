@@ -17,10 +17,13 @@ public static class SqlServerAgreements
     }
     public sealed record Company(long Id, string Name, string FullName, string Position, string Signer);
 
-    internal static bool Enabled(SqlConnection conn, SqlTransaction? tx = null)
+    internal static bool Enabled(SqlConnection conn, SqlTransaction? tx = null, CancellationToken token = default)
     {
         using var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'dbo.agreements',N'U') IS NOT NULL AND COL_LENGTH(N'dbo.contracts',N'agreement_id') IS NOT NULL THEN 1 ELSE 0 END", conn, tx);
-        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
+        token.ThrowIfCancellationRequested();
+        var value = token.CanBeCanceled ? cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult() : cmd.ExecuteScalar();
+        token.ThrowIfCancellationRequested();
+        return Convert.ToInt32(value, CultureInfo.InvariantCulture) == 1;
     }
 
     public static IReadOnlyList<Values> Read(SqlConnection conn, long objectId, SqlTransaction? tx = null)

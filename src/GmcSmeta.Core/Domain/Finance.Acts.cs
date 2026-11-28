@@ -61,11 +61,13 @@ public static partial class FinanceReader
     }
 
     private static Dictionary<int, ActReadState> ReadActHeaders(DbDataReader r,
-        Dictionary<int, ContractTotals> contracts, TagRules rules, bool schema31)
+        Dictionary<int, ContractTotals> contracts, TagRules rules, bool schema31,
+        CancellationToken token = default)
     {
         var headers = new Dictionary<int, ActReadState>();
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var contractId = Id(r, 1);
             var contract = contracts[contractId];
             DateOnly? Day(int index) => r.IsDBNull(index) ? null :
@@ -90,21 +92,25 @@ public static partial class FinanceReader
         return headers;
     }
 
-    private static void ReadActAmounts(DbDataReader r, Dictionary<int, ActReadState> headers)
+    private static void ReadActAmounts(DbDataReader r, Dictionary<int, ActReadState> headers,
+        CancellationToken token = default)
     {
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             if (!headers.TryGetValue(Id(r, 0), out var act)) continue;
             var amount = Number(r, 1) * Number(r, 2);
             act.Sum.Add(act.Exact ? amount : act.RoundRows ? HalfUp(amount) : PythonRound(amount));
         }
     }
 
-    private static IReadOnlyList<ActSummary> FinishActs(Dictionary<int, ActReadState> headers)
+    private static IReadOnlyList<ActSummary> FinishActs(Dictionary<int, ActReadState> headers,
+        CancellationToken token = default)
     {
         var result = new List<ActSummary>(headers.Count);
         foreach (var act in headers.Values.OrderBy(a => a.Id))
         {
+            token.ThrowIfCancellationRequested();
             var material = act.Exact ? HalfUp(act.Sum.Value) : PythonRound(act.Sum.Value);
             var net = PythonRound(material + act.Smr + act.Transport + act.Pnr);
             var total = act.VatTop
