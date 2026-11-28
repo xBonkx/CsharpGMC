@@ -14,6 +14,11 @@ public partial class EstimateView
     private bool _estimateHeaderResizeActive;
     private bool _applyingEstimateOrder;
     private Dictionary<DataGridColumn, double>? _estimateResizeStart;
+    private WeakReference<object>? _estimateMeasuredSource;
+    private WeakReference<object>? _estimateMeasuredRows;
+    private (FontFamily Family, double Size, FontStyle Style, FontStretch Stretch, double Dpi, double Pixels) _estimateMeasuredFont;
+    private (DataGridColumn Column, string Header)[] _estimateMeasuredColumns = [];
+    private Dictionary<DataGridColumn, double>? _estimateMeasuredMinimums;
 
     private void InitializeEstimateColumnLayout()
     {
@@ -36,6 +41,13 @@ public partial class EstimateView
             SaveEstimateUiSettings();
         };
         EstimateGrid.Loaded += (_, _) => RequestEstimateColumnFit();
+        EstimateGrid.LayoutUpdated += (_, _) =>
+        {
+            if (!_uiSettingsReady || _uiSettings.ColumnWidths.Count > 0 ||
+                !EstimateGrid.IsLoaded || !EstimateGrid.IsVisible || _estimateHeaderResizeActive ||
+                _estimateFitQueued || HasActiveEstimateEdit()) return;
+            if (!EstimateMeasurementsCurrent()) RequestEstimateColumnFit();
+        };
         EstimateGrid.Unloaded += (_, _) =>
         {
             _estimateHeaderResizeActive = false;
@@ -91,6 +103,71 @@ public partial class EstimateView
         }), DispatcherPriority.Loaded);
     }
 
+    private (FontFamily Family, double Size, FontStyle Style, FontStretch Stretch, double Dpi, double Pixels) EstimateMeasurementFont()
+    {
+        var dpi = VisualTreeHelper.GetDpi(EstimateGrid);
+        return (EstimateGrid.FontFamily, EstimateGrid.FontSize, EstimateGrid.FontStyle,
+            EstimateGrid.FontStretch, dpi.DpiScaleX, dpi.PixelsPerDip);
+    }
+
+    private static bool IsMeasuredIdentity(WeakReference<object>? reference, object? value) =>
+        value is null ? reference is null : reference is not null &&
+        reference.TryGetTarget(out var target) && ReferenceEquals(target, value);
+
+    private bool EstimateMeasurementsCurrent()
+    {
+        if (_estimateMeasuredMinimums is null ||
+            !IsMeasuredIdentity(_estimateMeasuredSource, EstimateGrid.ItemsSource) ||
+            !IsMeasuredIdentity(_estimateMeasuredRows, _rows) ||
+            !_estimateMeasuredFont.Equals(EstimateMeasurementFont())) return false;
+        int index = 0;
+        foreach (var column in _defaultEstimateColumns)
+        {
+            if (column.Visibility != Visibility.Visible) continue;
+            if (index >= _estimateMeasuredColumns.Length ||
+                !ReferenceEquals(_estimateMeasuredColumns[index].Column, column) ||
+                _estimateMeasuredColumns[index].Header != (column.Header?.ToString() ?? "")) return false;
+            index++;
+        }
+        return index == _estimateMeasuredColumns.Length;
+    }
+
+    private IReadOnlyDictionary<DataGridColumn, double> EstimateMeasuredMinimums()
+    {
+        if (EstimateMeasurementsCurrent()) return _estimateMeasuredMinimums!;
+        var visible = _defaultEstimateColumns.Where(c => c.Visibility == Visibility.Visible).ToArray();
+        var measure = new GridDisplayWidthMeasure(EstimateGrid);
+        var widths = visible.ToDictionary(c => c, c => measure.Header(c.Header?.ToString() ?? ""));
+        // Name/notes and normative references can be arbitrary prose. Keep
+        // their existing wrap/ellipsis and flex policy, not full-text widths.
+        var numeric = visible.Where(c => c.SortMemberPath is "number" or "unit" or "qty" or
+            "price" or "sum" or "purchase" or "work" or "workTotal" or "areaUnit" or "areaTotal").ToArray();
+        if (EstimateGrid.ItemsSource is IEnumerable<EditableEstimateRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                foreach (var column in numeric)
+                {
+                    var value = column.SortMemberPath switch
+                    {
+                        "number" => row.DisplayNum, "unit" => row.Unit, "qty" => row.QtyText,
+                        "price" => row.DisplayPriceText, "sum" => row.DisplayAmountText,
+                        "purchase" => row.PurchaseText, "work" => row.WorkDisplayText,
+                        "workTotal" => row.DisplayWorkAmountText, "areaUnit" => row.AreaUnitDisplay,
+                        "areaTotal" => row.AreaTotalDisplay, _ => ""
+                    };
+                    widths[column] = Math.Max(widths[column], measure.Cell(value,
+                        column == NumberColumn && row.IsExpandable ? 22 : 0));
+                }
+            }
+        }
+        _estimateMeasuredSource = EstimateGrid.ItemsSource is { } source ? new WeakReference<object>(source) : null;
+        _estimateMeasuredRows = new WeakReference<object>(_rows);
+        _estimateMeasuredFont = EstimateMeasurementFont();
+        _estimateMeasuredColumns = visible.Select(c => (c, c.Header?.ToString() ?? "")).ToArray();
+        return _estimateMeasuredMinimums = widths;
+    }
+
     private void FitEstimateColumns()
     {
         var scroll = EstimateScrollViewer();
@@ -107,6 +184,10 @@ public partial class EstimateView
             .Where(c => c.Visibility == Visibility.Visible).Sum(c => c.ActualWidth);
         var widths = _uiSettings.ColumnWidths;
         var manual = widths.Count > 0;
+        // Never change a live editor's geometry. The normal readback and the
+        // next layout pass will request a fit after it has closed.
+        if (HasActiveEstimateEdit()) return;
+        var measured = manual ? null : EstimateMeasuredMinimums();
         var inputs = visible.Select(column =>
         {
             var key = ColumnPreferenceKey(column);
@@ -117,7 +198,7 @@ public partial class EstimateView
             var minimum = role == EstimateColumnLayout.Role.Name ? 190 :
                 role == EstimateColumnLayout.Role.Note ? 36 : Math.Floor(fallback * 0.75);
             minimum = manual ? Math.Max(36, column.MinWidth) :
-                Math.Max(Math.Max(36, column.MinWidth), minimum);
+                Math.Max(Math.Max(36, column.MinWidth), Math.Max(minimum, measured![column]));
             return new EstimateColumnLayout.Column(key, preferred, minimum, role);
         }).ToList();
         var fitted = EstimateColumnLayout.Fit(inputs, available, manual);
