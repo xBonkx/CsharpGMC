@@ -391,7 +391,10 @@ public static class TableColumnMenu
                 _legacyCostFit ??= new LegacyCostColumnFit(grid, LegacyCostPreferred);
                 _legacyCostFit.Invalidate();
             }
-            if (grid.Columns.Any(c => GetFitDisplayPath(c).Length > 0))
+            // The common fitter also covers unannotated, simple scalar roles
+            // in dynamically built tables. Dedicated estimate-summary and
+            // legacy cost fitters retain sole ownership of their columns.
+            if (key != "estimate-summary" && !IsLegacyCostKey(key))
             {
                 _documentFit ??= new DocumentColumnFit(grid, DocumentPreferred);
                 _documentFit.Invalidate();

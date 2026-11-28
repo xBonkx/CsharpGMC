@@ -56,6 +56,9 @@ internal sealed class DocumentColumnFit
         foreach (var column in _grid.Columns)
         {
             var path = TableColumnMenu.GetFitDisplayPath(column);
+            if (path.Length == 0 && column is DataGridTextColumn { Binding: Binding automatic } &&
+                automatic.Path?.Path is { } candidate && DefaultDisplayPath(candidate))
+                path = candidate;
             if (column.Visibility != Visibility.Visible || !IsSimplePath(path) ||
                 _preferred(column) is not { } width || !double.IsFinite(width) || width <= 0) continue;
             var culture = _grid.Language.GetSpecificCulture();
@@ -82,6 +85,19 @@ internal sealed class DocumentColumnFit
     // Only known display-only converters are eligible; never call ConvertBack.
     private static bool ApprovedConverter(IValueConverter converter) =>
         converter is MetalAreaConverter or MetalPaidTextConverter or KsActValueConverter;
+
+    // Common scalar roles across programmatically generated and auxiliary
+    // tables. Prose, names, notes and arbitrary nested paths are deliberately
+    // not inferred; their existing wrap/ellipsis and flex width remain.
+    internal static bool DefaultDisplayPath(string path) => path is
+        "Num" or "Number" or "RowNumber" or "Unit" or "Qty" or "QtyText" or "Quantity" or
+        "QuantityText" or "Price" or "PriceText" or "Purchase" or "PurchaseText" or
+        "Cost" or "CostText" or "Amount" or "AmountText" or "Total" or "TotalText" or
+        "Sum" or "SumText" or "Net" or "Gross" or "Vat" or "Margin" or "MarginText" or
+        "Percent" or "PercentText" or "Rate" or "RateText" or "Count" or "Uses" or
+        "Date" or "DateText" or "CreatedUtc" or "AddedAtText" or "SizeText" or
+        "Issued" or "Received" or "Remaining" or "Left" or "Balance" or "Done" or
+        "Plan" or "Limit" or "TotalBefore" or "TotalAfter" or "DisplayQuantity" or "DisplayPrice";
 
     private static bool IsSimplePath(string path) => path.Length > 0 &&
         (char.IsAsciiLetter(path[0]) || path[0] == '_') &&

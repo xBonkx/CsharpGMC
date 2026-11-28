@@ -33,6 +33,7 @@ public sealed class DocumentColumnFitSourceTests
     [InlineData("LettersWindow.xaml", 3)]
     [InlineData("HistoryWindow.xaml", 1)]
     [InlineData("MetalWarehouseWindow.xaml", 29)]
+    [InlineData("ContractActsWorkspace.xaml", 6)]
     public void OptInColumnsReferToTheirActualDisplayBinding(string file, int count)
     {
         var doc = XDocument.Load(Path.Combine(App(), file));
@@ -85,6 +86,11 @@ public sealed class DocumentColumnFitSourceTests
         Assert.Contains("DataGridEditAction.Commit", fit);
         Assert.Contains("IsEditingItem: true", fit);
         Assert.Contains("binding.Converter is not null", fit);
+        Assert.Contains("DefaultDisplayPath(candidate)", fit);
+        Assert.Contains("converter is MetalAreaConverter or MetalPaidTextConverter or KsActValueConverter", fit);
+        Assert.Contains("item is DataRowView row", fit);
+        Assert.Contains("TableColumnMenu.RefreshDynamic(SummaryGrid", File.ReadAllText(Path.Combine(app, "ContractActsWorkspace.xaml.cs")));
+        Assert.Contains("row.StageDisplay[index]", File.ReadAllText(Path.Combine(app, "EstimateView.ColumnLayout.cs")));
         Assert.Contains("ReferenceEquals(prior, source)", fit);
         Assert.DoesNotContain("ScrollIntoView", fit);
         Assert.DoesNotContain("UpdateSource(", fit);

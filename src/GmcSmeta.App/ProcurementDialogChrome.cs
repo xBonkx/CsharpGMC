@@ -60,6 +60,9 @@ internal static class ProcurementDialogChrome
         column.HeaderStyle = (Style)Application.Current.FindResource(
             alignment == TextAlignment.Right ? "CompactCostMoneyHeader" :
             alignment == TextAlignment.Center ? "CompactCostHeader" : "CompactCostTextHeader");
+        if (alignment != TextAlignment.Left && column.Binding is System.Windows.Data.Binding binding &&
+            binding.Path?.Path is { Length: > 0 } path)
+            TableColumnMenu.SetFitDisplayPath(column, path);
     }
     public static void Buttons(Button primary, Button cancel, string primaryStyle = "PythonToolbarPrimary")
     {
