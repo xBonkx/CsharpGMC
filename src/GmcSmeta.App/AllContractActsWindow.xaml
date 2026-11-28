@@ -20,7 +20,7 @@
         <DataTemplate DataType="{x:Type local:Ks2RowVm}">
             <StackPanel Margin="4,3">
                 <TextBlock Text="{Binding Title}" Foreground="#0F172A" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding Caption}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
+                <TextBlock Text="{Binding Caption}" Foreground="#64748B" TextWrapping="Wrap" FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
             </StackPanel>
         </DataTemplate>
         <Style TargetType="TreeViewItem">
@@ -46,10 +46,11 @@
         </WrapPanel>
         <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,9">
             <Grid Width="260" Height="32">
-                <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Padding="8,5,32,5"
+                <TextBox x:Name="ActsSearch" Style="{StaticResource PythonSearch}" Padding="32,5,32,5"
                          VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
                          AutomationProperties.Name="Найти акт или приложение" ToolTip="Найти акт или приложение…"/>
-                <TextBlock Text="Найти акт или приложение…" Foreground="#94A3B8" Margin="8,0,32,0"
+                <Viewbox Width="18" Height="18" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Найти акт или приложение…" Foreground="#94A3B8" Margin="32,0,32,0"
                            VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">

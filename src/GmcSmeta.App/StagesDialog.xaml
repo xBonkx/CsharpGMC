@@ -53,11 +53,11 @@
             </Grid>
             <Button x:Name="AddStageButton" Grid.Column="1" Content="Новый этап" ContentTemplate="{StaticResource IconLabelPlus}" Click="AddStage_Click"
                     Margin="10,0,0,0" FontWeight="SemiBold" Padding="12,4" Style="{StaticResource PrimaryButton}"/>
-            <Button x:Name="CreateRestButton" Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Документ «Остаток»" ContentTemplate="{StaticResource IconLabelFile}" Click="CreateRest_Click" Margin="8,0,0,0"
+            <Button x:Name="CreateRestButton" Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Content="Документ «Остаток»" MinHeight="34" ContentTemplate="{StaticResource IconLabelFile}" Click="CreateRest_Click" Margin="8,0,0,0"
                     ToolTip="Создать или обновить документ «Остаток»: полное КП − этапы"/>
-            <Button Grid.Column="3" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" IsCancel="True" Margin="8,0,0,0" Padding="12,4"/>
+            <Button Grid.Column="3" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" MinHeight="34" IsCancel="True" Margin="8,0,0,0" Padding="12,4"/>
         </Grid>
-        <DataGrid MinRowHeight="27"
+        <DataGrid MinRowHeight="{StaticResource LayoutDocumentRowMinHeight}" CanUserResizeRows="False"
                  
                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalGridLinesBrush="#E4E8EF"

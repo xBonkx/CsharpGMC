@@ -35,9 +35,9 @@
                 <WrapPanel Margin="0,0,0,8">
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Наценка выделенным…" ContentTemplate="{StaticResource IconLabelList}" Click="MaterialsMarkup_Click" Margin="0,0,6,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Закуп из справочника" ContentTemplate="{StaticResource IconLabelBook}" Click="CatalogFill_Click" Margin="0,0,6,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Поставщик…" Click="MaterialSupplier_Click" Margin="0,0,6,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Пометки…" Click="MaterialNote_Click" Margin="0,0,6,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить…" Click="MaterialClear_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Поставщик…" ContentTemplate="{StaticResource IconLabelBuilding}" Click="MaterialSupplier_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Пометки…" ContentTemplate="{StaticResource IconLabelEdit}" Click="MaterialNote_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить…" ContentTemplate="{StaticResource IconLabelX}" Click="MaterialClear_Click" Margin="0,0,6,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="MaterialsExport_Click" Margin="0,0,6,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Транспорт…" Click="Transport_Click" Margin="0,0,6,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Цвет…" ContentTemplate="{StaticResource IconLabelEdit}" Click="MaterialColor_Click" Margin="0,0,6,0"/>
@@ -136,9 +136,9 @@
                 <WrapPanel Margin="0,0,0,8">
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Наценка выделенным…" ContentTemplate="{StaticResource IconLabelList}" Click="WorkMarkup_Click" Margin="0,0,6,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Розница из закупа…" ContentTemplate="{StaticResource IconLabelEdit}" Click="WorkFillEmpty_Click" Margin="0,0,8,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить закуп" Click="WorkClearCost_Click" Margin="0,0,6,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить розницу" Click="WorkClearSell_Click" Margin="0,0,12,0"/>
-                    <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт СМР Excel" Click="SmrExport_Click" Margin="0,0,12,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить закуп" ContentTemplate="{StaticResource IconLabelX}" Click="WorkClearCost_Click" Margin="0,0,6,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить розницу" ContentTemplate="{StaticResource IconLabelX}" Click="WorkClearSell_Click" Margin="0,0,12,0"/>
+                    <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт СМР Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="SmrExport_Click" Margin="0,0,12,0"/>
                     <TextBlock x:Name="SmrModeCaption" VerticalAlignment="Center" Foreground="#64748B"/>
                     <ComboBox x:Name="SmrModePicker" Width="160" Margin="10,0,5,0">
                         <ComboBoxItem Tag="sum" Content="Сумма"/>
@@ -301,7 +301,7 @@
         </TabControl>
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
             <Button x:Name="RetryCostButton" DockPanel.Dock="Right" Content="Повторить загрузку"
-                    Style="{StaticResource PythonToolbarButton}" Click="RetryCost_Click"
+                    Style="{StaticResource PythonToolbarButton}" ContentTemplate="{StaticResource IconLabelRefresh}" Click="RetryCost_Click"
                     Visibility="Collapsed" Margin="8,0,0,0"/>
             <TextBlock x:Name="FooterText" Foreground="#64748B" TextWrapping="Wrap"/>
         </DockPanel>

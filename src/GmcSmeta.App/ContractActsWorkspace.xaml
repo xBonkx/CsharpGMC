@@ -87,8 +87,7 @@
         <Border Grid.Row="1" x:Name="HintBar" Background="#E8F0FE" CornerRadius="8"
                 Padding="12,6,6,6" Margin="0,0,0,6" Visibility="Collapsed">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Left" Text="⚠" Foreground="#2563EB" FontSize="16"
-                           VerticalAlignment="Top" Margin="0,0,8,0"/>
+                <Viewbox Width="18" Height="18" IsHitTestVisible="False" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,0,8,0"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#2563EB"/></Canvas></Viewbox>
                 <Button DockPanel.Dock="Right" Content="Понятно" Click="HintClose_Click"
                         Foreground="#1E40AF" Background="Transparent" BorderThickness="0"
                         Cursor="Hand" VerticalAlignment="Top" Padding="6,2"/>
@@ -146,7 +145,7 @@
                 </DataGrid>
             </Border>
             <StackPanel Grid.Row="1" x:Name="ExtraBox" Margin="0,10,0,0" Visibility="Collapsed">
-                <TextBlock Text="Вне подписанной сметы" FontSize="{StaticResource UiH2Size}"
+                <TextBlock Text="Вне подписанной сметы" TextWrapping="Wrap" FontSize="{StaticResource UiH2Size}"
                            FontWeight="SemiBold" Foreground="#0F172A" Margin="2,0,0,6"/>
                 <Border Background="#FFFFFF" BorderBrush="#E1E7F0" BorderThickness="1"
                         CornerRadius="10" Padding="1">
@@ -245,7 +244,7 @@
                 </Border>
                 <Border Style="{StaticResource PythonTile}" MinWidth="210" Margin="0,0,10,0">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Всего с учётом вне сметы"/>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Всего с учётом вне сметы" TextWrapping="Wrap"/>
                         <TextBlock x:Name="SumAllValue" Style="{StaticResource PythonTileValue}" Text="—"
                                    Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>

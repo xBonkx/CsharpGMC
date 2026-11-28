@@ -112,7 +112,7 @@
 
                     <Button x:Name="PersonActiveButton" Content="Не работает / Снова работает"
                             Click="PersonActive_Click" Padding="8,4" Margin="0,0,5,0"/>
-                    <Button x:Name="PersonDeleteButton" Content="Удалить…" Click="PersonDelete_Click"
+                    <Button x:Name="PersonDeleteButton" Content="Удалить…" ContentTemplate="{StaticResource IconLabelTrash}" Click="PersonDelete_Click"
                             Padding="8,4"/>
                 </WrapPanel>
                 <DataGrid local:TableColumnMenu.Key="people" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="ФИО" x:Name="PeopleGrid" AutoGenerateColumns="False" CanUserAddRows="False"
@@ -122,7 +122,7 @@
                           SelectionChanged="Selection_Changed"
                           BeginningEdit="Inline_BeginningEdit" CellEditEnding="Inline_CellEditEnding" ContextMenuOpening="People_ContextMenuOpening"
                           PreviewKeyDown="People_PreviewKeyDown"
-                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
+                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}" CanUserResizeRows="False">
                     <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridCheckBoxColumn x:Name="PeopleSelectedColumn" Header="В списке"
@@ -156,14 +156,14 @@
 
                     <Button Content="Не работает / Снова работает" Click="CarActive_Click"
                             Padding="8,4" Margin="0,0,5,0"/>
-                    <Button Content="Удалить…" Click="CarDelete_Click" Padding="8,4"/>
+                    <Button Content="Удалить…" ContentTemplate="{StaticResource IconLabelTrash}" Click="CarDelete_Click" Padding="8,4"/>
                 </WrapPanel>
                 <DataGrid local:TableColumnMenu.Key="cars" local:TableColumnMenu.Exclude="В списке" local:TableColumnMenu.Protect="Марка|Госномер" x:Name="CarsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
                           HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
                           GridLinesVisibility="All" MinRowHeight="27" AlternationCount="0" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" Background="White"
                           BeginningEdit="Inline_BeginningEdit" CellEditEnding="Inline_CellEditEnding" ContextMenuOpening="Cars_ContextMenuOpening"
                           PreviewKeyDown="Cars_PreviewKeyDown"
-                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}">
+                          CurrentCellChanged="CheckCell_Changed" Style="{StaticResource DocumentTable}" CanUserResizeRows="False">
                     <DataGrid.ContextMenu><ContextMenu/></DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridCheckBoxColumn x:Name="CarsSelectedColumn" Header="В списке"

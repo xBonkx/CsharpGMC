@@ -135,8 +135,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="⚠" Foreground="#2563EB" FontSize="14"
-                       VerticalAlignment="Top" Margin="0,0,10,0"/>
+            <Viewbox Width="18" Height="18" IsHitTestVisible="False" Grid.Column="0" VerticalAlignment="Top" Margin="0,0,10,0"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="#2563EB"/></Canvas></Viewbox>
             <TextBlock Grid.Column="1" Foreground="#1E40AF" TextWrapping="Wrap" VerticalAlignment="Center"
                        Text="Впишите закуп в «Закуп за ед.» (двойной щелчок). Много строк сразу — выделите и «Наценка выделенным…»."/>
             <Button x:Name="MaterialsHintCloseButton" Grid.Column="2" Content="Понятно"  Margin="10,0,0,0"

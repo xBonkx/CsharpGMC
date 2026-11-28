@@ -356,7 +356,7 @@
         <!-- All original actions remain accessible when the contract pane narrows. -->
         <WrapPanel Grid.Row="0" VerticalAlignment="Center">
             <TextBlock x:Name="CaptionText" FontWeight="Bold" FontSize="{StaticResource UiH2Size}"
-                       MaxWidth="320" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                       MaxWidth="320" TextWrapping="Wrap" VerticalAlignment="Center"
                        ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,14,6"/>
             <Button x:Name="DeleteShipmentButton" Content="Ещё" ContentTemplate="{StaticResource IconLabelMore}" Click="ShipmentMore_Click"
                     Margin="0,0,8,6" ToolTip="Дополнительные действия с ведомостью" Style="{StaticResource PythonToolbarButton}"/>
@@ -394,7 +394,7 @@
             <!-- Labels stay with their input even when a second row is needed. -->
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="№:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                <TextBox x:Name="NumberBox" Width="84" Height="32" MaxLength="32" KeyDown="Header_KeyDown"/>
+                <TextBox x:Name="NumberBox" Width="84" MinHeight="{StaticResource LayoutFieldMinHeight}" MaxLength="32" KeyDown="Header_KeyDown"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="Дата:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
@@ -402,7 +402,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="Получатель:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                <TextBox x:Name="RecipientBox" Width="200" Height="32"
+                <TextBox x:Name="RecipientBox" Width="200" MinHeight="{StaticResource LayoutFieldMinHeight}"
                          MaxLength="255" KeyDown="Header_KeyDown"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">

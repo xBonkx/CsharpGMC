@@ -8,8 +8,8 @@
    <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
   </Grid.RowDefinitions>
   <StackPanel Margin="0,0,0,16">
-   <Button Content="‹ К карточке договора" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Click="Back_Click" Margin="0,0,0,10"/>
-   <TextBlock Text="Реквизиты договора" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"/>
+   <Button Content="К карточке договора" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" ContentTemplate="{StaticResource IconLabelArrowBack}" Click="Back_Click" Margin="0,0,0,10"/>
+   <TextBlock Text="Реквизиты договора" TextWrapping="Wrap" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"/>
    <TextBlock x:Name="TitleText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"/>
   </StackPanel>
   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -18,26 +18,26 @@
      <StackPanel>
       <StackPanel x:Name="LegalSelectorPanel" Visibility="Collapsed" Margin="0,0,0,12">
        <TextBlock Text="Юридический договор"/>
-       <ComboBox x:Name="LegalSelector" DisplayMemberPath="Caption" SelectedValuePath="Id" SelectionChanged="LegalSelector_Changed" MinHeight="32"/>
-       <Button Content="Создать ещё один договор на этом объекте" Click="NewLegal_Click" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+       <ComboBox x:Name="LegalSelector" DisplayMemberPath="Caption" SelectedValuePath="Id" SelectionChanged="LegalSelector_Changed" MinHeight="{StaticResource LayoutFieldMinHeight}"/>
+       <Button Content="Создать ещё один договор на этом объекте" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewLegal_Click" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
       </StackPanel>
-      <TextBlock Text="Данные договора" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
+      <TextBlock Text="Данные договора" TextWrapping="Wrap" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
       <Grid Margin="0,12,0,8">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
-       <StackPanel Margin="0,0,8,0"><TextBlock Text="№ договора"/><TextBox x:Name="AgreementNumberBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Дата договора"/><TextBox x:Name="AgreementDateBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="Подрядчик"/><TextBox x:Name="CompanyBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,0"/><ComboBox x:Name="LegalCompanySelector" Visibility="Collapsed" DisplayMemberPath="Name" SelectedValuePath="Id" MinHeight="32" Margin="0,4,0,0" SelectionChanged="LegalCompany_Changed"/></StackPanel>
+       <StackPanel Margin="0,0,8,0"><TextBlock Text="№ договора"/><TextBox x:Name="AgreementNumberBox" IsReadOnly="True" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Дата договора"/><TextBox x:Name="AgreementDateBox" IsReadOnly="True" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="Подрядчик"/><TextBox x:Name="CompanyBox" IsReadOnly="True" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/><ComboBox x:Name="LegalCompanySelector" Visibility="Collapsed" DisplayMemberPath="Name" SelectedValuePath="Id" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0" SelectionChanged="LegalCompany_Changed"/></StackPanel>
       </Grid>
       <StackPanel x:Name="LegalDetailsPanel" Visibility="Collapsed">
        <TextBlock Text="Подписанный PDF договора"/>
-       <TextBox x:Name="LegalPdfBox" IsReadOnly="True" MinHeight="32" Margin="0,4,0,6"/>
-       <WrapPanel Margin="0,0,0,12"><Button Content="Добавить подписанный PDF…" Click="LegalPdf_Add" Style="{StaticResource PythonToolbarButton}"/><Button Content="Открыть PDF" Click="LegalPdf_Open" Style="{StaticResource PythonToolbarButton}" Margin="8,0,0,0"/></WrapPanel>
+       <TextBox x:Name="LegalPdfBox" IsReadOnly="True" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,6"/>
+       <WrapPanel Margin="0,0,0,12"><Button Content="Добавить подписанный PDF…" ContentTemplate="{StaticResource IconLabelUpload}" Click="LegalPdf_Add" Style="{StaticResource PythonToolbarButton}"/><Button Content="Открыть PDF" ContentTemplate="{StaticResource IconLabelOpen}" Click="LegalPdf_Open" Style="{StaticResource PythonToolbarButton}" Margin="8,0,0,0"/></WrapPanel>
        <TextBlock Text="Предмет договора"/><TextBox x:Name="LegalSubjectBox" MinHeight="48" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,4,0,10"/>
-       <TextBlock Text="Адрес заказчика"/><TextBox x:Name="LegalCustomerAddressBox" MinHeight="32" Margin="0,4,0,10"/>
-       <TextBlock Text="Подрядчик для печати"/><TextBox x:Name="LegalContractorFullBox" MinHeight="32" Margin="0,4,0,10"/>
-       <TextBlock Text="Должность подписанта подрядчика"/><TextBox x:Name="LegalContractorPostBox" MinHeight="32" Margin="0,4,0,10"/>
-       <TextBlock Text="ФИО подписанта подрядчика"/><TextBox x:Name="LegalContractorNameBox" MinHeight="32" Margin="0,4,0,10"/>
-       <TextBlock Text="Дата окончания работ (дд.мм.гггг)"/><TextBox x:Name="LegalWorksEndBox" Width="200" MinHeight="32" HorizontalAlignment="Left" Margin="0,4,0,10"/>
+       <TextBlock Text="Адрес заказчика"/><TextBox x:Name="LegalCustomerAddressBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
+       <TextBlock Text="Подрядчик для печати"/><TextBox x:Name="LegalContractorFullBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
+       <TextBlock Text="Должность подписанта подрядчика"/><TextBox x:Name="LegalContractorPostBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
+       <TextBlock Text="ФИО подписанта подрядчика"/><TextBox x:Name="LegalContractorNameBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
+       <TextBlock Text="Дата окончания работ (дд.мм.гггг)"/><TextBox x:Name="LegalWorksEndBox" Width="200" MinHeight="{StaticResource LayoutFieldMinHeight}" HorizontalAlignment="Left" Margin="0,4,0,10"/>
       </StackPanel>
       <TextBlock x:Name="AgreementText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,8"/>
       <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
@@ -62,28 +62,28 @@
     </Border>
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
-      <TextBlock Text="Объект и основные сведения" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold" Margin="0,0,0,12"/>
+      <TextBlock Text="Объект и основные сведения" TextWrapping="Wrap" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold" Margin="0,0,0,12"/>
       <TextBlock Text="Название объекта (в дереве)"/>
-      <TextBox x:Name="NameBox" MinHeight="32" Margin="0,4,0,10"/>
+      <TextBox x:Name="NameBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
       <Grid Margin="0,0,0,10">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <StackPanel Margin="0,0,8,0"><TextBlock Text="Заказчик (кратко)"/><TextBox x:Name="CustomerBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Адрес объекта"/><TextBox x:Name="AddressBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Margin="0,0,8,0"><TextBlock Text="Заказчик (кратко)"/><TextBox x:Name="CustomerBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Адрес объекта"/><TextBox x:Name="AddressBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
       </Grid>
       <TextBlock Text="Папка документов"/>
       <DockPanel Margin="0,4,0,10">
        <Button DockPanel.Dock="Right" Content="Обзор…" Style="{StaticResource PythonToolbarButton}" Click="Browse_Click" Margin="8,0,0,0"/>
-       <TextBox x:Name="FolderBox" MinHeight="32"/>
+       <TextBox x:Name="FolderBox" MinHeight="{StaticResource LayoutFieldMinHeight}"/>
       </DockPanel>
       <TextBlock Text="Тег заказчика"/>
-      <ComboBox x:Name="TagBox" DisplayMemberPath="Caption" SelectedValuePath="Key" MinHeight="32" Margin="0,4,0,10"/>
+      <ComboBox x:Name="TagBox" DisplayMemberPath="Caption" SelectedValuePath="Key" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
       <TextBlock Text="Примечание"/>
       <TextBox x:Name="NoteBox" MinHeight="48" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,4,0,0"/>
      </StackPanel>
     </Border>
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
-      <TextBlock Text="Реквизиты для КС-2 и КС-3" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
+      <TextBlock Text="Реквизиты для КС-2 и КС-3" TextWrapping="Wrap" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
       <TextBlock Text="Общие для всех приложений и ДС этой карточки. Используются при формировании новых выгрузок КС." Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,14"/>
       <TextBlock Text="Полное наименование заказчика с адресом"/>
       <TextBox x:Name="CustomerFullBox" MinHeight="50" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,4,0,10"/>
@@ -92,29 +92,29 @@
       <TextBlock Text="Подписант заказчика" FontWeight="SemiBold" Margin="0,0,0,8"/>
       <Grid Margin="0,0,0,12">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <StackPanel Margin="0,0,8,0"><TextBlock Text="Организация"/><TextBox x:Name="CustOrgBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Должность"/><TextBox x:Name="CustPostBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="ФИО"/><TextBox x:Name="CustNameBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Margin="0,0,8,0"><TextBlock Text="Организация"/><TextBox x:Name="CustOrgBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Должность"/><TextBox x:Name="CustPostBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="ФИО"/><TextBox x:Name="CustNameBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
       </Grid>
       <TextBlock Text="Второй подписант (при необходимости)" FontWeight="SemiBold" Margin="0,0,0,8"/>
       <TextBlock Text="Роль"/>
-      <TextBox x:Name="SecondRoleBox" MinHeight="32" Margin="0,4,0,10"/>
+      <TextBox x:Name="SecondRoleBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
       <Grid Margin="0,0,0,12">
        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-       <StackPanel Margin="0,0,8,0"><TextBlock Text="Организация"/><TextBox x:Name="SecondOrgBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Должность"/><TextBox x:Name="SecondPostBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
-       <StackPanel Grid.Column="2"><TextBlock Text="ФИО"/><TextBox x:Name="SecondNameBox" MinHeight="32" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Margin="0,0,8,0"><TextBlock Text="Организация"/><TextBox x:Name="SecondOrgBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Должность"/><TextBox x:Name="SecondPostBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
+       <StackPanel Grid.Column="2"><TextBlock Text="ФИО"/><TextBox x:Name="SecondNameBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,0"/></StackPanel>
       </Grid>
       <TextBlock Text="Наименование работ для КС-3"/>
-      <TextBox x:Name="WorkTitleBox" MinHeight="32" Margin="0,4,0,10"/>
+      <TextBox x:Name="WorkTitleBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
       <TextBlock Text="Дата начала работ (дд.мм.гггг)"/>
-      <TextBox x:Name="WorksStartBox" MinHeight="32" Width="200" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+      <TextBox x:Name="WorksStartBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Width="200" HorizontalAlignment="Left" Margin="0,4,0,0"/>
      </StackPanel>
     </Border>
    </StackPanel>
   </ScrollViewer>
   <DockPanel Grid.Row="2" Margin="0,12,0,0">
-   <Button x:Name="SaveButton" DockPanel.Dock="Right" Content="Сохранить реквизиты" Style="{StaticResource PrimaryButton}" IsEnabled="False" Click="Save_Click" Margin="12,0,0,0"/>
+   <Button x:Name="SaveButton" DockPanel.Dock="Right" Content="Сохранить реквизиты" Style="{StaticResource PrimaryButton}" IsEnabled="False" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click" Margin="12,0,0,0"/>
    <TextBlock x:Name="StatusText" Foreground="#64748B" VerticalAlignment="Center" TextWrapping="Wrap"/>
   </DockPanel>
  </Grid>

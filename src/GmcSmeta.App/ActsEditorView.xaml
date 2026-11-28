@@ -96,7 +96,7 @@
                                   ToolTip="Показать / скрыть список актов слева"/>
                     <ComboBox x:Name="ActCombo" Width="240" Margin="10,0,0,0" Visibility="Collapsed"
                               SelectionChanged="Act_Changed" ToolTip="Акт документа"/>
-                    <TextBlock x:Name="ActCaption" Margin="10,0,0,0" VerticalAlignment="Center"
+                    <TextBlock x:Name="ActCaption" Margin="10,0,0,0" VerticalAlignment="Center" MaxWidth="420" TextWrapping="Wrap"
                                FontSize="{StaticResource UiH2Size}" FontWeight="Bold" Foreground="#0F172A"
                                Cursor="Hand" MouseLeftButtonDown="ActCaption_Click"
                                ToolTip="Двойной щелчок — свойства акта"/>
@@ -279,7 +279,7 @@
                 </Border>
                 <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="SmrTile">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="СМР в акте, ₽"/>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="СМР в акте, ₽" TextWrapping="Wrap"/>
                         <TextBox x:Name="SmrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
                                  LostFocus="SmrInput_Commit" KeyDown="TileInput_KeyDown"/>
                         <TextBlock x:Name="SmrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
@@ -293,7 +293,7 @@
                 <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="TrTile"
                         Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Транспорт в акте, ₽"/>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Транспорт в акте, ₽" TextWrapping="Wrap"/>
                         <TextBox x:Name="TrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
                                  LostFocus="TrInput_Commit" KeyDown="TileInput_KeyDown"/>
                         <TextBlock x:Name="TrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
@@ -304,7 +304,7 @@
                 <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="PnrTile"
                         Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Пусконаладка в акте, ₽"/>
+                        <TextBlock Style="{StaticResource PythonTileLabel}" Text="Пусконаладка в акте, ₽" TextWrapping="Wrap"/>
                         <TextBox x:Name="PnrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
                                  LostFocus="PnrInput_Commit" KeyDown="TileInput_KeyDown"/>
                         <TextBlock x:Name="PnrHint" Style="{StaticResource PythonTileLabel}" FontWeight="Normal"
