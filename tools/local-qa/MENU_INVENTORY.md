@@ -1,0 +1,12 @@
+# Функциональный аудит меню C# и Python (CTX-047/048)
+
+Python 3.10+ и Git, без БД, GUI и внешних пакетов. Запуск из корня C#:
+
+```powershell
+python tools/local-qa/menu_inventory.py --csharp . --csharp-ref HEAD --python C:\repos\gmcsmeta --python-ref HEAD --out menu-audit-01
+python -m unittest discover -s tools/local-qa -p "test_menu_inventory.py" -v
+```
+
+Используйте конкретные SHA для воспроизводимости. Анализируются только tracked commit snapshots, включая тесты (scope=test), C#/XAML отдельно от Python; исключения generated/vendor перечислены. Кандидаты по меню, правому клику, стандартным редакторам, клавишам, диалогам и фабрикам, с точной строкой исходника. Все кандидаты REVIEW. Регулярные выражения могут захватывать комментарии и обычный Popup, не распознают все косвенные вызовы; отсутствие кандидата не доказывает N/A.
+
+В manifest.json сохраняются полные SHA, исключения, exact candidate IDs и reviewed_commands. Заполните копию review-template.json как массив объектов с полями review-fields.json, указывая идентификаторы источников для каждого состояния и команды; текстовые неизвестные значения не выдавайте за проверенные. classification: MATCH, EXTENSION, DEFECT, N/A с обоснованием в notes. Для повторного запуска используйте те же SHA и `--review review.json --out menu-audit-02`. MATCH требует ссылок на обе стороны; проверяется только структура и идентичность источника, не выполнение команды. Не записывайте секреты в источники. CSV защищает текст от интерпретации как формулы, точное содержание в JSON. Новая папка обязательна, прежние результаты не перезаписываются. Статус REVIEW_REQUIRED не является приёмкой.
