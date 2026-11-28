@@ -33,8 +33,9 @@ public partial class MainWindow
                 Margin=new Thickness(0,8,0,12),TextWrapping=TextWrapping.Wrap});
             if(snapshot.LegalCaption.Length>0)
                 panel.Children.Add(new TextBlock{Text="Юридический договор: "+snapshot.LegalCaption,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,8)});
-            panel.Children.Add(new TextBlock{Text="Карточка назначения",Margin=new Thickness(0,0,0,4)});
+            panel.Children.Add(DynamicFormLayout.Secondary("Карточка назначения", "LayoutFormGroupHeadingGap"));
             var picker=new ComboBox{ItemsSource=candidates,DisplayMemberPath="Name",SelectedIndex=-1};
+            System.Windows.Automation.AutomationProperties.SetName(picker, "Карточка назначения");
             DynamicFormLayout.Field(picker);
             picker.SetBinding(FrameworkElement.ToolTipProperty, new System.Windows.Data.Binding("SelectedItem.Name") { Source = picker });
             panel.Children.Add(picker);
@@ -42,8 +43,9 @@ public partial class MainWindow
                 TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,10,0,12)});
             if(snapshot.LegalCaption.Length>0)
                 panel.Children.Add(new TextBlock{Text="При самостоятельных договорах перенос разрешён только в карточку без юридических договоров. Реквизиты копируются, существующие договоры не подменяются. При наличии юридических файлов перенос отклоняется.",TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,12)});
-            var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-            var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100,Margin=new Thickness(0,0,8,0)};
+            var actions=new WrapPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
+            var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100};
+            cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
             var confirm=new Button{Content="Перенести",IsDefault=true,IsEnabled=false,MinWidth=110};
             picker.SelectionChanged+=(_,_)=>confirm.IsEnabled=picker.SelectedItem is ObjectRow;
             confirm.Click+=(_,_)=>dialog.DialogResult=true;
