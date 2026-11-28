@@ -80,7 +80,7 @@ internal static class BackgroundEstimateChecks
         Console.WriteLine("Background production estimate checks passed; no SQL or user input used.");
     }
 
-    private static UserControl LoadEstimateGrid()
+    internal static UserControl LoadEstimateGrid()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "src/GmcSmeta.App/EstimateView.xaml"))) root = root.Parent;

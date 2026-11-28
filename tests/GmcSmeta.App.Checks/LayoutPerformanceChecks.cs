@@ -141,6 +141,7 @@ internal static class LayoutPerformanceChecks
                     {
                         for (var pageIndex = 0; pageIndex <= last.Page; pageIndex++)
                             Visit(pageIndex, pageIndex == 0 ? "top" : pageIndex == last.Page ? "bottom" : "page_" + pageIndex);
+                        if (last.Page == 0) Visit(0, "bottom");
                         for (var pageIndex = last.Page - 1; pageIndex >= 0; pageIndex--)
                             Visit(pageIndex, "back_" + pageIndex);
                         // Request the same immutable snapshot and page again.

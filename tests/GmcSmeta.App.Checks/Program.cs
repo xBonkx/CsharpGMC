@@ -66,6 +66,13 @@ internal static class Program
                 auditApp.Shutdown();
                 return 0;
             }
+            if (args.Length == 2 && args[0] == "--layout-interaction-check")
+            {
+                var interactionApp = CreateApplication();
+                try { LayoutInteractionChecks.Run(args[1]); }
+                finally { interactionApp.Shutdown(); }
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--layout-performance-check")
             {
                 var layoutApp = CreateApplication();
