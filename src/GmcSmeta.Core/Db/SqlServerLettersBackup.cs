@@ -49,7 +49,7 @@ public static class SqlServerLettersBackup
         // No deletion or overwrite; protects against interleaving with concurrent clients.
         using (var guard = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.gmc_letters WITH(TABLOCKX,HOLDLOCK)", conn, tx))
         {
-            if (Convert.ToInt64(guard.ExecuteScalar()) > 0)
+            if (SqlInteger.RequireInt64(guard.ExecuteScalar()) > 0)
                 throw new InvalidOperationException(
                     "SQL Server уже содержит письма. Восстановление допускается только в пустой тестовый архив SQL Server.");
         }

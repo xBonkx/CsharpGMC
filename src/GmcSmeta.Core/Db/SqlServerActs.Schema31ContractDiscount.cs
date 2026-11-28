@@ -64,7 +64,7 @@ public static partial class SqlServerActs
                 (discount_override=1 OR discount_percent<>0 OR manual_total_cents>=0)
                 """,conn,tx);
             check.Parameters.Add("@id",SqlDbType.BigInt).Value=contractId;
-            if(percent!=0m||Convert.ToInt64(check.ExecuteScalar(),CultureInfo.InvariantCulture)>0)
+            if(percent!=0m||SqlInteger.RequireInt64(check.ExecuteScalar())>0)
                 return SqlServerDatabase.SaveResult.Fail("Скидка доступна только для обычной формы КС.",rev);
         }
         if(old==percent) return new SqlServerDatabase.SaveResult(true,null,rev);

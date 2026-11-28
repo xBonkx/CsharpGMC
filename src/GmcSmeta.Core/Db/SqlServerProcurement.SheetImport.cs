@@ -257,7 +257,7 @@ public static partial class SqlServerProcurement
                     using var add = new SqlCommand(
                         "INSERT dbo.suppliers(name) OUTPUT INSERTED.id VALUES(@name)", conn, tx);
                     add.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = row.Supplier.Trim();
-                    supplierId = Convert.ToInt64(add.ExecuteScalar(), CultureInfo.InvariantCulture);
+                    supplierId = SqlInteger.RequireInt64(add.ExecuteScalar());
                 }
             }
             var stage = FillSheetText(current.Stage,

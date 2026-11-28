@@ -330,7 +330,7 @@ public static class SqlServerShipments
             insert.Parameters.AddWithValue("@number", nextNumber.ToString(CultureInfo.InvariantCulture));
             insert.Parameters.AddWithValue("@recipient", lastRecipient);
             insert.Parameters.AddWithValue("@issuedBy", lastIssuedBy);
-            shipmentId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            shipmentId = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         using (var log = new SqlCommand(
             "INSERT INTO dbo.change_log (ts,[user],entity,entity_id,action,details,object_id) " +
@@ -562,7 +562,7 @@ public static class SqlServerShipments
         using (var check = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.movements WHERE shipment_id=@id", conn, tx))
         {
             check.Parameters.AddWithValue("@id", shipmentId);
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 0)
                 return SqlServerDatabase.SaveResult.Fail("У черновика есть движения. Требуется проверка ведомости.", rev);
         }
         foreach (var positionId in positionIds)
@@ -640,7 +640,7 @@ public static class SqlServerShipments
             "SELECT COUNT_BIG(*) FROM dbo.movements WHERE shipment_id=@id", conn, tx))
         {
             check.Parameters.AddWithValue("@id", shipmentId);
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 0)
                 return SqlServerDatabase.SaveResult.Fail("У черновика уже есть движения. Проведение остановлено.", rev);
         }
         var doc = TitleOf(number);
@@ -665,7 +665,7 @@ public static class SqlServerShipments
         {
             check.Parameters.AddWithValue("@id", shipmentId);
             check.Parameters.AddWithValue("@obj", objectId);
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != lines.Count)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != lines.Count)
                 return SqlServerDatabase.SaveResult.Fail("В ведомости есть позиции другого объекта или недоступного документа.", rev);
         }
         // Preserve the existing object check and reject work rows or malformed parent links.
@@ -791,7 +791,7 @@ public static class SqlServerShipments
         using var count = new SqlCommand(
             "SELECT COUNT_BIG(*) FROM dbo.shipment_lines WHERE shipment_id=@id", conn, tx);
         count.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
-        return Convert.ToInt64(count.ExecuteScalar(), CultureInfo.InvariantCulture) == 0 ? message : null;
+        return SqlInteger.RequireInt64(count.ExecuteScalar()) == 0 ? message : null;
     }
 
     private static bool IsActiveShipment(SqlConnection conn, SqlTransaction tx, long shipmentId, long? expectedObjectId)
@@ -802,14 +802,14 @@ public static class SqlServerShipments
             "WHERE sh.id=@id AND ISNULL(o.archived,0)=0 AND (@object IS NULL OR sh.object_id=@object)", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
         cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = (object?)expectedObjectId ?? DBNull.Value;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar()) == 1;
     }
 
     private static long ObjectIdOf(SqlConnection conn, SqlTransaction tx, long shipmentId)
     {
         using var cmd = new SqlCommand("SELECT object_id FROM dbo.shipments WHERE id=@id", conn, tx);
         cmd.Parameters.AddWithValue("@id", shipmentId);
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
     }
 
     /// <summary>Delete a clean draft only; unexpected linked movements require reconciliation.</summary>

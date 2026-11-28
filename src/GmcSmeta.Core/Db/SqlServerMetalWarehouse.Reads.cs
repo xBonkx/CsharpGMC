@@ -62,7 +62,7 @@ public sealed partial class SqlServerMetalWarehouse
             "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.gmc_metal_opening) " +
             "OR EXISTS(SELECT 1 FROM dbo.meta WHERE [key]=N\'metal_warehouse_initialized\') " +
             "THEN CONVERT(BIGINT,1) ELSE CONVERT(BIGINT,0) END", conn, tx))
-            initialized = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
+            initialized = SqlFlag.Require(cmd.ExecuteScalar());
 
         var materials = new Dictionary<long, (string Category, string Name)>();
         using (var cmd = new SqlCommand(

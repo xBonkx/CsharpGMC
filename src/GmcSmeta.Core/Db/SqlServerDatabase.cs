@@ -57,7 +57,7 @@ public static partial class SqlServerDatabase
                 identity.CommandText = CutoverIdentitySql;
                 identity.Parameters.Add("@transport", SqlDbType.NVarChar, 30).Value =
                     SqlSchemaCompatibility.IsNetworkCutover(conn.Database, builder.DataSource) ? "TCP" : "Shared memory";
-                if (Convert.ToInt32(identity.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                if (SqlInteger.RequireInt32(identity.ExecuteScalar()) != 1)
                     throw new InvalidOperationException("Подключение открыло другой экземпляр SQL Server или транспорт.");
             }
             // Preview must be verified on EVERY connection; never cache a read-only check.
@@ -396,7 +396,7 @@ public static partial class SqlServerDatabase
                     catalog.Parameters.Add("@key", SqlDbType.NVarChar, 600).Value = key;
                     catalog.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = newName;
                     catalog.Parameters.Add("@unit", SqlDbType.NVarChar, 32).Value = newUnit;
-                    catalogId = Convert.ToInt64(catalog.ExecuteScalar(), CultureInfo.InvariantCulture);
+                    catalogId = SqlInteger.RequireInt64(catalog.ExecuteScalar());
                 }
             }
         }
@@ -759,7 +759,7 @@ public static partial class SqlServerDatabase
             insert.Parameters.Add("@parent", SqlDbType.BigInt).Value =
                 parentId is null ? DBNull.Value : (object)parentId.Value;
             insert.Parameters.Add("@at", SqlDbType.Int).Value = nextOrder;
-            id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
 
         using (var log = new SqlCommand(

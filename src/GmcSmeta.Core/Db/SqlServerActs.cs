@@ -303,7 +303,7 @@ public static partial class SqlServerActs
             insert.Parameters.AddWithValue("@date", today);
             insert.Parameters.AddWithValue("@from", start ?? today);
             insert.Parameters.AddWithValue("@cid", contractId);
-            actId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            actId = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         if (previous is not null)
         {
@@ -859,7 +859,7 @@ public static partial class SqlServerActs
             "WHERE p.id=@pid AND s.contract_id=@cid AND p.parent_id IS NULL", conn, tx);
         command.Parameters.AddWithValue("@pid", positionId);
         command.Parameters.AddWithValue("@cid", contractId);
-        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) == 1L;
+        return SqlInteger.RequireInt64(command.ExecuteScalar()) == 1L;
     }
 
     public sealed record Ks3Report(decimal Period, decimal Year, decimal Start, decimal Vat,
@@ -1058,7 +1058,7 @@ public static partial class SqlServerActs
         {
             check.Parameters.AddWithValue("@sid", systemId);
             check.Parameters.AddWithValue("@cid", contractId);
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Выберите систему этого договора");
         }
 
@@ -1076,7 +1076,7 @@ public static partial class SqlServerActs
             insert.Parameters.AddWithValue("@unit", unit);
             insert.Parameters.AddWithValue("@qty", (double)qty);
             insert.Parameters.AddWithValue("@price", (double)price);
-            positionId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            positionId = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         using (var line = new SqlCommand(
             "INSERT dbo.act_lines (act_id,position_id,qty,qty_formula,price,work_price) " +

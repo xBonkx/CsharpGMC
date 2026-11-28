@@ -248,7 +248,7 @@ public static class SqlServerEditorOps
             {
                 createSystem.Parameters.AddWithValue("@name", name);
                 createSystem.Parameters.AddWithValue("@sys", sourceSystemId);
-                var newSystemId = Convert.ToInt64(createSystem.ExecuteScalar(), CultureInfo.InvariantCulture);
+                var newSystemId = SqlInteger.RequireInt64(createSystem.ExecuteScalar());
                 using (var move = new SqlCommand(
                     "UPDATE p SET p.system_id=@newSys, p.parent_id=NULL " +
                     "FROM dbo.positions p WHERE p.id=@pid OR p.parent_id=@pid", conn, tx))

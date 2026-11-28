@@ -36,7 +36,7 @@ public static partial class SqlServerTrash
                 "THEN 1 ELSE 0 END", conn);
             cmd.Parameters.Add("@created", SqlDbType.BigInt).Value = createdId;
             cmd.Parameters.Add("@trash", SqlDbType.BigInt).Value = trashId;
-            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+            return SqlFlag.Require(cmd.ExecuteScalar());
         }
         catch (Exception ex) when (ex is SqlException or IOException or InvalidOperationException)
         {

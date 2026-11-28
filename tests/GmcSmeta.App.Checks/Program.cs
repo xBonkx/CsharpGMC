@@ -107,6 +107,12 @@ internal static class Program
                 return 0;
             }
             var app = CreateApplication();
+            // Харнесс работает без Application.Run: у главного потока нет
+            // DispatcherSynchronizationContext, поэтому продолжения async-загрузки
+            // сметы уходили на поток пула и падали на первом доступе к UI.
+            System.Threading.SynchronizationContext.SetSynchronizationContext(
+                new System.Windows.Threading.DispatcherSynchronizationContext(
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher));
             RunOfflineChecks();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))
@@ -157,7 +163,31 @@ internal static class Program
             if (host.Content is not EstimateView page)
                 throw new Exception("Document did not open in the SQL Server editor.");
             var grid = (DataGrid)page.FindName("EstimateGrid");
-            PumpUntil(() => grid.Items.Count > 0, "estimate rows");
+            try
+            {
+                PumpUntil(() => grid.Items.Count > 0, "estimate rows");
+            }
+            catch (TimeoutException)
+            {
+                // Диагностика гонки публикации: состояние страницы без изменений продукта.
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                string Describe(string field)
+                {
+                    var value = typeof(EstimateView).GetField(field, flags)?.GetValue(page);
+                    return $"{field}={value?.ToString() ?? "null"}";
+                }
+                var status = typeof(MainWindow).GetMethod("SetEstimateStatus", flags);
+                _ = status;
+                var rowsCollection = (System.Collections.ICollection?)typeof(EstimateView).GetField("_rows", flags)?.GetValue(page);
+                var statusText = (window.FindName("StatusText") as System.Windows.Controls.TextBlock)?.Text;
+                Console.Error.WriteLine("estimate-rows diagnostics: "
+                    + $"statusText={statusText ?? "null"}; "
+                    + string.Join("; ", Describe("_saveError"), Describe("_publishedEstimateRevision"),
+                        Describe("_serverRevision"), Describe("_serverConflict"), Describe("_reloadAfterAttach"),
+                        Describe("_refreshing"), Describe("_detached"))
+                    + $"; rowsCollection={(rowsCollection is null ? -1 : rowsCollection.Count)}");
+                throw;
+            }
             if (page.FindName("ContractActsPanel") is not Border { Child: null })
                 throw new Exception("Initial estimate must not create the hidden KS workspace.");
             if (page.FindName("TotalsPanel") is not Border { Child: null })
@@ -175,17 +205,20 @@ internal static class Program
                 if (grid.ActualWidth < 300) throw new Exception("Estimate grid is too narrow.");
                 Console.WriteLine($"SQL Server WPF {width:0}px: {grid.Items.Count} rows");
             }
-            foreach (var name in new[] { "AddSectionButton", "AddRowButton", "MoveUpButton",
-                        "MoveDownButton", "DeletePositionButton" })
-                if (page.FindName(name) is not Button)
-                    throw new Exception($"Missing SQL Server editor button: {name}");
+            // Панель редактора: разделы/перемещение/удаление — контекстное меню строки
+            // (паритет Python), кнопками являются добавление строки и групповые операции.
+            foreach (var name in new[] { "AddRowButton", "AddOptionsButton", "CatalogAddButton",
+                        "BottomAddRowButton", "EstimateSearch" })
+                if (page.FindName(name) is not System.Windows.FrameworkElement)
+                    throw new Exception($"Missing SQL Server editor control: {name}");
 
             var filter = (TextBox)page.FindName("EstimateSearch");
             var count = grid.Items.Count;
+            // Поиск дебаунсится (EstimateSearchTimer 180 мс) — ждать применения, как в реальном UI.
             filter.Text = "__not_found_123456789__";
-            if (grid.Items.Count != 0) throw new Exception("Filtering failed.");
+            PumpUntil(() => grid.Items.Count == 0, "filter applied");
             filter.Clear();
-            if (grid.Items.Count != count) throw new Exception("Filtering restore failed.");
+            PumpUntil(() => grid.Items.Count == count, "filter restore");
             Console.WriteLine("SQL Server editor WPF smoke OK. No writes performed.");
             CheckSettingsMenu(window);
             window.Close();
@@ -316,7 +349,9 @@ internal static class Program
         if (!settings.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Сведения о подключении SQL Server") ||
             !settings.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Резервные копии SQL Server"))
             throw new Exception("SQL Server settings entries are missing.");
-        var font = settings.Items.OfType<MenuItem>().First(m => (m.Header as string) == "Размер шрифта");
+        // Заголовок пункта масштаба содержит текущий процент («Размер шрифта · 100 %»).
+        var font = settings.Items.OfType<MenuItem>()
+            .First(m => m.Header is string header && header.StartsWith("Размер шрифта", StringComparison.Ordinal));
         var scales = font.Items.OfType<MenuItem>().Select(m => (double)m.Tag!).ToList();
         if (!scales.SequenceEqual(new[] { 1.0, 1.1, 1.2 }))
             throw new Exception("Font scale options do not match Python FONT_SCALES.");

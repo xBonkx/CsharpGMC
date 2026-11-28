@@ -440,7 +440,7 @@ public static partial class SqlServerProcurement
                 "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx);
             scope.Parameters.Add("@position", SqlDbType.BigInt).Value = positionId;
             scope.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            if (Convert.ToInt64(scope.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(scope.ExecuteScalar()) != 1)
                 return SqlServerDatabase.SaveResult.Fail(
                     "Часть позиций не принадлежит текущему договору. Изменения отменены.", rev);
         }
@@ -471,7 +471,7 @@ public static partial class SqlServerProcurement
                     "INSERT dbo.suppliers (name) OUTPUT INSERTED.id VALUES (@name)", conn, tx))
                 {
                     create.Parameters.AddWithValue("@name", clean);
-                    supplierId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+                    supplierId = SqlInteger.RequireInt64(create.ExecuteScalar());
                 }
         }
 

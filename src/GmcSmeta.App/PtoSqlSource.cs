@@ -146,7 +146,7 @@ public sealed class PtoSqlSource
             "SELECT COUNT_BIG(1) FROM dbo.acts WHERE id=@act AND contract_id=@contract",conn);
         check.Parameters.AddWithValue("@act",actId);
         check.Parameters.AddWithValue("@contract",contractId);
-        if(Convert.ToInt64(check.ExecuteScalar())!=1)
+        if(SqlInteger.RequireInt64(check.ExecuteScalar())!=1)
             throw new InvalidOperationException("КС не принадлежит выбранному договору.");
         using var cmd=new SqlCommand(
             "SELECT sy.name,p.name,p.unit,al.qty,p.id "+

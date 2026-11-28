@@ -122,7 +122,7 @@ public static partial class SqlServerWorkspace
                       N'',N'',N'',N'',N'',N'',N'',N'Монтаж системы вентиляции',0,@form,NULL,N'')",
             conn, tx);
         AddObjectFields(insert, v);
-        var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         Log(conn, tx, "object", id, "create", v.Name, null, id);
         BumpRevision(conn, tx);
         tx.Commit();
@@ -206,7 +206,7 @@ public static partial class SqlServerWorkspace
                 conn, tx);
             baseDoc.Parameters.Add("@id", SqlDbType.BigInt).Value = parentId;
             baseDoc.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-            if (Convert.ToInt64(baseDoc.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(baseDoc.ExecuteScalar()) != 1)
                 throw new ArgumentException("Исходный договор не найден в этом объекте.");
         }
 
@@ -231,7 +231,7 @@ public static partial class SqlServerWorkspace
         insert.Parameters.Add("@base", SqlDbType.BigInt).Value = v.BaseContractId is null ? DBNull.Value : v.BaseContractId.Value;
         insert.Parameters.Add("@phase", SqlDbType.NVarChar, 24).Value = v.Kind == "kp" ? "volumes" : "";
         insert.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = form;
-        var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, validateNewAnnex: true);
         SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
         Log(conn, tx, "contract", id, "create",
@@ -304,7 +304,7 @@ public static partial class SqlServerWorkspace
             insert.Parameters.Add("@transportNote", SqlDbType.NVarChar, -1).Value = src.TransportNote;
             insert.Parameters.Add("@transportCost", SqlDbType.Float).Value =
                 src.TransportCost is double cost ? cost : DBNull.Value;
-            var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
 
             SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, sourceId, validateNewAnnex: true);
             SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
@@ -381,7 +381,7 @@ public static partial class SqlServerWorkspace
             "WHERE id=@id AND object_id=@obj AND kind IN (N'main',N'kp') AND stage_of IS NULL", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = baseId;
         cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-        if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != 1)
             throw new ArgumentException("Исходный договор не найден в этом объекте.");
     }
 
@@ -467,7 +467,7 @@ public static partial class SqlServerWorkspace
                 sy.SmrAmount is double amount ? amount : DBNull.Value;
             insert.Parameters.Add("@heading", SqlDbType.NVarChar, 255).Value = sy.Heading;
             insert.Parameters.Add("@sourceNum", SqlDbType.NVarChar, 32).Value = sy.SourceNum;
-            var newSystem = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var newSystem = SqlInteger.RequireInt64(insert.ExecuteScalar());
             made[sy.Id] = newSystem;
             CopyPositions(conn, tx, sy.Id, newSystem);
         }

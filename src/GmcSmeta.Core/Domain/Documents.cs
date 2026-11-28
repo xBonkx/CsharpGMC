@@ -227,7 +227,7 @@ public static partial class Documents
         {
             cmd.CommandText = "SELECT COUNT(*) FROM acts WHERE contract_id = $id";
             cmd.Parameters.AddWithValue("$id", id);
-            acts = Convert.ToInt32(cmd.ExecuteScalar());
+            acts = checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar()));
         }
         using (var cmd = conn.CreateCommand())
         {
@@ -235,7 +235,7 @@ public static partial class Documents
                 "SELECT COUNT(*) FROM movements m JOIN positions p ON p.id = m.position_id " +
                 "JOIN systems s ON s.id = p.system_id WHERE s.contract_id = $id";
             cmd.Parameters.AddWithValue("$id", id);
-            movements = Convert.ToInt32(cmd.ExecuteScalar());
+            movements = checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar()));
         }
         var details = new List<string>();
         if (acts > 0) details.Add($"акты КС-2/КС-3: {acts}");
@@ -280,7 +280,7 @@ public static partial class Documents
         {
             cmd.CommandText = "SELECT COUNT(*) FROM shipments WHERE object_id = $id";
             cmd.Parameters.AddWithValue("$id", id);
-            var count = Convert.ToInt64(cmd.ExecuteScalar());
+            var count = SqlInteger.RequireInt64(cmd.ExecuteScalar());
             if (count > 0) details.Add("ведомости выдачи: " + count);
         }
         using (var cmd = conn.CreateCommand())
@@ -290,7 +290,7 @@ public static partial class Documents
                 "SELECT id FROM positions WHERE system_id IN (" +
                 "SELECT id FROM systems WHERE contract_id IN (SELECT id FROM contracts WHERE object_id = $id)))";
             cmd.Parameters.AddWithValue("$id", id);
-            var count = Convert.ToInt64(cmd.ExecuteScalar());
+            var count = SqlInteger.RequireInt64(cmd.ExecuteScalar());
             if (count > 0) details.Add($"история закупок и выдачи: {count} записей");
         }
         return new(name, details);
@@ -327,7 +327,7 @@ public static partial class Documents
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COALESCE(MAX(\"order\"), 0) + 1 FROM contracts WHERE object_id = $id";
         cmd.Parameters.AddWithValue("$id", objectId);
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? 1L);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 1L);
     }
 
     private static string ObjectName(SqliteConnection conn, long id) =>
@@ -894,7 +894,7 @@ public static partial class Documents
             guard.CommandText = "SELECT COUNT(*) FROM act_lines WHERE position_id IN " +
                 "(SELECT id FROM positions WHERE id = $id OR parent_id = $id)";
             guard.Parameters.AddWithValue("$id", id);
-            if (Convert.ToInt64(guard.ExecuteScalar()) > 0)
+            if (SqlInteger.RequireInt64(guard.ExecuteScalar()) > 0)
                 throw new InvalidOperationException("Позиция или её комплектующая уже есть в КС-2. Сначала уберите её из акта.");
         }
         var systemId = long.Parse(ScalarText(conn, "SELECT system_id FROM positions WHERE id = $id", id)!);
@@ -1080,7 +1080,7 @@ public static partial class Documents
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM positions WHERE system_id = $id";
         cmd.Parameters.AddWithValue("$id", systemId);
-        return Convert.ToInt64(cmd.ExecuteScalar());
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static string SystemName(SqliteConnection conn, long systemId) =>
@@ -1255,7 +1255,7 @@ public static partial class Documents
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM act_lines WHERE position_id IN (" + placeholders + ")";
         for (var i = 0; i < positionIds.Count; i++) cmd.Parameters.AddWithValue("$p" + i, positionIds[i]);
-        if (Convert.ToInt64(cmd.ExecuteScalar()) > 0)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) > 0)
             throw new InvalidOperationException(
                 "Строка уже есть в КС-2. Сначала уберите её из акта, потом удаляйте.");
     }

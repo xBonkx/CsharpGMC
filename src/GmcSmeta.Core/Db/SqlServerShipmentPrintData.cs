@@ -96,7 +96,7 @@ public static class SqlServerShipmentPrintData
             "SELECT COUNT_BIG(*) FROM dbo.shipment_lines WHERE shipment_id=@shipment", conn))
         {
             count.Parameters.Add("@shipment", SqlDbType.BigInt).Value = shipmentId;
-            if (Convert.ToInt64(count.ExecuteScalar(), CultureInfo.InvariantCulture) != lines.Count)
+            if (SqlInteger.RequireInt64(count.ExecuteScalar()) != lines.Count)
                 throw new InvalidOperationException("Ведомость содержит строки вне объекта или повреждённые ссылки. Экспорт отменён.");
         }
         return new Snapshot(number, date, objectName, recipient, issuedBy, note, fixedDocument, lines);

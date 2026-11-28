@@ -135,7 +135,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.gmc_met
             "DECLARE @code INT; EXEC @code=sys.sp_getapplock " +
             "@Resource=@key,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=15000; SELECT @code", conn, tx);
         command.Parameters.Add("@key", SqlDbType.NVarChar, 255).Value = resource;
-        if (Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture) < 0)
+        if (SqlInteger.RequireInt32(command.ExecuteScalar()) < 0)
             throw new TimeoutException("Не удалось захватить складской SQL-замок; повторите операцию.");
     }
 
@@ -157,7 +157,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.gmc_met
             "INSERT dbo.gmc_metal_materials(category,material) OUTPUT INSERTED.id VALUES (@cat,@name)", conn, tx);
         insert.Parameters.Add("@cat", SqlDbType.NVarChar, 32).Value = category;
         insert.Parameters.Add("@name", SqlDbType.NVarChar, 80).Value = material;
-        return Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(insert.ExecuteScalar());
     }
 
     private static string OperatorName()
@@ -195,7 +195,7 @@ VALUES (@operation,@material,@kind,@area,@pieces,@reserve,@from,@to,@obj,@object
         cmd.Parameters.Add("@invoice", SqlDbType.NVarChar, 120).Value = invoice;
         cmd.Parameters.Add("@note", SqlDbType.NVarChar, -1).Value = note;
         cmd.Parameters.Add("@user", SqlDbType.NVarChar, 64).Value = OperatorName();
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static void Finish(SqlConnection conn, SqlTransaction tx)
@@ -210,7 +210,7 @@ VALUES (@operation,@material,@kind,@area,@pieces,@reserve,@from,@to,@obj,@object
         using var cmd = new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.gmc_metal_opening) " +
             "OR EXISTS(SELECT 1 FROM dbo.meta WHERE [key]=N\'metal_warehouse_initialized\') " +
             "THEN CONVERT(BIGINT,1) ELSE CONVERT(BIGINT,0) END", conn);
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
+        return SqlFlag.Require(cmd.ExecuteScalar());
     }
 
     public string Revision()

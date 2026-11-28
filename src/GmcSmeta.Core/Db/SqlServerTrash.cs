@@ -161,7 +161,7 @@ public static partial class SqlServerTrash
         cmd.Parameters.Add("@by", SqlDbType.NVarChar, 64).Value = ChangeLog.CurrentUser;
         cmd.Parameters.Add("@data", SqlDbType.NVarChar, -1).Value =
             JsonSerializer.Serialize(dump, JsonOptions);
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()

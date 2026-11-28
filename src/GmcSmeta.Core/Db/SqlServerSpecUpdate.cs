@@ -129,7 +129,7 @@ public static class SqlServerSpecUpdate
                     NULL,N'',N'',NULL)", conn, tx);
             insert.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = name;
-            var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
             byName[key] = id;
             return id;
         }
@@ -328,7 +328,7 @@ public static class SqlServerSpecUpdate
             insert.Parameters.Add("@before", SqlDbType.Float).Value = (double)totalBefore;
             insert.Parameters.Add("@after", SqlDbType.Float).Value = (double)totalAfter;
             insert.Parameters.Add("@data", SqlDbType.NVarChar, -1).Value = json;
-            historyId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            historyId = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         using (var titleCmd = new SqlCommand(
             "SELECT title FROM dbo.spec_revisions WHERE id=@id AND contract_id=@contract",conn,tx))

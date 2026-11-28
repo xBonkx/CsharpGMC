@@ -92,7 +92,7 @@ public static class SqlServerExcelAppend
             "SELECT COALESCE(MAX([order]),-1)+1 FROM dbo.systems WITH (UPDLOCK,HOLDLOCK) WHERE contract_id=@id", conn, tx))
         {
             orderQuery.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            order = Convert.ToInt32(orderQuery.ExecuteScalar(), CultureInfo.InvariantCulture);
+            order = SqlInteger.RequireInt32(orderQuery.ExecuteScalar());
         }
         foreach (var b in blocks)
         {
@@ -115,7 +115,7 @@ public static class SqlServerExcelAppend
                 addSection.Parameters.Add("@smr", SqlDbType.Float).Value = DBNull.Value;
                 addSection.Parameters.Add("@heading", SqlDbType.NVarChar, 255).Value = section.Heading;
                 addSection.Parameters.Add("@source", SqlDbType.NVarChar, 32).Value = section.SourceNumber;
-                var sectionId = Convert.ToInt64(addSection.ExecuteScalar(), CultureInfo.InvariantCulture);
+                var sectionId = SqlInteger.RequireInt64(addSection.ExecuteScalar());
                 if (section.Positions.Count == 0) mapped[section.Name] = sectionId;
                 var positionOrder = 0;
                 foreach (var p in section.Positions)

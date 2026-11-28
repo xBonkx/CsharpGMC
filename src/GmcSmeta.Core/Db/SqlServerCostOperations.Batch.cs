@@ -41,7 +41,7 @@ public static partial class SqlServerCostOperations
                 using var create = new SqlCommand(
                     "INSERT dbo.suppliers(name, note) OUTPUT inserted.id VALUES(@name, N'')", conn, tx);
                 create.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = supplierName;
-                supplierId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+                supplierId = SqlInteger.RequireInt64(create.ExecuteScalar());
             }
         }
         var changed = 0;

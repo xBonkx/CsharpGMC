@@ -1038,7 +1038,7 @@ public partial class ProcurementPane : UserControl
             "JOIN dbo.contracts c ON c.id=sy.contract_id JOIN dbo.objects o ON o.id=c.object_id " +
             "WHERE p.id=@id", conn);
         cmd.Parameters.AddWithValue("@id", positionId);
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
     }
 
     private void SetStatus(string message)

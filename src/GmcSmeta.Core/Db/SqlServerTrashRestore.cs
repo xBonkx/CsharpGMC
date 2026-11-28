@@ -173,7 +173,7 @@ public static partial class SqlServerTrash
                 "SELECT COUNT_BIG(*) FROM dbo.objects WITH (UPDLOCK,HOLDLOCK) WHERE id=@id AND archived=0", conn, tx))
             {
                 active.Parameters.Add("@id", SqlDbType.BigInt).Value = destinationId;
-                if (Convert.ToInt64(active.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+                if (SqlInteger.RequireInt64(active.ExecuteScalar()) != 1)
                     throw new InvalidOperationException("Восстановление в архивную карточку запрещено.");
             }
             maps["objects"][oldObjectId] = destinationId;
@@ -314,7 +314,7 @@ public static partial class SqlServerTrash
             check.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
             check.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
             check.Parameters.Add("@number", SqlDbType.BigInt).Value = RequiredId(contract, "stage_no");
-            if ((destination.HasValue && destination != objectId) || (int)check.ExecuteScalar()! != 1)
+            if ((destination.HasValue && destination != objectId) || SqlInteger.RequireInt32(check.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Исходное КП недоступно или номер этапа уже занят.");
         }
 
@@ -411,7 +411,7 @@ public static partial class SqlServerTrash
                       N'',N'',N'',N'',N'',N'',N'',N'Монтаж системы вентиляции',0,N'',NULL,N'')",
             conn, tx);
         cmd.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = name;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static void Relink(SqlConnection conn, SqlTransaction tx, JsonElement root,
@@ -563,7 +563,7 @@ public static partial class SqlServerTrash
             $"VALUES ({string.Join(", ", values)})", conn, tx);
         foreach (var (name, meta, value) in parameters)
             insert.Parameters.Add(name, SqlDbTypeFor(meta.DataType)).Value = value ?? DBNull.Value;
-        return Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(insert.ExecuteScalar());
     }
 
     private static SqlDbType SqlDbTypeFor(string dataType) => dataType switch

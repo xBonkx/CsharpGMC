@@ -520,7 +520,7 @@ public static partial class SqlServerCostSummary
             using var create = new SqlCommand(
                 "INSERT dbo.suppliers (name, note) OUTPUT INSERTED.id VALUES (@name, N'')", conn, tx);
             create.Parameters.AddWithValue("@name", supplierName.Trim());
-            supplierId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+            supplierId = SqlInteger.RequireInt64(create.ExecuteScalar());
         }
 
         long? procurementId = null;

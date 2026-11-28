@@ -261,7 +261,7 @@ public static class Bench
         using var cmd = new SqlCommand(
             "SELECT MIN(id) FROM dbo.systems WHERE contract_id = @c", conn);
         cmd.Parameters.AddWithValue("@c", contractId);
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static void RestoreQuantities(string connectionString, Dictionary<long, decimal> original)

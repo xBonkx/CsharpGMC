@@ -86,7 +86,7 @@ public static partial class SqlServerActs
             "OR EXISTS(SELECT 1 FROM dbo.positions WHERE parent_id=@id) " +
             "THEN 1 ELSE 0 END",conn,tx);
         check.Parameters.Add("@id",SqlDbType.BigInt).Value=positionId;
-        var referenced=Convert.ToInt32(check.ExecuteScalar(),CultureInfo.InvariantCulture)!=0;
+        var referenced=SqlInteger.RequireInt32(check.ExecuteScalar())!=0;
         if (!referenced)
         {
             using var delete=new SqlCommand(

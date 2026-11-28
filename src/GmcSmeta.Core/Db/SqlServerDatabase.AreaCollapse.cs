@@ -395,7 +395,7 @@ public static partial class SqlServerDatabase
             "NULL,NULL,N'',N'',NULL)", conn, tx);
         insert.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = Area.AllSystems;
-        return Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(insert.ExecuteScalar());
     }
 
     private static Dictionary<(long SystemId, string Key), AreaSummaryRow> ExistingAreaSummaries(
@@ -446,7 +446,7 @@ public static partial class SqlServerDatabase
             purchase is decimal p ? (object)(double)p : DBNull.Value;
         insert.Parameters.Add("@extra", SqlDbType.NVarChar, -1).Value =
             JsonSerializer.Serialize(new Dictionary<string, string> { ["m2"] = key });
-        var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         return new AreaSummaryRow(id, 0m, price, purchase);
     }
 
@@ -484,7 +484,7 @@ public static partial class SqlServerDatabase
                 EXISTS (SELECT 1 FROM dbo.procurement WHERE position_id=@id)
                 THEN 1 ELSE 0 END", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
+        return SqlFlag.Require(cmd.ExecuteScalar());
     }
 
     private static void AreaLog(SqlConnection conn, SqlTransaction tx, long contractId,

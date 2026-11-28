@@ -379,7 +379,7 @@ public static partial class SqlServerDatabase
                 create.Parameters.Add("@key", SqlDbType.NVarChar, 600).Value = key;
                 create.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = newName;
                 create.Parameters.Add("@unit", SqlDbType.NVarChar, 32).Value = newUnit;
-                catalogId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+                catalogId = SqlInteger.RequireInt64(create.ExecuteScalar());
             }
         }
 
@@ -443,7 +443,7 @@ public static partial class SqlServerDatabase
             "SELECT sy.contract_id FROM dbo.positions p JOIN dbo.systems sy ON sy.id=p.system_id WHERE p.id=@id",
             conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = positionId;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static void LogReplace(SqlConnection conn, SqlTransaction tx, long positionId,

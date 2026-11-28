@@ -298,7 +298,7 @@ WHERE id=1 AND revision=@expected
             cmd.Parameters.Add("@bytes", SqlDbType.VarBinary, -1).Value = workbook;
             cmd.Parameters.Add("@user", SqlDbType.NVarChar, 64).Value = OperatorName();
             cmd.Parameters.Add("@expected", SqlDbType.BigInt).Value = expectedRevision.Value;
-            newVersion = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+            newVersion = SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
         }
         if (newVersion == 0)
             throw new DBConcurrencyException(

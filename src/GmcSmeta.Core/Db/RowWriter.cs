@@ -41,7 +41,7 @@ public static class RowWriter
 
         using var idCmd = conn.CreateCommand();
         idCmd.CommandText = "SELECT last_insert_rowid()";
-        return (long)idCmd.ExecuteScalar()!;
+        return SqlInteger.RequireInt64(idCmd.ExecuteScalar());
     }
 
     /// <summary>Изменить указанные колонки строки по id.</summary>
@@ -86,7 +86,7 @@ public static class RowWriter
         SchemaData.Get(table);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"SELECT COUNT(*) FROM \"{table}\"";
-        return (long)cmd.ExecuteScalar()!;
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     /// <summary>Значение по умолчанию для колонки — как его подставил бы SQLAlchemy.</summary>

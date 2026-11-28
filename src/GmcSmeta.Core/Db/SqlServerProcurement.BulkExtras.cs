@@ -111,7 +111,7 @@ public static partial class SqlServerProcurement
             "SELECT COUNT_BIG(*) FROM sys.foreign_keys WHERE referenced_object_id=OBJECT_ID(N'dbo.positions') " +
             "AND delete_referential_action<>0", conn, tx))
         {
-            if (Convert.ToInt64(cascades.ExecuteScalar(), CultureInfo.InvariantCulture) > 0)
+            if (SqlInteger.RequireInt64(cascades.ExecuteScalar()) > 0)
                 return SqlServerDatabase.SaveResult.Fail(
                     "В SQL-схеме есть каскадные FK на позиции. Удаление заблокировано до отдельной миграции.", rev);
         }

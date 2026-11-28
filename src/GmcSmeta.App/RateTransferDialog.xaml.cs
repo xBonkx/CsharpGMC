@@ -81,7 +81,7 @@ public partial class RateTransferDialog : Window
                     "SELECT object_id FROM dbo.contracts WHERE id=@id", conn))
                 {
                     read.Parameters.AddWithValue("@id", _targetId);
-                    targetObject = Convert.ToInt32(read.ExecuteScalar() ?? 0);
+                    targetObject = checked((int)SqlInteger.RequireInt64(read.ExecuteScalar() ?? 0L));
                 }
                 using var read2 = conn.CreateCommand();
                 read2.CommandText =

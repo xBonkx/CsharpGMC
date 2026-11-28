@@ -244,7 +244,7 @@ public static partial class SqlServerProcurement
             insert.Parameters.Add("@date", SqlDbType.Date).Value = when.Date;
             insert.Parameters.Add("@recipient", SqlDbType.NVarChar, 255).Value = recipient ?? "";
             insert.Parameters.Add("@user", SqlDbType.NVarChar, 255).Value = ChangeLog.CurrentUser;
-            shipmentId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            shipmentId = SqlInteger.RequireInt64(insert.ExecuteScalar());
             created = true;
         }
 

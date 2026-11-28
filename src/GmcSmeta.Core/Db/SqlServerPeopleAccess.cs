@@ -67,7 +67,7 @@ public sealed partial class SqlServerPeopleAccess
               @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=15000;
             SELECT @code;
             """);
-        if (Convert.ToInt32(cmd.ExecuteScalar()) < 0)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) < 0)
             throw new TimeoutException("Изменения справочника заблокированы другим пользователем.");
     }
     private static void CheckRevision(SqlConnection conn, SqlTransaction tx, string expected)
@@ -90,7 +90,7 @@ public sealed partial class SqlServerPeopleAccess
     {
         using var cmd = Command(conn, tx, "SELECT COUNT_BIG(*) FROM dbo.objects WITH (HOLDLOCK) WHERE id=@id",
             ("@id", objectId));
-        if (Convert.ToInt64(cmd.ExecuteScalar()) != 1)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != 1)
             throw new InvalidOperationException("Объект не найден в этой базе.");
     }
 
@@ -178,7 +178,7 @@ public sealed partial class SqlServerPeopleAccess
                 """, ("@fio", fio), ("@fg", row.FioGen), ("@post", PeopleRules.Clean(row.Post)),
                 ("@pg", row.PostGen), ("@birth", PeopleRules.BirthNorm(row.Birth)),
                 ("@note", row.Note), ("@active", row.Active), ("@ord", row.SortOrder));
-            id = Convert.ToInt64(cmd.ExecuteScalar());
+            id = SqlInteger.RequireInt64(cmd.ExecuteScalar());
         }
         else
         {
@@ -222,7 +222,7 @@ public sealed partial class SqlServerPeopleAccess
                 OUTPUT INSERTED.id VALUES(@model,@plate,@note,@active,SYSUTCDATETIME(),@ord)
                 """, ("@model", model), ("@plate", plate), ("@note", row.Note),
                 ("@active", row.Active), ("@ord", row.SortOrder));
-            id = Convert.ToInt64(cmd.ExecuteScalar());
+            id = SqlInteger.RequireInt64(cmd.ExecuteScalar());
         }
         else
         {
@@ -335,7 +335,7 @@ public sealed partial class SqlServerPeopleAccess
                     WITH (person_id BIGINT '$.Id')
             ) x WHERE x.person_id=@id
             """, ("@lower", lowerPath), ("@upper", upperPath), ("@id", id));
-        var used = Convert.ToInt64(check.ExecuteScalar()) > 0;
+        var used = SqlInteger.RequireInt64(check.ExecuteScalar()) > 0;
         if (person)
         {
             using var order = Command(conn, tx, """
@@ -346,7 +346,7 @@ public sealed partial class SqlServerPeopleAccess
                   OR TRY_CONVERT(BIGINT, JSON_VALUE(
                     CASE WHEN ISJSON(a.data)=1 THEN a.data ELSE N'{}' END,'$.PersonId'))=@id)
                 """, ("@id", id));
-            used |= Convert.ToInt64(order.ExecuteScalar()) > 0;
+            used |= SqlInteger.RequireInt64(order.ExecuteScalar()) > 0;
         }
         using var cmd = Command(conn, tx,
             (used ? "UPDATE dbo." : "DELETE FROM dbo.") + (person ? "people" : "cars") +
@@ -577,7 +577,7 @@ public sealed partial class SqlServerPeopleAccess
             OUTPUT INSERTED.id VALUES(@oid,@kind,SYSUTCDATETIME(),@user,@path,@json)
             """, ("@oid", objectId), ("@kind", kind), ("@user", Environment.UserName),
             ("@path", file), ("@json", payloadJson));
-        var id = Convert.ToInt64(insert.ExecuteScalar());
+        var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         var rev = Bump(conn, tx);
         tx.Commit();
         return (id, rev);
@@ -591,6 +591,6 @@ public sealed partial class SqlServerPeopleAccess
             WHERE object_id=@oid AND JSON_VALUE(CASE WHEN ISJSON([data])=1 THEN [data] ELSE N'{}' END,
                 '$.OperationId')=@operation
             """, ("@oid", objectId), ("@operation", operationId.ToString()));
-        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar()) > 0;
     }
 }

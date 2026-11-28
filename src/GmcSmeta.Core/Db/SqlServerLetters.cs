@@ -126,7 +126,7 @@ END;
             "DECLARE @result int; EXEC @result=sys.sp_getapplock " +
             "@Resource=@name,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=12000; SELECT @result;", conn, tx);
         cmd.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = name;
-        if (Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) < 0)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) < 0)
             throw new TimeoutException("Не удалось получить блокировку нумерации писем.");
     }
 
@@ -296,7 +296,7 @@ END;
                 "WHERE id=@contract AND object_id=@obj AND kind IN(N'main',N'dop')))", conn, tx);
             scope.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
             scope.Parameters.Add("@contract", SqlDbType.BigInt).Value = document.ContractId is long contractId ? contractId : DBNull.Value;
-            if (Convert.ToInt64(scope.ExecuteScalar()) != 1)
+            if (SqlInteger.RequireInt64(scope.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Объект или договор больше не существует либо не соответствует привязке.");
             ApplyAgreementContext(conn, tx, document, objectId, useAgreementRecipient);
         }

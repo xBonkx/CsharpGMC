@@ -309,7 +309,7 @@ public static class SqlLive
 
         long trashId;
         using (var cmd = new SqlCommand("SELECT MAX(id) FROM dbo.trash", conn))
-            trashId = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+            trashId = SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
         Console.WriteLine($"Запись корзины: {trashId}");
 
         var entry = SqlServerTrash.List(connectionString).FirstOrDefault(e => e.Id == trashId);
@@ -345,7 +345,7 @@ public static class SqlLive
 
         long trashId;
         using (var cmd = new SqlCommand("SELECT MAX(id) FROM dbo.trash", conn))
-            trashId = Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+            trashId = SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
         var entry = SqlServerTrash.List(connectionString).FirstOrDefault(e => e.Id == trashId);
         Console.WriteLine($"В корзине: {entry?.Kind} «{entry?.Title}» строк: {entry?.Rows}");
         if (entry is null) return Fail("Запись корзины не найдена.");
@@ -499,7 +499,7 @@ public static class SqlLive
     {
         using var cmd = new SqlCommand(sql, conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static string Scalar(SqlConnection conn, string sql, long id)

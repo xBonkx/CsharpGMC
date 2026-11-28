@@ -155,7 +155,7 @@ public static partial class SqlServerExcelExistingUpdate
         {
             validate.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             validate.CommandTimeout = 180;
-            if (Convert.ToInt64(validate.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(validate.ExecuteScalar()) != 0)
                 throw new DBConcurrencyException(
                     "Undo отказан: количество, цены, формулы, дети, документы или происхождение строки изменились.");
         }
@@ -224,7 +224,7 @@ public static partial class SqlServerExcelExistingUpdate
                 AND action=N'excel_undo_v1' AND details=@details", conn, tx);
         cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         cmd.Parameters.Add("@details", SqlDbType.NVarChar, -1).Value = UndoJournalDetail(operationId);
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar()) > 0;
     }
 
     private static string UndoJournalDetail(string operationId) =>

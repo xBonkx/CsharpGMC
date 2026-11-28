@@ -358,7 +358,7 @@ public static partial class SqlServerExcelExistingUpdate
             {
                 validate.Parameters.Add("@contract", SqlDbType.BigInt).Value = plan.ContractId;
                 validate.CommandTimeout = 180;
-                if (Convert.ToInt64(validate.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+                if (SqlInteger.RequireInt64(validate.ExecuteScalar()) != 0)
                     throw new DBConcurrencyException("Позиция, формула или связь изменились. Импорт отменён целиком.");
             }
             using (var update = new SqlCommand(
@@ -442,7 +442,7 @@ public static partial class SqlServerExcelExistingUpdate
                     WHERE p.system_id=n.sy AND p.parent_id IS NULL
                         AND p.name=n.name AND p.unit=n.unit)", conn, tx))
             {
-                if (Convert.ToInt64(duplicates.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+                if (SqlInteger.RequireInt64(duplicates.ExecuteScalar()) != 0)
                     throw new DBConcurrencyException("Новая позиция уже существует. Повтори сравнение.");
             }
             using (var catalog = new SqlCommand(

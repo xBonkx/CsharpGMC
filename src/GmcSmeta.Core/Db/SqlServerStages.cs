@@ -62,7 +62,7 @@ public static partial class SqlServerStages
         using var cmd = new SqlCommand(
             "SELECT COALESCE(stage_of, id) FROM dbo.contracts WHERE id=@id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? contractId, CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? contractId);
     }
 
     public static async Task<long> FullOfAsync(SqlConnection conn, long contractId, CancellationToken token)
@@ -127,7 +127,7 @@ public static partial class SqlServerStages
             "SELECT COALESCE(MAX(stage_no),0) FROM dbo.contracts WHERE stage_of=@id", conn, tx))
         {
             no.Parameters.Add("@id", SqlDbType.BigInt).Value = fullId;
-            nextNo = Convert.ToInt32(no.ExecuteScalar(), CultureInfo.InvariantCulture) + 1;
+            nextNo = SqlInteger.RequireInt32(no.ExecuteScalar()) + 1;
         }
         var stageName = fullName.Trim().Length > 0
             ? $"{fullName.Trim()} — Этап {nextNo}" : $"Этап {nextNo}";
@@ -151,7 +151,7 @@ public static partial class SqlServerStages
             insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = stageName;
             insert.Parameters.Add("@no", SqlDbType.Int).Value = nextNo;
             insert.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
-            stageId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            stageId = SqlInteger.RequireInt64(insert.ExecuteScalar());
             SqlServerAgreements.AttachNewDocument(conn, tx, stageId);
         }
         using (var log = new SqlCommand(
@@ -413,7 +413,7 @@ public static partial class SqlServerStages
     {
         using var cmd = new SqlCommand("SELECT stage_src FROM dbo.positions WHERE id=@id", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = stageRowId;
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
     }
 
     /// <summary>Масштабирование комплектующей: qty ребёнка × (новое кол-во / старое кол-во родителя).</summary>
@@ -470,7 +470,7 @@ public static partial class SqlServerStages
             insert.Parameters.Add("@parent", SqlDbType.BigInt).Value =
                 parentStageId is null ? DBNull.Value : parentStageId.Value;
             insert.Parameters.Add("@src", SqlDbType.BigInt).Value = srcSystemId;
-            newId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            newId = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         return newId;
     }
@@ -493,7 +493,7 @@ public static partial class SqlServerStages
             parentId is null ? DBNull.Value : parentId.Value;
         insert.Parameters.Add("@qty", SqlDbType.Float).Value = (double)qty;
         insert.Parameters.Add("@src", SqlDbType.BigInt).Value = srcPositionId;
-        var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         // The source KP may use qty="=2*3". A stage's assigned quantity is
         // independent and must never retain the source qty formula.
         using (var clear = new SqlCommand(
@@ -1205,7 +1205,7 @@ public static partial class SqlServerStages
             "SELECT COALESCE(MAX(stage_no),0)+1 FROM dbo.contracts WHERE stage_of=@id", conn, tx))
         {
             no.Parameters.Add("@id", SqlDbType.BigInt).Value = fullId;
-            nextNo = Convert.ToInt32(no.ExecuteScalar(), CultureInfo.InvariantCulture);
+            nextNo = SqlInteger.RequireInt32(no.ExecuteScalar());
         }
         var fullName = ContractName(conn, tx, fullId).Trim();
         var stageName = fullName.Length > 0 ? $"{fullName} — Этап {nextNo}" : $"Этап {nextNo}";
@@ -1226,7 +1226,7 @@ public static partial class SqlServerStages
         insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = stageName;
         insert.Parameters.Add("@no", SqlDbType.Int).Value = nextNo;
         insert.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
-        var created = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var created = SqlInteger.RequireInt64(insert.ExecuteScalar());
         SqlServerAgreements.AttachNewDocument(conn, tx, created);
         return created;
     }
@@ -1242,6 +1242,6 @@ public static partial class SqlServerStages
     {
         using var cmd = new SqlCommand("SELECT object_id FROM dbo.contracts WHERE id=@id", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar() ?? 0L);
     }
 }

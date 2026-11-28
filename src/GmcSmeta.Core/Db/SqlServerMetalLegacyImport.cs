@@ -51,7 +51,7 @@ public sealed class SqlServerMetalLegacyImport
     private static long Scalar(SqlConnection conn, SqlTransaction? tx, string sql)
     {
         using var cmd = new SqlCommand(sql, conn, tx) { CommandTimeout = 60 };
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static bool Exists(SqlConnection conn, SqlTransaction? tx, string table) =>
@@ -126,7 +126,7 @@ EXEC @result=sys.sp_getapplock @Resource=N'GMC.Metal.Stock',
   @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=15000;
 SELECT @result;
 """, conn, tx);
-        if (Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) < 0)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) < 0)
             throw new TimeoutException("Не удалось взять блокировку склада металла.");
     }
 
@@ -193,7 +193,7 @@ INSERT dbo.gmc_metal_materials(category,material) OUTPUT INSERTED.id VALUES(@cat
 """, conn, tx);
         cmd.Parameters.Add("@cat", SqlDbType.NVarChar, 32).Value = category;
         cmd.Parameters.Add("@name", SqlDbType.NVarChar, 80).Value = material;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static long InsertLot(SqlConnection conn, SqlTransaction tx, long materialId,
@@ -209,7 +209,7 @@ OUTPUT INSERTED.id VALUES(@mat,@supplier,@invoice,@area,@pieces,@date)
         cmd.Parameters.Add("@area", SqlDbType.BigInt).Value = row.Area;
         cmd.Parameters.Add("@pieces", SqlDbType.Int).Value = row.Pieces;
         cmd.Parameters.Add("@date", SqlDbType.DateTime2).Value = createdUtc;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static long InsertMovement(SqlConnection conn, SqlTransaction tx, long materialId,
@@ -238,7 +238,7 @@ VALUES(@op,@mat,@kind,@area,@pieces,@reserve,@source,@target,@obj,@objname,@lot,
         cmd.Parameters.Add("@note", SqlDbType.NVarChar, -1).Value = row.Note;
         cmd.Parameters.Add("@employee", SqlDbType.NVarChar, 64).Value = row.User;
         cmd.Parameters.Add("@created", SqlDbType.DateTime2).Value = createdUtc;
-        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(cmd.ExecuteScalar());
     }
 
     private static void InsertProvenance(SqlConnection conn, SqlTransaction tx,

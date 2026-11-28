@@ -109,7 +109,7 @@ public static partial class SqlServerWorkspace
         }
         using var max=new SqlCommand("SELECT COALESCE(MAX([order]),0) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE object_id=@target",conn,tx);
         max.Parameters.Add("@target",SqlDbType.BigInt).Value=targetId;
-        var order=Convert.ToInt32(max.ExecuteScalar());
+        var order=SqlInteger.RequireInt32(max.ExecuteScalar());
         var hasLegal=legal is not null;
         long? targetLegal=legal is not null?SqlServerAgreements.TransferTarget(conn,tx,legal,targetId):null;
         foreach(var doc in group)

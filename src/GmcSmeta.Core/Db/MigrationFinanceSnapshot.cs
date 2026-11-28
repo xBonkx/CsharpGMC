@@ -60,7 +60,7 @@ public sealed record MigrationFinanceSnapshot(
             }
         }
         using(var count=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.acts",connection))
-            if(Convert.ToInt64(count.ExecuteScalar(),CultureInfo.InvariantCulture)!=acts.Count)
+            if(SqlInteger.RequireInt64(count.ExecuteScalar())!=acts.Count)
                 throw new InvalidOperationException("Incomplete act finance snapshot.");
         return new(contracts,acts,groups);
     }

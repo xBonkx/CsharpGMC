@@ -202,7 +202,7 @@ public static class SqlServerPriceLike
             command.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
             command.Parameters.Add("@doc", SqlDbType.NVarChar, 255).Value = contractName;
             command.Parameters.Add("@username", SqlDbType.NVarChar, 64).Value = Environment.UserName;
-            var affected = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var affected = SqlInteger.RequireInt32(command.ExecuteScalar());
             if (affected != plan.TargetIds.Count)
                 throw new DBConcurrencyException(
                     "Не все одинаковые позиции обновлены — изменения отменены.");

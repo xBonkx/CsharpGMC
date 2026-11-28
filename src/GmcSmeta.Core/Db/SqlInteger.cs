@@ -21,4 +21,6 @@ public static class SqlInteger
 
     public static int ReadInt32(IDataRecord reader, int ordinal) =>
         checked((int)ReadInt64(reader, ordinal));
+
+    public static int RequireInt32(object? value) => checked((int)RequireInt64(value));
 }
