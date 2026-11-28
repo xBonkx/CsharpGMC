@@ -1,6 +1,9 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace GmcSmeta.App;
 
@@ -10,9 +13,62 @@ internal static class DynamicFormLayout
     internal static void Apply(Window window)
     {
         WorkspaceWindowUi.ApplyChrome(window);
-        window.MaxHeight = Math.Max(window.MinHeight, SystemParameters.WorkArea.Height);
-        window.MaxWidth = Math.Max(window.MinWidth, SystemParameters.WorkArea.Width);
+        var requestedMaxHeight = window.MaxHeight;
+        var requestedMaxWidth = window.MaxWidth;
+        void FitWorkArea()
+        {
+            var workArea = SystemParameters.WorkArea.Size;
+            // SystemParameters.WorkArea refers to the primary display. Once a
+            // HWND exists, constrain the form to the actual monitor instead.
+            var handle = new WindowInteropHelper(window).Handle;
+            if (handle != IntPtr.Zero &&
+                MonitorFromWindow(handle, MonitorDefaultToNearest) is var monitor &&
+                monitor != IntPtr.Zero)
+            {
+                var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+                if (GetMonitorInfo(monitor, ref info))
+                {
+                    var dpi = VisualTreeHelper.GetDpi(window);
+                    var width = (info.Work.Right - info.Work.Left) / dpi.DpiScaleX;
+                    var height = (info.Work.Bottom - info.Work.Top) / dpi.DpiScaleY;
+                    if (double.IsFinite(width) && width > 0 && double.IsFinite(height) && height > 0)
+                        workArea = new Size(width, height);
+                }
+            }
+            var maxHeight = Math.Max(window.MinHeight, Math.Min(requestedMaxHeight, workArea.Height));
+            var maxWidth = Math.Max(window.MinWidth, Math.Min(requestedMaxWidth, workArea.Width));
+            if (window.MaxHeight != maxHeight) window.MaxHeight = maxHeight;
+            if (window.MaxWidth != maxWidth) window.MaxWidth = maxWidth;
+        }
+        FitWorkArea();
+        window.SourceInitialized += (_, _) => FitWorkArea();
+        window.Loaded += (_, _) => FitWorkArea();
+        window.LocationChanged += (_, _) => FitWorkArea();
+        window.DpiChanged += (_, _) => FitWorkArea();
     }
+
+    private const uint MonitorDefaultToNearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor, Work;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     internal static void WrapCaption(ContentControl control)
     {
