@@ -66,6 +66,24 @@ public sealed class SummaryViewSourceTests
     }
 
     [Fact]
+    public void LegacySummaryPreservesVisibleIdentityAnchorAndSelectedCellRange()
+    {
+        var source = SummarySource("CostSummaryPane.ViewState.cs");
+        Assert.Contains("RealizedCostRows(viewport)", source);
+        Assert.Contains("VirtualizingPanel.GetScrollUnit(grid) == ScrollUnit.Pixel", source);
+        Assert.Contains("SummaryViewportAnchor.Choose(active, top,", source);
+        Assert.Contains("foreach (var key in duplicateAnchors) anchorCandidates.Remove(key)", source);
+        Assert.Contains("grid.ScrollIntoView(item)", source);
+        Assert.Contains("SummaryViewportAnchor.Offset(", source);
+        Assert.Contains("!ReferenceEquals(grid.ItemsSource, source)", source);
+        Assert.Contains("!ReferenceEquals(row.Item, item)", source);
+        Assert.Contains("grid.SelectedCells.Where(cell => cell.IsValid", source);
+        Assert.Contains("foreach (var (key, selectedColumn) in selectedCells)", source);
+        Assert.Contains("!grid.Columns.Contains(selectedColumn)", source);
+        Assert.Contains("foreach (var key in duplicates) candidates.Remove(key)", source);
+    }
+
+    [Fact]
     public void SummaryHostIsEmptyAndCompiledPanelPreservesTemplateAndEditHandlers()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
