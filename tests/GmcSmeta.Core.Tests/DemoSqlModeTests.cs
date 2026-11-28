@@ -45,7 +45,7 @@ public sealed class DemoSqlModeTests
     [Theory]
     [InlineData(0, "master")]
     [InlineData(1, "OTHER")]
-    [InlineData(2, "MSSQLSERVER")]
+    [InlineData(2, "SQLEXPRESS")]
     [InlineData(3, "TCP")]
     [InlineData(4, "")]
     [InlineData(5, "28")]
@@ -53,7 +53,7 @@ public sealed class DemoSqlModeTests
     {
         var table = new DataTable();
         for (var i = 0; i < 6; i++) table.Columns.Add("c" + i, typeof(string));
-        object[] good = [Db, "LOCAL", "SQLEXPRESS", "Shared memory", Db, "32"];
+        object[] good = [Db, "LOCAL", "MSSQLSERVER", "Shared memory", Db, "32"];
         table.Rows.Add(good);
         var wrong = good.ToArray();
         wrong[index] = bad;
@@ -63,5 +63,16 @@ public sealed class DemoSqlModeTests
         DemoMode.ValidateIdentity(reader, Db, "LOCAL");
         Assert.True(reader.Read());
         Assert.Throws<InvalidOperationException>(() => DemoMode.ValidateIdentity(reader, Db, "LOCAL"));
+    }
+
+    [Fact]
+    public void UnnamedDefaultInstanceIsAccepted()
+    {
+        var table = new DataTable();
+        for (var i = 0; i < 6; i++) table.Columns.Add("c" + i, typeof(string));
+        table.Rows.Add(Db, "LOCAL", DBNull.Value, "Shared memory", Db, "32");
+        using var reader = table.CreateDataReader();
+        Assert.True(reader.Read());
+        DemoMode.ValidateIdentity(reader, Db, "LOCAL");
     }
 }

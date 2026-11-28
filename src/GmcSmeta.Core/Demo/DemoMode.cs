@@ -8,7 +8,9 @@ namespace GmcSmeta.Core.Demo;
 public static class DemoMode
 {
     public const string Prefix = "GmcSmetaPilot_Test_Agreement_Demo_";
-    public const string LocalServer = @"lpc:.\SQLEXPRESS";
+    // Local default instance only. The demo build runs on the same PC as the
+    // generated test databases; SQL Server Express is not required.
+    public const string LocalServer = @"lpc:.";
     public const string Marker = "gmc_demo_ready";
     public static bool Active => IsRequested(Environment.GetCommandLineArgs().Skip(1));
     public static bool SmokeTest => IsSmokeRequested(Environment.GetCommandLineArgs().Skip(1));
@@ -131,8 +133,13 @@ public static class DemoMode
     public static void ValidateIdentity(IDataRecord row, string database, string machine)
     {
         string Text(int index) => row.IsDBNull(index) ? "" : Convert.ToString(row.GetValue(index)) ?? "";
+        var instance = Text(2);
+        // The local default instance reports NULL/empty; named local installs
+        // report their instance name. The endpoint itself is pinned to lpc:.
+        var defaultInstance = string.IsNullOrWhiteSpace(instance) ||
+            instance.Equals("MSSQLSERVER", StringComparison.OrdinalIgnoreCase);
         if (Text(0) != database || !Text(1).Equals(machine, StringComparison.OrdinalIgnoreCase) ||
-            !Text(2).Equals("SQLEXPRESS", StringComparison.OrdinalIgnoreCase) ||
+            !defaultInstance ||
             !Text(3).Equals("Shared memory", StringComparison.OrdinalIgnoreCase) ||
             Text(4) != database || Text(5) != "32")
             throw new InvalidOperationException("Тестовая база, локальный сервер, метка готовности или схема 32 не подтверждены.");
