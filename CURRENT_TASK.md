@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.04 CODE READY: atomic VOR workbook/rows/history, transactional KS revision fence, cancellable preview; 3 policy tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-atomic-20261129). Reservation released.
+
 - 29.11.2026 — ARCH-SIZE-01.01/.02 PARTIAL: pinned tree, 1042 candidates, 30 files counted, family map. Full clone unavailable; [evidence](docs/ARCH_SIZE_PINNED_SAMPLE_20261129.md). Бронь снята.
 
 - 29.11.2026 — DEMO-01.01 CODE READY / DEMO-05.01 PARTIAL: изоляция до WPF/trace, отказ прямого тестового EXE без аргументов, безопасные пути настроек. 3 test methods added, not run; [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.

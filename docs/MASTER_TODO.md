@@ -50,6 +50,8 @@ DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery, d
 
 29.11: PERF-047.04 remains PARTIAL — [certificate refresh and VOR snapshot](PERFORMANCE_TODO_20261124.md#perf-pto-finish-20261129).
 
+29.11: PERF-047.04 CODE READY — [atomic VOR and lifecycle](PERFORMANCE_TODO_20261124.md#perf-pto-atomic-20261129); parent PERF-047 remains PARTIAL.
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |

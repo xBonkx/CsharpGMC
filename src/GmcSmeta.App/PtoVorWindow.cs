@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Threading;
 using System.Windows.Controls;
 using GmcSmeta.Core.Domain;
 
@@ -10,6 +11,7 @@ public sealed class PtoVorWindow : Window
     private readonly string _path;
     private bool _busy, _closed;
     private long _generation;
+    private CancellationTokenSource? _readCancellation;
     private Button _parse = null!, _accept = null!;
     private Panel _mapping = null!;
     private readonly ComboBox _sheets=new(){Margin=new Thickness(0,2,9,0),MinWidth=130};
@@ -98,7 +100,7 @@ public sealed class PtoVorWindow : Window
         dock.Children.Add(_preview);
         Content=dock;
         SetBusy(true);
-        Closed+=(_,_)=>{_closed=true;_generation++;};
+        Closed+=(_,_)=>{_closed=true;_generation++;_readCancellation?.Cancel();};
         Loaded+=LoadSheetsAsync;
         foreach(var edit in new[]{_first,_name,_qty,_unit,_system})
             edit.TextChanged+=(_,_)=>Invalid();
@@ -107,10 +109,13 @@ public sealed class PtoVorWindow : Window
     private async void LoadSheetsAsync(object sender,RoutedEventArgs e)
     {
         Loaded-=LoadSheetsAsync;
+        using var cancellation=new CancellationTokenSource();
+        _readCancellation=cancellation;
+        var token=cancellation.Token;
         try
         {
-            var sheets=await Task.Run(()=>PtoVor.Sheets(_path));
-            if(_closed)return;
+            var sheets=await Task.Run(()=>PtoVor.Sheets(_path,token),token);
+            if(_closed||token.IsCancellationRequested)return;
             _sheets.ItemsSource=sheets;
             _sheets.SelectedIndex=0;
         }
@@ -118,7 +123,7 @@ public sealed class PtoVorWindow : Window
         {
             if(!_closed)MessageBox.Show(this,ex.Message,"Листы Excel",MessageBoxButton.OK,MessageBoxImage.Warning);
         }
-        finally {if(!_closed)SetBusy(false);}
+        finally {_readCancellation=null;if(!_closed)SetBusy(false);}
     }
     private void SetBusy(bool value)
     {
@@ -144,6 +149,9 @@ public sealed class PtoVorWindow : Window
     {
         if(_busy||_closed)return;
         Invalid();
+        using var cancellation=new CancellationTokenSource();
+        _readCancellation=cancellation;
+        var token=cancellation.Token;
         try
         {
             if(!int.TryParse(_first.Text.Trim(),out var first)||first<1)
@@ -153,8 +161,8 @@ public sealed class PtoVorWindow : Window
             var sheet=_sheets.SelectedItem?.ToString()??"";
             var generation=_generation;
             SetBusy(true);
-            var result=await Task.Run(()=>PtoVor.Read(_path,sheet,first,cols));
-            if(_closed||generation!=_generation)return;
+            var result=await Task.Run(()=>PtoVor.Read(_path,sheet,first,cols,token),token);
+            if(_closed||token.IsCancellationRequested||generation!=_generation)return;
             Parsed=result;
             _preview.ItemsSource=Parsed.Rows.Take(250).ToArray();
             _warnings.Text="Найдено строк: "+Parsed.Rows.Count+
@@ -170,6 +178,6 @@ public sealed class PtoVorWindow : Window
                 MessageBox.Show(this,ex.Message,"Проверка ВОР",MessageBoxButton.OK,MessageBoxImage.Warning);
             }
         }
-        finally {if(!_closed)SetBusy(false);}
+        finally {_readCancellation=null;if(!_closed)SetBusy(false);}
     }
 }

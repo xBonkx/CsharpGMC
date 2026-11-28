@@ -84,7 +84,18 @@ public sealed class PtoArchive
     }
 
     public PtoAttachment AddAttachment(PtoPackage package,string source,
-        string title,string kind,int? pages=null,IEnumerable<string>? systems=null)
+        string title,string kind,int? pages=null,IEnumerable<string>? systems=null) =>
+        AddAttachmentCore(package,source,title,kind,pages,systems,null,null).Attachment;
+
+    // One package revision contains both the workbook and every imported row.
+    // The returned detached model is published only on confirmed COMMIT.
+    public PtoPackage AddVor(PtoPackage package,string source,string title,
+        IReadOnlyList<PtoWork> rows,string? expectedSourceRevision=null) =>
+        AddAttachmentCore(package,source,title,"ВОР",null,null,rows,expectedSourceRevision).Package;
+
+    private (PtoAttachment Attachment,PtoPackage Package) AddAttachmentCore(
+        PtoPackage package,string source,string title,string kind,int? pages,
+        IEnumerable<string>? systems,IReadOnlyList<PtoWork>? rows,string? expectedSourceRevision)
     {
         var extension=Path.GetExtension(source).ToLowerInvariant();
         if(extension is not (".pdf" or ".xlsx"))
@@ -102,16 +113,22 @@ public sealed class PtoArchive
             Sha256=sha
         };
         attachment.RelativePath="files/"+attachment.Id.ToString("N")+extension;
+        var candidate=rows is null?package:PtoVorImport.Prepare(package,attachment,rows);
+        var previousStatus=package.Status;
+        var previousReview=package.ManualReview;
         var target=FilePath(attachment.RelativePath);
         SafeCopy(source,target);
         try
         {
             if(Sha(target)!=sha)throw new IOException("Изменение исходного файла при копировании.");
-            package.Attachments.Add(attachment);
-            package.ManualReview=false;
-            package.Status="Черновик";
-            Sql.Save(package);
-            return attachment;
+            if(rows is null)
+            {
+                candidate.Attachments.Add(attachment);
+                candidate.ManualReview=false;
+                candidate.Status="Черновик";
+            }
+            Sql.Save(candidate,expectedSourceRevision);
+            return (attachment,candidate);
         }
         catch(PtoCommitUncertainException)
         {
@@ -120,7 +137,12 @@ public sealed class PtoArchive
         }
         catch
         {
-            package.Attachments.Remove(attachment);
+            if(rows is null)
+            {
+                package.Attachments.Remove(attachment);
+                package.Status=previousStatus;
+                package.ManualReview=previousReview;
+            }
             if(File.Exists(target))File.Delete(target);
             throw;
         }

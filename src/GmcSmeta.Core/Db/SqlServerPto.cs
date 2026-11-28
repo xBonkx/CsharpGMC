@@ -190,7 +190,9 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         return p;
     }
 
-    public void Save(PtoPackage p)
+    public void Save(PtoPackage p) => Save(p,null);
+
+    public void Save(PtoPackage p,string? expectedSourceRevision)
     {
         PtoRules.ValidateShape(p);
         if(p.Status is "Готов" or "Подписан")
@@ -206,6 +208,12 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         var json=JsonSerializer.Serialize(p,PtoRules.Json);
         using var conn=Open();
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);
+        // For VOR sourced from KS, hold the shared estimate revision until
+        // package COMMIT; rendering/UNC copy can take arbitrarily long.
+        if(expectedSourceRevision is not null &&
+            (string.IsNullOrWhiteSpace(expectedSourceRevision)||
+             !string.Equals(SqlServerDatabase.LockRevision(conn,tx),expectedSourceRevision,StringComparison.Ordinal)))
+            throw new DBConcurrencyException("КС изменились до сохранения ВОР. Повторите выбор акта.");
         Lock(conn,tx,"GMC.PTO.Object."+p.ObjectId);
         CheckObject(conn,tx,p.ObjectId);
         long? oldRev;

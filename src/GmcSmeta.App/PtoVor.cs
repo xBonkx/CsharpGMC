@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using ClosedXML.Excel;
 using GmcSmeta.Core.Domain;
 
@@ -11,14 +12,17 @@ public static class PtoVor
     public sealed record Columns(int Name,int Qty,int Unit=0,int System=0);
     public sealed record Result(IReadOnlyList<PtoWork> Rows,IReadOnlyList<string> Warnings);
 
-    public static IReadOnlyList<string> Sheets(string path)
+    public static IReadOnlyList<string> Sheets(string path,CancellationToken token=default)
     {
+        token.ThrowIfCancellationRequested();
         using var book=new XLWorkbook(path);
+        token.ThrowIfCancellationRequested();
         return book.Worksheets.Select(s=>s.Name).ToArray();
     }
 
-    public static Result Read(string path,string sheet,int firstRow,Columns columns)
+    public static Result Read(string path,string sheet,int firstRow,Columns columns,CancellationToken token=default)
     {
+        token.ThrowIfCancellationRequested();
         if(firstRow<1 || columns.Name<1 || columns.Qty<1)
             throw new ArgumentException("Укажите первую строку, колонку наименования и объёма.");
         var chosen=new[]{columns.Name,columns.Qty,columns.Unit,columns.System}
@@ -26,6 +30,7 @@ public static class PtoVor
         if(chosen.Distinct().Count()!=chosen.Length)
             throw new ArgumentException("Выберите разные колонки для разных полей.");
         using var book=new XLWorkbook(path);
+        token.ThrowIfCancellationRequested();
         if(!book.Worksheets.Contains(sheet))throw new ArgumentException("Лист не найден.");
         var ws=book.Worksheet(sheet);
         var lastRow=ws.LastRowUsed()?.RowNumber()??0;
@@ -39,6 +44,7 @@ public static class PtoVor
         var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for(var index=firstRow;index<=lastRow;index++)
         {
+            token.ThrowIfCancellationRequested();
             var noCache=false;
             string Value(int column)
             {
@@ -93,6 +99,7 @@ public static class PtoVor
                 SourceFile=Path.GetFileName(path),SourceSheet=sheet,SourceRow=index
             });
         }
+        token.ThrowIfCancellationRequested();
         return new Result(rows,warnings);
     }
 }
