@@ -14,13 +14,18 @@ public sealed class PtoArchiveLifecycleTests
     public void CertificateSearchUsesLocalSnapshotAndPdfOperationsUseWorker()
     {
         var code=Source("PtoCertificatesWindow.cs");
-        Assert.Contains("PtoCertificateSearch.Build(_archive.Sql.Certificates())",code);
+        Assert.Contains("PtoCertificateSearch.Build(_archive.Sql.Certificates(token:token))",code);
+        Assert.Contains("_refreshCancellation?.Cancel();",code);
+        Assert.Contains("if(_closed||token.IsCancellationRequested)return;",code);
+        Assert.Contains("if(e is PtoCommitUncertainException or DBConcurrencyException)InvalidateSnapshot();",code);
+        Assert.Contains("await RefreshAfterWriteAsync();",code);
+        Assert.Contains("ItemsControl.ContainerFromElement(_grid,source)",code);
         Assert.Contains("PtoCertificateSearch.Filter(_rows,_search.Text)",code);
         Assert.DoesNotContain("Certificates(_search.Text",code);
         Assert.Contains("await Task.Run(()=>_archive.ImportCertificate(path,cert))",code);
         Assert.Contains("await Task.Run(()=>_archive.Sql.SaveCertificate(data))",code);
         Assert.Contains("if(!_closed)Process.Start",code);
-        Assert.Contains("if(_busy)e.Cancel=true",code);
+        Assert.Contains("if(_busy&&_refreshCancellation is null)e.Cancel=true",code);
     }
 
     [Fact]
@@ -60,13 +65,14 @@ public sealed class PtoArchiveLifecycleTests
     public void PackagePickerLoadsContractsOnceAndRevalidatesSourceAfterConfirmation()
     {
         var code=Source("PtoWindow.Packages.cs");
-        Assert.Contains("_source.Contracts(_scopeObjectId).ToLookup(c=>c.ObjectId)",code);
+        Assert.Contains("_source.Contracts(_scopeObjectId,_scopeContractId).ToLookup(c=>c.ObjectId)",code);
         Assert.Contains("items.AddRange(choices.Contracts[choice.Id]);",code);
         Assert.DoesNotContain("items.AddRange(_source.Contracts",code);
         // 0fc090bb: ревалидация после подтверждения — внутри ревизионного забора PtoSqlSource.Snapshot.
         Assert.Contains("choices.Contracts[scopedObject.Id].FirstOrDefault(c=>c.Id==cid)",code);
-        Assert.Contains("SqlServerPtoContractContext.Read(conn,obj.Id).SingleOrDefault(c=>c.Id==contract.Id)",Source("PtoSqlSource.cs"));
+        Assert.Contains("SqlServerPtoContractContext.Read(conn,obj.Id,contract.Id).SingleOrDefault(c=>c.Id==contract.Id)",Source("PtoSqlSource.cs"));
         Assert.Contains("archive.Sql.Save(package);",code);
+        Assert.Contains("_source.Objects(_scopeObjectId).ToArray()",code);
     }
 
     [Fact]

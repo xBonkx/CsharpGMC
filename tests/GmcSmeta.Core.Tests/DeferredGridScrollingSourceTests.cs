@@ -32,6 +32,26 @@ public sealed class DeferredGridScrollingSourceTests
             Assert.Equal("True", (string?)grid.Attribute("VirtualizingPanel.IsVirtualizingWhenGrouping"));
     }
 
+    [Theory]
+    [InlineData("CostSummaryPane.xaml", "MaterialsGrid")]
+    [InlineData("CostSummaryPane.xaml", "SmrWorkGrid")]
+    [InlineData("AgreementCardView.xaml", "SourceGrid")]
+    public void AdditionalBoundedGridsUseRecyclingAndContentScrolling(string file, string name)
+    {
+        var document = XDocument.Load(Path.Combine(Root(), "src", "GmcSmeta.App", file));
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var grid = Assert.Single(document.Descendants(p + "DataGrid")
+            .Where(e => (string?)e.Attribute(x + "Name") == name));
+        Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
+        Assert.Equal("True", (string?)grid.Attribute("EnableColumnVirtualization"));
+        Assert.Equal("True", (string?)grid.Attribute("VirtualizingPanel.IsVirtualizing"));
+        Assert.Equal("Recycling", (string?)grid.Attribute("VirtualizingPanel.VirtualizationMode"));
+        Assert.Equal("True", (string?)grid.Attribute("ScrollViewer.CanContentScroll"));
+        if (name == "SourceGrid")
+            Assert.Equal("240", (string?)grid.Attribute("MaxHeight"));
+    }
+
     [Fact]
     public void SharedDocumentTableKeepsPixelRecyclingAndLiveContentScrolling()
     {

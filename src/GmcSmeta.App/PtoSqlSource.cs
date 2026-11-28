@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Threading;
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
 using Microsoft.Data.SqlClient;
@@ -20,31 +21,33 @@ public sealed class PtoSqlSource
         public override string ToString()=>"КС № "+Number+" от "+Date;
     }
 
-    public IReadOnlyList<ObjectChoice> Objects()
+    public IReadOnlyList<ObjectChoice> Objects(long? objectId=null)
     {
         using var conn=SqlServerDatabase.Open(_connection);
-        return ReadObjects(conn);
+        return ReadObjects(conn,objectId);
     }
 
     private static IReadOnlyList<ObjectChoice> ReadObjects(SqlConnection conn,long? objectId=null)
     {
         using var cmd=new SqlCommand("SELECT id,name,address,customer FROM dbo.objects "+
-            "WHERE @id IS NULL OR id=@id ORDER BY name,id",conn);
-        cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=objectId.HasValue?objectId.Value:DBNull.Value;
+            (objectId.HasValue?"WHERE id=@id ":"")+"ORDER BY name,id",conn);
+        if(objectId is long id)cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=id;
         var result=new List<ObjectChoice>();
         using var r=cmd.ExecuteReader();
         string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
         while(r.Read())result.Add(new(SqlInteger.ReadInt64(r, 0),S(1),S(2),S(3)));
         return result;
     }
-    public IReadOnlyList<PtoContractContext> Contracts(long? objectId=null)
+    public IReadOnlyList<PtoContractContext> Contracts(long? objectId=null,long? contractId=null,
+        CancellationToken token=default)
     {
-        using var conn=SqlServerDatabase.Open(_connection);
+        using var conn=SqlServerDatabase.OpenAsync(_connection,token).GetAwaiter().GetResult();
         for(var attempt=0;attempt<2;attempt++)
         {
-            var revision=SqlServerDatabase.Revision(conn);
-            var result=SqlServerPtoContractContext.Read(conn,objectId);
-            if(!string.IsNullOrWhiteSpace(revision)&&revision==SqlServerDatabase.Revision(conn))
+            token.ThrowIfCancellationRequested();
+            var revision=SqlServerDatabase.RevisionAsync(conn,token).GetAwaiter().GetResult();
+            var result=SqlServerPtoContractContext.Read(conn,objectId,contractId,token);
+            if(!string.IsNullOrWhiteSpace(revision)&&revision==SqlServerDatabase.RevisionAsync(conn,token).GetAwaiter().GetResult())
                 return result;
         }
         throw new InvalidOperationException("Список приложений изменился. Повторите выбор.");
@@ -70,7 +73,7 @@ public sealed class PtoSqlSource
             }
             else
             {
-                var document=SqlServerPtoContractContext.Read(conn,obj.Id).SingleOrDefault(c=>c.Id==contract.Id)
+                var document=SqlServerPtoContractContext.Read(conn,obj.Id,contract.Id).SingleOrDefault(c=>c.Id==contract.Id)
                     ??throw new InvalidOperationException("Приложение больше не доступно в выбранном объекте.");
                 if(document.LegalRequired!=contract.LegalRequired || document.Agreement?.Id!=contract.Agreement?.Id)
                     throw new InvalidOperationException("Юридическая привязка приложения изменилась. Выберите источник объёмов заново.");

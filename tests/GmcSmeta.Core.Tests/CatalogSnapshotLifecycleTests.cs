@@ -39,6 +39,11 @@ public sealed class CatalogSnapshotLifecycleTests
         Assert.Contains("PageSize + 1, _expectedRevision", picker);
         Assert.Contains("includeUsageCount: false, token: token", picker);
         Assert.Contains("_pageCancellation?.Cancel();", picker);
+        Assert.DoesNotContain("ObservableCollection<CatalogPickRow>", picker);
+        Assert.Contains("_rows = page;", picker);
+        Assert.Contains("_items.ItemsSource = _rows;", picker);
+        Assert.Contains("_add.IsEnabled = false;", picker);
+        Assert.Contains("_add.IsEnabled = true;", picker);
         Assert.Contains("token.IsCancellationRequested || generation != _request", picker);
         Assert.Contains("CatalogSnapshot(", manager);
         var catalog = manager[manager.IndexOf("public sealed class CatalogWindow", StringComparison.Ordinal)..];

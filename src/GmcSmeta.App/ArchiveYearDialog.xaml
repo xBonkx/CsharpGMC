@@ -41,8 +41,8 @@
     </Window.Resources>
     <DockPanel Margin="{StaticResource LayoutFormDialogMargin}">
         <WrapPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource LayoutFormFooterGap}">
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" Margin="{StaticResource LayoutDialogActionGap}"/>
-            <Button x:Name="MoveButton" Content="Перенести" Style="{StaticResource PrimaryButton}" Click="Move_Click"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" TabIndex="102" Click="Cancel_Click" Margin="{StaticResource LayoutDialogActionGap}"/>
+            <Button x:Name="MoveButton" TabIndex="101" Content="Перенести" Style="{StaticResource PrimaryButton}" Click="Move_Click"/>
         </WrapPanel>
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
@@ -51,7 +51,7 @@
             <UniformGrid x:Name="YearGrid" Columns="4" Margin="0,10,0,0"/>
             <WrapPanel Orientation="Horizontal" Margin="{StaticResource LayoutFormFooterGap}">
                 <TextBlock Text="Другой год:" Style="{StaticResource UiSecondaryText}" VerticalAlignment="Center" Margin="{StaticResource LayoutDialogActionGap}"/>
-                <TextBox x:Name="YearBox" Style="{StaticResource PythonSearch}" Width="100" MaxLength="4" TextAlignment="Center" FontWeight="SemiBold" Padding="8,6" TextChanged="YearBox_TextChanged" KeyDown="YearBox_KeyDown"/>
+                <TextBox x:Name="YearBox" Style="{StaticResource PythonSearch}" Width="100" MaxLength="4" TextAlignment="Center" FontWeight="SemiBold" Padding="8,6" TextChanged="YearBox_TextChanged" TabIndex="100"/>
             </WrapPanel>
         </StackPanel>
         </ScrollViewer>

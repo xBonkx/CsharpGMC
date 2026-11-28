@@ -25,7 +25,17 @@ public sealed class OrdersInitialReadLifecycleTests
         Assert.Contains("OrderAgreementPolicy.BlockReason(_site, _companies)", initial);
         Assert.Contains("db.Companies(token)", initial);
         Assert.Equal(1, initial.Split("db.History(", StringSplitOptions.None).Length - 1);
-        Assert.Contains("LastResponsible(snapshot.History)", initial);
+        Assert.Contains("LastResponsible(history)", initial);
+        Assert.Contains("snapshot.LastResponsible", initial);
+        Assert.Contains("directory.Revision != db.OrderReadRevision(token)", initial);
+        var templateRead = initial.IndexOf("PeopleDocuments.Templates()", StringComparison.Ordinal);
+        var published = initial.IndexOf("_db = snapshot.Db;", StringComparison.Ordinal);
+        Assert.True(templateRead >= 0 && templateRead < published);
+        Assert.Contains("_templates.AddRange(snapshot.Templates)", initial);
+        Assert.Contains("await Task.Run(() => Directory.Exists(folder)", source);
+        Assert.Contains("await Task.Run(() => Directory.CreateDirectory(folder))", source);
+        Assert.Contains("if (_folderActionBusy) return;", source);
+        Assert.Contains("await Task.Run(() => SaveTemplateSettings(disabledTemplates))", source);
         Assert.Contains("ApplyHistory(snapshot.History);", initial);
         Assert.DoesNotContain("RefreshHistory();", initial);
         Assert.True(initial.IndexOf("if (_closed || token.IsCancellationRequested) return;", StringComparison.Ordinal) <

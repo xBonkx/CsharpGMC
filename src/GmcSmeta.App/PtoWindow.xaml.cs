@@ -72,7 +72,7 @@ public partial class PtoWindow : Window
                 string? title=null;
                 if(_scopeContractId is long cid)
                 {
-                    var doc=_source.Contracts(_scopeObjectId).FirstOrDefault(c=>c.Id==cid) ??
+                    var doc=_source.Contracts(_scopeObjectId,cid,token).SingleOrDefault(c=>c.Id==cid) ??
                         throw new InvalidOperationException("Договор не найден в выбранном объекте.");
                     title="АОСР · "+doc;
                 }

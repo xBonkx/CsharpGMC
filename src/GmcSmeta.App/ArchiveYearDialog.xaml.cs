@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 
 namespace GmcSmeta.App;
 
@@ -30,12 +29,13 @@ public partial class ArchiveYearDialog : Window
                 Style = (Style)Resources["YearChip"],
                 ToolTip = year == current ? "Сейчас" : null,
                 Tag = year,
+                TabIndex = YearGrid.Children.Count,
             };
             chip.Click += (_, _) => Pick(year);
             YearGrid.Children.Add(chip);
         }
         YearBox.Text = current.ToString(CultureInfo.InvariantCulture);
-        Loaded += (_, _) => MoveButton.Focus();
+        Loaded += (_, _) => { YearBox.Focus(); YearBox.SelectAll(); };
     }
 
     private void Pick(int year)
@@ -53,13 +53,6 @@ public partial class ArchiveYearDialog : Window
         if (!int.TryParse(YearBox.Text.Trim(), CultureInfo.InvariantCulture, out var year) || year is < 2000 or > 2100) return;
         Year = year;
         foreach (ToggleButton chip in YearGrid.Children) chip.IsChecked = (int)chip.Tag == year;
-    }
-
-    private void YearBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-        Move_Click(sender, e);
-        e.Handled = true;
     }
 
     private void Move_Click(object sender, RoutedEventArgs e)

@@ -46,29 +46,52 @@ public sealed partial class SqlServerMetalWarehouse
     /// Aggregated server-side dashboard: never downloads the full journal.
     /// A serializable read produces one consistent snapshot for all five grids.
     /// </summary>
-    public MetalSnapshot ReadSnapshot()
+    private SqlConnection OpenRead(CancellationToken token)
     {
-        using var conn = Open();
+        SqlServerWorkspace.RequirePilotDatabase(_connectionString);
+        var conn = SqlReadCancellation.Open(_connectionString, token);
+        if (!conn.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
+        {
+            conn.Dispose();
+            throw new InvalidOperationException("Склад металла: производственная база SQL Server заблокирована.");
+        }
+        return conn;
+    }
+
+    public MetalSnapshot ReadSnapshot() => ReadSnapshot(CancellationToken.None);
+
+    public MetalSnapshot ReadSnapshot(CancellationToken token)
+    {
+        using var conn = OpenRead(token);
+        token.ThrowIfCancellationRequested();
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         string revision;
         using (var rev = new SqlCommand(
             "SELECT [value] FROM dbo.meta WHERE [key]=N'rev'", conn, tx))
         {
-            revision = Convert.ToString(rev.ExecuteScalar(), CultureInfo.InvariantCulture)
-                ?? throw new InvalidOperationException("Нет meta.rev.");
+            revision = Convert.ToString(SqlReadCancellation.Scalar(rev, token), CultureInfo.InvariantCulture) ?? "";
+            if (string.IsNullOrWhiteSpace(revision))
+                throw new InvalidOperationException("Нет meta.rev.");
         }
         bool initialized;
         using (var cmd = new SqlCommand(
             "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.gmc_metal_opening) " +
             "OR EXISTS(SELECT 1 FROM dbo.meta WHERE [key]=N\'metal_warehouse_initialized\') " +
             "THEN CONVERT(BIGINT,1) ELSE CONVERT(BIGINT,0) END", conn, tx))
-            initialized = SqlFlag.Require(cmd.ExecuteScalar());
+            initialized = SqlFlag.Require(SqlReadCancellation.Scalar(cmd, token));
 
         var materials = new Dictionary<long, (string Category, string Name)>();
         using (var cmd = new SqlCommand(
             "SELECT id,category,material FROM dbo.gmc_metal_materials ORDER BY category,material", conn, tx))
-        using (var r = cmd.ExecuteReader())
-            while (r.Read()) materials.Add(SqlInteger.ReadInt64(r, 0), (r.GetString(1), r.GetString(2)));
+        using (var registration = SqlReadCancellation.Register(cmd, token))
+        using (var r = SqlReadCancellation.ExecuteReader(cmd, token))
+        {
+            while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                materials.Add(SqlInteger.ReadInt64(r, 0), (r.GetString(1), r.GetString(2)));
+            }
+        }
 
         // Credit and debit stock legs are grouped in SQL, not projected from full ledger in UI.
         var places = new List<MetalPlaceView>();
@@ -84,11 +107,17 @@ FROM (
 ) movements
 GROUP BY material_id,place
 """, conn, tx))
-        using (var r = cmd.ExecuteReader())
+        using (var registration = SqlReadCancellation.Register(cmd, token))
+        using (var r = SqlReadCancellation.ExecuteReader(cmd, token))
+        {
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 places.Add(new MetalPlaceView(SqlInteger.ReadInt64(r, 0), r.GetString(1),
                     Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
                     Convert.ToInt64(r.GetValue(3), CultureInfo.InvariantCulture)));
+            }
+        }
 
         var objectAggregates = new Dictionary<(long Material, string Key), (long? Id, string Name, long Demand, long Issued, long Reserved)>();
         using (var cmd = new SqlCommand("""
@@ -100,10 +129,12 @@ FROM dbo.gmc_metal_movements
 WHERE object_id IS NOT NULL OR object_name<>N''
 GROUP BY material_id,object_id,object_name
 """, conn, tx))
-        using (var r = cmd.ExecuteReader())
+        using (var registration = SqlReadCancellation.Register(cmd, token))
+        using (var r = SqlReadCancellation.ExecuteReader(cmd, token))
         {
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var materialId = SqlInteger.ReadInt64(r, 0);
                 long? obj = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1);
                 var name = r.GetString(2);
@@ -122,6 +153,7 @@ GROUP BY material_id,object_id,object_name
         var objects = new List<MetalObjectView>();
         foreach (var row in objectAggregates)
         {
+            token.ThrowIfCancellationRequested();
             var id = row.Key.Material;
             var v = row.Value;
             if (v.Demand == 0 && v.Issued == 0 && v.Reserved == 0) continue;
@@ -140,13 +172,21 @@ GROUP BY material_id,object_id,object_name
 SELECT material_id,SUM(reservation_milli) FROM dbo.gmc_metal_movements
 WHERE reservation_milli<>0 GROUP BY material_id
 """, conn, tx))
-        using (var r = cmd.ExecuteReader())
-            while (r.Read()) allReserved[SqlInteger.ReadInt64(r, 0)] = SqlInteger.ReadInt64(r, 1);
+        using (var registration = SqlReadCancellation.Register(cmd, token))
+        using (var r = SqlReadCancellation.ExecuteReader(cmd, token))
+        {
+            while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
+                allReserved[SqlInteger.ReadInt64(r, 0)] = SqlInteger.ReadInt64(r, 1);
+            }
+        }
 
         var placeTotals = MetalPlaceTotals.Aggregate(places);
         var stock = new List<MetalStockView>();
         foreach (var pair in materials)
         {
+            token.ThrowIfCancellationRequested();
             var id = pair.Key;
             var totals = placeTotals.GetValueOrDefault(id);
             var (ourArea, ourPieces, supplier, supplierPieces) = totals;
@@ -176,12 +216,20 @@ LEFT JOIN dbo.gmc_metal_movements e ON e.lot_id=l.id
 GROUP BY l.id,l.material_id,m.material,l.supplier,l.invoice,l.area_milli,l.pieces,l.created_utc
 ORDER BY l.created_utc DESC,l.id DESC
 """, conn, tx))
-        using (var r = cmd.ExecuteReader())
+        using (var registration = SqlReadCancellation.Register(cmd, token))
+        using (var r = SqlReadCancellation.ExecuteReader(cmd, token))
+        {
             while (r.Read())
+            {
+                token.ThrowIfCancellationRequested();
                 lots.Add(new MetalLotView(SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2),
                     r.GetString(3), r.GetString(4), SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6),
                     SqlFlag.Read(r, 7), SqlInteger.ReadInt64(r, 8), SqlInteger.ReadInt32(r, 9), r.GetDateTime(10)));
+            }
+        }
+        token.ThrowIfCancellationRequested();
         tx.Commit();
+        token.ThrowIfCancellationRequested();
         return new MetalSnapshot(revision, initialized, stock, places, objects, lots);
     }
 
@@ -190,9 +238,10 @@ ORDER BY l.created_utc DESC,l.id DESC
         ReadJournalCore(page, pageSize, search, category, lookAhead: false, beforeId: null);
 
     public (IReadOnlyList<MetalMovement> Rows, bool HasNext) ReadJournalPage(
-        int page, int pageSize, string search = "", string category = "")
+        int page, int pageSize, string search = "", string category = "", CancellationToken cancellationToken = default)
     {
-        var rows = ReadJournalCore(page, pageSize, search, category, lookAhead: true, beforeId: null);
+        var rows = ReadJournalCore(page, pageSize, search, category, lookAhead: true, beforeId: null,
+            cancellationToken: cancellationToken);
         return (rows.Take(pageSize).ToArray(), rows.Count > pageSize);
     }
 
@@ -201,11 +250,13 @@ ORDER BY l.created_utc DESC,l.id DESC
         ReadJournalCore(0, pageSize, "", "", lookAhead: false, beforeId: beforeId);
 
     private IReadOnlyList<MetalMovement> ReadJournalCore(int page, int pageSize,
-        string search, string category, bool lookAhead, long? beforeId)
+        string search, string category, bool lookAhead, long? beforeId, CancellationToken cancellationToken = default)
     {
         if (page < 0 || pageSize is < 1 or > 1000)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
-        using var conn = Open();
+        cancellationToken.ThrowIfCancellationRequested();
+        using var conn = OpenRead(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand("""
 SELECT e.id,e.material_id,m.category,m.material,e.kind,e.area_milli,e.pieces,
        e.reservation_milli,e.source_place,e.target_place,e.object_id,e.object_name,
@@ -225,14 +276,19 @@ ORDER BY e.id DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
             "%" + search.Trim()[..Math.Min(100, search.Trim().Length)].Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]") + "%";
         cmd.Parameters.Add("@offset", SqlDbType.Int).Value = checked(page * pageSize);
         cmd.Parameters.Add("@size", SqlDbType.Int).Value = pageSize + (lookAhead ? 1 : 0);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, cancellationToken);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, cancellationToken);
         var result = new List<MetalMovement>();
         while (r.Read())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             result.Add(new MetalMovement(SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2), r.GetString(3),
                 r.GetString(4), SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6), SqlInteger.ReadInt64(r, 7), r.GetString(8),
                 r.GetString(9), r.IsDBNull(10) ? null : SqlInteger.ReadInt64(r, 10), r.GetString(11),
                 r.GetString(12), r.GetString(13), r.IsDBNull(14) ? null : SqlInteger.ReadInt64(r, 14),
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
         return result;
     }
 }

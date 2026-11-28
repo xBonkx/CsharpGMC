@@ -24,9 +24,13 @@ public sealed partial class SqlServerLetters
         EnsureSchema();
     }
 
-    private SqlConnection Open()
+    private SqlConnection Open() => RequirePilotConnection(SqlServerDatabase.Open(_connectionString));
+
+    private async Task<SqlConnection> OpenReadAsync(CancellationToken token) =>
+        RequirePilotConnection(await SqlServerDatabase.OpenAsync(_connectionString, token).ConfigureAwait(false));
+
+    private static SqlConnection RequirePilotConnection(SqlConnection connection)
     {
-        var connection = SqlServerDatabase.Open(_connectionString);
         if (!connection.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
         {
             connection.Dispose();
@@ -172,7 +176,7 @@ END;
         CancellationToken token, Func<LetterDocument, bool>? belongs = null)
     {
         token.ThrowIfCancellationRequested();
-        using var conn = Open();
+        using var conn = await OpenReadAsync(token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT payload_json,revision FROM dbo.gmc_letters ORDER BY updated_utc DESC,id DESC", conn);

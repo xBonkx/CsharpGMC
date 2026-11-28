@@ -254,13 +254,26 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
     public sealed record SharedWorkbook(byte[] Data, long Revision);
 
     /// <summary>Revisioned workbook exchange; saving stale versions never overwrites a colleague's edits.</summary>
-    public SharedWorkbook? ReadRegister()
+    public SharedWorkbook? ReadRegister() => ReadRegister(CancellationToken.None);
+
+    public SharedWorkbook? ReadRegister(CancellationToken token)
     {
-        using var conn = Open();
+        using var conn = OpenRead(token);
         using var cmd = new SqlCommand(
-            "SELECT workbook,revision FROM dbo.gmc_metal_register WHERE id=1", conn);
-        using var r = cmd.ExecuteReader();
-        return r.Read() ? new SharedWorkbook((byte[])r.GetValue(0), SqlInteger.ReadInt64(r, 1)) : null;
+            "SELECT CASE WHEN DATALENGTH(workbook) BETWEEN 1 AND 5000000 THEN workbook ELSE NULL END,revision " +
+            "FROM dbo.gmc_metal_register WHERE id=1", conn);
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        var exists = r.Read();
+        token.ThrowIfCancellationRequested();
+        if (!exists) return null;
+        if (r.IsDBNull(0))
+            throw new InvalidDataException("Общая Excel-книга должна быть не больше 5 МБ и не пустой.");
+        var version = SqlInteger.ReadInt64(r, 1);
+        if (version <= 0) throw new InvalidDataException("Некорректная версия общей Excel-книги.");
+        var bytes = (byte[])r.GetValue(0);
+        token.ThrowIfCancellationRequested();
+        return new SharedWorkbook(bytes, version);
     }
 
     public long SaveRegister(byte[] workbook, long? expectedRevision, string expectedMainRevision)

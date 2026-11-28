@@ -249,8 +249,13 @@ public partial class LettersWindow : Window
         }
     });
 
-    private void List_DoubleClick(object sender, MouseButtonEventArgs e) =>
-        Open_Click(sender, e);
+    private void List_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source &&
+            ItemsControl.ContainerFromElement(LetterList, source) is DataGridRow row &&
+            ReferenceEquals(row.Item, Selected()))
+            Open_Click(sender, e);
+    }
 
     private async void AttachExisting_Click(object sender, RoutedEventArgs e) => await RunActionAsync(async archive =>
     {

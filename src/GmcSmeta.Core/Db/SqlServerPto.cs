@@ -190,7 +190,9 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         return p;
     }
 
-    public void Save(PtoPackage p)
+    public void Save(PtoPackage p) => Save(p,null);
+
+    public void Save(PtoPackage p,string? expectedSourceRevision)
     {
         PtoRules.ValidateShape(p);
         if(p.Status is "Готов" or "Подписан")
@@ -206,6 +208,12 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         var json=JsonSerializer.Serialize(p,PtoRules.Json);
         using var conn=Open();
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);
+        // For VOR sourced from KS, hold the shared estimate revision until
+        // package COMMIT; rendering/UNC copy can take arbitrarily long.
+        if(expectedSourceRevision is not null &&
+            (string.IsNullOrWhiteSpace(expectedSourceRevision)||
+             !string.Equals(SqlServerDatabase.LockRevision(conn,tx),expectedSourceRevision,StringComparison.Ordinal)))
+            throw new DBConcurrencyException("КС изменились до сохранения ВОР. Повторите выбор акта.");
         Lock(conn,tx,"GMC.PTO.Object."+p.ObjectId);
         CheckObject(conn,tx,p.ObjectId);
         long? oldRev;
@@ -336,20 +344,24 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         return rows;
     }
 
-    public IReadOnlyList<PtoCertificate> Certificates(string query="")
+    public IReadOnlyList<PtoCertificate> Certificates(string query="",CancellationToken token=default)
     {
-        using var conn=Open();
-        using var cmd=new SqlCommand("SELECT payload_json,revision FROM dbo.gmc_pto_certificates ORDER BY updated_utc DESC",conn);
-        using var reader=cmd.ExecuteReader();
+        using var conn=Open(token);
+        using var cmd=new SqlCommand("SELECT payload_json,revision FROM dbo.gmc_pto_certificates ORDER BY updated_utc DESC,id",conn);
+        using var registration=SqlReadCancellation.Register(cmd,token);
+        using var reader=SqlReadCancellation.ExecuteReader(cmd,token);
         var result=new List<PtoCertificate>();
         while(reader.Read())
         {
-            var c=JsonSerializer.Deserialize<PtoCertificate>(reader.GetString(0),PtoRules.Json)!;
+            token.ThrowIfCancellationRequested();
+            var c=JsonSerializer.Deserialize<PtoCertificate>(reader.GetString(0),PtoRules.Json)
+                ??throw new InvalidDataException("Повреждён JSON сертификата.");
             c.Revision=SqlInteger.ReadInt64(reader, 1);
             if(string.IsNullOrWhiteSpace(query) ||
                 JsonSerializer.Serialize(c,PtoRules.Json).Contains(query,StringComparison.OrdinalIgnoreCase))
                 result.Add(c);
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

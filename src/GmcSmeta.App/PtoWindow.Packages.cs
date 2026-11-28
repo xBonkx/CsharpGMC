@@ -46,9 +46,9 @@ public partial class PtoWindow
         // One contract query per picker, not one synchronous SQL read per object switch.
         var choices=await Task.Run(()=>
         {
-            var availableObjects=_source.Objects().Where(o=>_scopeObjectId is null || o.Id==_scopeObjectId).ToArray();
+            var availableObjects=_source.Objects(_scopeObjectId).ToArray();
             if(availableObjects.Length==0)throw new InvalidOperationException("Для ПТО отсутствуют доступные объекты.");
-            return (Objects:availableObjects,Contracts:_source.Contracts(_scopeObjectId).ToLookup(c=>c.ObjectId));
+            return (Objects:availableObjects,Contracts:_source.Contracts(_scopeObjectId,_scopeContractId).ToLookup(c=>c.ObjectId));
         });
         var objects=choices.Objects;
         if(_scopeContractId is long cid)

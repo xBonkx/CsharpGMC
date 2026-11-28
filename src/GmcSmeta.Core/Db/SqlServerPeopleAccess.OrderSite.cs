@@ -7,6 +7,19 @@ namespace GmcSmeta.Core.Db;
 
 public sealed partial class SqlServerPeopleAccess
 {
+    // The order form combines several read-only queries. Check their shared revision
+    // without reloading the full employee and vehicle directory.
+    public string OrderReadRevision(CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        using var conn = Open(token);
+        var revision = token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
+        token.ThrowIfCancellationRequested();
+        return revision;
+    }
+
     // Orders use legal context, whereas admission lists are object-scoped.
     // Read-only: never link documents or infer legal ID from number/date.
     public AccessSite OrderSite(long objectId, long? documentId = null, CancellationToken token = default)

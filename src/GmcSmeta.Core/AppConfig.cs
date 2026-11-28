@@ -36,7 +36,9 @@ public static class AppConfig
 
     public static string SettingsPath()
     {
-        var root = Environment.GetEnvironmentVariable("APPDATA");
+        var root = GmcSmeta.Core.Demo.DemoMode.Active
+            ? GmcSmeta.Core.Demo.DemoMode.ApplicationData
+            : Environment.GetEnvironmentVariable("APPDATA");
         if (string.IsNullOrWhiteSpace(root))
             root = GmcSmeta.Core.Demo.DemoMode.ApplicationData;
         var dir = Path.Combine(root!, AppId);
@@ -74,13 +76,22 @@ public static class AppConfig
             var workspace = Path.Combine(GmcSmeta.Core.Demo.DemoMode.ProfileRoot, "workspace");
             Directory.CreateDirectory(workspace);
             data["db_path"] = ToElement(Path.Combine(workspace, "workspace.marker"));
+            docs = workspace;
         }
         else if (!data.ContainsKey("db_path"))
             data["db_path"] = ToElement(DefaultDbPath());
 
         foreach (var key in new[] { "last_import_dir", "last_export_dir", "last_attach_dir" })
         {
-            if (data.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.String
+            if (GmcSmeta.Core.Demo.DemoMode.Active)
+            {
+                // Stored office/UNC paths are not suggested automatically in DEMO.
+                // A user can still explicitly choose an export destination.
+                if (!data.TryGetValue(key, out var demoValue) || demoValue.ValueKind != JsonValueKind.String ||
+                    !GmcSmeta.Core.Demo.DemoMode.IsWithin(docs, demoValue.GetString()))
+                    data[key] = ToElement(docs);
+            }
+            else if (data.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.String
                 && IsProgramDir(v.GetString() ?? ""))
                 data[key] = ToElement(docs);
             if (!data.ContainsKey(key))
@@ -100,9 +111,11 @@ public static class AppConfig
     }
 
     public static string DbPath(Dictionary<string, JsonElement> settings) =>
-        settings.TryGetValue("db_path", out var v) && v.ValueKind == JsonValueKind.String
-            ? v.GetString() ?? DefaultDbPath()
-            : DefaultDbPath();
+        GmcSmeta.Core.Demo.DemoMode.Active
+            ? Path.Combine(GmcSmeta.Core.Demo.DemoMode.ProfileRoot, "workspace", "workspace.marker")
+            : settings.TryGetValue("db_path", out var v) && v.ValueKind == JsonValueKind.String
+                ? v.GetString() ?? DefaultDbPath()
+                : DefaultDbPath();
 
     /// <summary>Путь внутри папки программы (её нельзя предлагать для сохранения: обновление её заменит).</summary>
     public static bool IsProgramDir(string path)

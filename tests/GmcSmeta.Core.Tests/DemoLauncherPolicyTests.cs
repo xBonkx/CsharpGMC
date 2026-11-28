@@ -121,4 +121,77 @@ public sealed class DemoLauncherPolicyTests
         Assert.False(DemoReleasePolicy.IsInside(root, root + "-office"));
         Assert.False(DemoReleasePolicy.IsInside(root, Path.Combine(root, "..", "office")));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DemoRecoveryPreservesPreviousPointerAndRejectsTamperedRelease(bool tamper)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gmc-demo-recovery-" + Guid.NewGuid().ToString("N"));
+        var apps = Path.Combine(root, "apps");
+        var directory = Path.Combine(apps, "1.2.3-sc");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var exe = Path.Combine(directory, "GMC-Smeta-Next.exe");
+            File.WriteAllText(exe, "original");
+            File.WriteAllText(Path.Combine(directory, DemoReleasePolicy.CapabilityFile), "GMC-DEMO-1\nschema=32\n");
+            File.WriteAllText(Path.Combine(directory, PackageIntegrity.VersionFile), "1.2.3");
+            File.WriteAllText(Path.Combine(directory, PackageIntegrity.SchemaFile), "32");
+            var seal = PackageIntegrity.Seal(directory, "1.2.3");
+            var previous = Path.Combine(root, "previous-installed.txt");
+            var state = Path.Combine(root, "installed.txt");
+            new InstalledApp { Version = "1.2.3", Flavor = "sc", Directory = directory, Exe = exe,
+                Sha256 = new string('a', 64), PackageSchema = seal.Schema, ManifestHash = seal.ManifestHash }
+                .Publish(apps, previous, Path.Combine(root, "unused.txt"), allowDemoSeed: true);
+            File.WriteAllText(state, "damaged");
+            var previousBytes = File.ReadAllBytes(previous);
+            if (tamper)
+            {
+                File.WriteAllText(exe, "changed");
+                var recorded = InstalledApp.Read(apps, previous, allowDemoSeed: true)!;
+                Assert.Throws<InvalidOperationException>(() => DemoReleasePolicy.RequireInstalledIntegrity(recorded, verifyFiles: true));
+                Assert.Throws<InvalidOperationException>(() => InstalledApp.RecoverDemoPrevious(apps, state, previous));
+                Assert.Equal("damaged", File.ReadAllText(state));
+            }
+            else
+            {
+                Assert.Equal(exe, InstalledApp.RecoverDemoPrevious(apps, state, previous).Exe);
+                Assert.Equal(exe, InstalledApp.Read(apps, state, allowDemoSeed: true)?.Exe);
+            }
+            Assert.Equal(previousBytes, File.ReadAllBytes(previous));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void LauncherDirectoriesAreCreatedOnlyUnderOwnedSegments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gmc-launcher-paths-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            AppPaths.EnsureUnredirectedDirectories(root, "demo", "launcher", "apps");
+            Assert.True(Directory.Exists(Path.Combine(root, "demo", "launcher", "apps")));
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, "..", "office"));
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, Path.GetFullPath(root)));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void LauncherRejectsFileInsteadOfDirectoryBeforeCreatingChildren()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gmc-launcher-paths-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var existing = Path.Combine(root, "launcher");
+            File.WriteAllText(existing, "do not replace");
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, "launcher", "apps"));
+            Assert.Equal("do not replace", File.ReadAllText(existing));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
 }

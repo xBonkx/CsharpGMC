@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +18,7 @@ public partial class PassportsWindow : Window
 {
     private SqlServerPassports _sql = null!;
     private readonly string _connectionString;
+    private CancellationTokenSource? _initialReadCancellation;
     private bool _ready, _busy, _closed, _exportUncertain, _writeBlocked, _closeApproved;
     private readonly long _objectId;
     private readonly string _objectName;
@@ -85,14 +87,19 @@ public partial class PassportsWindow : Window
         Loaded -= InitializeAsync;
         // Initial read may be abandoned by closing the window. No passport is
         // created until the live UI has received the successful result.
+        using var cancellation = new CancellationTokenSource();
+        _initialReadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             var data = await Task.Run(() =>
             {
                 var sql = new SqlServerPassports(_connectionString);
-                return (Sql: sql, Rows: sql.List(_objectId), Catalogue: sql.Catalogue(), Root: LoadRoot());
-            });
+                token.ThrowIfCancellationRequested();
+                return (Sql: sql, Rows: sql.List(_objectId, token), Catalogue: sql.Catalogue(token), Root: LoadRoot());
+            }, token);
             if (_closed) return;
+            token.ThrowIfCancellationRequested();
             _sql = data.Sql;
             _root = data.Root;
             _rows.AddRange(data.Rows);
@@ -112,6 +119,7 @@ public partial class PassportsWindow : Window
             SetControls();
             ArchiveLabel.Text = "Не удалось загрузить паспорта. Откройте окно заново: " + ex.Message;
         }
+        finally { _initialReadCancellation = null; }
     }
 
     private void SetControls()
@@ -131,6 +139,7 @@ public partial class PassportsWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _initialReadCancellation?.Cancel();
         base.OnClosed(e);
     }
 
@@ -478,10 +487,14 @@ public partial class PassportsWindow : Window
             picker.Content = list;
             bool opening = false, pickerClosed = false;
             picker.Closed += (_, _) => pickerClosed = true;
-            list.MouseDoubleClick += async (_, _) =>
+            list.MouseDoubleClick += async (_, e) =>
             {
-                if (opening || pickerClosed || list.SelectedIndex < 0) return;
-                var selected = entries[list.SelectedIndex];
+                if (opening || pickerClosed || e.ChangedButton != MouseButton.Left ||
+                    e.OriginalSource is not DependencyObject source ||
+                    ItemsControl.ContainerFromElement(list, source) is not ListBoxItem item) return;
+                var index = list.ItemContainerGenerator.IndexFromContainer(item);
+                if (index < 0 || index >= entries.Count) return;
+                var selected = entries[index];
                 opening = true;
                 list.IsEnabled = false;
                 try

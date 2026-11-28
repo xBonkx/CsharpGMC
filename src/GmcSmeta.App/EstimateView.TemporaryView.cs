@@ -23,7 +23,19 @@ public partial class EstimateView
     private void EstimateGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (EstimateGrid is null) return;
+        var keyboard = e.CursorLeft < 0 && e.CursorTop < 0;
+        if (keyboard && (Keyboard.FocusedElement is TextBoxBase or PasswordBox or ComboBox))
+            return; // the active editor owns its native menu
         var targetCell = ContextMenuTarget.TargetCell(EstimateGrid, e);
+        // A keyboard invocation must not fall back to a previously selected row.
+        if (keyboard && (!EstimateGrid.IsKeyboardFocusWithin ||
+            (EstimateGrid.Items.Count > 0 && (!targetCell.IsValid ||
+                !EstimateGrid.SelectedItems.Contains(targetCell.Item) ||
+                !ReferenceEquals(EstimateGrid.CurrentItem, targetCell.Item)))))
+        {
+            e.Handled = true;
+            return;
+        }
         var hit = ContextMenuTarget.SelectRow<EditableEstimateRow>(EstimateGrid, e);
         if (hit is null && (EstimateGrid.Items.Count > 0 || _rows.Count > 0 ||
             EstimateGrid.SelectedItems.Count > 0))

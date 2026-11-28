@@ -26,9 +26,9 @@ public sealed class SqlServerPassports
         EnsureSchema();
     }
 
-    private SqlConnection Open()
+    private SqlConnection Open(CancellationToken token = default)
     {
-        var conn = SqlServerDatabase.Open(_connectionString);
+        var conn = SqlReadCancellation.Open(_connectionString, token);
         if (!conn.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
         {
             conn.Dispose();
@@ -123,23 +123,26 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
             throw new InvalidOperationException("Объект не найден в этой тестовой базе.");
     }
 
-    public IReadOnlyList<VentPassport> List(long objectId)
+    public IReadOnlyList<VentPassport> List(long objectId, CancellationToken token = default)
     {
-        using var conn = Open();
+        using var conn = Open(token);
         using var cmd = new SqlCommand(
             "SELECT payload_json,revision FROM dbo.gmc_passports WHERE object_id=@object ORDER BY created_utc,id",
             conn);
         cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
         var list = new List<VentPassport>();
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var p = JsonSerializer.Deserialize<VentPassport>(reader.GetString(0), VentPassports.Json)
                 ?? throw new InvalidDataException("Повреждён JSON паспорта.");
             p.Revision = SqlInteger.ReadInt64(reader, 1);
             if (p.ObjectId != objectId) throw new InvalidDataException("Паспорт в чужом объекте.");
             list.Add(p);
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
@@ -159,15 +162,21 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         return p;
     }
 
-    public IReadOnlyList<VentEquipmentTemplate> Catalogue()
+    public IReadOnlyList<VentEquipmentTemplate> Catalogue(CancellationToken token = default)
     {
-        using var conn = Open();
+        using var conn = Open(token);
         using var cmd = new SqlCommand(
             "SELECT payload_json FROM dbo.gmc_passport_equipment_catalog ORDER BY catalog_key", conn);
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         var result = new List<VentEquipmentTemplate>();
         while (reader.Read())
-            result.Add(JsonSerializer.Deserialize<VentEquipmentTemplate>(reader.GetString(0), VentPassports.Json)!);
+        {
+            token.ThrowIfCancellationRequested();
+            result.Add(JsonSerializer.Deserialize<VentEquipmentTemplate>(reader.GetString(0), VentPassports.Json)
+                ?? throw new InvalidDataException("Повреждён JSON каталога оборудования."));
+        }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

@@ -27,19 +27,24 @@ public sealed class SectionPickerDialog : Window
         var root = new StackPanel();
         root.Children.Add(DynamicFormLayout.Secondary("Куда перенести позицию вместе с комплектующими?", "LayoutDialogIntroGap"));
         _sections = new ComboBox {
-            ItemsSource = sections.Select(x => new Choice(x.Id, x.Label)).ToArray(), SelectedIndex = 0 };
+            ItemsSource = sections.Select(x => new Choice(x.Id, x.Label)).ToArray(), SelectedIndex = -1, TabIndex = 0 };
         DynamicFormLayout.Field(_sections);
         System.Windows.Automation.AutomationProperties.SetName(_sections, "Раздел назначения");
         _sections.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("SelectedItem.Label") { Source = _sections });
         root.Children.Add(_sections);
         var bar = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        var cancel = new Button { Content = "Отмена", IsCancel = true, TabIndex = 2 };
         cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
-        var ok = new Button { Content = "Перенести", IsDefault = true };
-        ok.Click += (_, _) => DialogResult = SelectedSectionId is not null;
+        var ok = new Button { Content = "Перенести", IsEnabled = false, TabIndex = 1 };
+        _sections.SelectionChanged += (_, _) => ok.IsEnabled = SelectedSectionId is not null;
+        ok.Click += (_, _) =>
+        {
+            if (SelectedSectionId is not null) DialogResult = true;
+        };
         bar.Children.Add(cancel);
         bar.Children.Add(ok);
         DynamicFormLayout.StyleActions(ok, cancel);
         Content = DynamicFormLayout.WithFooter(root, bar);
+        Loaded += (_, _) => _sections.Focus();
     }
 }

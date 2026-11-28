@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 
 namespace GmcSmeta.App;
@@ -42,13 +41,13 @@ public sealed class PromptDialog : Window
         {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
-        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        var cancel = new Button { Content = "Отмена", IsCancel = true, TabIndex = 2 };
         cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         cancel.SetResourceReference(StyleProperty, "PythonToolbarButton");
         cancel.Click += (_, _) => DialogResult = false;
         var ok = new Button
         {
-            Content = "Сохранить", IsDefault = true
+            Content = "Сохранить", IsDefault = true, TabIndex = 1
         };
         ok.SetResourceReference(StyleProperty, "PythonToolbarPrimary");
         ok.Click += (_, _) => DialogResult = true;
@@ -72,17 +71,14 @@ public sealed class PromptDialog : Window
         Box = new TextBox
         {
             Text = value,
+            TabIndex = 0,
             VerticalContentAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap
         };
         DynamicFormLayout.Field(Box);
         Box.SetResourceReference(Control.PaddingProperty, "LayoutFieldPadding");
         AutomationProperties.SetName(Box, label);
-        Box.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter) { DialogResult = true; e.Handled = true; }
-            else if (e.Key == Key.Escape) { DialogResult = false; e.Handled = true; }
-        };
+        // Use the window's default/cancel buttons, including standard keyboard and IME handling.
         form.Children.Add(Box);
         root.Children.Add(new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });

@@ -27,6 +27,9 @@ internal sealed class MetalRegisterWindow : Window
     private XLWorkbook? _book;
     private long? _version;
     private bool _dirty;
+    private bool _registerReady;
+    private bool _closed;
+    private CancellationTokenSource? _registerRead;
 
     public MetalRegisterWindow(string connectionString)
     {
@@ -62,10 +65,12 @@ internal sealed class MetalRegisterWindow : Window
         SetBusy(false);
         Closing += (_, e) =>
         {
-            if (_busy || !CommitEditor() || !ConfirmDiscard()) e.Cancel = true;
+            if ((_busy && _registerRead is null) || !CommitEditor() || !ConfirmDiscard()) e.Cancel = true;
         };
         Closed += (_, _) =>
         {
+            _closed = true;
+            _registerRead?.Cancel();
             _tabs.SelectionChanged -= Tabs_SelectionChanged;
             _tabs.Items.Clear();
             _activePage = null;
@@ -198,25 +203,45 @@ internal sealed class MetalRegisterWindow : Window
 
     private async Task Reload()
     {
-        if (_busy || _warehouse is not { } store || !CommitEditor() || !ConfirmDiscard()) return;
+        if (_closed || _busy || _warehouse is not { } store || !CommitEditor() || !ConfirmDiscard()) return;
         SetBusy(true);
+        _registerReady = false;
+        using var request = new CancellationTokenSource();
+        _registerRead = request;
+        var token = request.Token;
         try
         {
             _status.Text = "Загрузка общей книги…";
             var data = await Task.Run(() =>
             {
-                var shared = store.ReadRegister();
+                var shared = store.ReadRegister(token);
+                token.ThrowIfCancellationRequested();
                 if (shared is null) return (Book: (PreparedBook?)null, Version: (long?)null);
                 var book = Prepare(new XLWorkbook(new MemoryStream(shared.Data, false)));
                 return (Book: (PreparedBook?)book, Version: (long?)shared.Revision);
-            });
+            }, token);
+            if (_closed || token.IsCancellationRequested)
+            {
+                data.Book?.Book.Dispose();
+                return;
+            }
             Display(data.Book);
             _version = data.Version;
+            _registerReady = true;
             _status.Text = data.Version is null ? "Нет общей Excel-книги." :
                 "Версия " + data.Version + " · изменения коллег защищены от перезаписи.";
         }
-        catch (Exception ex) { Error(ex); }
-        finally { SetBusy(false); }
+        catch (Exception ex)
+        {
+            if (_closed || token.IsCancellationRequested) return;
+            _status.Text = "Обновление не подтверждено. Можно выгрузить локальную книгу; перед сохранением обновите данные.";
+            Error(ex);
+        }
+        finally
+        {
+            if (ReferenceEquals(_registerRead, request)) _registerRead = null;
+            if (!_closed) SetBusy(false);
+        }
     }
 
     private static PreparedBook OpenLimited(string path)
@@ -250,6 +275,11 @@ internal sealed class MetalRegisterWindow : Window
     {
         if (_busy || _warehouse is not { } store || _book is not { } book ||
             !CommitEditor() || !_dirty) return;
+        if (!_registerReady)
+        {
+            _status.Text = "Перед сохранением обновите общую книгу. Локальные правки можно выгрузить в Excel.";
+            return;
+        }
         var version = _version;
         SetBusy(true);
         try
@@ -264,7 +294,8 @@ internal sealed class MetalRegisterWindow : Window
         }
         catch (Exception ex)
         {
-            _status.Text = "Сохранение не подтверждено. Локальная книга сохранена в редакторе.";
+            _registerReady = false;
+            _status.Text = "Сохранение не подтверждено. Выгрузите локальную книгу и обновите данные перед повтором.";
             Error(ex);
         }
         finally { SetBusy(false); }

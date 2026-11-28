@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -113,6 +114,24 @@ public partial class EstimateView
     private bool MaterialsSnapshotReady => !_materialsLoading && !_materialsBusy && !_materialsSearchDirty &&
         !_detached && !string.IsNullOrWhiteSpace(_materialsRevision) && _materialsRevision == _serverRevision && !_serverConflict &&
         System.Threading.Volatile.Read(ref _pendingWrites) == 0;
+
+    private bool CanContinueMaterialsWrite(string revision) =>
+        MaterialsEditPolicy.CanContinueWrite(revision, _materialsRevision, _serverRevision,
+            _detached || _materialsLoading || _materialsSearchDirty || _serverConflict,
+            System.Threading.Volatile.Read(ref _pendingWrites));
+
+    private void RecordMaterialsWriteReceipt(string expected, string receipt)
+    {
+        if (MaterialsEditPolicy.CanAcceptReceipt(expected, _serverRevision, receipt, _serverConflict,
+                System.Threading.Volatile.Read(ref _pendingWrites)))
+            _serverRevision = receipt;
+        else
+        {
+            _materialsRevision = "";
+            _publishedEstimateRevision = "";
+            RequestRefresh();
+        }
+    }
 
     private static readonly (string Name, string Hex)[] MatRowColors =
     {
@@ -246,12 +265,13 @@ public partial class EstimateView
 
     private MaterialsRow MaterialsPositionRow(CostMaterialsPosition p, string num, string? systemLabel = null, MaterialsRow? parent = null)
     {
-        var cu = p.UnitCost;
+        var values = MaterialsProjection.Position(p);
+        var cu = values.UnitCost;
         var sub = p.ParentId is not null;
         var hasFact = p.Fact is not null;
         var label = systemLabel ?? MaterialsSystemLabel(p.SystemId);
         var priceText = sub ? "" : MatMoney(p.Price);
-        var amount = Money.Round2(p.Qty * p.Price);
+        var amount = values.Amount;
         string costText, costSumText = "", markupText = "", markupRaw = "", marginText = "";
         var costMissing = false;
         var costWork = false;
@@ -260,16 +280,16 @@ public partial class EstimateView
         if (cu is decimal unit)
         {
             costText = MatMoney(unit);
-            costSumText = MatMoney(Money.Round2(unit * p.Qty));
+            costSumText = MatMoney(values.CostSum!.Value);
             if (!sub && p.Price != 0m)
             {
-                var mk = unit == 0m ? (decimal?)null : (p.Price / unit - 1m) * 100m;
+                var mk = values.Markup;
                 if (mk is decimal value)
                 {
                     markupText = Math.Round(value, 0, MidpointRounding.ToEven).ToString("0", Ru);
                     markupRaw = value.ToString("0.0", Ru);
-                    markupWarn = value > 300m || value < 0m;
-                    var margin = Money.Round2(amount - unit * p.Qty);
+                    markupWarn = values.MarkupWarn;
+                    var margin = values.Margin!.Value;
                     marginText = MatMoney(margin);
                     marginNegative = margin < 0m;
                 }
@@ -302,8 +322,8 @@ public partial class EstimateView
             CostWork = costWork,
             MarkupWarn = markupWarn,
             MarginNegative = marginNegative,
-            NoCostFlag = !sub && cu is null && p.Price != 0m && !p.Work,
-            NoPriceFlag = !sub && p.Price == 0m,
+            NoCostFlag = values.NoCost,
+            NoPriceFlag = values.NoPrice,
             Num = num,
             Name = p.Name,
             Unit = p.Unit,
@@ -342,17 +362,7 @@ public partial class EstimateView
         foreach (var (id, name, isSub, _) in data.Systems)
         {
             var members = topBySystem[id];
-            decimal sRev = 0m, sCost = 0m, sCov = 0m;
-            foreach (var p in bySystem[id])
-            {
-                var cu = p.UnitCost;
-                if (p.ParentId is null && !p.Work)
-                    sRev += p.Qty * p.Price;
-                if (cu is decimal unit)
-                    sCost += unit * p.Qty;
-                if (p.ParentId is null && cu is not null && p.Price != 0m)
-                    sCov += p.Qty * p.Price;
-            }
+            var (sRev, sCost, sCov, _, _) = MaterialsTileTotals.Count(bySystem[id]);
             var header = new MaterialsRow
             {
                 IsSystemHeader = true,
@@ -383,12 +393,7 @@ public partial class EstimateView
     private void MaterialsComputeSystemLabels()
     {
         var data = _materialsData!;
-        var names = data.Systems.ToDictionary(s => s.Id, s => s.Name);
-        _materialsLabels = new Dictionary<long, string>();
-        foreach (var (id, name, isSub, parentId) in data.Systems)
-            _materialsLabels[id] = isSub && parentId is long pid && names.ContainsKey(pid)
-                ? $"{names[pid]} > {name}"
-                : name;
+        _materialsLabels = MaterialsProjection.SystemLabels(data.Systems);
     }
 
     private List<MaterialsRow> MaterialsBuildView(CostMaterialsData data)
@@ -406,21 +411,17 @@ public partial class EstimateView
         }
         if (_materialsMode is "sup" or "sup_same")
         {
-            var groups = top.GroupBy(p => p.Supplier).ToList();
-            foreach (var g in groups.OrderBy(g => g.Key == "" ? 1 : 0).ThenBy(g => g.Key.ToLowerInvariant(), StringComparer.Ordinal))
+            foreach (var g in MaterialsProjection.SupplierGroups(top))
             {
-                var members = g.ToList();
-                decimal cost = 0m;
-                foreach (var p in members)
-                    if (p.UnitCost is decimal unit)
-                        cost += unit * p.Qty;
+                var members = g.Members;
+                var cost = g.Cost;
                 var header = new MaterialsRow
                 {
                     IsGroup = true,
                     IsSystemHeader = true,   // жирная шапка, не редактируется
-                    Name = (g.Key.Length == 0 ? "Поставщик не указан" : g.Key) + "  ·  " + members.Count + " поз.",
+                    Name = (g.Supplier.Length == 0 ? "Поставщик не указан" : g.Supplier) + "  ·  " + members.Count + " поз.",
                     CostSumText = cost != 0m ? MatMoney(Money.Round2(cost)) : "",
-                    RowBackground = g.Key.Length == 0 ? "#FEF3C7" : "#F1F4F9",
+                    RowBackground = g.Supplier.Length == 0 ? "#FEF3C7" : "#F1F4F9",
                     MemberIds = members.Select(p => p.Id).ToArray(),
                 };
                 rows.Add(header);
@@ -634,31 +635,12 @@ public partial class EstimateView
 
     /// <summary>Выделенные позиции (cost_view._selected_positions): строки, члены групп,
     /// целые системы (только верхние строки, вне КП).</summary>
-    private List<long> MaterialsSelectedIds()
-    {
-        var ids = new List<long>();
-        var seen = new HashSet<long>();
-        void Add(long id)
-        {
-            if (id > 0 && seen.Add(id)) ids.Add(id);
-        }
-        foreach (var row in MaterialsGrid.SelectedItems.OfType<MaterialsRow>())
-        {
-            if (row.IsSystemHeader && !row.IsGroup)
-            {
-                foreach (var p in _materialsTop.Where(p => p.SystemId == row.SystemId)) Add(p.Id);
-            }
-            else if (row.MemberIds.Length > 0)
-            {
-                foreach (var id in row.MemberIds) Add(id);
-            }
-            else if (row.PositionId > 0 && !row.IsSub)
-            {
-                Add(row.PositionId);
-            }
-        }
-        return ids;
-    }
+    private static MaterialsSelectionRow SelectionRow(MaterialsRow row) =>
+        new(row.IsSystemHeader, row.IsGroup, row.IsSub, row.IsWork,
+            row.SystemId, row.PositionId, row.MemberIds);
+
+    private List<long> MaterialsSelectedIds() => MaterialsEditPolicy.SelectedIds(
+        _materialsTop, MaterialsGrid.SelectedItems.OfType<MaterialsRow>().Select(SelectionRow));
 
     // ------------------------------------------------------------------ editing
     private void MaterialsGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
@@ -701,6 +683,13 @@ public partial class EstimateView
                     e.Cancel = true;
                 }
                 return;
+            case "Факт по счёту":
+                if (locked)
+                {
+                    SetStatus("Подписанный документ: факт по счёту недоступен для изменения.", true);
+                    e.Cancel = true;
+                }
+                return;
         }
     }
 
@@ -726,6 +715,12 @@ public partial class EstimateView
         if (editor is null) return;
         var column = e.Column.Header?.ToString() ?? "";
         var text = editor.Text;
+        if (!MaterialsEditPolicy.CellAllowed(column, row.IsSub, MaterialsLocked))
+        {
+            SetStatus("Редактирование недоступно: проверьте блокировку сметы.", true);
+            e.Cancel = true;
+            return;
+        }
         // Opening and leaving an unchanged cell is not a write (including mixed groups).
         if (text == (column switch
         {
@@ -743,55 +738,13 @@ public partial class EstimateView
             : row.PositionId > 0 ? new List<long> { row.PositionId } : new List<long>();
         if (ids.Count == 0) { e.Cancel = true; return; }
 
-        // Валидация до записи (cost_view.save_cell). Поставщик и пометки — текст без валидации.
-        switch (column)
+        var validation = MaterialsEditPolicy.Validate(column, text);
+        if (!validation.Handled) return;
+        if (!validation.Allowed)
         {
-            case "Наименование":
-                if (text.Trim().Length == 0)
-                {
-                    SetStatus("Наименование не может быть пустым", true);
-                    e.Cancel = true;
-                    return;
-                }
-                break;
-            case "Цена клиенту":
-            case "Закуп за ед.":
-                if (text.Trim().Length > 0 && NumberText.Parse(text) is null)
-                {
-                    SetStatus("Недопустимое число: " + text.Trim(), true);
-                    e.Cancel = true;
-                    return;
-                }
-                break;
-            case "Наценка, %":
-                if (text.Trim().Length == 0) { e.Cancel = true; return; }
-                var pct = NumberText.Parse(text);
-                if (pct is null)
-                {
-                    SetStatus("Недопустимое число: " + text.Trim(), true);
-                    e.Cancel = true;
-                    return;
-                }
-                if (pct < -100m)
-                {
-                    SetStatus("Наценка не может быть меньше −100 %: цена ушла бы в минус", true);
-                    e.Cancel = true;
-                    return;
-                }
-                break;
-            case "Факт по счёту":
-                if (text.Trim().Length > 0 && NumberText.Parse(text) is null)
-                {
-                    SetStatus("Недопустимое число: " + text.Trim(), true);
-                    e.Cancel = true;
-                    return;
-                }
-                break;
-            case "Поставщик":
-            case "Пометки":
-                break;
-            default:
-                return;
+            if (validation.Error is { } error) SetStatus(error, true);
+            e.Cancel = true;
+            return;
         }
         _materialsBusy = true;
         SetStatus($"materials write: ids=[{string.Join(",", ids)}] text='{text}'", false);
@@ -805,6 +758,7 @@ public partial class EstimateView
             var revision = _materialsRevision;
             if (string.IsNullOrWhiteSpace(revision))
                 throw new InvalidOperationException("Снимок материалов не подтверждён.");
+            var expectedRevision = revision;
             _materialsRevision = "";
             switch (column)
             {
@@ -857,15 +811,7 @@ public partial class EstimateView
                 case "Наценка, %":
                 {
                     var pct = NumberText.Parse(text)!;
-                    var edits = new List<(long PositionId, string Input)>();
-                    foreach (var id in ids)
-                    {
-                        var position = _materialsById.GetValueOrDefault(id);
-                        var cu = position?.UnitCost;
-                        if (cu is not decimal unit || unit == 0m) continue;
-                        var price = SqlServerCostOperations.PriceFromMarkup(unit, pct.Value, wholeRubles: false);
-                        edits.Add((id, price.ToString("0.##", CultureInfo.InvariantCulture)));
-                    }
+                    var edits = MaterialsEditPolicy.MarkupEdits(ids, _materialsById, pct.Value);
                     if (edits.Count == 0)
                     {
                         SetStatus("Сначала впишите закупочную цену", true);
@@ -903,7 +849,7 @@ public partial class EstimateView
                     // Тот же поставщик, что на вкладке «Закупки» (procurement.set_proc).
                     var result = await Task.Run(() => SqlServerCostOperations.SetSupplierBatch(
                         _sqlConnectionString, _contractId, ids, text.Trim(), revision));
-                    _serverRevision = result.Revision;
+                    RecordMaterialsWriteReceipt(revision, result.Revision);
                     await LoadMaterialsAsync(force: true);
                     SetStatus(text.Trim().Length == 0
                         ? $"Поставщик убран — у {result.Changed} строк"
@@ -914,12 +860,12 @@ public partial class EstimateView
                 {
                     var result = await Task.Run(() => SqlServerCostOperations.SetCostFormatting(
                         _sqlConnectionString, _contractId, ids, "cost_note", text.Trim(), revision));
-                    _serverRevision = result.Revision;
+                    RecordMaterialsWriteReceipt(revision, result.Revision);
                     await LoadMaterialsAsync(force: true);
                     return;
                 }
             }
-            _serverRevision = revision;
+            RecordMaterialsWriteReceipt(expectedRevision, revision);
             await LoadMaterialsAsync(force: true);
             if (column is "Наименование" or "Цена клиенту" or "Закуп за ед." or "Наценка, %")
                 _ = ReloadDocumentAsync();
@@ -1162,11 +1108,8 @@ public partial class EstimateView
         _ => null
     };
 
-    private long[] MaterialsClearIds(string field) => MaterialsGrid.SelectedItems.OfType<MaterialsRow>()
-        .Where(row => !row.IsSystemHeader)
-        .Where(row => field != "price" || !row.IsSub && !row.IsWork)
-        .SelectMany(row => row.IsGroup ? row.MemberIds : new[] { row.PositionId })
-        .Where(id => id > 0).Distinct().OrderBy(id => id).ToArray();
+    private long[] MaterialsClearIds(string field) => MaterialsEditPolicy.ClearIds(field,
+        MaterialsGrid.SelectedItems.OfType<MaterialsRow>().Select(SelectionRow));
 
     private async void MaterialsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -1199,11 +1142,12 @@ public partial class EstimateView
                     "Очистка материалов", MessageBoxButton.YesNo, MessageBoxImage.Warning,
                     MessageBoxResult.No) != MessageBoxResult.Yes) return;
             if (contractId != _contractId || connectionString != _sqlConnectionString ||
-                _materialsRevision != revision || !MaterialsClearIds(field).SequenceEqual(ids) ||
+                !CanContinueMaterialsWrite(revision) || !MaterialsClearIds(field).SequenceEqual(ids) ||
                 (field is "price" or "cost_price") && MaterialsLocked) return;
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.ClearMaterialCells(
                 connectionString, contractId, ids, field, revision));
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus($"Очищено: {result.Changed}; пропущено: {result.Skipped}.", false);
             await LoadMaterialsAsync(force: true);
             _ = ReloadDocumentAsync();
@@ -1258,7 +1202,7 @@ public partial class EstimateView
         try
         {
             if (dialog.ShowDialog() != true) return;
-            if (_materialsRevision != selectedRevision ||
+            if (!CanContinueMaterialsWrite(selectedRevision) ||
                 !MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id)))
             {
                 SetStatus("Данные или выбор изменились. Повторите действие.", true);
@@ -1270,7 +1214,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SetSupplierBatch(
                 _sqlConnectionString, _contractId, ids, dialog.Value, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(dialog.Value.Length == 0
                 ? $"Поставщик убран — у {result.Changed} строк"
                 : $"Поставщик «{dialog.Value}» — у {result.Changed} строк", false);
@@ -1305,7 +1249,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SetCostFormatting(
                 _sqlConnectionString, _contractId, ids, "cost_color", color, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(color.Length == 0
                 ? $"Цвет снят: {result.Changed} строк"
                 : $"Покрашено строк: {result.Changed}", false);
@@ -1331,7 +1275,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.FillPurchaseFromCatalog(
                 _sqlConnectionString, _contractId, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(result.Changed > 0
                 ? $"Закуп подставлен из справочника: {result.Changed} поз."
                 : "В справочнике нет закупочных цен для пустых строк", false);
@@ -1369,7 +1313,7 @@ public partial class EstimateView
         try
         {
             if (dialog.ShowDialog() != true) return;
-            if (_materialsRevision != selectedRevision ||
+            if (!CanContinueMaterialsWrite(selectedRevision) || MaterialsLocked ||
                 !MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id)))
             {
                 SetStatus("Данные или выбор изменились. Повторите действие.", true);
@@ -1382,7 +1326,7 @@ public partial class EstimateView
             var result = await Task.Run(() => SqlServerCostOperations.MarkupMaterials(
                 _sqlConnectionString, _contractId, ids, dialog.Factor, dialog.PriceFromCost,
                 dialog.OnlyEmpty, dialog.WholeRubles, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus($"Пересчитано строк: {result.Changed}" +
                 (result.Skipped > 0 ? $" · без закупа пропущено: {result.Skipped}" : ""), false);
             await LoadMaterialsAsync(force: true);
@@ -1402,6 +1346,8 @@ public partial class EstimateView
     private async void MaterialsRequest_Click(object sender, RoutedEventArgs e)
     {
         if (!MaterialsSnapshotReady) return;
+        var expectedRevision = _materialsRevision;
+        var supplier = (MaterialsGrid.SelectedItem as MaterialsRow)?.Supplier ?? "";
         _materialsBusy = true;
         try
         {
@@ -1409,6 +1355,8 @@ public partial class EstimateView
             {
                 using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                 var revision = SqlServerDatabase.Revision(conn);
+                if (revision != expectedRevision)
+                    throw new InvalidOperationException("Материалы изменились. Обновите таблицу.");
                 var rows = SqlServerProcurement.BuyRows(_sqlConnectionString, _contractId);
                 var children = ProcurementRequestPlanner.ChildPositionIds(_sqlConnectionString, _contractId);
                 var info = ProcurementRequestPlanner.ReadDocumentInfo(_sqlConnectionString, _contractId);
@@ -1417,8 +1365,7 @@ public partial class EstimateView
                     throw new InvalidOperationException("Закупки изменились при чтении. Повторите формирование заявки.");
                 return (revision, rows, children, info, number);
             });
-            var selectedSupplier = (MaterialsGrid.SelectedItem as MaterialsRow)?.Supplier ?? "";
-            var supplier = selectedSupplier.Length > 0 ? selectedSupplier : "";
+            if (!CanContinueMaterialsWrite(expectedRevision)) return;
             var dialog = new ProcurementRequestDialog(
                 snapshot.info, snapshot.rows, snapshot.children,
                 snapshot.number, supplier)
@@ -1430,6 +1377,12 @@ public partial class EstimateView
             }
             if (dialog.MarkedIds.Count > 0)
             {
+                if (!CanContinueMaterialsWrite(snapshot.revision) || MaterialsLocked)
+                {
+                    SetStatus("Excel сохранён, но строки НЕ отмечены заказанными: смета изменилась или заблокирована.", true);
+                    return;
+                }
+                _materialsRevision = "";
                 var saved = await Task.Run(() => SqlServerProcurement.SetProc(
                     _sqlConnectionString, _contractId, dialog.MarkedIds, null, "ordered",
                     $"Заявка №{(string.IsNullOrWhiteSpace(dialog.RequestNumber) ? "б/н" : dialog.RequestNumber)}",
@@ -1440,7 +1393,7 @@ public partial class EstimateView
                     await LoadMaterialsAsync(force: true);
                     return;
                 }
-                _serverRevision = saved.Revision;
+                RecordMaterialsWriteReceipt(snapshot.revision, saved.Revision);
                 SetStatus($"Заявка сохранена; отмечено «Заказано»: {dialog.MarkedIds.Count} позиций.", false);
             }
             else
@@ -1450,6 +1403,7 @@ public partial class EstimateView
         catch (Exception ex)
         {
             SetStatus("Ошибка заявки: " + ex.Message, true);
+            await LoadMaterialsAsync(force: true);
         }
         finally
         {
@@ -1520,9 +1474,11 @@ public partial class EstimateView
                     throw new InvalidOperationException("Материалы изменились при расчёте транспорта.");
                 return (current, suppliers);
             });
+            if (!CanContinueMaterialsWrite(revision) || !ReferenceEquals(data, _materialsData)) return;
             var dialog = new CostTransportDialog(snapshot.current, snapshot.suppliers, data.Locked)
             { Owner = Window.GetWindow(this) };
-            if (dialog.ShowDialog() != true || revision != _materialsRevision) return;
+            if (dialog.ShowDialog() != true || !CanContinueMaterialsWrite(revision) ||
+                !ReferenceEquals(data, _materialsData)) return;
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SaveTransport(
                 _sqlConnectionString, _contractId, dialog.OurCost, dialog.CustomerAmount,
@@ -1533,7 +1489,7 @@ public partial class EstimateView
                 await LoadMaterialsAsync(force: true);
                 return;
             }
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus("Транспорт сохранён" + (data.Locked ? "" : " — итог сметы тоже обновлён"), false);
             await LoadMaterialsAsync(force: true);
             _ = ReloadDocumentAsync();

@@ -251,10 +251,14 @@ public partial class PtoEditorWindow : Window
             x.CreatedUtc.ToString("dd.MM.yyyy HH:mm")+" UTC  ·  "+x.RelativePath).ToArray()};
         bool opening=false,closed=false;
         dlg.Closed+=(_,_)=>closed=true;
-        list.MouseDoubleClick+=async (_,_)=>
+        list.MouseDoubleClick+=async (_,e)=>
         {
-            if(opening||closed||list.SelectedIndex<0)return;
-            var release=releases[list.SelectedIndex];
+            if(opening||closed||e.ChangedButton!=MouseButton.Left||
+                e.OriginalSource is not DependencyObject source||
+                ItemsControl.ContainerFromElement(list,source) is not ListBoxItem item)return;
+            var index=list.ItemContainerGenerator.IndexFromContainer(item);
+            if(index<0||index>=releases.Count)return;
+            var release=releases[index];
             opening=true;list.IsEnabled=false;
             try
             {
@@ -314,7 +318,13 @@ public partial class PtoEditorWindow : Window
             HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,7,0,0)};
         DockPanel.SetDock(button,Dock.Bottom);dock.Children.Add(button);
         var list=new ListBox{ItemsSource=data};
-        list.MouseDoubleClick+=(_,_)=>{if(list.SelectedItem is not null)dialog.DialogResult=true;};
+        list.MouseDoubleClick+=(_,e)=>
+        {
+            if(e.ChangedButton!=MouseButton.Left||e.OriginalSource is not DependencyObject source||
+                ItemsControl.ContainerFromElement(list,source) is not ListBoxItem item||item.Content is not T clicked)return;
+            list.SelectedItem=clicked;
+            dialog.DialogResult=true;
+        };
         button.Click+=(_,_)=>{if(list.SelectedItem is not null)dialog.DialogResult=true;};
         dock.Children.Add(list);dialog.Content=dock;
         return dialog.ShowDialog()==true?list.SelectedItem as T:null;
@@ -337,22 +347,18 @@ public partial class PtoEditorWindow : Window
         var temp=Path.Combine(folder,"vor.xlsx");
         try
         {
-            var attachment=await Task.Run(()=>
+            var committed=await Task.Run(()=>
             {
                 using(var book=KsVorForms.Create(snapshot.Print,chosen.Id))book.SaveAs(temp);
                 _source.RequireKsRevision(chosen.Revision);
-                return _archive.AddAttachment(_data,temp,
-                    "ВОР по КС № "+chosen.Number+" от "+chosen.Date,"ВОР");
+                return _archive.AddVor(_data,temp,
+                    "ВОР по КС № "+chosen.Number+" от "+chosen.Date,rows,chosen.Revision);
             });
-            // The bound work list is changed only on the dispatcher.
-            foreach(var item in rows)item.AttachmentId=attachment.Id;
-            _data.Positions.AddRange(rows);
-            await Task.Run(()=>_archive.Sql.Save(_data));
+            PublishVor(committed);
         }
         finally
         {
             try{Directory.Delete(folder,true);}catch(IOException){}catch(UnauthorizedAccessException){}
-            WorksGrid.Items.Refresh();RefreshFiles();InvalidateReview();UpdateRevisionLabel();
         }
     });
     private async void ExternalVor_Click(object sender,RoutedEventArgs e)=>await RunAsync(async ()=>
@@ -361,23 +367,39 @@ public partial class PtoEditorWindow : Window
         var picker=new OpenFileDialog{Title="Внешняя ведомость объёмов работ",
             Filter="Excel (*.xlsx)|*.xlsx"};
         if(picker.ShowDialog(this)!=true)return;
-        var dialog=new PtoVorWindow(picker.FileName){Owner=this};
-        if(dialog.ShowDialog()!=true || dialog.Parsed is not { } parsed)return;
-        if(parsed.Rows.Count==0)
-            throw new ArgumentException("В выбранной таблице нет строк с наименованиями и объёмами.");
-        var path=picker.FileName;
+        // Preview and archive the same private workbook snapshot. The source
+        // may be changed or replaced by another user while the dialog is open.
+        var source=picker.FileName;
+        var folder=Directory.CreateTempSubdirectory("gmc-pto-vor-").FullName;
+        var path=Path.Combine(folder,Path.GetFileName(source));
         try
         {
-            var attachment=await Task.Run(()=>_archive.AddAttachment(_data,path,
-                "Внешняя ВОР — "+Path.GetFileName(path),"ВОР"));
-            foreach(var item in parsed.Rows)item.AttachmentId=attachment.Id;
-            _data.Positions.AddRange(parsed.Rows);
-            await Task.Run(()=>_archive.Sql.Save(_data));
+            await Task.Run(()=>File.Copy(source,path,overwrite:false));
+            var dialog=new PtoVorWindow(path){Owner=this};
+            if(dialog.ShowDialog()!=true || dialog.Parsed is not { } parsed)return;
+            if(parsed.Rows.Count==0)
+                throw new ArgumentException("В выбранной таблице нет строк с наименованиями и объёмами.");
+            var committed=await Task.Run(()=>_archive.AddVor(_data,path,
+                "Внешняя ВОР — "+Path.GetFileName(path),parsed.Rows));
+            PublishVor(committed);
+            if(parsed.Warnings.Count>0)
+                ShowText("Предупреждения при импорте ВОР",string.Join("\n",parsed.Warnings));
         }
-        finally{WorksGrid.Items.Refresh();RefreshFiles();InvalidateReview();UpdateRevisionLabel();}
-        if(parsed.Warnings.Count>0)
-            ShowText("Предупреждения при импорте ВОР",string.Join("\n",parsed.Warnings));
+        finally
+        {
+            try{Directory.Delete(folder,true);}catch(IOException){}catch(UnauthorizedAccessException){}
+        }
     });
+
+    private void PublishVor(PtoPackage committed)
+    {
+        // Keep the bound collection instance and existing selection; only the
+        // confirmed append is published on the dispatcher.
+        PtoVorImport.Publish(_data,committed);
+        StatusCombo.SelectedItem=_data.Status;
+        ReviewCheck.IsChecked=_data.ManualReview;
+        WorksGrid.Items.Refresh();RefreshFiles();UpdateRevisionLabel();
+    }
 
     private void RefreshFiles()
     {

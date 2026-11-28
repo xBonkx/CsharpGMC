@@ -97,49 +97,16 @@ public sealed partial class SqlServerPeopleAccess
     public (IReadOnlyList<PeoplePerson> People, IReadOnlyList<PeopleCar> Cars, string Revision) Load(
         bool showInactive, CancellationToken token = default)
     {
-        // A second pass when a different client writes during the read gives a consistent snapshot.
         for (var attempt = 0; attempt < 3; attempt++)
         {
             using var conn = Open(token);
-            string Revision() => token.CanBeCanceled
-                ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
-                : SqlServerDatabase.Revision(conn);
-            var before = Revision();
-            var people = new List<PeoplePerson>();
-            var cars = new List<PeopleCar>();
-            using (var cmd = Command(conn, null,
-                "SELECT id,fio,post,birth,note,fio_gen,post_gen,active,sort_order FROM dbo.people " +
-                (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
-            using (var registration = SqlReadCancellation.Register(cmd, token))
-            using (var reader = SqlReadCancellation.ExecuteReader(cmd, token))
-                while (reader.Read())
-                {
-                    token.ThrowIfCancellationRequested();
-                    people.Add(ReadPerson(reader));
-                }
-            using (var cmd = Command(conn, null,
-                "SELECT id,model,plate,note,active,sort_order FROM dbo.cars " +
-                (showInactive ? "" : "WHERE active=1 ") + "ORDER BY sort_order,id"))
-            using (var registration = SqlReadCancellation.Register(cmd, token))
-            using (var reader = SqlReadCancellation.ExecuteReader(cmd, token))
-                while (reader.Read())
-                {
-                    token.ThrowIfCancellationRequested();
-                    cars.Add(ReadCar(reader));
-                }
-            token.ThrowIfCancellationRequested();
-            var after = Revision();
-            token.ThrowIfCancellationRequested();
-            if (before == after)
-            {
-                var sortedPeople = PeopleRules.SortPeople(people);
-                var sortedCars = cars.OrderBy(x => x.SortOrder == 0 ? int.MaxValue : x.SortOrder)
-                    .ThenBy(x => x.Model).ThenBy(x => x.Plate).ToArray();
-                token.ThrowIfCancellationRequested();
-                return (sortedPeople, sortedCars, after);
-            }
+            var before = ReadAccessRevision(conn, token);
+            var directory = ReadDirectory(conn, showInactive, token);
+            var after = ReadAccessRevision(conn, token);
+            if (IsSameReadRevision(before, after))
+                return (directory.People, directory.Cars, after);
         }
-        throw new DBConcurrencyException("Справочник меняется в другом окне. Повторите загрузку.");
+        throw new DBConcurrencyException("Справочник меняется в другом окне или отсутствует ревизия. Повторите загрузку.");
     }
 
     // SQL Server copies may store sort_order as INT or BIGINT.
@@ -458,6 +425,11 @@ public sealed partial class SqlServerPeopleAccess
     public AccessSite Site(long objectId, CancellationToken token = default)
     {
         using var conn = Open(token);
+        return ReadSite(conn, objectId, token);
+    }
+
+    private static AccessSite ReadSite(SqlConnection conn, long objectId, CancellationToken token)
+    {
         using var cmd = Command(conn, null, """
             SELECT o.id,o.name,o.address,o.site_full,o.work_title,o.folder,
             COALESCE(NULLIF(o.cust_org,N''),o.customer),
@@ -481,6 +453,11 @@ public sealed partial class SqlServerPeopleAccess
     public IReadOnlyList<AccessCompany> Companies(CancellationToken token = default)
     {
         using var conn = Open(token);
+        return ReadCompanies(conn, token);
+    }
+
+    private static IReadOnlyList<AccessCompany> ReadCompanies(SqlConnection conn, CancellationToken token)
+    {
         using var cmd = Command(conn, null,
             "SELECT id,name,address,inn_kpp,signer_post,signer_name FROM dbo.companies ORDER BY [order],id");
         using var registration = SqlReadCancellation.Register(cmd, token);
@@ -500,6 +477,11 @@ public sealed partial class SqlServerPeopleAccess
     {
         if (kind is not ("list" or "order")) throw new ArgumentException("Недопустимый тип истории.");
         using var conn = Open(token);
+        return ReadHistory(conn, objectId, kind, token);
+    }
+
+    private static IReadOnlyList<AccessHistory> ReadHistory(SqlConnection conn, long objectId, string kind, CancellationToken token)
+    {
         using var cmd = Command(conn, null, """
             SELECT a.id,a.object_id,a.kind,a.created_at,a.[file],a.[user],a.[data]
             FROM dbo.access_lists a INNER JOIN dbo.objects o ON o.id=a.object_id

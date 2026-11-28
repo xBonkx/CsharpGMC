@@ -49,7 +49,11 @@ public sealed class PeopleMutationLifecycleTests
         Assert.Contains("_db.Site(objectId) != site || !_db.Companies().SequenceEqual(companies)",code);
         Assert.Contains("await MutateAsync(expected => _db.RegisterExport",code);
         Assert.Contains("_registrationUncertain = true;",code);
-        Assert.Contains("await RefreshHistoryAsync();",code);
+        Assert.Contains("await RefreshHistoryAsync(registeredId);",code);
+        Assert.Contains("registeredId = registered.Id;",code);
+        Assert.Contains("ApplyHistory(history, registeredId);",code);
+        Assert.Contains("h.History.Id == registeredId.Value",code);
+        Assert.Contains("if (!history.Any(h => h.Id == registeredId))",code);
         Assert.Contains("CommitChecks()",code);
     }
 }

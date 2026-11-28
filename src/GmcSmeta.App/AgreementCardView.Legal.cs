@@ -45,7 +45,7 @@ public partial class AgreementCardView
     }
 
     private SqlServerAgreements.Values? ReadLegal(SqlServerKsRequisites.Values print) =>
-        _snapshot is { LegalEnabled: true } snapshot ? new(snapshot.SelectedLegal?.Id ?? 0, _objectId,
+        _snapshot is { LegalEnabled: true, RequiresLegalSelection: false } snapshot ? new(snapshot.SelectedLegal?.Id ?? 0, _objectId,
             AgreementNumberBox.Text, AgreementDateBox.Text, LegalCompanySelector.SelectedValue is long id ? id : null,
             LegalSubjectBox.Text, LegalWorksEndBox.Text, LegalCustomerAddressBox.Text, LegalContractorFullBox.Text,
             LegalContractorPostBox.Text, LegalContractorNameBox.Text, print) : null;

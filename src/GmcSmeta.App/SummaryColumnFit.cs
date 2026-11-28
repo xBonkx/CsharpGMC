@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,8 +39,20 @@ internal sealed class SummaryColumnFit
         grid.IsVisibleChanged += (_, _) => Request();
         grid.SizeChanged += (_, e) => { if (e.WidthChanged) Request(); };
         grid.Columns.CollectionChanged += (_, _) => Request();
+        // Source identity alone is insufficient for a mutable collection.
+        CollectionChangedEventManager.AddHandler(grid.Items, (_, _) => InvalidateMeasurements());
+        grid.CellEditEnding += (_, e) =>
+        {
+            if (e.EditAction == DataGridEditAction.Commit) InvalidateMeasurements();
+        };
         grid.LayoutUpdated += (_, _) => ObserveMetrics();
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(ViewportChanged), true);
+    }
+
+    private void InvalidateMeasurements()
+    {
+        _minimums = null;
+        Request();
     }
 
     private void ObserveMetrics()

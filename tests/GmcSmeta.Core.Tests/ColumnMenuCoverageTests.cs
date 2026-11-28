@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.Core.Tests;
 
@@ -17,7 +18,7 @@ public sealed class ColumnMenuCoverageTests
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
         XNamespace local = "clr-namespace:GmcSmeta.App";
-        var profiles = new HashSet<string>(StringComparer.Ordinal);
+        var profiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var specials = new HashSet<string>(StringComparer.Ordinal);
         var missing = new List<string>();
         foreach (var file in Directory.EnumerateFiles(app, "*.xaml", SearchOption.AllDirectories)
@@ -31,6 +32,7 @@ public sealed class ColumnMenuCoverageTests
                 var location = Path.GetFileName(file) + ":" + name;
                 if (!string.IsNullOrWhiteSpace(key))
                 {
+                    if (!ColumnLayoutKeyPolicy.IsValid(key)) missing.Add(location + ": invalid profile " + key);
                     if (!profiles.Add(key)) missing.Add(location + ": duplicate profile " + key);
                 }
                 else if (location is "EstimateView.xaml:EstimateGrid" or "StagesDialog.xaml:StagesGrid")
@@ -43,6 +45,39 @@ public sealed class ColumnMenuCoverageTests
         Assert.NotEmpty(profiles);
         Assert.Contains("TableColumnMenu.InstallHeaderMenu(EstimateGrid", File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs")));
         Assert.Contains("TableColumnMenu.AppendDynamicMenu(StagesGrid, StageMenu)", File.ReadAllText(Path.Combine(app, "StagesDialog.xaml.cs")));
+    }
+
+    [Theory]
+    [InlineData("agreement.sources", true)]
+    [InlineData("stage-distribution-42", true)]
+    [InlineData("estimate_summary", true)]
+    [InlineData("a.b.c", true)]
+    [InlineData("../other", false)]
+    [InlineData("a..b", false)]
+    [InlineData(".a", false)]
+    [InlineData("a.", false)]
+    [InlineData("a/b", false)]
+    [InlineData("a\\b", false)]
+    [InlineData("C:drive", false)]
+    [InlineData("", false)]
+    public void ProfileKeyAcceptsNamespacedKeysButRejectsPathSyntax(string key, bool expected) =>
+        Assert.Equal(expected, ColumnLayoutKeyPolicy.IsValid(key));
+
+    [Fact]
+    public void CachedGridReloadsLatestProfileWithoutRecapturingDefaults()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "TableColumnMenu.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "TableColumnMenu.cs"));
+        Assert.Contains("grid.Loaded += (_, _) => layout.OnLoaded();", code);
+        Assert.Contains("ApplyProfile(Read(), restoreDefaults: true);", code);
+        Assert.Contains("entry.Column.Width = entry.Width;", code);
+        Assert.Contains("ApplyOrder(latest.Order);", code);
+        Assert.Contains("generation == _profileGeneration", code);
+        Assert.Contains("_entries.Where(x => !x.Excluded)", code);
+        Assert.Contains("if (!Current() || entry.Protected", code);
     }
 
     [Fact]

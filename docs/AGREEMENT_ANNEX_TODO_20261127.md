@@ -203,3 +203,29 @@ DDL/рабочая БД/версия/релиз не менялись. AGR-11 т
 - AGR-08.01 CODE READY: SqlServerDirector.ReadRows сохраняет объектный финансовый scope и отмечает mixed/unlinked legal ID; DirectorView показывает предупреждение и открывает точный ObjectId выбранной строки. SearchAsync параметризован, независимый agreement hit с AgreementId, MainWindow.Navigation после reload проверяет object и открывает exact legal ID, документы/позиции сохраняют ContractId. Новый код: AgreementSearchTitle показывает ID и при заполненном номере/дате, устраняя визуально одинаковые результаты; unit-сценарий. Раздельная юридическая сводка не согласована и не добавлена.
 - AGR-07.01/02 PARTIAL: не менялись финансовые формулы/агрегаты/разделы сметы/стадий и object-wide выдачи; ранее подтверждённые read scope проверки сохраняются. Полная независимая проверка двух legal ID, подписей, остатков и сумм, всех write/readback маршрутов не завершена; требуются тестовые снимки и Pilot.
 - Статическая сверка/patch anchors на 5e7acae309f2; 1 новый дочерний CODE READY, 4 PARTIAL, 0 DONE, 0 повышений родителей. .NET/Windows/SQL/EXE не запускались. Рабочая БД, DDL, релиз не менялись; бронь chat-agr-fin-1453 снята.
+
+
+<a id="agr-map-transfer-20261129"></a>
+
+### 29.11.2026 — карта модели и безопасный перенос AGR
+
+AGR-01.01 — CODE READY (аналитический пакет, не новая реализация). Фактическая модель по Workspace.cs, SqlServerAgreements, SqlServerKsContractScope, SqlServerAgreementFiles и SqlServerWorkspace.ContractTransfer:
+
+| Уровень | Ключ и поля | Связь / фактическое правило |
+|---|---|---|
+| Стройка | objects.id, name, customer, address, folder, site_full, archived/archived_on | Общие физический объект, папка и архив; не юридический договор |
+| Юридический договор | agreements.id, object_id, number, agreement_date, company_id, subject, works_start/end, customer_address, печатные стороны/подписи, archived | Независимая карточка; несколько на один объект, в том числе без приложений; active same-object ID, не номер |
+| Приложение | contracts.id, object_id, kind=main, agreement_id, annex_number, number/date/company_id | Сметный ID сохраняется; старые поля остаются для исторических расчётов, не определяют legal ID |
+| ДС | contracts.kind=dop, base_contract_id, agreement_id, number/date | Собственные реквизиты ДС; новый ДС наследует действующее основание и организацию; legacy без связи не угадывать |
+| КП | contracts.kind=kp, kp_phase | Самостоятельный документ без legal ID, кроме stage/rest, которые наследуют связь родителя |
+| Этап/остаток | stage_of, stage_no, stage_rest | Идентичность родителя и исходных позиций, не отдельный договор; Navigation.Documents хранит порядок и вложенность |
+| Деньги/КС | systems.contract_id, positions.system_id, acts.contract_id, movements.position_id | Сметные ID не меняются; старая общая КС-3 использует effective number + object + group, при неоднозначности guard; opening marker исторический |
+| PDF | agreement_files.agreement_id, role, signed, sha256, file_address | Независимо от файлов сметы; версии, проверка SHA и active legal/object; архив/неизвестный COMMIT не удаляют файл |
+| История | change_log, trash snapshots | SqlServerTrash включает agreements/metadata; restore/forget ограничены TrashRestoreSafety; перенос с файлами/существующим target запрещён |
+
+Неоднозначности: совпадающие номера/даты разных legal ID, несколько номеров одного legal ID, пустые поля, отсутствующее/чужое/архивное основание ДС, отсутствующий parent этапа, КП без связи, архив. AgreementAudit.Inspect — legacy диагностический список; AGR-01.02 реальный Pilot остаётся. Родитель AGR-01 PARTIAL.
+
+- AGR-03.01 PARTIAL: новый код SelectLegalCard не выбирает первую из нескольких карточек при входе с объекта. Требует явный выбор или явное создание, save и редактирование отключены до выбора; точное открытие по ID и единственная карточка сохранены. Добавлены unit/source проверки. Дерево и object totals по-прежнему используют объектную legacy-проекцию без полного набора legal ID; отдельная группировка/заголовки не завершены.
+- AGR-06.02/08.03 PARTIAL: ReadTransferLegalContext проверяет полный набор документов legal ID (включая этапы и чужую повреждённую связь), отсутствие прикреплённых legal PDF, подписанных/locked документов и КС до выбора назначения и повторно при записи. Существующая защита target/архива/ревизии/выдачи сохранена; файлы не перемещаются и не удаляются, никакого silent split. Unit-сценарий покрытия добавлен. Решение владельца требуется для отдельной миграции подписанных файлов/истории и допустимых частичных переносов. Trash read-only review: снимки legal/files и запреты restore/forget ранее реализованы, BUG-F23 занят другим агентом; не менялись. Полная архивная политика и Windows/UNC приёмка остаются.
+- AGR-08.02 UNVERIFIED: письма применяют контекст в той же транзакции, PTO хранит отдельный legal ID и источник сметы, приказы требуют точную активную карточку и подписанта, допуски и паспорта остаются объектными. Другой агент занят orders/letters readers; не изменяли их. Полная сверка history/архива не завершена.
+- Статическая сверка/patch anchors на 22e53d8aff60. 0 новых закрытых реализационных пакетов, 1 аналитический CODE READY, 3 PARTIAL, 1 возвращён UNVERIFIED, 0 DONE, 0 повышений родителей. .NET/Windows/SQL/EXE не запускались. Рабочая БД, DDL, релиз не менялись; бронь chat-agr-map-1457 снята.

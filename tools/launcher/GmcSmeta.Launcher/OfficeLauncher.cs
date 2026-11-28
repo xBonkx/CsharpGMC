@@ -22,8 +22,11 @@ internal static class OfficeLauncher
     public static bool InstallLauncher(string root, string[] arguments)
     {
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Не найден запускающий EXE.");
-        var local = Path.Combine(root, FileName);
-        if (string.Equals(executable, local, StringComparison.OrdinalIgnoreCase))
+        var local = Path.GetFullPath(Path.Combine(root, FileName));
+        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0 ||
+            (File.Exists(local) && (File.GetAttributes(local) & FileAttributes.ReparsePoint) != 0))
+            throw new InvalidOperationException("Рабочий лаунчер не может использовать перенаправленный путь.");
+        if (string.Equals(Path.GetFullPath(executable), local, StringComparison.OrdinalIgnoreCase))
             return false;
 
         // A fresh download must not replace a launcher that has already updated itself.
@@ -39,12 +42,16 @@ internal static class OfficeLauncher
             finally { File.Delete(temporary); }
         }
 
-        CreateDesktopShortcut(local);
+        // Recheck the target after installation, before executing it.
+        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0 ||
+            (File.GetAttributes(local) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Рабочий лаунчер не может использовать перенаправленный путь.");
 
         var start = new ProcessStartInfo(local) { UseShellExecute = false };
         foreach (var argument in arguments)
             start.ArgumentList.Add(argument);
         using var child = Process.Start(start) ?? throw new InvalidOperationException("Локальный запуск не удался.");
+        CreateDesktopShortcut(local);
         return true;
     }
 

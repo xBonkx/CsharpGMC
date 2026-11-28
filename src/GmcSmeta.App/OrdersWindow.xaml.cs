@@ -28,6 +28,7 @@ public partial class OrdersWindow : Window
     private bool _initializing = true;
     private bool _registrationUncertain;
     private bool _issuing;
+    private bool _folderActionBusy;
     private static readonly string TemplateSettings = Path.Combine(
         GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "orders-off.json");
@@ -77,18 +78,28 @@ public partial class OrdersWindow : Window
             {
                 token.ThrowIfCancellationRequested();
                 var db = createDatabase(token);
-                var site = db.OrderSite(_objectId, _documentId, token);
                 var directory = db.Load(false, token);
+                var site = db.OrderSite(_objectId, _documentId, token);
                 var people = directory.People.Where(p => p.Active).ToList();
                 var companies = db.Companies(token).ToList();
                 var history = db.History(_objectId, "order", token);
+                if (string.IsNullOrWhiteSpace(directory.Revision) || directory.Revision != db.OrderReadRevision(token))
+                    throw new System.Data.DBConcurrencyException("Данные приказов изменились при загрузке. Откройте окно заново.");
                 token.ThrowIfCancellationRequested();
                 var folder = Directory.Exists(site.Folder) ? Path.Combine(site.Folder, "допуск") :
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                         "Допуск", PeopleRules.SafeFileName(site.Name), "допуск");
+                var uncheckedNames = DisabledTemplates();
+                var templates = PeopleDocuments.Templates().Select(path => new OrderTemplateChoice
+                {
+                    Path = path, Title = PeopleDocuments.TemplateTitle(path),
+                    Checked = !uncheckedNames.Contains(Path.GetFileName(path))
+                }).ToArray();
+                var lastResponsible = LastResponsible(history);
                 token.ThrowIfCancellationRequested();
                 return (Db: db, Site: site, People: people, Revision: directory.Revision,
-                    Companies: companies, History: history, Folder: folder);
+                    Companies: companies, History: history, Folder: folder,
+                    Templates: templates, LastResponsible: lastResponsible);
             }, token);
             if (_closed || token.IsCancellationRequested) return;
             _db = snapshot.Db;
@@ -99,7 +110,7 @@ public partial class OrdersWindow : Window
             _folder = snapshot.Folder;
             ObjectName.Text = _site.Name;
             PersonBox.ItemsSource = _people;
-            var lastResponsible = LastResponsible(snapshot.History);
+            var lastResponsible = snapshot.LastResponsible;
             PersonBox.SelectedItem = _people.FirstOrDefault(p => p.Id == lastResponsible) ??
                 _people.FirstOrDefault(p => p.Post.Contains("прораб",
                     StringComparison.OrdinalIgnoreCase)) ?? _people.FirstOrDefault();
@@ -110,10 +121,7 @@ public partial class OrdersWindow : Window
             DayPicker.SelectedDate = DateTime.Today;
             NumberBox.Text = DateTime.Today.ToString("dd/MM", CultureInfo.InvariantCulture) + "-01";
             FolderInfo.Text = _folder;
-            var uncheckedNames = DisabledTemplates();
-            foreach (var path in PeopleDocuments.Templates())
-                _templates.Add(new OrderTemplateChoice { Path = path, Title = PeopleDocuments.TemplateTitle(path),
-                    Checked = !uncheckedNames.Contains(Path.GetFileName(path)) });
+            _templates.AddRange(snapshot.Templates);
             TemplateList.ItemsSource = _templates;
             if (_templates.Count == 0)
                 StatusInfo.Text = "Нет Word-шаблонов. Положите .docx в папку шаблонов.";
@@ -170,10 +178,9 @@ public partial class OrdersWindow : Window
         }
         catch (Exception) { return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
     }
-    private void SaveTemplateSettings()
+    private static void SaveTemplateSettings(string[] disabled)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(TemplateSettings)!);
-        var disabled = _templates.Where(x => !x.Checked).Select(x => Path.GetFileName(x.Path)).ToArray();
         File.WriteAllText(TemplateSettings, JsonSerializer.Serialize(disabled));
     }
 
@@ -212,29 +219,47 @@ public partial class OrdersWindow : Window
         if (NumberBox is null || DayPicker?.SelectedDate is not DateTime day) return;
         NumberBox.Text = day.ToString("dd/MM", CultureInfo.InvariantCulture) + "-01";
     }
-    private void Templates_Click(object sender, RoutedEventArgs e)
+    private async Task RunFolderActionAsync(Func<Task> action)
     {
-        try
+        if (_closed || _initializing || _issuing || _folderActionBusy || _historyOpenCancellation is not null) return;
+        _folderActionBusy = true;
+        var wasMakeEnabled = MakeButton.IsEnabled;
+        MakeButton.IsEnabled = false;
+        try { await action(); }
+        catch (Exception ex) { if (!_closed) Error(ex.Message); }
+        finally
         {
-            Directory.CreateDirectory(PeopleDocuments.TemplatesFolder);
-            Process.Start(new ProcessStartInfo(PeopleDocuments.TemplatesFolder) { UseShellExecute = true });
-        }
-        catch (Exception ex) { Error(ex.Message); }
-    }
-    private void OutputFolder_Click(object sender, RoutedEventArgs e)
-    {
-        var choose = new OpenFolderDialog
-        {
-            Title = "Папка для выданных приказов",
-            InitialDirectory = Directory.Exists(_folder) ? _folder :
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-        };
-        if (choose.ShowDialog(this) == true)
-        {
-            _folder = choose.FolderName;
-            FolderInfo.Text = _folder;
+            _folderActionBusy = false;
+            if (!_closed) MakeButton.IsEnabled = wasMakeEnabled && !_registrationUncertain;
         }
     }
+
+    private async void Templates_Click(object sender, RoutedEventArgs e) =>
+        await RunFolderActionAsync(async () =>
+        {
+            var folder = PeopleDocuments.TemplatesFolder;
+            await Task.Run(() => Directory.CreateDirectory(folder));
+            if (!_closed) Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        });
+
+    private async void OutputFolder_Click(object sender, RoutedEventArgs e) =>
+        await RunFolderActionAsync(async () =>
+        {
+            var folder = _folder;
+            var initial = await Task.Run(() => Directory.Exists(folder) ? folder :
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            if (_closed) return;
+            var choose = new OpenFolderDialog
+            {
+                Title = "Папка для выданных приказов",
+                InitialDirectory = initial
+            };
+            if (choose.ShowDialog(this) == true && !_closed)
+            {
+                _folder = choose.FolderName;
+                FolderInfo.Text = _folder;
+            }
+        });
     private void History_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _historyOpenCancellation?.Cancel();
@@ -242,7 +267,7 @@ public partial class OrdersWindow : Window
 
     private async void OpenHistory_Click(object sender, RoutedEventArgs e)
     {
-        if (_closed || _initializing || _issuing || _historyOpenCancellation is not null ||
+        if (_closed || _initializing || _issuing || _folderActionBusy || _historyOpenCancellation is not null ||
             OrderHistory.SelectedItem is not OrderHistoryItem selected) return;
         using var cancellation = new CancellationTokenSource();
         _historyOpenCancellation = cancellation;
@@ -280,6 +305,7 @@ public partial class OrdersWindow : Window
         if (_closed || _initializing || string.IsNullOrWhiteSpace(_revision)) return;
         if (_historyOpenCancellation is not null) return;
         if (_issuing) return;
+        if (_folderActionBusy) return;
         if (OrderAgreementPolicy.BlockReason(_site, _companies) is { } blocked) { Error(blocked); return; }
         if (_registrationUncertain) { Error("Проверьте журнал и файлы, затем заново откройте окно."); return; }
         var chosen = _templates.Where(x => x.Checked)
@@ -295,6 +321,7 @@ public partial class OrdersWindow : Window
             person with { }, when, number, NumberBox.Text, ContractBox.Text.Trim(), site,
             _folder, _revision, chosen, Guid.NewGuid());
 
+        var disabledTemplates = _templates.Where(x => !x.Checked).Select(x => Path.GetFileName(x.Path)).ToArray();
         _issuing = true;
         OrderContent.IsEnabled = false;
         MakeButton.IsEnabled = false;
@@ -324,7 +351,7 @@ public partial class OrdersWindow : Window
                 StatusInfo.Text += " " + result.Warning;
                 return;
             }
-            try { SaveTemplateSettings(); }
+            try { await Task.Run(() => SaveTemplateSettings(disabledTemplates)); }
             catch (Exception) { /* optional UI preference cannot invalidate issued orders */ }
             try { Process.Start(new ProcessStartInfo(request.Folder) { UseShellExecute = true }); }
             catch (Exception ex) { StatusInfo.Text += " Не удалось открыть папку: " + ex.Message; }

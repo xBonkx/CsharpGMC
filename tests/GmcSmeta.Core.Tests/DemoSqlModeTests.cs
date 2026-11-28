@@ -110,4 +110,51 @@ public sealed class DemoSqlModeTests
         Assert.True(reader.Read());
         DemoMode.ValidateIdentity(reader, Db, "LOCAL");
     }
+
+    [Fact]
+    public void InstalledDemoExecutableWithoutArgumentsCannotBecomeOfficeApp()
+    {
+        var local = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "local"));
+        var root = DemoMode.ResolveProfileRoot(local, Db);
+        var executable = Path.Combine(root, "launcher", "apps", "1.2.3-sc", "GMC-Smeta-Next.exe");
+        Assert.Throws<InvalidOperationException>(() => DemoMode.RequireExplicitLaunch([], local, executable));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.RequireExplicitLaunch(["--smoke-test"], local, executable));
+        DemoMode.RequireExplicitLaunch(["--demo", Db], local, executable);
+        DemoMode.RequireExplicitLaunch([], local, Path.Combine(local, "GMC-Smeta-Office", "apps", "1.2.3-sc", "GMC-Smeta-Next.exe"));
+        DemoMode.RequireExplicitLaunch([], local, Path.Combine(local, "GMC-Smeta-Demo", "CSharp-other", "GMC-Smeta-Next.exe"));
+    }
+
+    [Fact]
+    public void DemoWorkspacePathCheckRejectsRelativeAndSiblingPaths()
+    {
+        var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "demo-workspace"));
+        Assert.True(DemoMode.IsWithin(root, root));
+        Assert.True(DemoMode.IsWithin(root, Path.Combine(root, "sub", "example.xlsx")));
+        Assert.False(DemoMode.IsWithin(root, root + "-office"));
+        Assert.False(DemoMode.IsWithin(root, Path.Combine(root, "..", "office")));
+        Assert.False(DemoMode.IsWithin(root, "relative"));
+        Assert.False(DemoMode.IsWithin(root, null));
+    }
+
+    [Fact]
+    public void StartupConfiguresDemoBeforeApplicationOrTraceInitialization()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        const string relative = "src/GmcSmeta.App/StartupEntryPoint.cs";
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, relative)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var entry = File.ReadAllText(Path.Combine(root!.FullName, relative));
+        var guard = entry.IndexOf("DemoMode.RequireExplicitLaunch", StringComparison.Ordinal);
+        var configure = entry.IndexOf("DemoMode.ConfigureProcess(args)", StringComparison.Ordinal);
+        var trace = entry.IndexOf("StartupTrace.Mark", StringComparison.Ordinal);
+        var application = entry.IndexOf("app = new App()", StringComparison.Ordinal);
+        Assert.True(guard >= 0 && guard < configure && configure < trace && trace < application);
+        Assert.Contains("MethodImplOptions.NoInlining", entry);
+        var demo = File.ReadAllText(Path.Combine(root.FullName, "src/GmcSmeta.Core/Demo/DemoMode.cs"));
+        Assert.Contains("Environment.SetEnvironmentVariable(\"GMC_SMETA_STARTUP_TRACE_DIR\", null)", demo);
+        var config = File.ReadAllText(Path.Combine(root.FullName, "src/GmcSmeta.Core/AppConfig.cs"));
+        Assert.Contains("GmcSmeta.Core.Demo.DemoMode.IsWithin(docs, demoValue.GetString())", config);
+    }
+
 }

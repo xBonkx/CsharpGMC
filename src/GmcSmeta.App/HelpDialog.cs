@@ -10,10 +10,11 @@ namespace GmcSmeta.App;
 /// <summary>Справка по работе с программой, по эталону Python HelpDialog.</summary>
 public sealed class HelpDialog : Window
 {
-    private readonly ListBox _list = new() { SelectionMode = SelectionMode.Single };
+    private readonly ListBox _list = new() { SelectionMode = SelectionMode.Single, TabIndex = 0 };
     private readonly FlowDocumentScrollViewer _view = new()
     {
         IsToolBarVisible = false,
+        TabIndex = 1,
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
     };
@@ -47,7 +48,7 @@ public sealed class HelpDialog : Window
 
         var close = new Button { Content = "Закрыть", MinWidth = 110,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0),
-            IsDefault = true, IsCancel = true };
+            IsCancel = true, TabIndex = 2 };
         WorkspaceWindowUi.StyleButton(close, primary: true);
         close.Click += (_, _) => Close();
         DockPanel.SetDock(close, Dock.Bottom);
@@ -64,6 +65,7 @@ public sealed class HelpDialog : Window
         Content = grid;
 
         _list.SelectedItem = HelpTopics.All.ContainsKey(topic) ? topic : HelpTopics.All.Keys.First();
+        Loaded += (_, _) => _list.Focus();
     }
 
     // HELP содержит только локальный, доверенный текст с h2/p/ol/ul/li/b/code.

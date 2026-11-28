@@ -60,8 +60,8 @@ Assert.Contains("_allowClose=true;",code);
         var snapshot=vor.IndexOf("_source.ReadKsVor(cid,chosen)",StringComparison.Ordinal);
         var render=vor.IndexOf("KsVorForms.Create(snapshot.Print,chosen.Id)",StringComparison.Ordinal);
         var fence=vor.IndexOf("_source.RequireKsRevision(chosen.Revision)",StringComparison.Ordinal);
-        var attach=vor.IndexOf("_archive.AddAttachment(_data,temp,",StringComparison.Ordinal);
-        var add=vor.IndexOf("_data.Positions.AddRange(rows)",StringComparison.Ordinal);
+        var attach=vor.IndexOf("_archive.AddVor(_data,temp,",StringComparison.Ordinal);
+        var add=vor.IndexOf("PublishVor(committed)",StringComparison.Ordinal);
         Assert.True(snapshot>=0&&render>snapshot&&fence>render&&attach>fence&&add>attach);
         Assert.DoesNotContain("KsWorkspaceProjection.Build",vor);
         Assert.DoesNotContain("SqlServerKsPrintData.Read(",vor);
@@ -82,6 +82,17 @@ Assert.Contains("_allowClose=true;",code);
     }
 
     [Fact]
+    public void ExternalVorUsesSamePrivateWorkbookForPreviewAndArchive()
+    {
+        var code=Source("PtoEditorWindow.xaml.cs");
+        Assert.Contains("await Task.Run(()=>File.Copy(source,path,overwrite:false))",code);
+        Assert.Contains("new PtoVorWindow(path)",code);
+        Assert.Contains("_archive.AddVor(_data,path,",code);
+        Assert.Contains("Directory.CreateTempSubdirectory(\"gmc-pto-vor-\")",code);
+        Assert.DoesNotContain("new PtoVorWindow(picker.FileName)",code);
+    }
+
+    [Fact]
     public void AttachmentReadAndImportUseWorkerAndPreserveSelection()
     {
         var code=Source("PtoEditorWindow.xaml.cs");
@@ -89,7 +100,8 @@ Assert.Contains("_allowClose=true;",code);
         Assert.Contains("var state=_archive.FileInfo(file);",code);
         Assert.Contains("if(!closed)Process.Start",code);
         Assert.Contains("FilesGrid.SelectedItem=rows.FirstOrDefault(x=>x.Id==selected);",code);
-        Assert.Contains("finally{WorksGrid.Items.Refresh();RefreshFiles();InvalidateReview();UpdateRevisionLabel();}",code);
+        Assert.Contains("PtoVorImport.Publish(_data,committed);",code);
+        Assert.Contains("WorksGrid.Items.Refresh();RefreshFiles();UpdateRevisionLabel();",code);
         Assert.Contains("var acts=await Task.Run(()=>_source.Ks(cid));",code);
     }
 }

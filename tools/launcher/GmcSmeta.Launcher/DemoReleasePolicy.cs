@@ -58,6 +58,22 @@ internal static class DemoReleasePolicy
             throw new InvalidOperationException("Релиз не подтверждает DEMO схемы 32. Для другой схемы нужен актуальный генератор; прежняя сборка сохранена.");
     }
 
+    // The local installer seed has no release seal. A downloaded release must
+    // retain its schema and seal; recovery additionally verifies every file.
+    internal static void RequireInstalledIntegrity(InstalledApp app, bool verifyFiles)
+    {
+        var marker = Path.Combine(app.Directory, CapabilityFile);
+        RequireCapability(File.Exists(marker) ? File.ReadAllText(marker) : null);
+        if (app.Version == "0.0.0" && app.Flavor == "sc" &&
+            IsSeedFolder(Path.GetFileName(app.Directory)))
+            return;
+        RequireCandidateMetadata(app.Directory, app.Version);
+        if (app.PackageSchema != 32 || !PackageIntegrity.IsHash(app.Sha256) ||
+            !PackageIntegrity.IsHash(app.ManifestHash) ||
+            (verifyFiles && !PackageIntegrity.Verify(app.Directory, app.Version, 32, app.ManifestHash)))
+            throw new InvalidOperationException("Установленная тестовая сборка не прошла проверку целостности.");
+    }
+
     internal static bool IsInside(string root, string path)
     {
         var relative = Path.GetRelativePath(Path.GetFullPath(root), Path.GetFullPath(path));

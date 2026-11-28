@@ -14,6 +14,7 @@ public static partial class SqlServerWorkspace
         public string SignedLegalPdf { get; init; } = "";
         public IReadOnlyList<SqlServerAgreementFiles.SignedFile> SignedLegalFiles { get; init; } = Array.Empty<SqlServerAgreementFiles.SignedFile>();
         public bool LegalEnabled { get; init; }
+        public bool RequiresLegalSelection { get; init; }
         public IReadOnlyList<SqlServerAgreements.Values> LegalCards { get; init; } = Array.Empty<SqlServerAgreements.Values>();
         public SqlServerAgreements.Values? SelectedLegal { get; init; }
         public IReadOnlyList<SqlServerAgreements.Company> LegalCompanies { get; init; } = Array.Empty<SqlServerAgreements.Company>();
@@ -39,10 +40,8 @@ public static partial class SqlServerWorkspace
             var metadata = Workspace.ReadObjectDocumentMetadata(conn, objectId);
             var enabled = SqlServerAgreements.Enabled(conn);
             var cards = SqlServerAgreements.Read(conn, objectId);
-            var selected = legalId == 0 ? null : legalId is long chosen
-                ? cards.SingleOrDefault(c => c.Id == chosen) : cards.FirstOrDefault();
-            if (legalId is > 0 && selected is null)
-                throw new InvalidOperationException("Выбранный договор удалён, архивирован или относится к другому объекту.");
+            var selected = SelectLegalCard(cards, legalId);
+            var requiresLegalSelection = enabled && legalId is null && cards.Count > 1;
             if (selected is not null) print = selected.Print;
             var agreement = enabled ? (selected is { CompanyId: long companyId } ?
                 new AgreementPresentation.Requisites(selected.Number, selected.Date, companyId) : null) : AgreementPresentation.Resolve(metadata);
@@ -63,9 +62,18 @@ public static partial class SqlServerWorkspace
             var signedPdf = signedFiles.FirstOrDefault()?.Path ?? "";
             var legalCompanies = enabled ? SqlServerAgreements.Companies(conn) : Array.Empty<SqlServerAgreements.Company>();
             if (!string.IsNullOrWhiteSpace(revision) && revision == SqlServerDatabase.Revision(conn))
-                return new(properties, print, agreement, company, tags, revision) { Documents = documents, SignedLegalPdf = signedPdf, SignedLegalFiles = signedFiles, LegalEnabled = enabled, LegalCards = cards, SelectedLegal = selected, LegalCompanies = legalCompanies };
+                return new(properties, print, agreement, company, tags, revision) { Documents = documents, SignedLegalPdf = signedPdf, SignedLegalFiles = signedFiles, LegalEnabled = enabled, RequiresLegalSelection = requiresLegalSelection, LegalCards = cards, SelectedLegal = selected, LegalCompanies = legalCompanies };
         }
         throw new InvalidOperationException("Реквизиты изменились во время чтения. Откройте страницу заново.");
+    }
+
+    public static SqlServerAgreements.Values? SelectLegalCard(IReadOnlyList<SqlServerAgreements.Values> cards, long? legalId)
+    {
+        if (legalId == 0) return null; // Explicit new card.
+        if (legalId is long chosen)
+            return cards.SingleOrDefault(c => c.Id == chosen)
+                ?? throw new InvalidOperationException("Выбранный договор удалён, архивирован или относится к другому объекту.");
+        return cards.Count == 1 ? cards[0] : null;
     }
 
     private static HashSet<long> ReadAgreementDocumentIds(SqlConnection conn, long objectId, long legalId)

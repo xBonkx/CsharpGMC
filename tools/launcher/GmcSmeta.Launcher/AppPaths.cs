@@ -28,8 +28,16 @@ internal sealed class AppPaths
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(baseDir)) baseDir = Path.GetTempPath();
         var paths = new AppPaths(Path.Combine(baseDir, office ? "GMC-Smeta-Office" : "GMC-Smeta-Next"));
-        Directory.CreateDirectory(paths.Apps);
-        Directory.CreateDirectory(paths.Downloads);
+        if (office)
+        {
+            EnsureUnredirectedDirectories(baseDir, "GMC-Smeta-Office", "apps");
+            EnsureUnredirectedDirectories(baseDir, "GMC-Smeta-Office", "cache");
+        }
+        else
+        {
+            Directory.CreateDirectory(paths.Apps);
+            Directory.CreateDirectory(paths.Downloads);
+        }
         return paths;
     }
 
@@ -40,9 +48,37 @@ internal sealed class AppPaths
         if (string.IsNullOrWhiteSpace(baseDir))
             throw new InvalidOperationException("Не найден локальный профиль Windows.");
         var paths = new AppPaths(Path.Combine(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher"), isDemo: true);
-        Directory.CreateDirectory(paths.Apps);
-        Directory.CreateDirectory(paths.Downloads);
+        EnsureUnredirectedDirectories(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher", "apps");
+        EnsureUnredirectedDirectories(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher", "cache");
         return paths;
+    }
+
+    // Check each application-owned segment before creating any of its children.
+    internal static void EnsureUnredirectedDirectories(string baseDir, params string[] segments)
+    {
+        var current = Path.GetFullPath(baseDir);
+        foreach (var segment in segments)
+        {
+            if (string.IsNullOrEmpty(segment) || segment is "." or ".." ||
+                Path.GetFileName(segment) != segment || Path.IsPathRooted(segment))
+                throw new InvalidOperationException("Некорректный сегмент каталога лаунчера.");
+            current = Path.Combine(current, segment);
+            FileAttributes attributes;
+            try { attributes = File.GetAttributes(current); }
+            catch (FileNotFoundException)
+            {
+                Directory.CreateDirectory(current);
+                attributes = File.GetAttributes(current);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Directory.CreateDirectory(current);
+                attributes = File.GetAttributes(current);
+            }
+            if ((attributes & FileAttributes.ReparsePoint) != 0 ||
+                (attributes & FileAttributes.Directory) == 0)
+                throw new InvalidOperationException("Каталог лаунчера не может использовать перенаправленный путь.");
+        }
     }
 
     /// <summary>Файл с токеном GitHub, если пользователь не хочет полагаться на git credential manager.</summary>

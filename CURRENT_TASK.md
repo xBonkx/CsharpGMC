@@ -1,5 +1,57 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.04 CODE READY: atomic VOR workbook/rows/history, transactional KS revision fence, cancellable preview; 3 policy tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-atomic-20261129). Reservation released.
+
+- 29.11.2026 — ARCH-SIZE-01.01/.02 PARTIAL: pinned tree, 1042 candidates, 30 files counted, family map. Full clone unavailable; [evidence](docs/ARCH_SIZE_PINNED_SAMPLE_20261129.md). Бронь снята.
+
+- 29.11.2026 — DEMO-01.01 CODE READY / DEMO-05.01 PARTIAL: изоляция до WPF/trace, отказ прямого тестового EXE без аргументов, безопасные пути настроек. 3 test methods added, not run; [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.
+
+- 29.11.2026 — DEMO-02.01 PARTIAL: generator preflight + metal and catalog price fixture, 2 tests added (not run), Python main a76b032a. [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.02 PARTIAL: единый согласованный снимок допуска, отказ без ревизии, ограниченные повторы; source/unit tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — CTX-046.02 PARTIAL: integrated saved archive year, estimate discount, transport and signed PDF keyboard patch; 4 source tests added (not run). [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-044.02 PARTIAL: integrated prepared summary header geometry and width invalidation patch; 12 prior static checks, 3 source test cases (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.02 PARTIAL: поиск людей и авто без повторной склейки строк, точный ID истории после экспорта, отказ без ревизии; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.04 PARTIAL: certificate cancellation/write-refresh fence, exact history clicks, same private XLSX preview/archive; existing two-step VOR save remains. [Evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-finish-20261129). Tests not run, reservation released.
+
+- 29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL: проверка каталогов и полного seal тестового пакета, ярлык после успешного redirect; 2 regression cases added + 1 extended, not run. [Evidence](docs/DEMO_MODE_TODO_20261128.md). 0 CODE READY/DONE; бронь снята.
+
+- 29.11.2026 — PERF-050.04 CODE READY: каталог — сначала страница, затем цены/использования; совместимые API организаций/тегов проверяют ревизию, обоснован отказ от общего кэша. 3 test cases added, not run; [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — CTX-044.01 PARTIAL: убрано чтение JSON режима ПТО при открытии меню документа, проверка при выполнении сохранена. Один source test добавлен, не запускался. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.02 PARTIAL: пакетная публикация страницы справочника и импорт логотипа в фоне; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — CTX-046.02 PARTIAL: safe keyboard routes in Prompt/Help/SectionPicker, 3 source tests added (not run); remaining inventory and Windows checks open. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-044.01 PARTIAL: single allocation for compact name, frozen KS/menu brushes, bounded indent cache; 5000 JS model cases, 9 static checks, 4 xUnit methods not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — CTX-027.01/.02 PARTIAL: точная область наценки, повторная проверка после диалога, снимок Excel до диалога сохранения; 4 source tests added, not run. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). 0 CODE READY/DONE; бронь снята.
+
+- 29.11.2026 — CTX-022.02 CODE READY: общая таблица при повторной загрузке применяет актуальный профиль, независимые сбросы сохранены; .01 PARTIAL — исправлен недопустимый ключ agreement.sources. 12 key cases + 1 source test добавлены, не запускались. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.04 PARTIAL: cancellation initial passport list/catalogue, exact PDF click, scoped PTO SQL; tests not run, [evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-read-20261129), reservation released.
+
+- 29.11.2026 — PERF-047.05 CODE READY: cancellable metal snapshots/register and save-refresh fence; 15 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL: восстановление тестового указателя, контроль seal и защита пути рабочего лаунчера; 2 regression cases added, not run. [Evidence](docs/DEMO_MODE_TODO_20261128.md). 0 CODE READY/DONE; бронь снята.
+
+- 29.11.2026 — AGR: карта модели AGR-01.01 CODE READY (аналитика), явный выбор при нескольких карточках и запрет неполного/подписанного переноса; 3 PARTIAL, AGR-08.02 UNVERIFIED. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-map-transfer-20261129). Windows/SQL не запускались, бронь снята.
+- 29.11.2026 — PERF-047.05 PARTIAL: cancellation/fence for warehouse journal, reject empty snapshot revision; 11 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
+- 29.11.2026 — PERF-047.03 CODE READY: приказы — согласованный снимок и файловые операции на worker; письма — отмена SQL connect и точный double-click. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
+- 29.11.2026 — приёмка BUG-F29/F30/F51: 3 новых регрессионных сценария, не запускались. BUG-F11/F12 оставлены zcode-sess-bugf125; параллельный агент устранил merge-конфликты, повторно проверены уникальные ID. [Отчёт](docs/ACCEPTANCE_PROCUREMENT_SHIPMENT_20261129.md).
+
+- 29.11.2026 — CTX-009.01/.04 PARTIAL: явное подтверждение удаления, фокус отмены и предупреждение полного выделения; 4 source-test cases добавлены, не запущены. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). 0 CODE READY/DONE; бронь снята.
+
+- 29.11.2026 — CTX-041.01–03 PARTIAL: integrated prepared keyboard patch; 9 prior static checks, 3 source tests added (not run). [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+
+- 29.11.2026 — PERF-042.01/.02 PARTIAL: явные флаги Recycling/content scroll для трёх дополнительных таблиц, 3 source-проверки добавлены, не запускались. Полный инвентарь и Windows-приёмка остаются. [Доказательства](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — AGR-07/08: защита от неполной исторической группы КС, изоляция печатных реквизитов и ID в поиске; AGR-08.01 CODE READY, 4 PARTIAL, 0 DONE. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-financial-scope-20261129). Windows/SQL не запускались, бронь снята.
 
 - 29.11.2026 — PERF-047.01 CODE READY: история читает заголовок и строки одним соединением с контролем ревизии, старый API сохранён. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
@@ -44,6 +96,14 @@
 - 29.11.2026 — chat-demo-next-1449: DEMO-01.01/05.01/08.01 PARTIAL; усилены guard ошибочных параметров, запрет failover, изоляция локального профиля и окружения child. 6 xUnit случаев добавлены, не запускались; новые CODE READY/DONE отсутствуют. [Доказательства](docs/DEMO_MODE_TODO_20261128.md).
 
 - 29.11.2026 — chat-legacy-1455: DEMO-06.01–03 PARTIAL, CLI totals/estimate/check теперь SQL-only, явная тестовая база и revision fence. Legacy fixture/dependency не удалены до полной замены. 3 source-теста добавлены, не запускались. [Доказательства](docs/DEMO_MODE_TODO_20261128.md).
+
+- 29.11.2026 — ARCH-SIZE-05.01 CODE READY, .02 PARTIAL: material financial projection and edit planning extracted, 15 xUnit cases not run. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
+
+- 29.11.2026 — ARCH-SIZE-05.02 CODE READY: bulk/write/readback receipt + modal guards, 22 unrun tests; both materials implementation packages CODE READY. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
+
+- 29.11.2026 — ARCH-SIZE-02.01–03 CODE READY: independent KS close planning and original snapshot/command/export fences, 14 unrun tests. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
+
+- 29.11.2026 — ARCH-SIZE-04.01 CODE READY, .02 PARTIAL: independent routing and stale navigation/cache guards; 21 unrun tests. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
 
 ## История до реорганизации
 

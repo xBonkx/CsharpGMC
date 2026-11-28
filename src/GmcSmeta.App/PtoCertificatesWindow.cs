@@ -1,4 +1,7 @@
 using System.IO;
+using System.Data;
+using System.Threading;
+using GmcSmeta.Core.Db;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -24,6 +27,8 @@ public sealed class PtoCertificatesWindow : Window
     private readonly DispatcherTimer _filterTimer=new(){Interval=TimeSpan.FromMilliseconds(150)};
     private readonly WrapPanel _actions=new(){Margin=new Thickness(0,0,0,8)};
     private bool _busy,_closed,_ready;
+    private CancellationTokenSource? _refreshCancellation;
+    private Button? _refreshButton;
     public PtoCertificate? SelectedCertificate {get;private set;}
 
     public PtoCertificatesWindow(PtoArchive archive,bool pick=false)
@@ -44,6 +49,7 @@ public sealed class PtoCertificatesWindow : Window
             b.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
             if(icon is not null)b.SetResourceReference(ContentControl.ContentTemplateProperty, icon);
             b.Click+=async (_,_)=>await RunAsync(run);_actions.Children.Add(b);
+            if(run==RefreshAsync)_refreshButton=b;
         }
         Button("Добавить PDF…",New);
         Button("Изменить карточку",Edit);
@@ -87,15 +93,24 @@ public sealed class PtoCertificatesWindow : Window
         }
         TableColumnMenu.SetProtect(_grid, "Продукция|Номер|До|Проверено");
         TableColumnMenu.SetKey(_grid, "pto-certificates");
-        _grid.MouseDoubleClick+=async (_,_)=>{if(_busy||!_ready)return;if(_pick)Choose();else await RunAsync(Edit);};
+        _grid.MouseDoubleClick+=async (_,e)=>
+        {
+            if(_busy||!_ready||e.ChangedButton!=MouseButton.Left||
+                e.OriginalSource is not DependencyObject source||
+                ItemsControl.ContainerFromElement(_grid,source) is not DataGridRow row||
+                row.Item is not PtoCertificate clicked)return;
+            _grid.SelectedItem=clicked;
+            if(_pick)Choose();else await RunAsync(Edit);
+        };
         ScrollViewer.SetIsDeferredScrollingEnabled(_grid,false);
         VirtualizingPanel.SetVirtualizationMode(_grid,VirtualizationMode.Recycling);
         panel.Children.Add(_grid);Content=panel;
         Loaded+=InitialLoad;
-        Closing+=(_,e)=>{if(_busy)e.Cancel=true;};
+        Closing+=(_,e)=>{if(_busy&&_refreshCancellation is null)e.Cancel=true;};
         Closed+=(_,_)=>
         {
             _closed=true;
+            _refreshCancellation?.Cancel();
             _filterTimer.Stop();
             _filterTimer.Tick-=FilterTimer_Tick;
         };
@@ -109,7 +124,7 @@ public sealed class PtoCertificatesWindow : Window
 
     private async Task RunAsync(Func<Task> act)
     {
-        if(_busy||_closed)return;
+        if(_busy||_closed||(!_ready&&act!=RefreshAsync))return;
         if(_ready&&_filterTimer.IsEnabled)
         {
             _filterTimer.Stop();
@@ -118,25 +133,60 @@ public sealed class PtoCertificatesWindow : Window
         _busy=true;_actions.IsEnabled=_grid.IsEnabled=_search.IsEnabled=false;
         _filterTimer.Stop();
         try{await act();}
-        catch(Exception e){if(!_closed)MessageBox.Show(this,e.Message,"Библиотека сертификатов",MessageBoxButton.OK,
-            MessageBoxImage.Warning);}
+        catch(Exception e)
+        {
+            if(e is PtoCommitUncertainException or DBConcurrencyException)InvalidateSnapshot();
+            if(!_closed)MessageBox.Show(this,e.Message+(!_ready
+                ?"\nОбновите библиотеку перед следующей операцией.":""),"Библиотека сертификатов",MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
         finally
         {
             _busy=false;
-            if(!_closed){_actions.IsEnabled=true;_grid.IsEnabled=_search.IsEnabled=_ready;}
+            if(!_closed)
+            {
+                _actions.IsEnabled=true;_grid.IsEnabled=_search.IsEnabled=_ready;
+                foreach(var button in _actions.Children.OfType<Button>())
+                    button.IsEnabled=_ready||ReferenceEquals(button,_refreshButton);
+            }
         }
     }
 
     private PtoCertificate? Selected()=>_grid.SelectedItem as PtoCertificate;
-    private async Task RefreshAsync()
+    private void InvalidateSnapshot()
     {
-        var selected=Selected()?.Id;
         _ready=false;
         _grid.ItemsSource=null;
         _rows=Array.Empty<PtoCertificateSearch.Row>();
-        _rows=await Task.Run(()=>PtoCertificateSearch.Build(_archive.Sql.Certificates()));
-        _ready=true;
-        ApplyFilter(selected);
+    }
+
+    private async Task RefreshAsync()
+    {
+        var selected=Selected()?.Id;
+        InvalidateSnapshot();
+        using var cancellation=new CancellationTokenSource();
+        _refreshCancellation=cancellation;
+        var token=cancellation.Token;
+        try
+        {
+            var rows=await Task.Run(()=>PtoCertificateSearch.Build(_archive.Sql.Certificates(token:token)),token);
+            if(_closed||token.IsCancellationRequested)return;
+            _rows=rows;
+            _ready=true;
+            ApplyFilter(selected);
+        }
+        finally{_refreshCancellation=null;}
+    }
+
+    private async Task RefreshAfterWriteAsync()
+    {
+        try{await RefreshAsync();}
+        catch(Exception e)
+        {
+            InvalidateSnapshot();
+            if(!_closed)MessageBox.Show(this,"Изменения сохранены, но библиотека не обновилась.\n"+e.Message+
+                "\nНажмите «Обновить», не повторяйте запись.","Библиотека сертификатов",MessageBoxButton.OK,MessageBoxImage.Warning);
+        }
     }
 
     private void QueueFilter()
@@ -167,7 +217,7 @@ public sealed class PtoCertificatesWindow : Window
         if(!EditDialog(cert))return;
         var path=picker.FileName;
         await Task.Run(()=>_archive.ImportCertificate(path,cert));
-        await RefreshAsync();
+        await RefreshAfterWriteAsync();
     }
     private async Task Edit()
     {
@@ -178,7 +228,7 @@ public sealed class PtoCertificatesWindow : Window
         data.Revision=current.Revision;
         if(!EditDialog(data))return;
         await Task.Run(()=>_archive.Sql.SaveCertificate(data));
-        await RefreshAsync();
+        await RefreshAfterWriteAsync();
     }
     private bool EditDialog(PtoCertificate c)
     {

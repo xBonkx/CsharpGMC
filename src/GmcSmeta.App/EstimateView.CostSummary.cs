@@ -1200,7 +1200,8 @@ public partial class EstimateView
             "включая скрытые фильтром, заменит суммы СМР соответствующих систем. " +
             "Системы без рассчитанных цен сохранят свои суммы.",
             "Перенести СМР в смету?", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes || revision != _summaryRevision) return;
+        if (answer != MessageBoxResult.Yes || !SummarySnapshotReady ||
+            _estimate?.Locked != false || revision != _summaryRevision) return;
         await RunSummaryWriteAsync(revision, async expected =>
         {
             var result = await Task.Run(() => SqlServerCostSummary.TransferSmrToSystemsWithRevision(
