@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+DEMO-02.01 PARTIAL: [fixture coverage and generator preflight](DEMO_MODE_TODO_20261128.md).
+
 DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery, directory and integrity hardening](DEMO_MODE_TODO_20261128.md).
 
 **Работа начинается с [EXECUTION_TODO](EXECUTION_TODO_20261128.md) для реализации либо [ACCEPTANCE_TODO](ACCEPTANCE_TODO.md) для приёмки старых CODE READY: сверить обе очереди, выбрать и подтвердить бронь ID.** Здесь только родительские статусы и критерии, не журнал каждого прохода. [Полный исторический снимок до сокращения](https://github.com/xBonkx/CsharpGMC/blob/c00f4c32d3faea3e9db33a31ca07c0207df3a376/docs/MASTER_TODO.md) содержит все прежние доказательства и отчёты. [Карта документации](README.md).
