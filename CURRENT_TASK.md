@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-041.01–03 PARTIAL: integrated prepared keyboard patch; 9 prior static checks, 3 source tests added (not run). [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+
 - 29.11.2026 — PERF-042.01/.02 PARTIAL: явные флаги Recycling/content scroll для трёх дополнительных таблиц, 3 source-проверки добавлены, не запускались. Полный инвентарь и Windows-приёмка остаются. [Доказательства](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — AGR-07/08: защита от неполной исторической группы КС, изоляция печатных реквизитов и ID в поиске; AGR-08.01 CODE READY, 4 PARTIAL, 0 DONE. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-financial-scope-20261129). Windows/SQL не запускались, бронь снята.
