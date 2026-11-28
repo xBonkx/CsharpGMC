@@ -91,6 +91,19 @@ public sealed class SqlServerWorkspaceTests
     }
 
     [Fact]
+    public void ValidationPreservesIndependentLegalFieldsWithoutSql()
+    {
+        var input = new SqlServerWorkspace.NewContractData(" main ", " N ", "01.01.2026", " A ", 5, 6)
+        { AgreementId = 2147483648L, AnnexNumber = " 2 " };
+        var result = WorkspaceInputPolicy.ValidateContract(input);
+        Assert.Equal(SqlServerWorkspace.ValidateContract(input),result);
+        Assert.Equal("main",result.Kind);
+        Assert.Null(result.BaseContractId);
+        Assert.Equal(2147483648L,result.AgreementId);
+        Assert.Equal(" 2 ",result.AnnexNumber);
+    }
+
+    [Fact]
     public void ContractValidation_RejectsInvalidKind()
     {
         Assert.Throws<ArgumentException>(() =>

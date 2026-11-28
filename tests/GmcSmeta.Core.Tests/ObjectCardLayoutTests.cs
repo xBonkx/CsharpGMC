@@ -4,6 +4,25 @@ namespace GmcSmeta.Core.Tests;
 
 public class ObjectCardLayoutTests
 {
+    [Theory]
+    [InlineData(0, 318, 1, 288)]
+    [InlineData(691, 1000, 1, 679)]
+    [InlineData(692, 1000, 2, 334)]
+    [InlineData(1044, 1000, 3, 336)]
+    [InlineData(2000, 1000, 3, 654)]
+    public void CardWidthPreservesViewportAndColumnThresholds(double viewport, double actual, int columns, double width)
+    {
+        Assert.Equal((columns,width),ObjectCardLayout.Measure(viewport,actual));
+    }
+
+    [Fact]
+    public void RestoredGeometryClampsToWorkAreaOrKeepsDefaultWhenTooSmall()
+    {
+        Assert.Equal((1200d,800d),ObjectCardLayout.RestoreGeometry(1800,1000,1200,800,600,400));
+        Assert.Null(ObjectCardLayout.RestoreGeometry(1800,1000,500,800,600,400));
+        Assert.Null(ObjectCardLayout.RestoreGeometry(1800,300,1200,800,600,400));
+    }
+
     [Fact]
     public void EmptyObject_StillOffersNewKpCard()
     {

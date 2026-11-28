@@ -998,10 +998,7 @@ public partial class MainWindow : Window
     private void ResizeCards()
     {
         if (ObjectCardsScroll is null) return;
-        var width = Math.Max(300, ObjectCardsScroll.ViewportWidth > 0 ? ObjectCardsScroll.ViewportWidth : ObjectCardsScroll.ActualWidth - 18);
-        var columns = Math.Clamp((int)((width + 12) / 352), 1, 3);
-        // WrapPanel учитывает завершающий отступ каждой карточки, включая последнюю.
-        var cardWidth = Math.Floor(width / columns) - 12;
+        var cardWidth = ObjectCardLayout.Measure(ObjectCardsScroll.ViewportWidth, ObjectCardsScroll.ActualWidth).CardWidth;
         if (CardWidth != cardWidth) CardWidth = cardWidth;
         LayoutObjectTotals();
     }
@@ -1013,37 +1010,8 @@ public partial class MainWindow : Window
         if (_objectTileLayout == state) return;
         _objectTileLayout = state;
         var gap = (double)FindResource("LayoutObjectTileGap");
-        ObjectTotals.RowDefinitions.Clear();
-        ObjectTotals.ColumnDefinitions.Clear();
-        var cards = new[] { ObjectTotalCard, ObjectProgressCard, ObjectMaterialsCard, ObjectSmrCard, ObjectEarnedCard };
-        if (state.Wide)
-        {
-            ObjectTotals.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var visible = cards.Where(c => c != ObjectProgressCard || state.Progress).ToList();
-            for (var i = 0; i < visible.Count; i++)
-            {
-                ObjectTotals.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(visible[i] == ObjectProgressCard ? 4 : 2, GridUnitType.Star) });
-                Position(visible[i], 0, i);
-                visible[i].Margin = new Thickness(0, 0, i == visible.Count - 1 ? 0 : gap, 0);
-            }
-        }
-        else
-        {
-            for (var i = 0; i < 3; i++) ObjectTotals.ColumnDefinitions.Add(new ColumnDefinition());
-            for (var i = 0; i < 2; i++) ObjectTotals.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Position(ObjectTotalCard, 0, 0, state.Progress ? 1 : 3);
-            Position(ObjectProgressCard, 0, 1, 2);
-            Position(ObjectMaterialsCard, 1, 0); Position(ObjectSmrCard, 1, 1); Position(ObjectEarnedCard, 1, 2);
-            ObjectTotalCard.Margin = new Thickness(0, 0, state.Progress ? gap : 0, gap);
-            ObjectProgressCard.Margin = new Thickness(0, 0, 0, gap);
-            ObjectMaterialsCard.Margin = ObjectSmrCard.Margin = new Thickness(0, 0, gap, 0);
-            ObjectEarnedCard.Margin = new Thickness(0);
-        }
-    }
-
-    private static void Position(FrameworkElement element, int row, int column, int span = 1)
-    {
-        Grid.SetRow(element, row); Grid.SetColumn(element, column); Grid.SetColumnSpan(element, span);
+        ObjectTotalsLayout.Apply(ObjectTotals, ObjectTotalCard, ObjectProgressCard,
+            ObjectMaterialsCard, ObjectSmrCard, ObjectEarnedCard, state.Wide, state.Progress, gap);
     }
 
     private void ToggleSidebar_Click(object sender, RoutedEventArgs e) => ToggleSidebar();
@@ -1554,12 +1522,12 @@ public partial class MainWindow : Window
         {
             var settings = _navigationSettings.Load().Settings;
             // Если монитор сменился/стал меньше, окно не должно вылезти за рабочую область.
-            var width = Math.Min(settings.WindowWidth, SystemParameters.WorkArea.Width);
-            var height = Math.Min(settings.WindowHeight, SystemParameters.WorkArea.Height);
-            if (width >= MinWidth && height >= MinHeight)
+            var geometry = ObjectCardLayout.RestoreGeometry(settings.WindowWidth, settings.WindowHeight,
+                SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height, MinWidth, MinHeight);
+            if (geometry is { } size)
             {
-                Width = width;
-                Height = height;
+                Width = size.Width;
+                Height = size.Height;
             }
             if (settings.WindowMaximized) WindowState = WindowState.Maximized;
         }

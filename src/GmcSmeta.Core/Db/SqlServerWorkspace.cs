@@ -40,38 +40,11 @@ public static partial class SqlServerWorkspace
             : server + " · " + builder.InitialCatalog;
     }
 
-    public static ObjectProperties ValidateObject(ObjectProperties values)
-    {
-        if (values is null) throw new ArgumentNullException(nameof(values));
-        var clean = values.Normalize() with
-        {
-            Note = values.Note ?? "",
-            Form = (values.Form ?? "").Trim()
-        };
-        if (clean.Name.Length > 255 || clean.Customer.Length > 255 || clean.Address.Length > 255 ||
-            clean.Folder.Length > 500 || clean.Form.Length > 32)
-            throw new ArgumentException("Слишком длинное поле объекта (название/заказчик/адрес — 255, папка — 500, форма — 32).");
-        return clean;
-    }
+    public static ObjectProperties ValidateObject(ObjectProperties values) =>
+        WorkspaceInputPolicy.ValidateObject(values);
 
-    public static NewContractData ValidateContract(NewContractData input)
-    {
-        if (input is null) throw new ArgumentNullException(nameof(input));
-        var v = input with
-        {
-            Kind = (input.Kind ?? "").Trim(), Number = (input.Number ?? "").Trim(),
-            Date = (input.Date ?? "").Trim(), Name = (input.Name ?? "").Trim()
-        };
-        if (v.Kind is not ("kp" or "main" or "dop"))
-            throw new ArgumentException("Недопустимый тип документа.");
-        if (v.Number.Length > 64 || v.Date.Length > 32 || v.Name.Length > 255)
-            throw new ArgumentException("Слишком длинные реквизиты документа.");
-        if (!Documents.IsValidDocumentDate(v.Date))
-            throw new ArgumentException("Дата должна быть в формате дд.мм.гггг.");
-        if (v.Kind == "dop" && v.BaseContractId is null)
-            throw new ArgumentException("Для допсоглашения выбери исходный договор.");
-        return v with { BaseContractId = v.Kind == "dop" ? v.BaseContractId : null };
-    }
+    public static NewContractData ValidateContract(NewContractData input) =>
+        WorkspaceInputPolicy.ValidateContract(input);
 
     public static ObjectProperties ReadObject(SqlConnection conn, long objectId)
     {
@@ -929,109 +902,6 @@ public static partial class SqlServerWorkspace
     }
 
     // ---------------------------------------------------------------- удаление и корзина
-
-    public sealed record ContractDeleteInfo(string Title, string ObjectName, int Acts, int Movements,
-        IReadOnlyList<string> Details);
-
-    public sealed record ObjectDeleteInfo(string Name, IReadOnlyList<string> Details);
-
-    /// <summary>Что удаляется вместе с документом — текст подтверждений (kp_editor.delete_contract).</summary>
-    public static ContractDeleteInfo DescribeContractForDelete(SqlConnection conn, SqlTransaction? tx, long id)
-    {
-        string title, objectName;
-        using (var cmd = new SqlCommand(
-            "SELECT c.kind,c.number,c.[date],c.name,o.name FROM dbo.contracts c " +
-            "JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) throw new ArgumentException("Документ не найден.");
-            string Text(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-            title = Documents.ContractTitleText(Text(0), Text(1), Text(2), Text(3));
-            objectName = Text(4);
-        }
-        int acts;
-        using (var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*) FROM dbo.acts WHERE contract_id=@id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            acts = (int)Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-        }
-        int movements;
-        using (var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*) FROM dbo.movements m JOIN dbo.positions p ON p.id=m.position_id " +
-            "JOIN dbo.systems s ON s.id=p.system_id WHERE s.contract_id=@id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            movements = (int)Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-        }
-        var details = new List<string>();
-        if (acts > 0) details.Add($"акты КС-2/КС-3: {acts}");
-        if (movements > 0) details.Add($"история закупок и выдачи: {movements} записей");
-        return new ContractDeleteInfo(title, objectName, acts, movements, details);
-    }
-
-    /// <summary>Что удаляется вместе с объектом — текст первого подтверждения (main_window.delete_object).</summary>
-    public static ObjectDeleteInfo DescribeObjectForDelete(SqlConnection conn, SqlTransaction? tx, long id)
-    {
-        string name;
-        using (var cmd = new SqlCommand("SELECT name FROM dbo.objects WHERE id=@id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            var value = cmd.ExecuteScalar();
-            if (value is null or DBNull) throw new ArgumentException("Объект не найден.");
-            name = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
-        }
-        var details = new List<string>();
-        var titles = new List<string>();
-        using (var cmd = new SqlCommand(
-            "SELECT kind,number,[date],name FROM dbo.contracts WHERE object_id=@id ORDER BY [order],id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-                titles.Add(Documents.ContractTitleText(
-                    r.IsDBNull(0) ? "kp" : r.GetString(0),
-                    r.IsDBNull(1) ? "" : r.GetString(1),
-                    r.IsDBNull(2) ? "" : r.GetString(2),
-                    r.IsDBNull(3) ? "" : r.GetString(3)));
-        }
-        if (titles.Count > 0)
-            details.Add("документы: " + titles.Count + " (" + string.Join(", ", titles.Take(4))
-                + (titles.Count > 4 ? " …" : "") + ")");
-        using (var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*), COALESCE(SUM(CASE WHEN signed=1 THEN 1 ELSE 0 END), 0) FROM dbo.acts " +
-            "WHERE contract_id IN (SELECT id FROM dbo.contracts WHERE object_id=@id)", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            using var r = cmd.ExecuteReader();
-            // SUM по int возвращает int: читаем через Convert, не GetInt64.
-            if (r.Read() && Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture) > 0)
-            {
-                var acts = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-                var signed = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
-                details.Add("акты КС-2/КС-3: " + acts + (signed > 0 ? $", из них подписанных: {signed}" : ""));
-            }
-        }
-        using (var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*) FROM dbo.shipments WHERE object_id=@id", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            var count = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (count > 0) details.Add("ведомости выдачи: " + count);
-        }
-        using (var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*) FROM dbo.movements WHERE position_id IN (" +
-            "SELECT id FROM dbo.positions WHERE system_id IN (" +
-            "SELECT id FROM dbo.systems WHERE contract_id IN " +
-            "(SELECT id FROM dbo.contracts WHERE object_id=@id)))", conn, tx))
-        {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            var count = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-            if (count > 0) details.Add($"история закупок и выдачи: {count} записей");
-        }
-        return new(name, details);
-    }
 
     /// <summary>
     /// Удалить объект: полная копия в корзину, журнал до удаления и явное удаление зависимых
