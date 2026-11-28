@@ -26,10 +26,10 @@
 | Дизайн | 246 | 246 | 0 | 0 | 0 | 0 |
 | Производительность | 48 | 48 | 0 | 0 | 0 | 0 |
 | Контекстные меню | 29 | 29 | 0 | 0 | 0 | 0 |
-| Функциональные дефекты | 57 | 57 | 0 | 0 | 0 | 0 |
-| **Всего** | 380 | 380 | 0 | 0 | 0 | 0 |
+| Функциональные дефекты | 57 | 54 | 3 | 0 | 0 | 0 |
+| **Всего** | 380 | 377 | 3 | 0 | 0 | 0 |
 
-Активных броней: **0 из 380**.
+Активных броней: **3 из 380**.
 
 Контроль из PowerShell (из корня репозитория; считает реальные строки, не заголовок):
 ```powershell
@@ -433,10 +433,10 @@ $parsed | Group-Object ID | Where-Object Count -gt 1
 | [BUG-F49](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L481) | P1 | устаревший выбор из каталога и вставка по чужой ревизии | Windows build/xUnit, задержки, выбор по страницам, stale revision, SQL Pilot; не запускались | CODE READY | — | ☐ |
 | [BUG-F50](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L482) | P1 | несогласованный снимок карточек объекта и поздние ответы | Windows build/xUnit, GUI F5/A→B→A, параллельные изменения SQL Pilot; не запускались | CODE READY | — | ☐ |
 | [BUG-F51](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L483) | P0 | ложное покрытие закупа 100% в сводке руководителя | xUnit, Windows, Python/SQL Pilot на договорах с неполным закупом; не запускались | CODE READY | — | ☐ |
-| [BUG-F52](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L484) | P1 | SQL INT/BIGINT: люди и автомобили | Windows/xUnit/SQL Pilot | CODE READY | — | ☐ |
-| [BUG-F53](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L485) | P1 | SQL INT/BIGINT: организации | Windows/xUnit/SQL Pilot | CODE READY | — | ☐ |
+| [BUG-F52](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L484) | P1 | SQL INT/BIGINT: люди и автомобили | Windows/xUnit/SQL Pilot | IN PROGRESS | — | ☑ chat-accept-people58 / 2026-11-28T14:37Z / main / read-only source/evidence: SqlServerPeopleAccess*, organizations, people/vehicle history; tests/GmcSmeta.App.Checks/SqlRouteAcceptanceChecks.cs if extension (no shared SQL/GUI run) / prior=CODE READY |
+| [BUG-F53](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L485) | P1 | SQL INT/BIGINT: организации | Windows/xUnit/SQL Pilot | IN PROGRESS | — | ☑ chat-accept-people58 / 2026-11-28T14:37Z / main / read-only source/evidence: SqlServerPeopleAccess*, organizations, people/vehicle history; tests/GmcSmeta.App.Checks/SqlRouteAcceptanceChecks.cs if extension (no shared SQL/GUI run) / prior=CODE READY |
 | [BUG-F55](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L487) | P1 | Завершающая точка у целых количеств в Excel ВОР | .NET golden, Excel desktop/print and regeneration of VOR | CODE READY | — | ☐ |
 | [BUG-F56](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L488) | P1 | Страница 0 и лишний номер при печати ВОР | Windows build/golden, Excel single/multi-page preview, regenerate XLSX | CODE READY | — | ☐ |
 | [BUG-F57](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L489) | P1 | Сохранение отчётов без повреждения предыдущего файла | Windows/xUnit, existing/locked destination, disk/network errors, Excel/PDF reopen, other direct exporters audit | CODE READY | — | ☐ |
-| [BUG-F58](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L490) | P1 | SQL Server: зарезервированное имя file в истории допусков/приказов | Windows/xUnit/SQL Pilot, открыть допуск/приказы, проверить историю | CODE READY | — | ☐ |
+| [BUG-F58](https://github.com/xBonkx/CsharpGMC/blob/508b323c6a8cfa73d0da9017bb7e43314d59534f/docs/MASTER_TODO.md#L490) | P1 | SQL Server: зарезервированное имя file в истории допусков/приказов | Windows/xUnit/SQL Pilot, открыть допуск/приказы, проверить историю | IN PROGRESS | — | ☑ chat-accept-people58 / 2026-11-28T14:37Z / main / read-only source/evidence: SqlServerPeopleAccess*, organizations, people/vehicle history; tests/GmcSmeta.App.Checks/SqlRouteAcceptanceChecks.cs if extension (no shared SQL/GUI run) / prior=CODE READY |
 
