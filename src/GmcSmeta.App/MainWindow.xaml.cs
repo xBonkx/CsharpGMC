@@ -68,7 +68,8 @@ public partial class MainWindow : Window
         StartupTrace.Mark("main_initialize_component_end");
         StartupTrace.Mark("main_shell_setup_begin");
         Closing += (_, e) => { if (_peopleWorkspace is { } view && !view.TryLeave()) e.Cancel = true; };
-        Title = WindowTitle + " — C#";
+        Title = WindowTitle + " — C#" +
+            (GmcSmeta.Core.Demo.DemoMode.Active ? " · ТЕСТОВЫЙ РЕЖИМ" : "");
         _navigationSearchTimer = new System.Windows.Threading.DispatcherTimer(
             System.Windows.Threading.DispatcherPriority.Background)
         {
@@ -95,7 +96,8 @@ public partial class MainWindow : Window
             _pendingOpen = openId;
         _pendingGmcs = argv.FirstOrDefault(a => a.EndsWith(".gmcs", StringComparison.OrdinalIgnoreCase));
         RootLayout.IsEnabled = false;
-        DatabaseLabel.Text = "SQL Server · подключение…";
+        DatabaseLabel.Text = GmcSmeta.Core.Demo.DemoMode.Active
+            ? "ТЕСТ · локальный SQL Server · подключение…" : "SQL Server · подключение…";
         ShowStartupMessage("Загрузка объектов и документов…");
     }
 
@@ -221,7 +223,9 @@ public partial class MainWindow : Window
                     StartupTrace.Mark("main_initialization_error");
                     try
                     {
-                        File.WriteAllText(Path.Combine(Path.GetTempPath(), "GmcSmeta-Next-startup-error.txt"),
+                        var errorRoot = GmcSmeta.Core.Demo.DemoMode.Active
+                            ? GmcSmeta.Core.Demo.DemoMode.ProfileRoot : Path.GetTempPath();
+                        File.WriteAllText(Path.Combine(errorRoot, "GmcSmeta-Next-startup-error.txt"),
                             $"{DateTime.UtcNow:O}: {e.GetType().Name}");
                     }
                     catch { /* лог не критичен */ }

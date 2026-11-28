@@ -26,7 +26,7 @@ public sealed class LettersArchive
     public LettersArchive(string connectionString, string? root = null)
     {
         Root = Path.GetFullPath(root ?? Environment.GetEnvironmentVariable("GMC_SMETA_LETTERS_ROOT")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GMC-Smeta-Letters-Next"));
+            ?? Path.Combine(GmcSmeta.Core.Demo.DemoMode.LocalData, "GMC-Smeta-Letters-Next"));
         var program = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         if (Root.Equals(program.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) ||

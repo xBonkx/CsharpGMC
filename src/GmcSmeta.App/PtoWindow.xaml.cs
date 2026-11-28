@@ -295,7 +295,7 @@ public partial class PtoWindow : Window
 public static class PtoUserSettings
 {
     private static readonly string PathName=Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next","pto.settings.json");
     public static string? Root
     {
@@ -319,7 +319,7 @@ public static class PtoUserSettings
         }
     }
     private static readonly string ModePath=Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next","pto-mode.json");
     public static bool Enabled
     {

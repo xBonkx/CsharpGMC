@@ -21,7 +21,7 @@ public sealed class PtoArchive
     {
         Sql=new SqlServerPto(connectionString);
         Root=Path.GetFullPath(root??Environment.GetEnvironmentVariable("GMC_SMETA_PTO_ROOT")??
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Path.Combine(GmcSmeta.Core.Demo.DemoMode.LocalData,
             "GMC-Smeta-Next","PTO"));
         var app=Path.GetFullPath(AppContext.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar);
         if(Root.TrimEnd(Path.DirectorySeparatorChar).StartsWith(app+Path.DirectorySeparatorChar,

@@ -29,7 +29,7 @@ public partial class OrdersWindow : Window
     private bool _registrationUncertain;
     private bool _issuing;
     private static readonly string TemplateSettings = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "orders-off.json");
 
 

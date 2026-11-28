@@ -24,7 +24,7 @@ public static class PeopleDocuments
         "К/С: 30101810900000000705 БИК  040507705";
 
     public static string TemplatesFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "Шаблоны приказов");
 
     public static IReadOnlyList<string> Templates()

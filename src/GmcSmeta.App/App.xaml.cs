@@ -145,7 +145,17 @@ public partial class App : Application
             window.ContentRendered -= rendered;
             StartupTrace.Mark("app_main_content_rendered");
             var ready = await window.InitializeWorkspaceAsync(offerRetry: !demoSmoke);
-            if (demoSmoke) Shutdown(ready ? 0 : 1);
+            if (demoSmoke)
+            {
+                try { ready = ready && await window.VerifyDemoEstimateAsync(); }
+                catch (Exception ex)
+                {
+                    ready = false;
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(
+                        GmcSmeta.Core.Demo.DemoMode.ProfileRoot, "smoke-error.txt"), ex.ToString());
+                }
+                Shutdown(ready ? 0 : 1);
+            }
         };
         window.ContentRendered += rendered;
         window.Show();

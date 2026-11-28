@@ -67,7 +67,7 @@ public static class RemoteSqlProfileStore
     {
         get
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var appData = GmcSmeta.Core.Demo.DemoMode.ApplicationData;
             return Path.Combine(appData, "GMC-Smeta-Next", "sql-profiles.json");
         }
     }

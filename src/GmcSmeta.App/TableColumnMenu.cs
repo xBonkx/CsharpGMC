@@ -54,7 +54,7 @@ public static class TableColumnMenu
     // uses the existing per-user location; this hook is internal and process-local.
     internal static string? TestProfileDirectory { get; set; }
     private static string ProfileDirectory => TestProfileDirectory ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GMC-Smeta-Next", "column-layouts");
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData, "GMC-Smeta-Next", "column-layouts");
 
     internal static void RefreshDynamic(DataGrid grid, string key, bool ownHeaderMenu)
     {

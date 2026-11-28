@@ -31,7 +31,7 @@ public partial class PassportsWindow : Window
     private string _root = "";
 
     private static readonly string SettingsPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "passports.settings.json");
 
     public sealed class PassportListRow
@@ -148,7 +148,7 @@ public partial class PassportsWindow : Window
             }
         }
         catch (Exception) { /* A corrupted local UI setting cannot modify passport data. */ }
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        return Path.Combine(GmcSmeta.Core.Demo.DemoMode.LocalData,
             "GMC-Smeta-Next", "Passports");
     }
 

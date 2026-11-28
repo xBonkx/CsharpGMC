@@ -22,7 +22,7 @@ public partial class LettersWindow : Window
     private long _generation;
     private CancellationTokenSource? _listReadCancellation;
     private static readonly string SettingsFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "letters.settings.json");
 
     private static string? SavedRoot()
