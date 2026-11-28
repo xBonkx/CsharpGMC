@@ -1,4 +1,6 @@
 using System.Windows;
+using ClosedXML.Excel;
+using Microsoft.Win32;
 using System.Windows.Controls;
 using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
@@ -18,6 +20,9 @@ public partial class CompareDialog : Window
     private CompareResult? _result;
     private CompareDisplaySnapshot? _display;
     private CancellationTokenSource? _loadCancellation;
+    private CancellationTokenSource? _exportCancellation;
+    private readonly SemaphoreSlim _readGate = new(1, 1);
+    private bool _exportBusy;
     private bool _initializing = true;
     private bool _closed;
 
@@ -43,6 +48,7 @@ public partial class CompareDialog : Window
         {
             _closed = true;
             _loadCancellation?.Cancel();
+            _exportCancellation?.Cancel();
         };
     }
 
@@ -77,6 +83,7 @@ public partial class CompareDialog : Window
     {
         if (_closed) return;
         _loadCancellation?.Cancel();
+        _exportCancellation?.Cancel();
         _loadCancellation = null;
         _result = null;
         _display = null;
@@ -95,16 +102,21 @@ public partial class CompareDialog : Window
         var token = cancellation.Token;
         try
         {
-            var snapshot = await Task.Run(() =>
+            var snapshot = await Task.Run(async () =>
             {
-                var result = SqlServerCompare.Compare(_connectionString, a.Id, b.Id, token);
-                return (Result: result, Display: CompareDisplayProjection.Build(result, token));
+                await _readGate.WaitAsync(token).ConfigureAwait(false);
+                try
+                {
+                    var result = SqlServerCompare.Compare(_connectionString, a.Id, b.Id, token);
+                    return (Result: result, Display: CompareDisplayProjection.Build(result, token));
+                }
+                finally { _readGate.Release(); }
             }, token);
             if (_closed || token.IsCancellationRequested || !ReferenceEquals(_loadCancellation, cancellation)) return;
             _result = snapshot.Result;
             _display = snapshot.Display;
             ShowResult();
-            ExportButton.IsEnabled = true;
+            ExportButton.IsEnabled = !_exportBusy;
         }
         catch (Exception ex)
         {
@@ -131,53 +143,101 @@ public partial class CompareDialog : Window
         InfoText.Text = display.Info;
     }
 
-    /// <summary>Экспорт таблицы сравнения — xlsx (compare_view.export).</summary>
-    private void Export_Click(object sender, RoutedEventArgs e)
+    /// <summary>Export the captured comparison snapshot, not a later combo selection.</summary>
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        var res = _result;
-        if (res is null) return;
-        XlsxExport.Save(this, $"Сравнение — {res.TitleB}", sheet =>
+        if (_closed || _exportBusy || _result is not { } res) return;
+        var picker = new SaveFileDialog
         {
-            sheet.Cell(1, 1).Value = "Было: " + res.TitleA;
-            sheet.Cell(2, 1).Value = "Стало: " + res.TitleB;
-            sheet.Range(1, 1, 2, 1).Style.Font.Bold = true;
-            XlsxExport.Header(sheet, 4, new[] { "Система", "Наименование", "Ед.", "Кол-во было", "Кол-во стало",
-                "Цена было", "Цена стало", "Сумма было", "Сумма стало", "Разница", "Что" });
-            var row = 5;
-            foreach (var r in res.Rows)
+            Title = "Сохранить в Excel",
+            Filter = "Excel (*.xlsx)|*.xlsx",
+            FileName = XlsxExport.SanitizeFileName($"Сравнение — {res.TitleB}")
+        };
+        if (picker.ShowDialog(this) != true || _closed || !ReferenceEquals(res, _result)) return;
+        var path = picker.FileName;
+        _exportBusy = true;
+        ExportButton.IsEnabled = false;
+        using var cancellation = new CancellationTokenSource();
+        _exportCancellation = cancellation;
+        var token = cancellation.Token;
+        try
+        {
+            using var prepared = await Task.Run(() => ExportFilePublication.Stage(path, stream =>
             {
-                var word = r.Kind switch
-                {
-                    "added" => "добавлено", "removed" => "убрано", "changed" => "изменено", _ => "",
-                };
-                sheet.Cell(row, 1).Value = r.Sys;
-                sheet.Cell(row, 2).Value = r.Name;
-                sheet.Cell(row, 3).Value = r.Unit;
-                sheet.Cell(row, 4).Value = r.QtyA is null ? "" : (double)r.QtyA;
-                sheet.Cell(row, 5).Value = r.QtyB is null ? "" : (double)r.QtyB;
-                sheet.Cell(row, 6).Value = r.PriceA is null ? "" : (double)r.PriceA;
-                sheet.Cell(row, 7).Value = r.PriceB is null ? "" : (double)r.PriceB;
-                sheet.Cell(row, 8).Value = r.QtyA is null ? "" : (double)r.SumA;
-                sheet.Cell(row, 9).Value = r.QtyB is null ? "" : (double)r.SumB;
-                sheet.Cell(row, 10).Value = r.Diff == 0m ? "" : (double)r.Diff;
-                sheet.Cell(row, 11).Value = word;
-                sheet.Range(row, 6, row, 10).Style.NumberFormat.Format = "#,##0.00";
-                row++;
+                using var workbook = new XLWorkbook();
+                var sheet = workbook.Worksheets.Add("Лист1");
+                FillComparisonSheet(sheet, res, token);
+                token.ThrowIfCancellationRequested();
+                sheet.Columns().AdjustToContents(1, Math.Min(sheet.LastRowUsed()?.RowNumber() ?? 1, 200));
+                token.ThrowIfCancellationRequested();
+                workbook.SaveAs(stream);
+                token.ThrowIfCancellationRequested();
+            }), token);
+            if (_closed || token.IsCancellationRequested || !ReferenceEquals(res, _result)) return;
+            prepared.Publish();
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path)
+                { UseShellExecute = true });
             }
+            catch { /* Excel viewer is optional. */ }
+        }
+        catch (Exception ex)
+        {
+            if (!_closed && !token.IsCancellationRequested && ReferenceEquals(res, _result))
+                MessageBox.Show(this, ex.Message, "Экспорт", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _exportCancellation = null;
+            _exportBusy = false;
+            if (!_closed) ExportButton.IsEnabled = _result is not null;
+        }
+    }
+
+    private static void FillComparisonSheet(IXLWorksheet sheet, CompareResult res, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        sheet.Cell(1, 1).Value = "Было: " + res.TitleA;
+        sheet.Cell(2, 1).Value = "Стало: " + res.TitleB;
+        sheet.Range(1, 1, 2, 1).Style.Font.Bold = true;
+        XlsxExport.Header(sheet, 4, new[] { "Система", "Наименование", "Ед.", "Кол-во было", "Кол-во стало",
+            "Цена было", "Цена стало", "Сумма было", "Сумма стало", "Разница", "Что" });
+        var row = 5;
+        foreach (var r in res.Rows)
+        {
+            token.ThrowIfCancellationRequested();
+            var word = r.Kind switch
+            {
+                "added" => "добавлено", "removed" => "убрано", "changed" => "изменено", _ => "",
+            };
+            sheet.Cell(row, 1).Value = r.Sys;
+            sheet.Cell(row, 2).Value = r.Name;
+            sheet.Cell(row, 3).Value = r.Unit;
+            sheet.Cell(row, 4).Value = r.QtyA is null ? "" : (double)r.QtyA;
+            sheet.Cell(row, 5).Value = r.QtyB is null ? "" : (double)r.QtyB;
+            sheet.Cell(row, 6).Value = r.PriceA is null ? "" : (double)r.PriceA;
+            sheet.Cell(row, 7).Value = r.PriceB is null ? "" : (double)r.PriceB;
+            sheet.Cell(row, 8).Value = r.QtyA is null ? "" : (double)r.SumA;
+            sheet.Cell(row, 9).Value = r.QtyB is null ? "" : (double)r.SumB;
+            sheet.Cell(row, 10).Value = r.Diff == 0m ? "" : (double)r.Diff;
+            sheet.Cell(row, 11).Value = word;
             row++;
-            foreach (var (label, a, b) in new[] { ("Материалы", res.MatA, res.MatB),
-                ("СМР", res.SmrA, res.SmrB), ("ИТОГО с НДС", res.TotalA, res.TotalB) })
-            {
-                sheet.Cell(row, 2).Value = label;
-                sheet.Cell(row, 2).Style.Font.Bold = true;
-                sheet.Cell(row, 8).Value = (double)a;
-                sheet.Cell(row, 9).Value = (double)b;
-                sheet.Cell(row, 10).Value = (double)(b - a);
-                sheet.Range(row, 8, row, 10).Style.NumberFormat.Format = "#,##0.00";
-                sheet.Range(row, 8, row, 10).Style.Font.Bold = true;
-                row++;
-            }
-            sheet.SheetView.FreezeRows(4);
-        });
+        }
+        if (row > 5) sheet.Range(5, 6, row - 1, 10).Style.NumberFormat.Format = "#,##0.00";
+        row++;
+        foreach (var (label, a, b) in new[] { ("Материалы", res.MatA, res.MatB),
+            ("СМР", res.SmrA, res.SmrB), ("ИТОГО с НДС", res.TotalA, res.TotalB) })
+        {
+            sheet.Cell(row, 2).Value = label;
+            sheet.Cell(row, 2).Style.Font.Bold = true;
+            sheet.Cell(row, 8).Value = (double)a;
+            sheet.Cell(row, 9).Value = (double)b;
+            sheet.Cell(row, 10).Value = (double)(b - a);
+            sheet.Range(row, 8, row, 10).Style.NumberFormat.Format = "#,##0.00";
+            sheet.Range(row, 8, row, 10).Style.Font.Bold = true;
+            row++;
+        }
+        sheet.SheetView.FreezeRows(4);
     }
 }

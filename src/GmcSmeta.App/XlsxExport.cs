@@ -93,7 +93,7 @@ public static class XlsxExport
         return true;
     }
 
-    private static string SanitizeFileName(string name)
+    internal static string SanitizeFileName(string name)
     {
         foreach (var c in Path.GetInvalidFileNameChars())
             name = name.Replace(c, ' ');

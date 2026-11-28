@@ -27,7 +27,8 @@ public static class CompareDisplayProjection
     {
         token.ThrowIfCancellationRequested();
         var all = new List<ComparePreviewRow>(result.Rows.Count);
-        var changed = new List<ComparePreviewRow>();
+        var changed = new List<ComparePreviewRow>(Math.Min(result.Rows.Count,
+            result.Added + result.Removed + result.ChangedCount));
         foreach (var r in result.Rows)
         {
             token.ThrowIfCancellationRequested();
@@ -73,6 +74,7 @@ public static class CompareDisplayProjection
     {
         if (a is null) return fmt(b!.Value);
         if (b is null) return fmt(a.Value);
+        if (a.Value == b.Value) return fmt(b.Value);
         var before = fmt(a.Value);
         var after = fmt(b.Value);
         return before == after ? after : $"{before} → {after}";

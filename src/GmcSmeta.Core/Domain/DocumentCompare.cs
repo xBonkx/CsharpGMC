@@ -61,47 +61,59 @@ public static class DocumentCompare
             token.ThrowIfCancellationRequested();
             Add(freeB, rb[j].KSys, j);
         }
-        var pair = new Dictionary<int, int>();
+        var pair = new int[ra.Count];
+        Array.Fill(pair, -1);
+        var used = new bool[rb.Count];
         foreach (var r in ra)                                    // 1) тот же раздел, имя и единица
         {
             token.ThrowIfCancellationRequested();
             if (freeB.TryGetValue(r.KSys, out var queue) && queue.Count > 0)
-                pair[r.Order] = queue.Dequeue();
+            {
+                var j = queue.Dequeue();
+                pair[r.Order] = j;
+                used[j] = true;
+            }
         }
-        var used = pair.Values.ToHashSet();
         var byAny = new Dictionary<(string, string), Queue<int>>();
         for (var j = 0; j < rb.Count; j++)
         {
             token.ThrowIfCancellationRequested();
-            if (!used.Contains(j))
+            if (!used[j])
                 Add(byAny, rb[j].KAny, j);
         }
         foreach (var r in ra)                                    // 2) переехал в другой раздел
         {
             token.ThrowIfCancellationRequested();
-            if (pair.ContainsKey(r.Order)) continue;
+            if (pair[r.Order] >= 0) continue;
             if (byAny.TryGetValue(r.KAny, out var any) && any.Count > 0)
-                pair[r.Order] = any.Dequeue();
+            {
+                var j = any.Dequeue();
+                pair[r.Order] = j;
+                used[j] = true;
+            }
         }
-        var usedFinal = pair.Values.ToHashSet();
 
-        var rows = new List<CompareRow>();
+        var rows = new List<CompareRow>(Math.Max(ra.Count, rb.Count));
+        int added = 0, removed = 0, changedCount = 0, same = 0;
         foreach (var r in ra)
         {
             token.ThrowIfCancellationRequested();
-            if (pair.TryGetValue(r.Order, out var j))
+            var j = pair[r.Order];
+            if (j >= 0)
             {
                 var n = rb[j];
                 var changed = new List<string>();
                 if (Math.Abs(r.Qty - n.Qty) > 0.000000001m) changed.Add("qty");
                 if (Math.Abs(r.Price - n.Price) > 0.005m) changed.Add("price");
                 if (r.KSys.Item1 != n.KSys.Item1) changed.Add("sys");
+                if (changed.Count > 0) changedCount++; else same++;
                 rows.Add(new CompareRow(changed.Count > 0 ? "changed" : "same", changed.ToArray(),
                     n.Sys, r.Sys, n.Name, n.Unit, r.Qty, n.Qty, r.Price, n.Price,
                     r.Sum, n.Sum, decimal.Round(n.Sum - r.Sum, 2), j));
             }
             else
             {
+                removed++;
                 rows.Add(new CompareRow("removed", Array.Empty<string>(), r.Sys, r.Sys, r.Name, r.Unit,
                     r.Qty, null, r.Price, null, r.Sum, 0m, decimal.Round(-r.Sum, 2), -1));
             }
@@ -109,7 +121,8 @@ public static class DocumentCompare
         for (var j = 0; j < rb.Count; j++)
         {
             token.ThrowIfCancellationRequested();
-            if (usedFinal.Contains(j)) continue;
+            if (used[j]) continue;
+            added++;
             var n = rb[j];
             rows.Add(new CompareRow("added", Array.Empty<string>(), n.Sys, "", n.Name, n.Unit,
                 null, n.Qty, null, n.Price, 0m, n.Sum, decimal.Round(n.Sum, 2), j));
@@ -143,10 +156,6 @@ public static class DocumentCompare
             return (x.Order < 0 ? 1_000_000 : x.Order) - (y.Order < 0 ? 1_000_000 : y.Order);
         });
         token.ThrowIfCancellationRequested();
-        var added = rows.Count(r => r.Kind == "added");
-        var removed = rows.Count(r => r.Kind == "removed");
-        var changedCount = rows.Count(r => r.Kind == "changed");
-        var same = rows.Count(r => r.Kind == "same");
         return new CompareResult(rows, added, removed, changedCount, same,
             a.Totals.Materials, b.Totals.Materials, a.Totals.Smr, b.Totals.Smr,
             a.Totals.Total, b.Totals.Total, a.Title, b.Title);

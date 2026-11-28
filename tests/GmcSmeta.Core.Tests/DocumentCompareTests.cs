@@ -217,4 +217,29 @@ public sealed class DocumentCompareTests
             DocumentCompare.CompareDocuments(doc, doc, cancellation.Token));
     }
 
+
+    [Fact]
+    public void LargeMixedComparisonPreservesExactFirstPassPriorityAndSecondPassPairing()
+    {
+        const int count = 25000;
+        var a = new[] { Sys(1, "A"), Sys(2, "B") }.Concat(Enumerable.Range(0, count)
+            .Select(i => Pos(i + 10, i % 2 + 1, "Позиция " + (i / 2), "шт", 1m, 2m))).ToArray();
+        // Keep even rows in A; move odd rows from B to C. Add a new unique row.
+        var b = new[] { Sys(3, "A"), Sys(4, "C") }.Concat(Enumerable.Range(0, count)
+            .Where(i => i != count - 1)
+            .Select(i => Pos(i + 10, i % 2 + 3, "Позиция " + (i / 2), "шт", 1m, 2m)))
+            .Append(Pos(count + 10, 4, "Новая", "шт", 3m, 2m)).ToArray();
+        var result = DocumentCompare.CompareDocuments(Doc("A", a), Doc("B", b));
+        Assert.Equal(count / 2, result.Same);
+        Assert.Equal(count / 2 - 1, result.ChangedCount);
+        Assert.Equal(1, result.Added);
+        Assert.Equal(1, result.Removed);
+        Assert.Equal(count + 1, result.Rows.Count);
+        Assert.All(result.Rows.Where(r => r.Kind == "changed"), r =>
+        {
+            Assert.Equal(new[] { "sys" }, r.Changed);
+            Assert.Equal("B", r.SysWas);
+            Assert.Equal("C", r.Sys);
+        });
+    }
 }
