@@ -55,8 +55,11 @@ public sealed class EstimateFooterSourceTests
         XElement Named(string name) => Assert.Single(view.Descendants().Where(e => (string?)e.Attribute(xaml + "Name") == name));
         var toggle = Named("ToggleTotalsButton");
         var cards = Named("TotalsCards");
-        Assert.Same(cards.Parent, Named("TotalsSummary").Parent);
-        Assert.Same(toggle.Parent, cards.Parent!.Parent);
+        var viewport = Named("TotalsCardsViewport");
+        Assert.Same(viewport, cards.Parent);
+        Assert.Same(viewport.Parent, Named("TotalsSummary").Parent);
+        Assert.Same(toggle.Parent, viewport.Parent!.Parent);
+        Assert.Equal("Auto", (string?)viewport.Attribute("VerticalScrollBarVisibility"));
         Assert.Equal("True", (string?)toggle.Parent!.Attribute("LastChildFill"));
         Assert.Equal("10,0,0,0", (string?)toggle.Attribute("Margin"));
         Assert.Equal("5", (string?)Named("TotalsFooterPanel").Attribute("Grid.Row"));
@@ -79,6 +82,8 @@ public sealed class EstimateFooterSourceTests
         Assert.Contains("if (!hidden) LayoutTotalsCards();", code);
         Assert.Contains("_uiSettings.TotalsHidden = hidden;", code);
         Assert.Contains("ActualWidth >= 1180", code);
+        Assert.Contains("ActualHeight * .42", code);
+        Assert.Contains("TotalsCardsViewport.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible", code);
         var layout = File.ReadAllText(Path.Combine(app, "EstimateTotalsCardsPanel.cs"));
         Assert.Contains("internal const double Gap = 10;", layout);
         Assert.Contains("PreferredMinCardWidth = 200", layout);

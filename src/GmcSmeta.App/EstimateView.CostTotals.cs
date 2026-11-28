@@ -42,6 +42,12 @@ public partial class EstimateView
         public string SellTip { get; init; } = "";
         public bool IsSubtotal => Kind == "total";
         public bool IsBold => Kind is "total" or "grand";
+        public bool CanEdit(string column) => Kind == "line" && (column switch
+        {
+            "cost" => CostEditable,
+            "sell" => SellEditable,
+            _ => false,
+        });
 
     }
 
@@ -68,8 +74,18 @@ public partial class EstimateView
         view.TotalsGrid.BeginningEdit += TotalsGrid_BeginningEdit;
         view.TotalsGrid.PreparingCellForEdit += TotalsGrid_PreparingCellForEdit;
         view.TotalsGrid.CellEditEnding += TotalsGrid_CellEditEnding;
+        view.TotalsGrid.LayoutUpdated += (_, _) => SyncTotalsEditAvailability();
         TotalsPanel.Child = view;
+        SyncTotalsEditAvailability();
         return view;
+    }
+
+    // The row eligibility is authoritative; transient load/write/conflict state
+    // must not advertise an editor that BeginningEdit would reject.
+    private void SyncTotalsEditAvailability()
+    {
+        if (TotalsGrid is { } grid && !Equals(grid.Tag, TotalsSnapshotReady))
+            grid.Tag = TotalsSnapshotReady;
     }
 
     // ------------------------------------------------------------------ load
@@ -79,6 +95,7 @@ public partial class EstimateView
         var cancellation = _totalsLoadCancellation;
         _totalsLoadCancellation = null;
         _totalsLoading = false;
+        SyncTotalsEditAvailability();
         if (cancel) cancellation?.Cancel();
     }
 
@@ -96,6 +113,7 @@ public partial class EstimateView
         _costTotalsData = null;
         _totalsSourceSummary = null;
         _totalsRevision = "";
+        SyncTotalsEditAvailability();
         if (TotalsGrid is { } grid) grid.ItemsSource = null;
     }
 
@@ -112,6 +130,7 @@ public partial class EstimateView
         var cachedRevision = cachedSummary is null ? "" : _summaryRevision;
         _totalsLoading = true;
         _totalsRevision = "";
+        SyncTotalsEditAvailability();
         var version = ++_totalsLoadVersion;
         using var cancellation = new CancellationTokenSource();
         _totalsLoadCancellation = cancellation;
@@ -143,32 +162,18 @@ public partial class EstimateView
             {
                 _totalsLoadCancellation = null;
                 _totalsLoading = false;
+                SyncTotalsEditAvailability();
             }
         }
     }
 
     // ------------------------------------------------------------------ show
-    private static string TotalsMoney(decimal? v) => v is decimal value && value != 0m ? Money.Format(value) : "";
+    private static string TotalsMoney(decimal? value) => GmcSmeta.Core.Domain.TotalsDisplayPolicy.MoneyText(value);
 
-    private static string TotalsPct(decimal cost, decimal sell) =>
-        cost != 0m ? ((sell - cost) / cost * 100m).ToString("0.0", Ru).Replace('.', ',') + "%" : "";
+    private static string TotalsPct(decimal cost, decimal sell) => GmcSmeta.Core.Domain.TotalsDisplayPolicy.PercentText(cost, sell);
 
-    /// <summary>Маржа строки (cost_totals_view._margin_cells): «−закуп», «—», сумма и %.</summary>
-    private static (string MarginText, string PctText, bool Neg) TotalsMargin(decimal? cost, decimal? sell)
-    {
-        if (sell is null)
-        {
-            // только себестоимость: она уменьшает маржу всей работы
-            return cost is decimal c && c != 0m ? ("−" + Money.Format(c), "", true) : ("", "", false);
-        }
-        if (cost is null or 0m)
-        {
-            // наш расход ещё не вписан: маржи нет
-            return (sell.Value != 0m ? "—" : "", "", false);
-        }
-        var margin = sell.Value - cost.Value;
-        return (Money.Format(margin), TotalsPct(cost.Value, sell.Value), margin < 0m);
-    }
+    private static (string MarginText, string PctText, bool Neg) TotalsMargin(decimal? cost, decimal? sell) =>
+        GmcSmeta.Core.Domain.TotalsDisplayPolicy.Margin(cost, sell);
 
     private void TotalsShow()
     {
@@ -194,7 +199,7 @@ public partial class EstimateView
                 Kind = "line", Key = line.Key, Name = line.Name, NameTip = nameTip,
                 CostText = TotalsMoney(line.Cost),
                 CostRaw = line.CostEditable && line.Cost is decimal c ? NumberText.QtyText(c) : "",
-                SellText = line.Sell is null ? "—" : TotalsMoney(line.Sell),
+                SellText = GmcSmeta.Core.Domain.TotalsDisplayPolicy.SellText(line.Sell),
                 SellRaw = line.SellEditable && line.Sell is decimal s ? NumberText.QtyText(s) : "",
                 SellTip = sellTip,
                 MarginText = marginText, PctText = pctText, MarginNeg = neg,
@@ -251,21 +256,9 @@ public partial class EstimateView
             return;
         }
         var column = e.Column.SortMemberPath ?? "";
-        if (column == "cost")
-        {
-            if (!row.CostEditable) e.Cancel = true;
-            return;
-        }
-        if (column == "sell")
-        {
-            if (!row.SellEditable)
-            {
-                if (row.Key is "pnr" or "trans" or "smr")
-                    SetStatus("Смета подписана — сумму клиенту здесь не поменять", true);
-                e.Cancel = true;
-            }
-            return;
-        }
+        if (row.CanEdit(column)) return;
+        if (column == "sell" && (row.Key is "pnr" or "trans" or "smr"))
+            SetStatus("Ручной ввод этой статьи сейчас недоступен", true);
         e.Cancel = true;
     }
 
@@ -283,7 +276,7 @@ public partial class EstimateView
         if (editor is null) return;
         var column = e.Column.SortMemberPath ?? "";
         var text = editor.Text.Trim().Replace("₽", "").Trim();
-        if (column is not ("cost" or "sell")) return;
+        if (!row.CanEdit(column)) { e.Cancel = true; return; }
         if (editor.Text == (column == "cost" ? row.CostRaw : row.SellRaw)) return;
 
         var field = column == "cost"
@@ -316,6 +309,7 @@ public partial class EstimateView
         if (value is null && field is "pnr_amount" or "transport_amount")
             value = 0m;
         _totalsBusy = true;
+        SyncTotalsEditAvailability();
         _ = TotalsCommitAsync(field, value, _totalsRevision);
     }
 
@@ -343,6 +337,7 @@ public partial class EstimateView
         finally
         {
             _totalsBusy = false;
+            SyncTotalsEditAvailability();
         }
     }
 }

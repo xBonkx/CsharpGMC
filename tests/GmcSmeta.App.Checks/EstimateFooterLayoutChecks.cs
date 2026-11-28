@@ -51,6 +51,28 @@ internal static class EstimateFooterLayoutChecks
         Slot(first, 0, 0, 200, 120);
         Slot(third, 420, 0, 200, 120);
         Slot(fourth, 0, 130, 200, 70);
+        // The capped viewport must leave the star-sized document body room even
+        // when cards stack vertically at narrow widths.
+        var body = new Border();
+        var scroll = new ScrollViewer { Content = panel, MaxHeight = 210,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var host = new Grid();
+        host.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        host.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        host.Children.Add(body);
+        host.Children.Add(scroll);
+        Grid.SetRow(scroll, 1);
+        host.Measure(new Size(330, 500));
+        host.Arrange(new Rect(0, 0, 330, 500));
+        host.UpdateLayout();
+        if (body.ActualHeight < 289.99 || scroll.ActualHeight > 210.01)
+            throw new Exception("Expanded footer consumed the document body.");
+        scroll.Visibility = Visibility.Collapsed;
+        host.Measure(new Size(330, 500));
+        host.Arrange(new Rect(0, 0, 330, 500));
+        host.UpdateLayout();
+        if (body.ActualHeight < 499.99) throw new Exception("Collapsed footer did not release space.");
         Console.WriteLine("Estimate footer layout OK (no SQL).");
     }
 

@@ -973,6 +973,7 @@
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
                                Foreground="#64748B" VerticalAlignment="Center"/>
+                    <ScrollViewer x:Name="TotalsCardsViewport" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="360" Focusable="False">
                     <local:EstimateTotalsCardsPanel x:Name="TotalsCards" Columns="4">
                 <Border x:Name="MaterialsCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
@@ -1033,6 +1034,7 @@
                     </StackPanel>
                 </Border>
                     </local:EstimateTotalsCardsPanel>
+                    </ScrollViewer>
                 </Grid>
             </DockPanel>
         </Border>

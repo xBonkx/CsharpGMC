@@ -155,8 +155,11 @@ public sealed class EstimateTotalsVisualSourceTests
         foreach (var key in new[] { "Cost", "Sell" })
         {
             var cell = Style(shared, "Totals" + key + "Cell");
-            var editable = Assert.Single(cell.Descendants(W + "DataTrigger"));
-            Assert.Equal("{Binding " + key + "Editable}", (string?)editable.Attribute("Binding"));
+            var editable = Assert.Single(cell.Descendants(W + "MultiDataTrigger"));
+            var conditions = editable.Descendants(W + "Condition").ToArray();
+            Assert.Contains(conditions, e => (string?)e.Attribute("Binding") == "{Binding " + key + "Editable}" && (string?)e.Attribute("Value") == "True");
+            Assert.Contains(conditions, e => (string?)e.Attribute("Binding") == "{Binding Kind}" && (string?)e.Attribute("Value") == "line");
+            Assert.Contains(conditions, e => ((string?)e.Attribute("Binding") ?? "").Contains("AncestorType=DataGrid") && (string?)e.Attribute("Value") == "True");
             Assert.Equal("#FFF7E6", Value(editable, "Background"));
         }
         var margin = Style(shared, "TotalsArticleMargin");

@@ -745,6 +745,7 @@ public partial class EstimateView : UserControl
 
     private void SetStatus(string message, bool error)
     {
+        SyncTotalsEditAvailability();
         // Python: status.emit → нижняя строка главного окна (QStatusBar).
         if (!_detached && Window.GetWindow(this) is MainWindow main)
             main.SetEstimateStatus(message, error);
@@ -1115,6 +1116,7 @@ public partial class EstimateView : UserControl
     private void SetTotalsHidden(bool hidden)
     {
         TotalsCards.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
+        TotalsCardsViewport.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible;
         TotalsSummary.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
         ToggleTotalsButton.Content = hidden ? "Показать итоги" : "Скрыть итоги";
         ToggleTotalsButton.ContentTemplate = (DataTemplate)FindResource(hidden ? "IconLabelArrowUp" : "IconLabelArrowDown");
@@ -1132,7 +1134,8 @@ public partial class EstimateView : UserControl
 
     private void LayoutTotalsCards()
     {
-        if (TotalsCards is null) return;
+        if (TotalsCards is null || TotalsCardsViewport is null) return;
+        if (ActualHeight > 0) TotalsCardsViewport.MaxHeight = Math.Clamp(ActualHeight * .42, 100, 360);
         TotalsCards.Columns = ActualWidth >= 1180
             ? Math.Max(1, TotalsCards.Children.Cast<UIElement>().Count(card => card.Visibility == Visibility.Visible))
             : 2;
@@ -1140,7 +1143,7 @@ public partial class EstimateView : UserControl
 
     private void EstimateView_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (e.WidthChanged) LayoutTotalsCards();
+        if (e.WidthChanged || e.HeightChanged) LayoutTotalsCards();
     }
 
     private void EstimateView_Unloaded(object sender, RoutedEventArgs e) =>
