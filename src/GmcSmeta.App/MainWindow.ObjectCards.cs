@@ -32,6 +32,7 @@ public partial class MainWindow
         _selectedObject = o;
         _openDocumentId = null;
         ++_estimateOpenGeneration;
+        CancelNavigationRefresh();
         CancelEstimateCacheValidation();
         _objectCardTransitionPending = true;
         PageHost.IsEnabled = false;
@@ -43,6 +44,7 @@ public partial class MainWindow
         using var cancellation = new CancellationTokenSource();
         _objectCardReadCancellation = cancellation;
         var token = cancellation.Token;
+        using var operationTiming = StartupTrace.BeginOperation();
         var request = ++_objectCardLoadRequest;
         // Only this object's documents are used by both scoped readers.
         var documentsSnapshot = _docs.Where(d => d.ObjectId == o.Id).ToArray();
@@ -58,7 +60,9 @@ public partial class MainWindow
         var entered = false;
         try
         {
+            using var waitTiming = StartupTrace.MeasureElapsed("object_cards_read_gate");
             await _objectCardReadGate.WaitAsync(token);
+            waitTiming?.Dispose();
             entered = true;
             if (!IsCurrent() || token.IsCancellationRequested) return;
             loaded = await Task.Run(async () =>
@@ -67,7 +71,7 @@ public partial class MainWindow
                 var before = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
                 if (string.IsNullOrWhiteSpace(before) ||
-                    !Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot))
+                    !Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot, token))
                     throw new InvalidOperationException("Состав документов или реквизиты объекта изменились. Нажмите F5.");
                 token.ThrowIfCancellationRequested();
                 var result = cached is not null && cached.Revision == before
@@ -106,6 +110,7 @@ public partial class MainWindow
         }
         // A different object/estimate may have been selected before SQL replied.
         if (!IsCurrent()) return;
+        using var bindTiming = StartupTrace.Measure("object_cards_bind");
         var documents = loaded.Documents;
         _objectCardCache.Store(connectionString, o.Id, mode, loaded.Revision, documents);
         // Prepare the header, totals and cards on this dispatcher turn, with

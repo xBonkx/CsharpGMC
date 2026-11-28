@@ -35,7 +35,7 @@ public sealed class ObjectCardTransitionSourceTests
         Assert.Contains("await _objectCardReadGate.WaitAsync(token)", cards);
         Assert.Contains("if (entered) _objectCardReadGate.Release();", cards);
         Assert.Contains("SqlServerDatabase.OpenAsync(connectionString, token)", cards);
-        Assert.Contains("Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot)", cards);
+        Assert.Contains("Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot, token)", cards);
         Assert.Contains("cached.Revision == before", cards);
         Assert.Contains("_docs.Where(d => d.ObjectId == o.Id).ToArray()", cards);
         Assert.Contains("CancelObjectCardRead();", main);

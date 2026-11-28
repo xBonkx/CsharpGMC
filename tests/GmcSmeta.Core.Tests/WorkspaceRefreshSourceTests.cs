@@ -21,14 +21,16 @@ public sealed class WorkspaceRefreshSourceTests
         var refresh = code[start..end];
         Assert.Contains("_navigationRefreshInProgress", refresh);
         Assert.Contains("await Task.Run", refresh);
-        Assert.Contains("using var read = SqlServerDatabase.Open(connection)", refresh);
-        Assert.Contains("Workspace.ReadConsistentNavigation(read)", refresh);
+        Assert.Contains("SqlServerDatabase.OpenAsync(connection, token)", refresh);
+        Assert.Contains("Workspace.ReadConsistentNavigation(read, token)", refresh);
         Assert.Contains("navigationGeneration == _estimateOpenGeneration", refresh);
         Assert.Contains("dataGeneration == _navigationDataGeneration", refresh);
         Assert.Contains("!_startupClosed", refresh);
         Assert.True(refresh.IndexOf("if (!IsCurrent())", StringComparison.Ordinal) <
             refresh.IndexOf("ApplyNavigationData(loaded.Objects", StringComparison.Ordinal));
-        Assert.Contains("finally { _navigationRefreshInProgress = false; }", refresh);
+        Assert.Contains("_navigationRefreshInProgress = false;", refresh);
+        Assert.Contains("ReferenceEquals(_navigationRefreshCancellation, cancellation)", refresh);
+        Assert.Contains("catch (Exception) when (token.IsCancellationRequested)", refresh);
     }
 
     [Fact]

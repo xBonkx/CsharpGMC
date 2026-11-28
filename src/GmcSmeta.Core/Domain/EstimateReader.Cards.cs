@@ -23,19 +23,25 @@ public static partial class EstimateReader
         LoadCardsSql(conn, contractIds, null);
 
     internal static IReadOnlyDictionary<int, EstimateCardData> LoadCardsSql(
-        SqlConnection conn, IEnumerable<int> contractIds, TagRules? knownRules)
+        SqlConnection conn, IEnumerable<int> contractIds, TagRules? knownRules, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ids = contractIds.Distinct().OrderBy(id => id).ToArray();
         if (ids.Any(id => id <= 0)) throw new ArgumentOutOfRangeException(nameof(contractIds));
         var result = new Dictionary<int, EstimateCardData>(ids.Length);
         foreach (var batch in ids.Chunk(CardBatchSize))
-            ReadCardBatch(conn, batch, result, knownRules);
+        {
+            token.ThrowIfCancellationRequested();
+            ReadCardBatch(conn, batch, result, knownRules, token);
+        }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 
     private static void ReadCardBatch(SqlConnection conn, int[] ids,
-        Dictionary<int, EstimateCardData> result, TagRules? knownRules)
+        Dictionary<int, EstimateCardData> result, TagRules? knownRules, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var scope = new ContractReadScope(ids);
         using var cmd = conn.CreateCommand();
         cmd.CommandText = WithDiscountColumn(conn,
@@ -47,10 +53,12 @@ public static partial class EstimateReader
             "FROM positions p JOIN systems sy ON sy.id = p.system_id WHERE " +
             scope.Predicate("sy.contract_id") + " ORDER BY p.[order], p.id;");
         scope.Bind(cmd);
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         var heads = new Dictionary<int, Head>(ids.Length);
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var head = ReadHeadCurrent(reader);
             heads.Add(head.ContractId, head);
         }
@@ -59,7 +67,10 @@ public static partial class EstimateReader
 
         void Next()
         {
-            if (!reader.NextResult())
+            token.ThrowIfCancellationRequested();
+            var next = reader.NextResult();
+            token.ThrowIfCancellationRequested();
+            if (!next)
                 throw new InvalidOperationException("Неполный пакет карточек SQL Server.");
         }
 
@@ -72,16 +83,21 @@ public static partial class EstimateReader
         Next();
         var systems = ids.ToDictionary(id => id, _ => new List<SystemRow>());
         while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
             systems[SqlInteger.ReadInt32(reader, 3)].Add(new SystemRow
             {
                 Id = SqlInteger.ReadInt32(reader, 0),
                 ParentId = reader.IsDBNull(1) ? null : SqlInteger.ReadInt32(reader, 1),
                 SmrAmount = Dec(reader, 2)
             });
+        }
 
         Next();
         var positions = ids.ToDictionary(id => id, _ => new List<PositionRow>());
         while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
             positions[SqlInteger.ReadInt32(reader, 8)].Add(new PositionRow
             {
                 Id = SqlInteger.ReadInt32(reader, 0),
@@ -93,10 +109,13 @@ public static partial class EstimateReader
                 OutOfKp = !reader.IsDBNull(6) && Convert.ToBoolean(reader.GetValue(6)),
                 WorkPrice = reader.IsDBNull(7) ? null : Dec(reader, 7)
             });
+        }
+        token.ThrowIfCancellationRequested();
         reader.Close();
 
         foreach (var id in ids)
         {
+            token.ThrowIfCancellationRequested();
             var head = heads[id];
             var ss = systems[id];
             var pp = positions[id];

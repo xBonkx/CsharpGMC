@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,6 +13,9 @@ public partial class MainWindow
 {
     private bool _workspaceNavigationAttached;
     private bool _navigationRefreshInProgress;
+    private CancellationTokenSource? _navigationRefreshCancellation;
+
+    private void CancelNavigationRefresh() => _navigationRefreshCancellation?.Cancel();
     private long _navigationDataGeneration;
 
     internal void InitializeWorkspaceNavigation()
@@ -222,10 +226,14 @@ public partial class MainWindow
         }
 
         _navigationRefreshInProgress = true;
+        using var cancellation = new CancellationTokenSource();
+        _navigationRefreshCancellation = cancellation;
+        var token = cancellation.Token;
+        using var operationTiming = StartupTrace.BeginOperation();
         var navigationGeneration = _estimateOpenGeneration;
         var dataGeneration = _navigationDataGeneration;
         var selected = CommandObject()?.Id;
-        bool IsCurrent() => !_startupClosed && _ready &&
+        bool IsCurrent() => !token.IsCancellationRequested && !_startupClosed && _ready &&
             navigationGeneration == _estimateOpenGeneration &&
             dataGeneration == _navigationDataGeneration &&
             connection == _sqlConnectionString;
@@ -237,11 +245,13 @@ public partial class MainWindow
             var loaded = await Task.Run(() =>
             {
                 StartupTrace.Mark("main_navigation_refresh_begin");
-                using var read = SqlServerDatabase.Open(connection);
-                var result = Workspace.ReadConsistentNavigation(read);
+                using var timing = StartupTrace.MeasureElapsed("navigation_refresh_sql_open");
+                using var read = SqlServerDatabase.OpenAsync(connection, token).GetAwaiter().GetResult();
+                timing?.Dispose();
+                var result = Workspace.ReadConsistentNavigation(read, token);
                 StartupTrace.Mark("main_navigation_refresh_end");
                 return result;
-            });
+            }, token);
 
             if (!IsCurrent())
             {
@@ -302,13 +312,22 @@ public partial class MainWindow
                 ShowEmptyPage();
             StatusText.Text = "Данные объектов и документов обновлены из SQL Server";
         }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            if (!_startupClosed && StatusText.Text == loading)
+                StatusText.Text = "Обновление списка отменено: нажмите F5 повторно.";
+        }
         catch (Exception ex)
         {
             LogError(ex);
             if (IsCurrent())
                 StatusText.Text = "Не удалось обновить список: " + ex.Message + " · Повторите F5.";
         }
-        finally { _navigationRefreshInProgress = false; }
+        finally
+        {
+            if (ReferenceEquals(_navigationRefreshCancellation, cancellation)) _navigationRefreshCancellation = null;
+            _navigationRefreshInProgress = false;
+        }
     }
 
     private void ReloadAndSelect(int objectId)
@@ -328,6 +347,7 @@ public partial class MainWindow
     {
         // Invalidate any manual F5 snapshot before a synchronous post-write refresh.
         ++_navigationDataGeneration;
+        CancelNavigationRefresh();
         var reader = _serverConn
             ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
         var (objects, documents) = Workspace.ReadNavigation(reader);

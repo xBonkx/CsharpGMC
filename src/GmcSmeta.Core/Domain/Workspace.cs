@@ -107,11 +107,13 @@ public static class Workspace
         return ReadObjectRows(r);
     }
 
-    private static List<ObjectRow> ReadObjectRows(DbDataReader r)
+    private static List<ObjectRow> ReadObjectRows(DbDataReader r, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<ObjectRow>();
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             list.Add(new ObjectRow(
                 SqlInteger.ReadInt32(r, 0),
                 Str(r, 1),
@@ -120,6 +122,7 @@ public static class Workspace
                 !r.IsDBNull(4) && Convert.ToBoolean(r.GetValue(4)),
                 Str(r, 5)) { CreatedAt = Str(r, 6), Folder = Str(r, 7) });
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 
@@ -203,38 +206,50 @@ public static class Workspace
 
     /// <summary>One metadata batch plus the existing financial batch; no MARS required.</summary>
     public static (List<ObjectRow> Objects, List<DocRow> Documents) ReadNavigation(
-        Microsoft.Data.SqlClient.SqlConnection conn)
+        Microsoft.Data.SqlClient.SqlConnection conn, CancellationToken token = default)
     {
-        var totals = Totals.ReadAll(conn).ToDictionary(t => t.Id);
-        return ReadNavigationMetadata(conn, null, totals);
+        token.ThrowIfCancellationRequested();
+        using var totalsTiming = StartupTrace.Measure("navigation_sql_totals");
+        var totals = Totals.ReadSqlBatch(conn, null, out _, token: token).ToDictionary(t => t.Id);
+        totalsTiming?.Dispose();
+        return ReadNavigationMetadata(conn, null, totals, token);
     }
 
     // Manual refresh uses an independent read connection. Do not mix list
     // metadata and monetary totals from two different server revisions.
     public static (List<ObjectRow> Objects, List<DocRow> Documents) ReadConsistentNavigation(
-        Microsoft.Data.SqlClient.SqlConnection conn)
+        Microsoft.Data.SqlClient.SqlConnection conn, CancellationToken token = default)
     {
-        var before = Db.SqlServerDatabase.Revision(conn);
+        token.ThrowIfCancellationRequested();
+        var before = SqlReadCancellation.Revision(conn, token);
         if (string.IsNullOrWhiteSpace(before))
             throw new InvalidOperationException("Не удалось прочитать ревизию SQL Server.");
-        var data = ReadNavigation(conn);
-        if (!string.Equals(before, Db.SqlServerDatabase.Revision(conn), StringComparison.Ordinal))
+        var data = ReadNavigation(conn, token);
+        if (!string.Equals(before, SqlReadCancellation.Revision(conn, token), StringComparison.Ordinal))
             throw new InvalidOperationException("Данные изменились во время обновления списка.");
+        token.ThrowIfCancellationRequested();
         return data;
     }
 
     private static (List<ObjectRow> Objects, List<DocRow> Documents) ReadNavigationMetadata(
         Microsoft.Data.SqlClient.SqlConnection conn, int? objectId,
-        IReadOnlyDictionary<int, ContractTotals>? totals)
+        IReadOnlyDictionary<int, ContractTotals>? totals, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
+        using var timing = StartupTrace.Measure("navigation_sql_metadata");
         using var cmd = conn.CreateCommand();
         cmd.CommandText = ObjectQuery(objectId) + ";" + DocumentQuery(objectId);
         if (objectId is int id) AddObjectParameter(cmd, id);
-        using var reader = cmd.ExecuteReader();
-        var objects = ReadObjectRows(reader);
-        if (!reader.NextResult())
-            throw new InvalidOperationException("Неполный пакет навигации SQL Server.");
-        return (objects, ReadDocumentRows(reader, totals));
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
+        var objects = ReadObjectRows(reader, token);
+        token.ThrowIfCancellationRequested();
+        var next = reader.NextResult();
+        token.ThrowIfCancellationRequested();
+        if (!next) throw new InvalidOperationException("Неполный пакет навигации SQL Server.");
+        var documents = ReadDocumentRows(reader, totals, token);
+        StartupTrace.Sample("navigation_metadata_rows", objects.Count, documents.Count);
+        return (objects, documents);
     }
 
     private static void AddObjectParameter(DbCommand command, int id)
@@ -249,17 +264,19 @@ public static class Workspace
     // Compare navigation metadata without re-reading totals for the whole workspace.
     // Money and row counts are read afresh by the card projection.
     public static bool ObjectCardMetadataMatches(DbConnection conn, ObjectRow obj,
-        IReadOnlyList<DocRow> navigationDocuments)
+        IReadOnlyList<DocRow> navigationDocuments, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         // The surrounding caller still checks the revision before and after the read.
         var metadata = conn is Microsoft.Data.SqlClient.SqlConnection sql
-            ? ReadNavigationMetadata(sql, obj.Id, null)
+            ? ReadNavigationMetadata(sql, obj.Id, null, token)
             : (Objects: ReadObjects(conn, obj.Id), Documents: ReadDocuments(conn, obj.Id, false));
         if (metadata.Objects.SingleOrDefault() != obj) return false;
         static DocRow Metadata(DocRow d) => d with { Materials = 0m, Smr = 0m, Total = 0m, Positions = 0 };
         var expected = navigationDocuments.Where(d => d.ObjectId == obj.Id)
             .OrderBy(d => d.Id).Select(Metadata);
         var actual = metadata.Documents.OrderBy(d => d.Id).Select(Metadata);
+        token.ThrowIfCancellationRequested();
         return expected.SequenceEqual(actual);
     }
 
@@ -280,11 +297,15 @@ public static class Workspace
         Dictionary<string, string> tags;
         if (conn is Microsoft.Data.SqlClient.SqlConnection sql)
         {
-            var rules = TagRules.LoadWithNames(sql, out tags);
+            TagRules rules;
+            using (StartupTrace.Measure("object_cards_tags"))
+                rules = TagRules.LoadWithNames(sql, out tags, token);
             token.ThrowIfCancellationRequested();
-            estimates = EstimateReader.LoadCardsSql(sql, docs.Select(doc => doc.Id), rules);
+            using (StartupTrace.Measure("object_cards_estimate_projection"))
+                estimates = EstimateReader.LoadCardsSql(sql, docs.Select(doc => doc.Id), rules, token);
             token.ThrowIfCancellationRequested();
-            finances = FinanceReader.ReadForCards(sql, estimates.Values.Select(e => e.Totals).ToArray(), rules);
+            using (StartupTrace.Measure("object_cards_finance_projection"))
+                finances = FinanceReader.ReadForCards(sql, estimates.Values.Select(e => e.Totals).ToArray(), rules, token);
         }
         else
         {
@@ -297,6 +318,7 @@ public static class Workspace
             while (reader.Read()) tags[Str(reader, 0)] = Str(reader, 1);
         }
         token.ThrowIfCancellationRequested();
+        using var projectionTiming = StartupTrace.Measure("object_cards_prepare");
         var docsById = docs.ToDictionary(d => d.Id);
         var cards = new List<ObjectDocumentCard>(docs.Count);
         foreach (var doc in OrderDocumentCards(docs))

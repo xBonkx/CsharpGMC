@@ -151,18 +151,21 @@ public static partial class FinanceReader
     // Caller owns the revision fence over both projections.
     internal static IReadOnlyDictionary<int, ContractFinance> ReadForCards(
         Microsoft.Data.SqlClient.SqlConnection conn,
-        IReadOnlyCollection<ContractTotals> cardTotals, TagRules rules)
+        IReadOnlyCollection<ContractTotals> cardTotals, TagRules rules, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ordered = cardTotals.OrderBy(t => t.Id).ToArray();
         if (ordered.Any(t => t.Id <= 0) || ordered.Select(t => t.Id).Distinct().Count() != ordered.Length)
             throw new ArgumentException("Некорректный набор документов карточек.", nameof(cardTotals));
         var result = new Dictionary<int, ContractFinance>(ordered.Length);
         foreach (var batch in ordered.Chunk(ContractReadScope.BatchSize))
         {
+            token.ThrowIfCancellationRequested();
             var scope = new ContractReadScope(batch.Select(t => t.Id));
-            foreach (var pair in ReadFinance(conn, batch, rules, scope))
+            foreach (var pair in ReadFinance(conn, batch, rules, scope, token))
                 result.Add(pair.Key, pair.Value);
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -19,6 +20,7 @@ public partial class MainWindow : Window
     private SqlConnection? _serverConn;
     private volatile bool _startupClosed;
     private bool _startupInProgress;
+    private CancellationTokenSource? _startupReadCancellation;
     private readonly string? _sqlConnectionString;
 
     /// <summary>
@@ -118,21 +120,25 @@ public partial class MainWindow : Window
 
     // No SQL in the constructor; the background reader must not touch WPF objects.
     // The connection is handed to the UI only after all startup reads finish.
-    private (SqlConnection Connection, List<ObjectRow> Objects, List<DocRow> Documents) ReadStartupData()
+    private (SqlConnection Connection, List<ObjectRow> Objects, List<DocRow> Documents) ReadStartupData(CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         if (_startupClosed) throw new OperationCanceledException();
         var cs = _sqlConnectionString;
         if (string.IsNullOrWhiteSpace(cs))
             throw new InvalidOperationException("Укажи GMC_SMETA_SQL_CONNECTION — подключение к отдельной тестовой базе SQL Server.");
         SqlServerWorkspace.RequirePilotDatabase(cs);
         StartupTrace.Mark("main_sql_open_begin");
-        var connection = SqlServerDatabase.Open(cs);
+        using var timing = StartupTrace.MeasureElapsed("workspace_startup_sql_open");
+        var connection = SqlServerDatabase.OpenAsync(cs, token).GetAwaiter().GetResult();
+        timing?.Dispose();
         try
         {
             StartupTrace.Mark("main_sql_open_end");
             if (_startupClosed) throw new OperationCanceledException();
             StartupTrace.Mark("main_navigation_read_begin");
-            var (objects, documents) = Workspace.ReadNavigation(connection);
+            var (objects, documents) = Workspace.ReadConsistentNavigation(connection, token);
+            token.ThrowIfCancellationRequested();
             StartupTrace.Mark("main_navigation_read_end");
             if (_startupClosed) throw new OperationCanceledException();
             return (connection, objects, documents);
@@ -150,6 +156,9 @@ public partial class MainWindow : Window
         if (_ready) return true;
         if (_startupInProgress || _startupClosed) return false;
         _startupInProgress = true;
+        using var cancellation = new CancellationTokenSource();
+        _startupReadCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
             while (!_startupClosed)
@@ -158,8 +167,11 @@ public partial class MainWindow : Window
                 ShowStartupMessage("Загрузка объектов и документов…");
                 try
                 {
-                    var loaded = await Task.Run(ReadStartupData);
-                    if (_startupClosed)
+                    using var operationTiming = StartupTrace.BeginOperation();
+                    using var loadTiming = StartupTrace.MeasureElapsed("workspace_startup_read");
+                    var loaded = await Task.Run(() => ReadStartupData(token), token);
+                    loadTiming?.Dispose();
+                    if (_startupClosed || token.IsCancellationRequested)
                     {
                         loaded.Connection.Dispose();
                         return false;
@@ -214,7 +226,7 @@ public partial class MainWindow : Window
                     _ready = false;
                     _objects.Clear();
                     _docs.Clear();
-                    if (_startupClosed) return false;
+                    if (_startupClosed || token.IsCancellationRequested) return false;
                     RootLayout.IsEnabled = false;
                     NavigationTree.Items.Clear();
                     _documentNodes.Clear();
@@ -243,7 +255,11 @@ public partial class MainWindow : Window
             }
             return false;
         }
-        finally { _startupInProgress = false; }
+        finally
+        {
+            if (ReferenceEquals(_startupReadCancellation, cancellation)) _startupReadCancellation = null;
+            _startupInProgress = false;
+        }
     }
 
     private NavigationMode CurrentMode => ArchiveMode.IsChecked == true ? NavigationMode.Archive :
@@ -321,6 +337,7 @@ public partial class MainWindow : Window
 
     private void RefreshNavigation()
     {
+        using var treeTiming = StartupTrace.Measure("navigation_tree_rebuild");
         UpdateNavigationCaptions();
         _navigationSearchTimer?.Stop();
         // Сохраняем реальное состояние пользователя, а не раскрытые поиском узлы.
@@ -332,8 +349,11 @@ public partial class MainWindow : Window
         _documentNodes.Clear();
         _objectNodes.Clear();
         _pendingNavigationDocuments.Clear();
-        var years = Navigation.Years(_objects, _docs, CurrentMode, DateTime.Today.Year);
-        _navigationSearchIndex = new NavigationSearchIndex(years.SelectMany(y => y.Objects));
+        IReadOnlyList<NavigationYear> years;
+        using (StartupTrace.Measure("navigation_tree_projection"))
+            years = Navigation.Years(_objects, _docs, CurrentMode, DateTime.Today.Year);
+        using (StartupTrace.Measure("navigation_search_index"))
+            _navigationSearchIndex = new NavigationSearchIndex(years.SelectMany(y => y.Objects));
         _expanded.TryGetValue(CurrentMode, out var opened);
         foreach (var year in years)
         {
@@ -377,6 +397,7 @@ public partial class MainWindow : Window
         }
         _shownMode = CurrentMode;
         ApplyNavigationFilter();
+        StartupTrace.Sample("navigation_tree_nodes", _objectNodes.Count, _documentNodes.Count);
     }
 
     private void ObjectNavigation_Expanded(object sender, RoutedEventArgs e)
@@ -395,6 +416,7 @@ public partial class MainWindow : Window
 
         // Build locally before replacing the placeholder. The existing
         // Navigation.Documents projection retains stage hierarchy and order.
+        using var timing = StartupTrace.Measure("navigation_lazy_documents");
         var opened = pending.Opened;
         var shortTitle = CurrentMode != NavigationMode.Kp &&
             AgreementPresentation.Resolve(pending.Documents) is not null;
@@ -436,6 +458,7 @@ public partial class MainWindow : Window
                 .ToDictionary(node => node, node => node.IsExpanded);
 
         _navigationSearchTimer?.Stop();
+        using var timing = StartupTrace.Measure("navigation_filter");
         var visible = _navigationSearchIndex.Match(ObjectSearch.Text);
         foreach (TreeViewItem year in NavigationTree.Items)
         {
@@ -527,6 +550,7 @@ public partial class MainWindow : Window
     private void ShowPage(FrameworkElement? page)
     {
         ++_estimateOpenGeneration; // Invalidate background navigation, including object/home switches.
+        CancelNavigationRefresh();
         CancelEstimateCacheValidation();
         CancelObjectCardRead();
         _objectCardTransitionPending = false;
@@ -1543,6 +1567,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _startupClosed = true;
+        _startupReadCancellation?.Cancel();
+        CancelNavigationRefresh();
         _peopleWorkspace?.CloseView();
         CancelEstimateCacheValidation();
         CancelObjectCardRead();

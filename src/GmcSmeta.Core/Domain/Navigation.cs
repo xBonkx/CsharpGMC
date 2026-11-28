@@ -34,10 +34,10 @@ public static class Navigation
         foreach (var obj in objects)
         {
             if (obj.Archived != (mode == NavigationMode.Archive)) continue;
-            var all = byObject[obj.Id].ToList();
+            var all = byObject[obj.Id];
             var visible = all.Where(d => mode == NavigationMode.Archive ||
                 (mode == NavigationMode.Kp ? d.Kind == "kp" : d.Kind is "main" or "dop")).ToList();
-            if (visible.Count == 0 && !(mode == NavigationMode.Kp && all.Count == 0) &&
+            if (visible.Count == 0 && !(mode == NavigationMode.Kp && !all.Any()) &&
                 mode != NavigationMode.Archive) continue;
             // Слова могут быть распределены между названием объекта и ОДНИМ видимым
             // документом, но не между разными документами и не между режимами.

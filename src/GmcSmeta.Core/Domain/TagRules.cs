@@ -40,19 +40,23 @@ public sealed class TagRules
     // Object cards need names and exactly the same rule snapshot for both
     // estimate and finance projections. Read both in one SQL Server command.
     internal static TagRules LoadWithNames(Microsoft.Data.SqlClient.SqlConnection conn,
-        out Dictionary<string, string> names)
+        out Dictionary<string, string> names, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT [key], rules, name FROM tags";
-        using var reader = cmd.ExecuteReader();
+        using var registration = GmcSmeta.Core.Db.SqlReadCancellation.Register(cmd, token);
+        using var reader = GmcSmeta.Core.Db.SqlReadCancellation.ExecuteReader(cmd, token);
         var result = new TagRules();
         names = new Dictionary<string, string>();
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             result.ReadCurrent(reader);
             var key = reader.IsDBNull(0) ? "" : reader.GetString(0);
             names[key] = reader.IsDBNull(2) ? "" : reader.GetString(2);
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 
