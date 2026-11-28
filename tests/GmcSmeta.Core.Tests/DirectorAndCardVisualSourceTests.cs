@@ -181,4 +181,119 @@ public sealed class DirectorAndCardVisualSourceTests
         Assert.Equal("{StaticResource LayoutDirectorSectionGap}", (string?)footer.Attribute("Margin"));
         Assert.Contains(footer.Elements(W + "TextBlock"), e => ((string?)e.Attribute("Text"))?.Contains("Суммы с НДС.") == true);
     }
+
+    [Fact]
+    public void DirectorHeadingFilterAndCardsUseSharedMetrics()
+    {
+        var doc = XDocument.Parse(Source("DirectorView.xaml"));
+        var shared = XDocument.Parse(Source("App.xaml"));
+        var metrics = XDocument.Parse(Source("Theme/LayoutMetrics.xaml"));
+        string Metric(string key) => metrics.Descendants().Single(e => (string?)e.Attribute(X + "Key") == key).Value;
+        var crumb = Named(doc, "DirectorCrumb");
+        var heading = Named(doc, "HeadingText");
+        Assert.Same(crumb.Parent, heading.Parent);
+        Assert.Equal("Top", (string?)heading.Parent!.Attribute("VerticalAlignment"));
+        Assert.Equal("Главная", (string?)crumb.Attribute("Text"));
+        Assert.Equal("0,0,0,2", (string?)crumb.Attribute("Margin"));
+        Assert.Equal("{StaticResource UiMutedTextBrush}", (string?)crumb.Attribute("Foreground"));
+        Assert.Equal("{StaticResource UiH1Size}", (string?)heading.Attribute("FontSize"));
+        Assert.Equal("24", shared.Descendants().Single(e => (string?)e.Attribute(X + "Key") == "UiH1Size").Value);
+        Assert.Equal("{StaticResource UiWrappedHeading}", (string?)heading.Attribute("Style"));
+        Assert.Equal("Bottom", (string?)Named(doc, "ExportButton").Attribute("VerticalAlignment"));
+        Assert.Equal("24,18,24,14", Metric("LayoutPageMargin"));
+        var icons = XDocument.Parse(Source("Theme/ToolbarIcons.xaml"));
+        var download = icons.Descendants(W + "DataTemplate").Single(e => (string?)e.Attribute(X + "Key") == "IconLabelDownload");
+        var glyph = Assert.Single(download.Descendants(W + "Viewbox"));
+        Assert.Equal("18", (string?)glyph.Attribute("Width"));
+        Assert.Equal("18", (string?)glyph.Attribute("Height"));
+        Assert.Equal("24", (string?)Assert.Single(glyph.Descendants(W + "Canvas")).Attribute("Width"));
+        Assert.Equal("{StaticResource GlyphDownload}", (string?)Assert.Single(glyph.Descendants(W + "Path")).Attribute("Data"));
+        Assert.Equal("M12 4v11M7.5 10.5 12 15l4.5-4.5 M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3",
+            (string?)icons.Descendants(W + "PathGeometry").Single(e => (string?)e.Attribute(X + "Key") == "GlyphDownload").Attribute("Figures"));
+        var combo = shared.Descendants(W + "Style").Single(e => (string?)e.Attribute("TargetType") == "ComboBox" && e.Attribute(X + "Key") is null);
+        Assert.Equal("{StaticResource LayoutFieldMinHeight}", Value(combo, "MinHeight"));
+        Assert.Equal("{StaticResource LayoutFieldPadding}", Value(combo, "Padding"));
+        Assert.Equal("32", Metric("LayoutFieldMinHeight"));
+        Assert.Equal("10,6", Metric("LayoutFieldPadding"));
+        Assert.Equal("22", Metric("LayoutComboArrowWidth"));
+        var comboChrome = combo.Descendants(W + "Border").Single(e => (string?)e.Attribute(X + "Name") == "ComboChrome");
+        Assert.Equal("8", (string?)comboChrome.Attribute("CornerRadius"));
+        var arrow = combo.Descendants(W + "Path").Single(e => (string?)e.Attribute(X + "Name") == "DropArrow");
+        Assert.Equal("M5,8 L10,13 L15,8", (string?)arrow.Attribute("Data"));
+        Assert.Equal("False", (string?)arrow.Attribute("IsHitTestVisible"));
+        var cards = Named(doc, "DirectorTiles").Elements(W + "Border").ToArray();
+        Assert.Equal(4, cards.Length);
+        Assert.All(cards, card => Assert.Equal("0", (string?)card.Attribute("MinWidth")));
+        var tile = Style(shared, "PythonTile");
+        Assert.Equal("70", Value(tile, "MinHeight"));
+        Assert.Equal("12", Value(tile, "CornerRadius"));
+        Assert.Equal("{StaticResource LayoutTilePadding}", Value(tile, "Padding"));
+        Assert.Equal("16,11,16,11", Metric("LayoutTilePadding"));
+        var shadow = Assert.Single(tile.Descendants(W + "DropShadowEffect"));
+        Assert.Equal("18", (string?)shadow.Attribute("BlurRadius"));
+        Assert.Equal("2", (string?)shadow.Attribute("ShadowDepth"));
+        Assert.Equal("Wrap", Value(Style(shared, "PythonTileValue"), "TextWrapping"));
+    }
+
+    [Fact]
+    public void DirectorLongHeadersAndMoneyAreNotTrimmedAndSortIndicatorRemainsSeparate()
+    {
+        var doc = XDocument.Parse(Source("DirectorView.xaml"));
+        var header = Style(doc, "DirectorHeader");
+        Assert.Equal("{StaticResource TableHeaderSurface}", Value(header, "Background"));
+        Assert.Equal("Stretch", Value(header, "HorizontalContentAlignment"));
+        Assert.Equal("{StaticResource DirectorHeader}", (string?)Style(doc, "DirectorObjectHeader").Attribute("BasedOn"));
+        foreach (var key in new[] { "DirectorHeader", "DirectorObjectHeader" })
+        {
+            var text = Assert.Single(Style(doc, key).Descendants(W + "TextBlock"));
+            Assert.Equal("Wrap", (string?)text.Attribute("TextWrapping"));
+            Assert.Equal("None", (string?)text.Attribute("TextTrimming"));
+            Assert.Equal("MaxHeight", (string?)text.Attribute("LineStackingStrategy"));
+        }
+        foreach (var (name, width) in new[] { ("ExtraColumn", "120"), ("IssuedColumn", "108"), ("LateColumn", "118") })
+        {
+            var column = Named(doc, name);
+            Assert.Equal(width, (string?)column.Attribute("MinWidth"));
+            Assert.Contains("\n", (string?)column.Attribute("Header"));
+        }
+        var body = Style(doc, "DirectorText");
+        Assert.Equal("Wrap", Value(body, "TextWrapping"));
+        Assert.Equal("None", Value(body, "TextTrimming"));
+        Assert.Equal("MaxHeight", Value(body, "LineStackingStrategy"));
+        Assert.Equal("{StaticResource DirectorText}", (string?)Style(doc, "DirectorMoney").Attribute("BasedOn"));
+        var shared = XDocument.Parse(Source("App.xaml"));
+        var report = Style(shared, "ReportGridHeader");
+        var sortArrow = report.Descendants(W + "Path").Single(e => (string?)e.Attribute(X + "Name") == "SortArrow");
+        Assert.Equal("Right", (string?)sortArrow.Attribute("DockPanel.Dock"));
+        Assert.Equal("Collapsed", (string?)sortArrow.Attribute("Visibility"));
+        Assert.Equal("False", (string?)sortArrow.Attribute("IsHitTestVisible"));
+        foreach (var direction in new[] { "Ascending", "Descending" })
+        {
+            var trigger = report.Descendants(W + "Trigger").Single(e => (string?)e.Attribute("Property") == "SortDirection" &&
+                (string?)e.Attribute("Value") == direction);
+            Assert.Contains(trigger.Elements(W + "Setter"), e => (string?)e.Attribute("TargetName") == "SortArrow" &&
+                (string?)e.Attribute("Value") == "Visible");
+        }
+        var code = Source("DirectorView.xaml.cs");
+        Assert.Contains("v is null ? \"—\" : $\"{v.Value:0}%\"", code);
+        Assert.Contains("d.MarginPct is null ? \"—\"", code);
+        Assert.Contains("d.SmrMargin is null ? (d.Smr != 0m ? \"не внесено\" : \"—\")", code);
+        Assert.Contains("d.OutCost != 0m ? Money.Format(d.OutCost) : \"—\"", code);
+        Assert.Contains("d.Late > 0 ? d.Late.ToString() : \"—\"", code);
+        Assert.Contains("data.Out != 0m ? Money.Format(data.Out) : \"нет\"", code);
+    }
+
+    [Fact]
+    public void SignedPdfMenuUsesSmallCanvasGlyphAndRetainsItsAction()
+    {
+        var doc = XDocument.Parse(Source("MainWindow.xaml"));
+        var menu = doc.Descendants(W + "Button").Single(e => (string?)e.Attribute("Click") == "CardSignedPdfMenu_Click");
+        var icon = Assert.Single(menu.Descendants(W + "Viewbox"));
+        Assert.Equal("{StaticResource LayoutSmallAffordanceIcon}", (string?)icon.Attribute("Style"));
+        Assert.Equal("24", (string?)Assert.Single(icon.Descendants(W + "Canvas")).Attribute("Width"));
+        var path = Assert.Single(icon.Descendants(W + "Path"));
+        Assert.Equal("{StaticResource GlyphChevronDown}", (string?)path.Attribute("Data"));
+        Assert.Equal("{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}", (string?)path.Attribute("Stroke"));
+        Assert.Null(path.Attribute("Stretch"));
+    }
 }

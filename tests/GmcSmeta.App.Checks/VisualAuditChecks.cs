@@ -16,6 +16,7 @@ internal static class VisualAuditChecks
     internal static void RunLayoutChecks()
     {
         RunNavigationGlyphChecks();
+        RunDirectorTextLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
         var right = new WrapPanel();
@@ -70,6 +71,30 @@ internal static class VisualAuditChecks
                     "Hamburger painted bounds differ from the original three lines.");
         }
         Console.WriteLine("Navigation glyph contour starts and stroked bounds checked (no SQL).");
+    }
+
+    private static void RunDirectorTextLayoutChecks()
+    {
+        // Construct but do not load/show: DirectorView starts its SQL reader
+        // only on Loaded. Measure real local styles using synthetic long text.
+        var view = new DirectorView("");
+        Require(!view.IsLoaded, "Offline director fixture must not load a database.");
+        var headerStyle = (Style)view.FindResource("DirectorHeader");
+        foreach (var label in new[] { "Докуплено\nвне сметы", "Выдано\nна объект", "Просрочено\nпоставок" })
+        {
+            var header = new DataGridColumnHeader { Content = label.Replace("\n", "\n"), Style = headerStyle };
+            header.Measure(new Size(58, double.PositiveInfinity));
+            Require(header.DesiredSize.Height > 48, "Narrow header must grow instead of clipping: " + label);
+        }
+        var money = new TextBlock
+        {
+            Style = (Style)view.FindResource("DirectorMoney"),
+            Text = "123 456 789 012 345,67 ₽"
+        };
+        money.Measure(new Size(90, double.PositiveInfinity));
+        Require(money.DesiredSize.Height > money.FontSize * 2 && money.TextTrimming == TextTrimming.None,
+            "Long money text must occupy additional lines without ellipsis.");
+        Console.WriteLine("Director long headers and amounts measured (no SQL).");
     }
 
     internal static void Export(string directory)

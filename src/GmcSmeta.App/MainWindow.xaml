@@ -279,7 +279,12 @@
                         <Button Style="{StaticResource PythonToolbarButton}" Tag="{Binding Id}" Click="CardSignedPdfMenu_Click"
                                 Padding="6,4" Margin="0,0,6,4" ToolTip="Добавить / выбрать подписанный PDF"
                                 AutomationProperties.Name="Меню подписанного PDF">
-                            <Path Data="{StaticResource GlyphChevronDown}" Style="{StaticResource SvgGlyphPath}" Width="16" Height="16" Stretch="Uniform"/>
+                            <Viewbox Style="{StaticResource LayoutSmallAffordanceIcon}">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="{StaticResource GlyphChevronDown}" Style="{StaticResource SvgGlyphPath}"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Canvas>
+                            </Viewbox>
                         </Button>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Файлы" ContentTemplate="{StaticResource IconLabelFile}"
                                 Tag="{Binding Id}" Click="CardFiles_Click" Margin="0,0,6,4" ToolTip="Файлы этого документа"/>
