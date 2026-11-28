@@ -69,7 +69,17 @@
         <Border.Effect>
             <DropShadowEffect Color="#0F172A" BlurRadius="24" ShadowDepth="7" Opacity="0.20"/>
         </Border.Effect>
-        <StackPanel>
+        <DockPanel>
+            <Border DockPanel.Dock="Bottom" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="24,15,24,18">
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Отмена" Style="{StaticResource DeleteCancelButton}"
+                            IsCancel="True" Click="Cancel_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="DeleteButton" Style="{StaticResource DeleteConfirmButton}"
+                            Click="Delete_Click" Content="Удалить позиции"/>
+                </WrapPanel>
+            </Border>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
             <Grid Margin="24,22,18,0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="48"/>
@@ -117,14 +127,9 @@
             </Border>
             <TextBlock Text="Проверьте выделение перед подтверждением — будут удалены все показанные строки."
                        Foreground="{StaticResource UiMutedTextBrush}" Margin="24,11,24,0" FontSize="{StaticResource UiTotalDetailSize}" TextWrapping="Wrap"/>
-            <Border BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="24,15,24,18">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Отмена" Style="{StaticResource DeleteCancelButton}"
-                            IsCancel="True" Click="Cancel_Click" Margin="0,0,10,0"/>
-                    <Button x:Name="DeleteButton" Style="{StaticResource DeleteConfirmButton}"
-                            Click="Delete_Click" Content="Удалить позиции"/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+
+            </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </Window>
