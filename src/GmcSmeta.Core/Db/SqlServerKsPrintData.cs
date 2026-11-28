@@ -46,12 +46,14 @@ public static partial class SqlServerKsPrintData
         }
     }
 
-    public static Package Read(string connectionString, long contractId, string groupKey, CancellationToken token = default)
+    public static Package Read(string connectionString, long contractId, string groupKey, CancellationToken token = default, string? expectedRevision = null)
     {
         using var conn = SqlReadCancellation.Open(connectionString, token);
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var before = SqlReadCancellation.Revision(conn, token);
+            if (expectedRevision is not null && (string.IsNullOrWhiteSpace(before) || before != expectedRevision))
+                throw new InvalidOperationException("КС изменились. Обновите акт перед выгрузкой.");
             var scope = SqlServerKsContractScope.Read(conn, contractId, token: token);
             var package = ReadPackage(conn, contractId, scope, KsGroupReport.Calculate(scope, groupKey), groupReport: true, token: token);
             if (!string.IsNullOrWhiteSpace(before) && before == SqlReadCancellation.Revision(conn, token))

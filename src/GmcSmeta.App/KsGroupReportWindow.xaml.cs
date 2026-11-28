@@ -16,16 +16,18 @@ public partial class KsGroupReportWindow : Window
     private readonly string _connectionString;
     private readonly long _contractId;
     private readonly string _groupKey;
+    private readonly string? _expectedRevision;
     private SqlServerKsPrintData.Package? _package;
     private bool _exportInProgress;
     private bool _closed;
     private readonly CancellationTokenSource _lifetime = new();
 
-    public KsGroupReportWindow(string connectionString, long contractId, string groupKey)
+    public KsGroupReportWindow(string connectionString, long contractId, string groupKey, string? expectedRevision = null)
     {
         _connectionString=connectionString;
         _contractId=contractId;
         _groupKey=groupKey;
+        _expectedRevision=expectedRevision;
         InitializeComponent();
         TitleText.Text="КС-3 № " + groupKey;
         Loaded += OnLoaded;
@@ -39,7 +41,7 @@ public partial class KsGroupReportWindow : Window
         {
             var token = _lifetime.Token;
             var package=await Task.Run(() => SqlServerKsPrintData.Read(
-                _connectionString,_contractId,_groupKey, token), token);
+                _connectionString,_contractId,_groupKey, token, _expectedRevision), token);
             if (_closed || !IsLoaded) return;
             _package=package;
             var r=package.Report;

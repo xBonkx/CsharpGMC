@@ -13,9 +13,10 @@ public partial class ActsEditorView
     private async Task<(KsPreSignAudit.Report Report, string Revision)> ReadPreSignAuditAsync(
         long actId, int contractId)
     {
+        var connectionString = _connectionString;
         return await Task.Run(() =>
         {
-            using var conn = SqlServerDatabase.Open(_connectionString);
+            using var conn = SqlServerDatabase.Open(connectionString);
             var before = SqlServerDatabase.Revision(conn);
             var sheet = SqlServerActs.ActSheet(conn, actId, contractId);
             var after = SqlServerDatabase.Revision(conn);
@@ -36,12 +37,14 @@ public partial class ActsEditorView
 
     private async void PreSignCheck_Click(object sender, RoutedEventArgs e)
     {
-        if (_actId <= 0 || _contractId <= 0) return;
-        var actId = _actId;
+        var target = CaptureMoreCommand(sender);
+        if (target is null) return;
         try
         {
-            var audit = await ReadPreSignAuditAsync(actId, _contractId);
-            if (actId != _actId) return; // User navigated to another act meanwhile.
+            var audit = await ReadPreSignAuditAsync(target.ActId, target.ContractId);
+            if (!IsCurrentActCommand(target)) return;
+            if (audit.Revision != target.Revision)
+                throw new InvalidOperationException("Акт изменился. Обновите КС перед проверкой.");
             MessageBox.Show(Window.GetWindow(this), audit.Report.Format(),
                 "ГМЦ-Смета — проверка КС-2", MessageBoxButton.OK,
                 audit.Report.HasWarnings ? MessageBoxImage.Warning : MessageBoxImage.Information);
@@ -51,7 +54,7 @@ public partial class ActsEditorView
         }
         catch (Exception ex)
         {
-            if (actId != _actId) return;
+            if (!IsCurrentActCommand(target)) return;
             SetStatus("Не удалось проверить КС-2: " + ex.Message, true);
             MessageBox.Show(Window.GetWindow(this),
                 "Проверка КС-2 не завершена. Никаких изменений не выполнено.\n" + ex.Message,

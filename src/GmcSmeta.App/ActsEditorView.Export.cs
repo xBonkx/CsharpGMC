@@ -52,7 +52,7 @@ public partial class ActsEditorView
     /// <summary>«Ведомость объёмов работ (ВОР) по этому акту…».</summary>
     private async void ExportVor_Click(object sender, RoutedEventArgs e)
     {
-        var target = CaptureActCommand();
+        var target = CaptureMoreCommand(sender);
         var act = Current;
         if (_exportInProgress || target is null || act is null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
@@ -70,7 +70,7 @@ public partial class ActsEditorView
     /// <summary>All acts of this document, in one workbook (Python export_all).</summary>
     private async void ExportAll_Click(object sender, RoutedEventArgs e)
     {
-        var target = CaptureActCommand();
+        var target = CaptureMoreCommand(sender);
         if (_exportInProgress || target is null) return;
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
@@ -191,16 +191,17 @@ public partial class ActsEditorView
     /// <summary>«Общая КС-3 на несколько КС-2 (№1.1 + №1.2 → КС-3 №1)…».</summary>
     private void ExportGroup_Click(object sender, RoutedEventArgs e)
     {
+        var target = CaptureMoreCommand(sender);
         var current = Current;
-        if (current is null) return;
-        OpenGroupReport(KsWorkspaceProjection.GroupKey(current));
+        if (target is null || current is null || _exportInProgress) return;
+        OpenGroupReport(KsWorkspaceProjection.GroupKey(current), target.Revision);
     }
 
-    private void OpenGroupReport(string key)
+    private void OpenGroupReport(string key, string? expectedRevision = null)
     {
         try
         {
-            var report = new KsGroupReportWindow(_connectionString, _contractId, key)
+            var report = new KsGroupReportWindow(_connectionString, _contractId, key, expectedRevision)
             {
                 Owner = Window.GetWindow(this)
             };

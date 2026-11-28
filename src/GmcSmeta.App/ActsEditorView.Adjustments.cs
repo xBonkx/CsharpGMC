@@ -7,18 +7,18 @@ namespace GmcSmeta.App;
 
 public partial class ActsEditorView
 {
-    private ActCommandTarget? CaptureAdjustment()
+    private ActCommandTarget? CaptureAdjustment(object sender)
     {
         if(!SqlSchemaCompatibility.Schema31WritesAllowed(_connectionString)||_signed||_contractLocked||
             _details?.SupportsAdjustment!=true||_totals is null||Current is null)return null;
         if(!ActGrid.CommitEdit(DataGridEditingUnit.Cell,true)||!ActGrid.CommitEdit(DataGridEditingUnit.Row,true))
             return null;
-        return CaptureActCommand();
+        return CaptureMoreCommand(sender);
     }
 
     private async void ActDiscount_Click(object sender,RoutedEventArgs e)
     {
-        var target=CaptureAdjustment();
+        var target=CaptureAdjustment(sender);
         if(target is null||Current is not { } current||_totals is not { } totals)return;
         var gross=current.Materials+current.Smr+current.Transport+current.Pnr;
         var dialog=new ActDiscountDialog(gross,current.Total,totals.DiscountPercent,
@@ -31,7 +31,7 @@ public partial class ActsEditorView
 
     private async void SectionAmounts_Click(object sender,RoutedEventArgs e)
     {
-        var target=CaptureAdjustment();
+        var target=CaptureAdjustment(sender);
         if(target is null)return;
         try
         {

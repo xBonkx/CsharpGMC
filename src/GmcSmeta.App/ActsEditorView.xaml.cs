@@ -1072,6 +1072,7 @@ public partial class ActsEditorView : UserControl
     /// <summary>«Сдать то, что выдано на объект» (acts.fill mode=issued).</summary>
     private async void FillIssued_Click(object sender, RoutedEventArgs e)
     {
+        if (CaptureMoreCommand(sender, selectionRequired: true) is null || _signed || _contractLocked) return;
         var current = Current;
         if (current is null || current.Signed) return;
         var states = SelectedPositionStates();
@@ -1094,6 +1095,9 @@ public partial class ActsEditorView : UserControl
     /// <summary>«Сдать весь остаток по договору (закрыть на 100 %)…» (acts.fill_all_rest).</summary>
     private async void FillAllRest_Click(object sender, RoutedEventArgs e)
     {
+        var target = CaptureMoreCommand(sender);
+        if (target is null || !string.IsNullOrEmpty(_details?.SectionAmountsJson)) return;
+        var sheet = _sheet;
         var current = Current;
         var totals = _totals;
         if (ActWritePending || _building || current is null || current.Signed || _contractLocked ||
@@ -1117,7 +1121,8 @@ public partial class ActsEditorView : UserControl
                 "(+ СМР, транспорт и ПНР, если остались)." +
                 (linked.Count > 0 ? "\nСтроки со ссылками пересчитаются по своим формулам." : "")))
             return;
-        if (ActWritePending || _building || !IsLoaded || _actId != actId ||
+        if (!IsCurrentActCommand(target) || !ReferenceEquals(sheet, _sheet) || _signed || _contractLocked ||
+            !string.IsNullOrEmpty(_details?.SectionAmountsJson) || _actId != actId ||
             _contractId != contractId || _revision != revision)
         {
             SetStatus("Данные или выбранная КС изменились. Повторите операцию.", true);
@@ -1284,6 +1289,7 @@ public partial class ActsEditorView : UserControl
 
     private async void DeleteAct_Click(object sender, RoutedEventArgs e)
     {
+        if (CaptureMoreCommand(sender) is null) return;
         if (ActWritePending || !ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) || ActWritePending)
         { SetStatus("Сначала завершите сохранение текущего акта.", true); return; }
@@ -1574,174 +1580,6 @@ public partial class ActsEditorView : UserControl
 
     // -------------------------------------------------------------- позиции вне сметы
 
-    /// <summary>«Добавить позицию вне сметы…» (acts.add_extra_line): позиция вне КП +
-    /// строка акта одной операцией, сумма строки видна до сохранения.</summary>
-    private async void AddExtra_Click(object sender, RoutedEventArgs e)
-    {
-        var target = CaptureActCommand();
-        var current = Current;
-        if (target is null || current is null || current.Signed) return;
-        var systems = new List<(long Id, string Label)>();
-        try
-        {
-            using var conn = SqlServerDatabase.Open(_connectionString);
-            using var read = new SqlCommand(
-                "SELECT id, name FROM dbo.systems WHERE contract_id=@id ORDER BY [order], id", conn);
-            read.Parameters.AddWithValue("@id", target.ContractId);
-            using var r = read.ExecuteReader();
-            while (r.Read())
-                systems.Add((Convert.ToInt64(r.GetValue(0)), r.GetString(1)));
-        }
-        catch (Exception ex)
-        {
-            SetStatus("Ошибка чтения систем: " + ex.Message, true);
-            return;
-        }
-        if (systems.Count == 0)
-        {
-            MessageBox.Show(Window.GetWindow(this), "В договоре нет систем — сначала создайте систему.",
-                "Позиция вне сметы", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        long defaultSystem = systems[0].Id;
-        var selected = ActGrid.SelectedItems?.OfType<KsRowVm>().FirstOrDefault();
-        if (selected is not null)
-            defaultSystem = selected.SystemId;
-
-        var dialog = new Window
-        {
-            Title = "Добавить позицию вне сметы",
-            Width = 560,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = Window.GetWindow(this),
-        };
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Работа или материал, которых нет в подписанной смете. Строка войдёт только в этот акт; " +
-                   "смета, договор и подписанные акты не изменятся.",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)),
-        });
-        var systemCombo = new ComboBox
-        {
-            ItemsSource = systems.Select(s => new ComboPair(s.Id, s.Label)).ToList(),
-            DisplayMemberPath = "Label",
-            SelectedIndex = Math.Max(0, systems.FindIndex(s => s.Id == defaultSystem)),
-            Margin = new Thickness(0, 8, 0, 0),
-        };
-        var nameBox = new TextBox { Margin = new Thickness(0, 4, 0, 0) };
-        var unitBox = new TextBox { Text = "шт", MaxWidth = 120, HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 4, 0, 0) };
-        var qtyBox = new TextBox { Margin = new Thickness(0, 4, 0, 0) };
-        var priceBox = new TextBox { Margin = new Thickness(0, 4, 0, 0) };
-        var sumLabel = new TextBlock { Text = "0,00 ₽", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 6, 0, 0) };
-        panel.Children.Add(new TextBlock { Text = "Система", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(systemCombo);
-        panel.Children.Add(new TextBlock { Text = "Наименование", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(nameBox);
-        panel.Children.Add(new TextBlock { Text = "Единица", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(unitBox);
-        panel.Children.Add(new TextBlock { Text = "Фактический объём", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(qtyBox);
-        panel.Children.Add(new TextBlock { Text = "Цена за единицу, ₽", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(priceBox);
-        panel.Children.Add(new TextBlock { Text = "Сумма строки", Margin = new Thickness(0, 10, 0, 0) });
-        panel.Children.Add(sumLabel);
-        void UpdateSum()
-        {
-            decimal? q = decimal.TryParse(qtyBox.Text.Trim().Replace(',', '.'), NumberStyles.Number,
-                CultureInfo.InvariantCulture, out var qv) ? qv : null;
-            decimal? p = decimal.TryParse(priceBox.Text.Trim().Replace(" ", "").Replace(',', '.'),
-                NumberStyles.Number, CultureInfo.InvariantCulture, out var pv) ? pv : null;
-            sumLabel.Text = q is not null && p is not null
-                ? Money.Format(decimal.Round(q.Value * p.Value, 2)) + " ₽" : "—";
-        }
-        qtyBox.TextChanged += (_, _) => UpdateSum();
-        priceBox.TextChanged += (_, _) => UpdateSum();
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 16, 0, 0),
-        };
-        var ok = new Button
-        {
-            Content = "Добавить в акт",
-            Style = (Style)FindResource("PythonToolbarPrimary"),
-            Padding = new Thickness(14, 5, 14, 5),
-        };
-        var cancel = new Button { Content = "Отмена", Style = (Style)FindResource("PythonToolbarButton"),
-            Margin = new Thickness(8, 0, 0, 0) };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
-        panel.Children.Add(buttons);
-        dialog.Content = panel;
-        bool? accepted = null;
-        cancel.Click += (_, _) => dialog.Close();
-        ok.Click += (_, _) =>
-        {
-            var name = nameBox.Text.Trim();
-            var unit = unitBox.Text.Trim();
-            decimal? q = decimal.TryParse(qtyBox.Text.Trim().Replace(',', '.'), NumberStyles.Number,
-                CultureInfo.InvariantCulture, out var qv) ? qv : null;
-            decimal? p = decimal.TryParse(priceBox.Text.Trim().Replace(" ", "").Replace(',', '.'),
-                NumberStyles.Number, CultureInfo.InvariantCulture, out var pv) ? pv : null;
-            if (name.Length == 0)
-            {
-                MessageBox.Show(dialog, "Впишите наименование позиции.", "Позиция вне сметы",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            if (unit.Length == 0)
-            {
-                MessageBox.Show(dialog, "Впишите единицу измерения.", "Позиция вне сметы",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            if (q is null || q <= 0m)
-            {
-                MessageBox.Show(dialog, "Впишите количество числом больше нуля, например 4,11.",
-                    "Позиция вне сметы", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            if (p is null || p < 0m)
-            {
-                MessageBox.Show(dialog, "Впишите цену числом, например 4 530,50.",
-                    "Позиция вне сметы", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            try
-            {
-                var systemId = (systemCombo.SelectedItem as ComboPair)?.Id ?? 0;
-                RequireCurrentActCommand(target);
-                Task.Run(() => SqlServerActs.AddExtraLine(target.ConnectionString, target.ActId, systemId,
-                    name, unit, q.Value, p.Value, target.Revision)).GetAwaiter().GetResult();
-                _revision = "";
-                accepted = true;
-                dialog.DialogResult = true;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(dialog, ex.Message, "Позиция вне сметы", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        if (dialog.ShowDialog() == true && accepted == true)
-        {
-            SetStatus($"Позиция вне сметы добавлена в акт: {nameBox.Text.Trim()}");
-            await ReloadActAfterSave();
-            if (_rows is not null)
-            {
-                var row = _rows.LastOrDefault(r => r.OutOfKp && r.InAct);
-                if (row is not null)
-                {
-                    ActGrid.SelectedItem = row;
-                    ActGrid.ScrollIntoView(row);
-                }
-            }
-        }
-    }
 
     private sealed record ComboPair(long Id, string Label)
     {
@@ -1938,10 +1776,18 @@ public partial class ActsEditorView : UserControl
     {
         var current = Current;
         var ready = CaptureActCommand() is not null && current is not null && _sheet is not null;
+        if (sender is ContextMenu menu)
+        {
+            var target = ready ? CaptureActCommand() : null;
+            var snapshot = target is not null && _sheet is not null
+                ? new ActMoreSnapshot(target, _sheet, ActGrid.SelectedItems.OfType<KsRowVm>().ToArray()) : null;
+            foreach (var item in menu.Items.OfType<MenuItem>()) item.Tag = snapshot;
+        }
         var unsigned = ready && current is { Signed: false };
         var editable = unsigned && !_contractLocked;
         var manualSections = !string.IsNullOrEmpty(_details?.SectionAmountsJson);
-        PreSignMenuItem.IsEnabled = ExportGroupMenuItem.IsEnabled = ready;
+        PreSignMenuItem.IsEnabled = ready;
+        ExportGroupMenuItem.IsEnabled = ready && !_exportInProgress;
         VorMenuItem.IsEnabled = ExportAllMenuItem.IsEnabled = ready && !_exportInProgress;
         DeleteActMenuItem.IsEnabled = editable;
         ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;

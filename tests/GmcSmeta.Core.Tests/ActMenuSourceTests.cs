@@ -48,4 +48,30 @@ public sealed class ActMenuSourceTests
         Assert.Contains("ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;", code);
         Assert.Contains("RestAllMenuItem.IsEnabled = editable && !manualSections && _totals is not null;", code);
     }
+    [Fact]
+    public void MoreCommandsCaptureSnapshotAndNeverWriteInsideAddDialog()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ActsEditorView.MoreCommands.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        string Read(string name) => File.ReadAllText(Path.Combine(root!.FullName, "src", name));
+        var more = Read("GmcSmeta.App/ActsEditorView.MoreCommands.cs");
+        Assert.Contains("ReferenceEquals(snapshot.Sheet, _sheet)", more);
+        Assert.Contains("SequenceEqual(snapshot.Selection)", more);
+        Assert.Contains("!SameSnapshot()", more);
+        Assert.Contains("SqlServerDatabase.Revision(conn) != target.Revision", more);
+        Assert.DoesNotContain("GetAwaiter().GetResult()", more);
+        Assert.True(more.IndexOf("dialog.ShowDialog()", StringComparison.Ordinal) <
+            more.IndexOf("await RunActWriteAsync", StringComparison.Ordinal));
+        Assert.Contains("r.PositionId == createdId", more);
+        var code = Read("GmcSmeta.App/ActsEditorView.xaml.cs");
+        Assert.Contains("item.Tag = snapshot", code);
+        Assert.Contains("CaptureMoreCommand(sender, selectionRequired: true)", code);
+        Assert.Contains("!ReferenceEquals(sheet, _sheet)", code);
+        var export = Read("GmcSmeta.App/ActsEditorView.Export.cs");
+        Assert.Contains("OpenGroupReport(KsWorkspaceProjection.GroupKey(current), target.Revision)", export);
+        Assert.Contains("audit.Revision != target.Revision", Read("GmcSmeta.App/ActsEditorView.PreSign.cs"));
+        Assert.Contains("before != expectedRevision", Read("GmcSmeta.Core/Db/SqlServerKsPrintData.cs"));
+    }
 }
