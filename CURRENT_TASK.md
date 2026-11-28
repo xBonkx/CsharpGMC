@@ -1,6 +1,8 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
-- 29.11.2026 — CTX-048.01 CODE READY: усилен валидатор реестра меню, вывод точных исходных ссылок; 7 изолированных Python-проверок OK. CTX-048 остаётся PARTIAL. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+- 29.11.2026 — CTX-047.01–03/048.03 PARTIAL: file inventory and candidate coverage gate; 9 isolated assertions passed, full scan and mapping pending. Correction: preceding CTX-048.01 test count lacks execution evidence. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+
+- 29.11.2026 — CTX-048.01 CODE READY: усилен валидатор реестра меню, вывод точных исходных ссылок; тесты добавлены, выполнение не подтверждено. CTX-048 остаётся PARTIAL. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
 **Начать с [рабочей очереди](docs/EXECUTION_TODO_20261128.md) или [приёмки старых CODE READY](docs/ACCEPTANCE_TODO.md), сверить обе очереди, забронировать ID и подтвердить коммит в main.** Не читать весь исторический журнал для выбора задач.
 
@@ -14,6 +16,7 @@
 - 29.11.2026 — приёмка BUG-F52/F53/F58: новая read-only SQL-сверка в App.Checks, 3 CODE READY сохранены, 0 DONE, Windows/SQL не запускались. [Отчёт](docs/ACCEPTANCE_PEOPLE_SQL_20261129.md).
 - 29.11.2026 — обнаружен параллельный реестр perfacc-A; 30 броней zcode-sess-perfacc перенесены в ACCEPTANCE_TODO без смены владельца. Старый файл оставлен как [план](docs/CODE_READY_ACCEPTANCE_20261129.md), не источник занятости. Приёмку и статусы MASTER не изменяли; проверить совместимость SQL/GUI/benchmark ресурсов с активными PERF-007/014 A перед запуском.
 - 29.11.2026 — приёмка BUG-F55/F56/F57: подготовлено сохранение девяти специальных golden ВОР для Excel и четыре отказных xUnit-сценария (lock/cancel), 3 CODE READY сохранены, 0 DONE, Windows/Excel не запускались. [Отчёт](docs/ACCEPTANCE_VOR_EXPORT_20261129.md).
+- 29.11.2026 — приёмка BUG-F37/F39/F41/F43/F44/F45/F46: 6 новых xUnit-сценариев настроек, 6 P0 сверены статически и подготовлены конкретные сценарии отказа COMMIT/файлов; 0 DONE, Windows/SQL не запускались. [Отчёт](docs/ACCEPTANCE_FILE_RECOVERY_20261129.md).
 - Основной реестр: [MASTER_TODO](docs/MASTER_TODO.md), на момент реорганизации 380/418 CODE READY, 36 PARTIAL, 2 BLOCKED. Дочерние статусы и занятость — в рабочей очереди; не суммировать.
 - Приоритет: [перенос Python](docs/PYTHON_0664_TO_0679_PARITY.md), [SQL/релиз](docs/SQL_MIGRATION_RELEASE_TODO.md), [договоры/приложения](docs/AGREEMENT_ANNEX_TODO_20261127.md). Схема 32 применена по отдельному разрешению; релиз не подтверждён данным проходом.
 - Последний функциональный блок BUG-F54: **DONE** (28.11 scalar-проход + повторная приёмка маршрутов, см. ниже), ранее — [коммит 7a222c2](https://github.com/xBonkx/CsharpGMC/commit/7a222c2790d3781abe67a9f361a993b51dd5fc77).
