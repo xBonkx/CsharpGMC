@@ -111,7 +111,7 @@ public static partial class SqlServerWorkspace
         max.Parameters.Add("@target",SqlDbType.BigInt).Value=targetId;
         var order=Convert.ToInt32(max.ExecuteScalar());
         var hasLegal=legal is not null;
-        var targetLegal=legal is not null?SqlServerAgreements.TransferTarget(conn,tx,legal,targetId):null;
+        long? targetLegal=legal is not null?SqlServerAgreements.TransferTarget(conn,tx,legal,targetId):null;
         foreach(var doc in group)
         {
             using var update=new SqlCommand("UPDATE dbo.contracts SET object_id=@target,[order]=@order"+(hasLegal?",agreement_id=@legal":"")+" WHERE id=@id AND object_id=@source",conn,tx);
