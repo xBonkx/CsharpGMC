@@ -25,18 +25,17 @@ public sealed class SectionPickerDialog : Window
         Background = System.Windows.Media.Brushes.White;
         DynamicFormLayout.Apply(this);
         var root = new StackPanel();
-        root.Children.Add(new TextBlock { Text = "Куда перенести позицию вместе с комплектующими?",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
-        _sections = new ComboBox { Padding = new Thickness(7),
+        root.Children.Add(DynamicFormLayout.Secondary("Куда перенести позицию вместе с комплектующими?", "LayoutDialogIntroGap"));
+        _sections = new ComboBox {
             ItemsSource = sections.Select(x => new Choice(x.Id, x.Label)).ToArray(), SelectedIndex = 0 };
         DynamicFormLayout.Field(_sections);
+        System.Windows.Automation.AutomationProperties.SetName(_sections, "Раздел назначения");
         _sections.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("SelectedItem.Label") { Source = _sections });
         root.Children.Add(_sections);
-        var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 18, 0, 0) };
-        var cancel = new Button { Content = "Отмена", Padding = new Thickness(13, 7, 13, 7) };
-        cancel.Click += (_, _) => DialogResult = false;
-        var ok = new Button { Content = "Перенести", Padding = new Thickness(13, 7, 13, 7), Margin = new Thickness(8, 0, 0, 0) };
+        var bar = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
+        var ok = new Button { Content = "Перенести", IsDefault = true };
         ok.Click += (_, _) => DialogResult = SelectedSectionId is not null;
         bar.Children.Add(cancel);
         bar.Children.Add(ok);
