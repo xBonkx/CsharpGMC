@@ -196,8 +196,24 @@ public static class TableColumnMenu
     {
         private Entry[] _entries = Array.Empty<Entry>();
         private SummaryColumnFit? _summaryFit;
+        private LegacyCostColumnFit? _legacyCostFit;
 
-        internal void RequestSummaryFit() => _summaryFit?.Request();
+        private static bool IsLegacyCostKey(string value) =>
+            value is "cost-materials" or "smr-work" or "smr-expenses" or "cost-summary" or "cost-totals";
+
+        internal void RequestSummaryFit()
+        {
+            _summaryFit?.Request();
+            _legacyCostFit?.Request();
+        }
+
+        private double? LegacyCostPreferred(DataGridColumn column)
+        {
+            if (!_initialized || !IsLegacyCostKey(key)) return null;
+            var entry = _entries.FirstOrDefault(e => e.Column == column);
+            return entry is not null && !entry.Excluded && entry.Width.IsAbsolute &&
+                !_prefs.Widths.ContainsKey(entry.Id) ? entry.Width.Value : null;
+        }
 
         private double SummaryPreferred(DataGridColumn column)
         {
@@ -236,6 +252,7 @@ public static class TableColumnMenu
             _initialized = false;
             _resizeStart = null;
             if (_summaryFit is not null) _summaryFit.Suspended = false;
+            if (_legacyCostFit is not null) _legacyCostFit.Suspended = false;
             _entries = Array.Empty<Entry>();
             key = newKey;
             Initialize();
@@ -345,6 +362,11 @@ public static class TableColumnMenu
                 _summaryFit ??= new SummaryColumnFit(grid, SummaryPreferred, () => _prefs.Widths.Count > 0);
                 RequestSummaryFit();
             }
+            if (IsLegacyCostKey(key))
+            {
+                _legacyCostFit ??= new LegacyCostColumnFit(grid, LegacyCostPreferred);
+                _legacyCostFit.Invalidate();
+            }
         }
 
         private bool CanHide(DataGridColumn column) => column.Visibility != Visibility.Visible ||
@@ -434,6 +456,7 @@ public static class TableColumnMenu
                 if (!Current()) return;
                 foreach (var entry in _entries.Where(x => !x.Excluded)) entry.Column.Width = entry.Width;
                 Save(prefs => prefs.Widths.Clear());
+                _legacyCostFit?.Invalidate();
                 RequestSummaryFit();
             };
             menu.Items.Add(widths);
@@ -487,6 +510,7 @@ public static class TableColumnMenu
             if (!Ready() || HeaderFrom(e.OriginalSource as DependencyObject, grid) is null) return;
             _resizeStart = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
             if (_summaryFit is not null) _summaryFit.Suspended = true;
+            if (_legacyCostFit is not null) _legacyCostFit.Suspended = true;
         }
 
         internal void ResizeCompleted(object sender, DragCompletedEventArgs e)
@@ -502,6 +526,7 @@ public static class TableColumnMenu
             if (e.ClickCount != 2 || e.OriginalSource is not Thumb thumb || HeaderFrom(thumb, grid) is null || !Ready()) return;
             var before = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
             if (_summaryFit is not null) _summaryFit.Suspended = true;
+            if (_legacyCostFit is not null) _legacyCostFit.Suspended = true;
             CompleteResize(before);
         }
 
@@ -516,6 +541,7 @@ public static class TableColumnMenu
                 finally
                 {
                     if (_resizeStart is null && _summaryFit is not null) _summaryFit.Suspended = false;
+                    if (_resizeStart is null && _legacyCostFit is not null) _legacyCostFit.Suspended = false;
                     RequestSummaryFit();
                 }
             }));
