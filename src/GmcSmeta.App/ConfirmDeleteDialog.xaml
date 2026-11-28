@@ -5,10 +5,10 @@
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" UseLayoutRounding="True">
-    <Border Padding="24,20,24,18">
+    <Border Padding="{StaticResource LayoutFormDialogMargin}">
         <DockPanel>
             <UniformGrid DockPanel.Dock="Bottom" Columns="2" Rows="1" Margin="0,16,0,0">
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" HorizontalAlignment="Right" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" HorizontalAlignment="Right" Margin="{StaticResource LayoutDialogActionGap}"/>
                 <Button x:Name="DeleteButton" Content="Удалить" Style="{StaticResource DangerButton}" HorizontalAlignment="Left" IsEnabled="False" Click="Delete_Click" Padding="14,7"/>
             </UniformGrid>
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -17,8 +17,8 @@
                 <TextBlock x:Name="NameText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
                 <TextBlock x:Name="DetailsText" TextWrapping="Wrap" Margin="0,10,0,0"/>
                 <TextBlock Text="Если удалили по ошибке, запись можно вернуть из корзины в течение 30 дней: меню «☰ → Корзина»."
-                           Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                <TextBlock Text="Чтобы подтвердить, ответьте на вопрос:" TextWrapping="Wrap" Foreground="#64748B" Margin="0,10,0,0"/>
+                           Style="{StaticResource UiSecondaryText}" Margin="{StaticResource LayoutFormFooterGap}"/>
+                <TextBlock Text="Чтобы подтвердить, ответьте на вопрос:" Style="{StaticResource UiSecondaryText}" Margin="{StaticResource LayoutFormFooterGap}"/>
                 <TextBlock x:Name="QuestionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Foreground="#B91C1C" Margin="0,10,0,0"/>
                 <TextBox x:Name="AnswerBox" Style="{StaticResource PythonSearch}" MaxWidth="160" TextAlignment="Center" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="0,10,0,0"
                          Padding="10,6" ToolTip="ответ цифрами" KeyDown="AnswerBox_KeyDown" TextChanged="AnswerBox_TextChanged"/>
