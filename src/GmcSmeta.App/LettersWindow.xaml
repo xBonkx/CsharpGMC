@@ -7,7 +7,7 @@
         Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <DockPanel Margin="14">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <TextBlock x:Name="ArchivePath" Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,10"/>
+            <TextBlock x:Name="ArchivePath" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
             <WrapPanel x:Name="ActionPanel" Margin="0,0,0,10" IsEnabled="False">
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Новое письмо" ContentTemplate="{StaticResource IconLabelPlus}" Click="New_Click" Padding="14,6" Margin="0,0,6,6"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" ContentTemplate="{StaticResource IconLabelOpen}" Click="Open_Click" Padding="14,6" Margin="0,0,6,6"/>
@@ -25,7 +25,7 @@
                              VerticalContentAlignment="Center" AutomationProperties.Name="Поиск писем"
                              ToolTip="Поиск по номеру, теме, объекту, адресату" TextChanged="Search_Changed"/>
                     <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                    <TextBlock Text="Номер, тема, объект, адресат…" Foreground="#94A3B8" Margin="32,0,10,0"
+                    <TextBlock Text="Номер, тема, объект, адресат…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,10,0"
                                VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
