@@ -44,7 +44,8 @@ public partial class EstimateView
         var projected = new List<EditableEstimateRow>(_rows.Count);
         var virtualKey = -1;
         var showPositionNumbers = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber;
-        var searching = !string.IsNullOrWhiteSpace(EstimateSearch.Text);
+        var revealNested = !string.IsNullOrWhiteSpace(EstimateSearch.Text) ||
+            (_inlineStagesOn && _inlineStagesFilter != StageAllocationPresentation.All);
         var typeMode = _temporaryGroupMode == EstimateGroups.Type;
 
         void ShowPosition(EstimateRow source, int depth)
@@ -84,7 +85,8 @@ public partial class EstimateView
                 {
                     var only = group.Members[0];
                     ShowPosition(only, depth);
-                    if (!only.IsAreaSummary || _expandedAreaSummaries.Contains(only.Id) || searching)
+                    if (EstimateNestedVisibility.ShowComponents(only.IsAreaSummary,
+                        _expandedAreaSummaries.Contains(only.Id), _ordinaryComponentsCollapsed, revealNested, honorAreaFold: true))
                         foreach (var child in group.Components)
                             ShowPosition(child, depth + 1);
                     continue;
@@ -124,7 +126,8 @@ public partial class EstimateView
                 foreach (var member in group.Members)
                 {
                     ShowPosition(member, depth + 1);
-                    if (!member.IsAreaSummary || _expandedAreaSummaries.Contains(member.Id) || searching)
+                    if (EstimateNestedVisibility.ShowComponents(member.IsAreaSummary,
+                        _expandedAreaSummaries.Contains(member.Id), _ordinaryComponentsCollapsed, revealNested, honorAreaFold: true))
                         foreach (var child in components?[member.Id] ?? Enumerable.Empty<EstimateRow>())
                             ShowPosition(child, depth + 2);
                 }

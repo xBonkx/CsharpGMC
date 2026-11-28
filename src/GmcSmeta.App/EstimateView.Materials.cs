@@ -563,6 +563,11 @@ public partial class EstimateView
 
     private void MaterialsSyncViewButtons()
     {
+        if (MaterialsView is { } view)
+        {
+            StyleBlue(view.MaterialsGroupingButton, _materialsMode != "kp");
+            StyleBlue(view.MaterialsSortingButton, _materialsSort != "kp");
+        }
         if (MaterialsResetViewButton is not null)
             MaterialsResetViewButton.Visibility =
                 _materialsMode != "kp" || _materialsSort != "kp" ? Visibility.Visible : Visibility.Collapsed;
@@ -896,6 +901,12 @@ public partial class EstimateView
 
     private void MaterialsSetView(string mode, string sort)
     {
+        if (_detached || _materialsLoading || _materialsBusy || _materialsData is null) return;
+        if (MaterialsGrid?.Items is IEditableCollectionView { IsEditingItem: true })
+        {
+            SetStatus("Завершите редактирование ячейки перед изменением вида.", true);
+            return;
+        }
         // Python cost_view._set_view clears frozen keys even when the same
         // sort is chosen again. Ordinary edits/rebuilds still keep row order.
         _materialsOrder.Reset();

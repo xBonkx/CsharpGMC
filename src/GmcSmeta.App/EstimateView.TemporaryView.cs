@@ -16,6 +16,7 @@ public partial class EstimateView
 {
     private string _temporarySort = EstimateViewProjection.DocumentOrder;
     private bool _flatTemporaryView;
+    private bool _ordinaryComponentsCollapsed;
     private bool _noPriceTemporaryView;
     private readonly Dictionary<int, int> _frozenTemporaryOrder = new();
 
@@ -223,8 +224,10 @@ public partial class EstimateView
     {
         if (sender is not Button button) return;
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = "Как группировать", IsEnabled = false });
         void SetGrouping(string mode)
         {
+            if (!CanChangeEstimateView()) return;
             _temporaryGroupMode = mode;
             _flatTemporaryView = mode == "list";
             if (mode is EstimateGroups.Same or EstimateGroups.Type)
@@ -245,20 +248,34 @@ public partial class EstimateView
         AddViewOption(menu, "Одним списком, без систем",
             _flatTemporaryView, () => SetGrouping("list"));
         menu.Items.Add(new Separator());
-        AddViewOption(menu, "Вернуть как в КП", false, () =>
-        {
-            ResetTemporaryView();
-            ApplyFilter();
-        });
+        AddViewCommand(menu, "Вернуть как в КП", "X", ResetView);
         menu.Items.Add(new Separator());
-        AddViewOption(menu, "Свернуть вложенные строки (комплектующие)", false, CollapseNestedRows);
-        AddViewOption(menu, "Развернуть всё", false, ExpandAllRows);
+        menu.Items.Add(new MenuItem { Header = "Свёрнутые строки", IsEnabled = false });
+        AddViewCommand(menu, "Свернуть все вложенные строки (м², комплектующие)", "Outdent", CollapseNestedRows);
+        AddViewCommand(menu, "Развернуть всё", "Indent", ExpandAllRows);
         NameWrapPreference.AddMenuItem(menu);
         menu.IsOpen = true;
     }
 
+    private bool CanChangeEstimateView()
+    {
+        if (_detached || _estimate is null) return false;
+        if (!HasActiveEstimateEdit()) return true;
+        SetStatus("Завершите редактирование ячейки перед изменением вида.", true);
+        return false;
+    }
+
+    private static void AddViewCommand(ContextMenu menu, string title, string glyph, Action apply)
+    {
+        var item = ContextMenuIcons.Create(title, glyph);
+        item.Click += (_, _) => apply();
+        menu.Items.Add(item);
+    }
+
     private void CollapseNestedRows()
     {
+        if (!CanChangeEstimateView()) return;
+        _ordinaryComponentsCollapsed = true;
         // Python collapse_nested keeps system/type headings open, but folds
         // their nested area summaries and combined duplicate-position groups.
         // ApplyFilter uses these sets, not EditableEstimateRow.IsCollapsed alone.
@@ -276,6 +293,8 @@ public partial class EstimateView
 
     private void ExpandAllRows()
     {
+        if (!CanChangeEstimateView()) return;
+        _ordinaryComponentsCollapsed = false;
         // Python tree.expandAll: expand real systems, area rows, type headings
         // and every synthetic multi-position group in the current projection.
         _collapsedSectionIds.Clear();
@@ -297,6 +316,7 @@ public partial class EstimateView
     {
         if (sender is not Button button) return;
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = "Как сортировать", IsEnabled = false });
         foreach (var (key, label) in new[]
         {
             (EstimateViewProjection.DocumentOrder, "Исходный порядок (как в КП)"),
@@ -311,11 +331,12 @@ public partial class EstimateView
             AddViewOption(menu, label, _temporarySort == sortKey, () => SetTemporarySort(sortKey));
         }
         menu.Items.Add(new Separator());
-        AddViewOption(menu, "Сбросить сортировку", false,
-            () => SetTemporarySort(EstimateViewProjection.DocumentOrder));
+        var reset = new MenuItem { Header = "Сбросить сортировку" };
+        reset.Click += (_, _) => SetTemporarySort(EstimateViewProjection.DocumentOrder);
+        menu.Items.Add(reset);
         menu.Items.Add(new MenuItem
         {
-            Header = "Сортировка только на экране. Нажатия на заголовок: по возрастанию → по убыванию → исходный порядок.",
+            Header = "Сортировка — один раз, как в Excel: поправленная строка остаётся на месте. Пересортировать — выбрать сортировку снова",
             IsEnabled = false
         });
         menu.IsOpen = true;
@@ -330,14 +351,18 @@ public partial class EstimateView
 
     private void NoPriceFilter_Click(object sender, RoutedEventArgs e)
     {
+        if (!CanChangeEstimateView()) return;
         _noPriceTemporaryView = !_noPriceTemporaryView;
         _frozenTemporaryOrder.Clear();
         _frozenGroupedOrder.Clear();
         ApplyFilter();
     }
 
-    private void ResetView_Click(object sender, RoutedEventArgs e)
+    private void ResetView_Click(object sender, RoutedEventArgs e) => ResetView();
+
+    private void ResetView()
     {
+        if (!CanChangeEstimateView()) return;
         ResetTemporaryView();
         ApplyFilter();
     }
@@ -347,6 +372,7 @@ public partial class EstimateView
         _temporarySort = EstimateViewProjection.DocumentOrder;
         _temporaryGroupMode = EstimateViewProjection.DocumentOrder;
         _flatTemporaryView = false;
+        _ordinaryComponentsCollapsed = false;
         _noPriceTemporaryView = false;
         _frozenTemporaryOrder.Clear();
         _frozenGroupedOrder.Clear();
@@ -371,7 +397,7 @@ public partial class EstimateView
             _temporaryGroupMode != EstimateViewProjection.DocumentOrder;
         var sortOn = _temporarySort != EstimateViewProjection.DocumentOrder;
         RefreshEstimateSortIndicators();
-        var active = groupOn || sortOn || _noPriceTemporaryView;
+        var active = groupOn || sortOn || _noPriceTemporaryView || _ordinaryComponentsCollapsed;
         ResetViewButton.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         // Python sync_view_button: подпись кнопки постоянна, активный вид подсвечен синим.
         StyleBlue(GroupButton, groupOn);

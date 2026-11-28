@@ -713,13 +713,13 @@ public partial class EstimateView : UserControl
         // A stage filter must still reveal rows hidden inside collapsed
         // systems, or the user could see a blank result with no expandable
         // header to reach the undistributed positions.
-        var honorFolds = !_flatTemporaryView &&
-            string.IsNullOrWhiteSpace(EstimateSearch.Text) &&
-            (!_inlineStagesOn || _inlineStagesFilter == StageAllocationPresentation.All);
+        var revealNested = !string.IsNullOrWhiteSpace(EstimateSearch.Text) ||
+            (_inlineStagesOn && _inlineStagesFilter != StageAllocationPresentation.All);
+        var honorFolds = !_flatTemporaryView && !revealNested;
         var rootFolded = false;
         var subFolded = false;
         var visible = new List<EditableEstimateRow>(projected.Count);
-        var areaSummaryIds = honorFolds ? index.AreaSummaryIds : null;
+        var areaSummaryIds = index.AreaSummaryIds;
         var showPositionNumbers = EstimateViewProjection.SortField(_temporarySort) == EstimateViewProjection.ByNumber;
         foreach (var row in index.Project(projected, _estimate.Rows))
         {
@@ -733,9 +733,10 @@ public partial class EstimateView : UserControl
 
             if (rootFolded && row.Level > 0) continue;
             if (subFolded && row.Level > 1) continue;
-            if (honorFolds && row.IsSub &&
-                row.Source.ParentPositionId is int areaId &&
-                areaSummaryIds!.Contains(areaId) && !_expandedAreaSummaries.Contains(areaId))
+            if (row.IsSub && row.Source.ParentPositionId is int parentId &&
+                !EstimateNestedVisibility.ShowComponents(areaSummaryIds.Contains(parentId),
+                    _expandedAreaSummaries.Contains(parentId), _ordinaryComponentsCollapsed,
+                    revealNested, honorAreaFold: honorFolds || _ordinaryComponentsCollapsed))
                 continue;
             // Prepare only rows surviving search and folds. Stage filtering
             // below needs their current presentation depth to find ancestors.
