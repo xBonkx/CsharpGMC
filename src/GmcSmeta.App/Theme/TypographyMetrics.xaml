@@ -20,7 +20,7 @@
     </Style>
     <!-- Keep disabled text readable on white and pale dialog surfaces; inactive non-text affordances retain the original shade. -->
     <SolidColorBrush x:Key="UiMutedTextBrush" Color="#526174"/>
-    <SolidColorBrush x:Key="UiDisabledTextBrush" Color="#607084"/>
+    <SolidColorBrush x:Key="UiDisabledTextBrush" Color="#59697D"/>
     <SolidColorBrush x:Key="UiDisabledAffordanceBrush" Color="#94A3B8"/>
     <!-- Python navigation: 8.8pt, not a second application-scale multiplier. -->
     <sys:Double x:Key="UiNavigationDetailSize">11.733333333333333</sys:Double>
