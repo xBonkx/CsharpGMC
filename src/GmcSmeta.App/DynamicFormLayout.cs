@@ -17,8 +17,10 @@ internal static class DynamicFormLayout
         var requestedMaxWidth = window.MaxWidth;
         var lastAppliedHeight = requestedMaxHeight;
         var lastAppliedWidth = requestedMaxWidth;
+        var fitting = false;
         void FitWorkArea()
         {
+            if (fitting) return;
             // Callers may set an intentional local cap after Apply.
             if (window.MaxHeight != lastAppliedHeight) requestedMaxHeight = window.MaxHeight;
             if (window.MaxWidth != lastAppliedWidth) requestedMaxWidth = window.MaxWidth;
@@ -41,10 +43,15 @@ internal static class DynamicFormLayout
             }
             var maxHeight = Math.Max(window.MinHeight, Math.Min(requestedMaxHeight, workArea.Height));
             var maxWidth = Math.Max(window.MinWidth, Math.Min(requestedMaxWidth, workArea.Width));
-            lastAppliedHeight = maxHeight;
-            lastAppliedWidth = maxWidth;
-            if (window.MaxHeight != maxHeight) window.MaxHeight = maxHeight;
-            if (window.MaxWidth != maxWidth) window.MaxWidth = maxWidth;
+            fitting = true;
+            try
+            {
+                if (window.MaxHeight != maxHeight) window.MaxHeight = maxHeight;
+                if (window.MaxWidth != maxWidth) window.MaxWidth = maxWidth;
+                lastAppliedHeight = maxHeight;
+                lastAppliedWidth = maxWidth;
+            }
+            finally { fitting = false; }
         }
         FitWorkArea();
         window.SourceInitialized += (_, _) => FitWorkArea();
