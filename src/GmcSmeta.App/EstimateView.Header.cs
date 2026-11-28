@@ -347,7 +347,13 @@ public partial class EstimateView
         }
         SmrHintText.Visibility = string.IsNullOrEmpty(SmrHintText.Text)
             ? Visibility.Collapsed : Visibility.Visible;
-        TransportEdit.IsReadOnly = est.Locked;
+        SmrCaption.Text = est.MoneyFromStages ? "СМР — сумма этапов" : "Монтаж · СМР";
+        TransportCaption.Text = est.MoneyFromStages ? "Транспорт — сумма этапов" : "Транспорт, ₽";
+        TransportEdit.ToolTip = est.MoneyFromStages
+            ? "Транспорт определяется этапами и остатком"
+            : "Транспорт: сумма (Enter — сохранить)";
+        SmrModeCombo.IsEnabled = !est.Locked && !est.MoneyFromStages;
+        TransportEdit.IsReadOnly = est.Locked || est.MoneyFromStages;
         PnrEdit.IsReadOnly = est.Locked;
     }
 

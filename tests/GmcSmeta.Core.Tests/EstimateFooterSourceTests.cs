@@ -40,4 +40,50 @@ public sealed class EstimateFooterSourceTests
         Assert.Contains("TotalsCards.Visibility = hidden ? Visibility.Collapsed : Visibility.Visible", code);
         Assert.Contains("TotalsSummary.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed", code);
     }
+
+    [Fact]
+    public void TotalsShareOneDockedRowAndCompactPaddingWhenCollapsed()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XNamespace w = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var view = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        XElement Named(string name) => Assert.Single(view.Descendants().Where(e => (string?)e.Attribute(xaml + "Name") == name));
+        var toggle = Named("ToggleTotalsButton");
+        var cards = Named("TotalsCards");
+        Assert.Same(cards.Parent, Named("TotalsSummary").Parent);
+        Assert.Same(toggle.Parent, cards.Parent!.Parent);
+        Assert.Equal("True", (string?)toggle.Parent!.Attribute("LastChildFill"));
+        Assert.Equal("10,0,0,0", (string?)toggle.Attribute("Margin"));
+        Assert.Equal("5", (string?)Named("TotalsFooterPanel").Attribute("Grid.Row"));
+        Assert.Equal(4, cards.Elements(w + "Border").Count());
+        Assert.All(cards.Elements(w + "Border"), card => Assert.Null(card.Attribute("Margin")));
+        var metrics = XDocument.Load(Path.Combine(app, "Theme", "LayoutMetrics.xaml"));
+        string Metric(string name) => metrics.Descendants().Single(e => (string?)e.Attribute(xaml + "Key") == name).Value;
+        Assert.Equal("24,12,24,14", Metric("LayoutDocumentFooterPadding"));
+        Assert.Equal("24,6,24,8", Metric("LayoutDocumentFooterCompactPadding"));
+        Assert.Equal("16,11,16,11", Metric("LayoutTilePadding"));
+        var shared = XDocument.Load(Path.Combine(app, "App.xaml"));
+        var tile = shared.Descendants(w + "Style").Single(e => (string?)e.Attribute(xaml + "Key") == "PythonTile");
+        Assert.Contains(tile.Elements(w + "Setter"), e => (string?)e.Attribute("Property") == "Padding" &&
+            (string?)e.Attribute("Value") == "{StaticResource LayoutTilePadding}");
+        var accent = shared.Descendants(w + "Style").Single(e => (string?)e.Attribute(xaml + "Key") == "PythonTileAccent");
+        Assert.Equal(new[] { "#2563EB", "#4F46E5" }, accent.Descendants(w + "GradientStop")
+            .Select(e => (string?)e.Attribute("Color")).ToArray());
+        var code = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("LayoutDocumentFooterCompactPadding", code);
+        Assert.Contains("if (!hidden) LayoutTotalsCards();", code);
+        Assert.Contains("_uiSettings.TotalsHidden = hidden;", code);
+        Assert.Contains("ActualWidth >= 1180", code);
+        var layout = File.ReadAllText(Path.Combine(app, "EstimateTotalsCardsPanel.cs"));
+        Assert.Contains("internal const double Gap = 10;", layout);
+        Assert.Contains("PreferredMinCardWidth = 200", layout);
+        Assert.Contains("FitColumns(availableSize.Width, cards.Length)", layout);
+        Assert.Contains("FitColumns(finalSize.Width, cards.Length)", layout);
+        Assert.Contains("card.Visibility != Visibility.Collapsed", layout);
+    }
 }

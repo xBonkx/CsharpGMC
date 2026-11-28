@@ -1119,7 +1119,12 @@ public partial class EstimateView : UserControl
         ToggleTotalsButton.ContentTemplate = (DataTemplate)FindResource(hidden ? "IconLabelArrowUp" : "IconLabelArrowDown");
         ToggleTotalsButton.Foreground = (Brush)new BrushConverter().ConvertFromString(hidden ? "#0F172A" : "#64748B")!;
         var description = hidden ? "Показать итоги" : "Скрыть итоги";
-        ToggleTotalsButton.ToolTip = description;
+        ToggleTotalsButton.ToolTip = hidden
+            ? "Показать плитки с итогами"
+            : "Свернуть итоги в одну строку — таблице больше места";
+        TotalsFooterPanel.Padding = (Thickness)FindResource(hidden
+            ? "LayoutDocumentFooterCompactPadding" : "LayoutDocumentFooterPadding");
+        if (!hidden) LayoutTotalsCards();
         System.Windows.Automation.AutomationProperties.SetName(ToggleTotalsButton, description);
         _uiSettings.TotalsHidden = hidden;
     }

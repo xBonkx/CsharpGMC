@@ -23,6 +23,8 @@
     <sys:Double x:Key="LayoutTotalsRowHeight">34</sys:Double>
     <Thickness x:Key="LayoutSummaryPageMargin">36,14,44,30</Thickness>
     <Thickness x:Key="LayoutDocumentFooterPadding">24,12,24,14</Thickness>
+    <!-- Collapsed footer owns only one summary line, not full card spacing. -->
+    <Thickness x:Key="LayoutDocumentFooterCompactPadding">24,6,24,8</Thickness>
     <Thickness x:Key="LayoutDialogMargin">22,18,22,16</Thickness>
     <!-- dialogs.py _form: 22/18/22/18, spacing 9; labels right/center. -->
     <Thickness x:Key="LayoutFormDialogMargin">22,18,22,18</Thickness>

@@ -37,6 +37,20 @@ internal static class EstimateFooterLayoutChecks
         Layout(panel, 830, 120);
         Slot(second, 210, 0, 200, 120);
         Slot(fourth, 630, 0, 200, 120);
+        // The toggle may leave less than two minimum-width cards even when
+        // the surrounding view requested two or four columns.
+        panel.Columns = 2;
+        Layout(panel, 390, 370);
+        Slot(first, 0, 0, 390, 120);
+        Slot(second, 0, 130, 390, 80);
+        Slot(third, 0, 220, 390, 70);
+        Slot(fourth, 0, 300, 390, 70);
+
+        panel.Columns = 4;
+        Layout(panel, 620, 200);
+        Slot(first, 0, 0, 200, 120);
+        Slot(third, 420, 0, 200, 120);
+        Slot(fourth, 0, 130, 200, 70);
         Console.WriteLine("Estimate footer layout OK (no SQL).");
     }
 

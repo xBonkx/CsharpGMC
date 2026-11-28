@@ -10,6 +10,17 @@ namespace GmcSmeta.App;
 public sealed class EstimateTotalsCardsPanel : Panel
 {
     internal const double Gap = 10;
+    private const double PreferredMinCardWidth = 200;
+
+    // Measure against the space remaining AFTER the docked toggle. Keep the
+    // requested wide/two-column layout when it fits, but don't squeeze fields.
+    private int FitColumns(double width, int cardCount)
+    {
+        var requested = Math.Min(Columns, cardCount);
+        if (double.IsPositiveInfinity(width)) return requested;
+        var fitting = Math.Max(1, Math.Floor((width + Gap) / (PreferredMinCardWidth + Gap)));
+        return (int)Math.Min(requested, fitting);
+    }
 
     public static readonly DependencyProperty ColumnsProperty = DependencyProperty.Register(
         nameof(Columns), typeof(int), typeof(EstimateTotalsCardsPanel),
@@ -43,7 +54,7 @@ public sealed class EstimateTotalsCardsPanel : Panel
     {
         var cards = VisibleCards();
         if (cards.Length == 0) return new Size();
-        var columns = Math.Min(Columns, cards.Length);
+        var columns = FitColumns(availableSize.Width, cards.Length);
         var gap = HorizontalGap(availableSize.Width, columns);
         var width = CellWidth(availableSize.Width, columns, gap);
         foreach (var card in cards)
@@ -59,7 +70,7 @@ public sealed class EstimateTotalsCardsPanel : Panel
     {
         var cards = VisibleCards();
         if (cards.Length == 0) return finalSize;
-        var columns = Math.Min(Columns, cards.Length);
+        var columns = FitColumns(finalSize.Width, cards.Length);
         var gap = HorizontalGap(finalSize.Width, columns);
         var width = CellWidth(finalSize.Width, columns, gap);
         var heights = RowHeights(cards, columns);

@@ -958,7 +958,8 @@
                 <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,0,0,0"
                         Style="{StaticResource DocumentFlatTool}" MinHeight="30"
                         Content="Скрыть итоги" ContentTemplate="{StaticResource IconLabelArrowDown}"
-                        Foreground="#64748B" Click="ToggleTotals_Click"/>
+                        Foreground="#64748B" Click="ToggleTotals_Click"
+                        ToolTip="Свернуть итоги в одну строку — таблице больше места"/>
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
                                Foreground="#64748B" VerticalAlignment="Center"/>
@@ -992,8 +993,8 @@
                         <Border x:Name="TransportCard" Margin="0,2,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="Транспорт, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox x:Name="TransportEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MaxWidth="150" HorizontalAlignment="Stretch"
+                                <TextBlock x:Name="TransportCaption" Text="Транспорт, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox x:Name="TransportEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"
                                          KeyDown="TotalsEdit_KeyDown" LostFocus="TransportEdit_Commit"
                                          ToolTip="Транспорт: сумма (Enter — сохранить)"/>
                             </Grid>
@@ -1002,14 +1003,14 @@
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="Пусконаладка, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox x:Name="PnrEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MaxWidth="150" HorizontalAlignment="Stretch"
+                                <TextBox x:Name="PnrEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"
                                          KeyDown="TotalsEdit_KeyDown" LostFocus="PnrEdit_Commit"
                                          ToolTip="Пусконаладка: сумма (Enter — сохранить)"/>
                             </Grid>
                         </Border>
                     </StackPanel>
                 </Border>
-                <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}">
+                <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}" MinWidth="0">
                     <StackPanel>
                         <TextBlock x:Name="TotalCaption" Text="ИТОГО с НДС" Foreground="White" FontWeight="SemiBold" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"/>
                         <TextBlock x:Name="TotalText" Style="{StaticResource PythonTileValue}" Foreground="White"

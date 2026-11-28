@@ -83,4 +83,36 @@ public sealed class EstimateMoneyCardSourceTests
         Assert.Contains("TransportEdit.Text = est.Totals.Transport == 0m ? \"0\" : N2(est.Totals.Transport)", code);
         Assert.Contains("PnrEdit.Text = est.Totals.Pnr == 0m ? \"0\" : N2(est.Totals.Pnr)", code);
     }
+
+    [Fact]
+    public void StageDerivedAmountsAreReadOnlyAndTheirCaptionsResetForOrdinaryDocuments()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var code = File.ReadAllText(Path.Combine(app, "EstimateView.Header.cs"));
+        Assert.Contains("SmrModeCombo.IsEnabled = !est.Locked && !est.MoneyFromStages;", code);
+        Assert.Contains("TransportEdit.IsReadOnly = est.Locked || est.MoneyFromStages;", code);
+        Assert.Contains("PnrEdit.IsReadOnly = est.Locked;", code);
+        Assert.Contains("SmrCaption.Text = est.MoneyFromStages ? \"СМР — сумма этапов\" : \"Монтаж · СМР\";", code);
+        Assert.Contains("TransportCaption.Text = est.MoneyFromStages ? \"Транспорт — сумма этапов\" : \"Транспорт, ₽\";", code);
+        Assert.Contains("if (_smrComboSilent || _estimate is not { } snapshot) return;", code);
+        Assert.Contains("if (snapshot.MoneyFromStages || !CanChangeHeader(snapshot, revision, false))", code);
+        var refresh = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("SmrCard.Visibility = est.VatTop ? Visibility.Collapsed : Visibility.Visible;", refresh);
+        Assert.Contains("PnrCard.Visibility = est.SmrMode == \"pos\" || est.Totals.Pnr != 0m", refresh);
+        var view = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement Named(string name) => Assert.Single(view.Descendants().Where(e => (string?)e.Attribute(xaml + "Name") == name));
+        foreach (var name in new[] { "TransportEdit", "PnrEdit" })
+        {
+            Assert.Equal("80", (string?)Named(name).Attribute("MinWidth"));
+            Assert.Equal("150", (string?)Named(name).Attribute("MaxWidth"));
+        }
+        Assert.Equal("Транспорт, ₽", (string?)Named("TransportCaption").Attribute("Text"));
+        Assert.Equal("30", (string?)Named("SmrModeCombo").Attribute("MinHeight"));
+        Assert.Equal("10,6", (string?)Named("SmrModeCombo").Attribute("Padding"));
+    }
 }
