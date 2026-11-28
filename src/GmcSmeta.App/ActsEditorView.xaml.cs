@@ -170,10 +170,8 @@ public partial class ActsEditorView : UserControl
 
     internal static bool CanReuseActOnReturn(string published, string displayed, string listRevision,
         string observed, long publishedId, long selectedId, bool cleanReadOnly) =>
-        cleanReadOnly && publishedId == selectedId && !string.IsNullOrWhiteSpace(published) &&
-        string.Equals(published, displayed, StringComparison.Ordinal) &&
-        string.Equals(published, listRevision, StringComparison.Ordinal) &&
-        string.Equals(published, observed, StringComparison.Ordinal);
+        KsReadRevisionPolicy.CanReuse(published, displayed, listRevision, observed,
+            publishedId, selectedId, cleanReadOnly);
 
     // Drafts retain the existing full readback: charges and quantity bindings
     // can contain unsaved input. Only signed acts and a confirmed empty list
@@ -1011,27 +1009,12 @@ public partial class ActsEditorView : UserControl
     private List<KsBatchPosition> SelectedPositionStates()
     {
         if (_sheet is null || _rows is null) return new List<KsBatchPosition>();
-        var byId = _sheet.Positions.ToDictionary(p => p.PositionId);
-        var linked = _sheet.Positions
-            .Where(p => (p.LineFormula ?? "").Contains('@'))
-            .Select(p => p.PositionId).ToHashSet();
-        var chosen = new List<long>();
-        foreach (var vm in ActGrid.SelectedItems?.OfType<KsRowVm>() ?? Enumerable.Empty<KsRowVm>())
-        {
-            if (vm.IsSection)
-                chosen.AddRange(_rows.Where(r => !r.IsSection && r.SystemId == vm.SystemId)
-                    .Select(r => r.PositionId));
-            else
-                chosen.Add(vm.PositionId);
-        }
-        var states = new List<KsBatchPosition>();
-        foreach (var pid in chosen.Distinct())
-        {
-            if (!byId.TryGetValue(pid, out var p)) continue;
-            states.Add(new KsBatchPosition(p.PositionId, p.QtyByKp, p.ClosedByOthers, p.LineQty, p.Price,
-                p.OutOfKp, linked.Contains(p.PositionId)));
-        }
-        return states;
+        static KsBatchSelectionRow Row(KsRowVm vm) => new(vm.IsSection, vm.SystemId, vm.PositionId);
+        return KsBatchSelection.Resolve(
+            _sheet.Positions.Select(p => new KsBatchPosition(p.PositionId, p.QtyByKp,
+                p.ClosedByOthers, p.LineQty, p.Price, p.OutOfKp, (p.LineFormula ?? "").Contains('@'))),
+            _rows.Select(Row),
+            (ActGrid.SelectedItems?.OfType<KsRowVm>() ?? Enumerable.Empty<KsRowVm>()).Select(Row));
     }
 
     /// <summary>«Закрыть выделенное» (acts.fill mode=rest): вписать весь остаток выделенных строк.</summary>

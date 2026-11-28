@@ -63,7 +63,7 @@ public partial class ActsEditorView
                 ? ReadSharedExtras(conn, id, token) : new HashSet<long>();
             var after = Revision();
             token.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(before) && before == after)
+            if (KsReadRevisionPolicy.IsStable(before, after))
                 return new ActLoadSnapshot(acts, id, after, sheet, details, totals, rules, sharedExtras);
             cachedActs = null; // A concurrent change invalidates the cached list too.
             cachedContext = null;

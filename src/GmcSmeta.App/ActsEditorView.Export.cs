@@ -85,34 +85,12 @@ public partial class ActsEditorView
     }
 
     private static (long BuildMs, long SaveMs) SaveKsWorkbook(Stream stream,
-        Func<ClosedXML.Excel.XLWorkbook> create, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        var timer = System.Diagnostics.Stopwatch.StartNew();
-        using var book = create();
-        var build = timer.ElapsedMilliseconds;
-        if (book.Worksheets.Count == 0)
-            throw new InvalidDataException("В книге нет листов.");
-        token.ThrowIfCancellationRequested();
-        timer.Restart();
-        book.SaveAs(stream);
-        token.ThrowIfCancellationRequested();
-        return (build, timer.ElapsedMilliseconds);
-    }
+        Func<ClosedXML.Excel.XLWorkbook> create, CancellationToken token) =>
+        KsExportRendering.SaveWorkbook(stream, create, book => book.Worksheets.Count != 0,
+            (book, output) => book.SaveAs(output), token);
 
     private static (long BuildMs, long SaveMs) SaveKsPdf(Stream stream, Func<byte[]> create,
-        CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        var timer = System.Diagnostics.Stopwatch.StartNew();
-        var bytes = create();
-        var build = timer.ElapsedMilliseconds;
-        token.ThrowIfCancellationRequested();
-        timer.Restart();
-        stream.Write(bytes);
-        token.ThrowIfCancellationRequested();
-        return (build, timer.ElapsedMilliseconds);
-    }
+        CancellationToken token) => KsExportRendering.SavePdf(stream, create, token);
 
     // The snapshot and output are independent of the live UI. Recheck the
     // editor context after each await and publish only a complete staged file.
