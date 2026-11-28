@@ -116,6 +116,8 @@ public static partial class SqlServerActs
         if (unit.Length==0 || unit.Length>32) throw new ArgumentException("Некорректная единица измерения.");
         if (price<0m || price>1000000000000m)
             throw new ArgumentOutOfRangeException(nameof(price));
+        if (string.IsNullOrWhiteSpace(expectedRevision))
+            throw new DBConcurrencyException("Нет подтверждённой ревизии КС.");
         RequirePilotWrite(connectionString);
         using var conn=SqlServerDatabase.Open(connectionString);
         using var tx=conn.BeginTransaction(IsolationLevel.Serializable);

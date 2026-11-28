@@ -38,7 +38,7 @@ public partial class EstimateView
         if (!CanRunInlineStageCommand(snapshot)) return;
         var stage = snapshot.Stages.FirstOrDefault(s => s.Id == id) ??
             (snapshot.Rest?.Id == id ? snapshot.Rest : null);
-        if (stage is null || stage.Locked || stage.StageSum is not null) return;
+        if (stage is null || stage.Rest || stage.Locked || stage.StageSum is not null) return;
         var revision = snapshot.Revision;
         var owner = Window.GetWindow(this);
         try

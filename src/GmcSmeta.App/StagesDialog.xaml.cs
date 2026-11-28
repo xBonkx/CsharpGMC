@@ -24,6 +24,8 @@ public partial class StagesDialog : Window
     private readonly Dictionary<int, long> _columnStages = new();   // индекс колонки → id этапа
     private bool _building;
     private bool _quantityWriteBusy;
+    private string? _fullMutationProblem = "Нет подтверждённого снимка.";
+    private bool FullEditable => _fullMutationProblem is null;
     private SqlServerStages.StageInfo? _restDocument;
     private List<SqlServerStages.StageInfo> _cachedStages = new();
     private DataTable? _table;
@@ -65,7 +67,9 @@ public partial class StagesDialog : Window
 
     private void SetReadControls(bool enabled)
     {
-        StagesGrid.IsEnabled = SearchBox.IsEnabled = AddStageButton.IsEnabled = CreateRestButton.IsEnabled = enabled;
+        StagesGrid.IsEnabled = SearchBox.IsEnabled = enabled;
+        AddStageButton.IsEnabled = CreateRestButton.IsEnabled = enabled && FullEditable;
+        AddStageButton.ToolTip = CreateRestButton.ToolTip = _fullMutationProblem;
     }
 
     private async Task ReloadAsync()
@@ -75,6 +79,7 @@ public partial class StagesDialog : Window
         _distributionCancellation = cancellation;
         var token = cancellation.Token;
         _revision = "";
+        _fullMutationProblem = "Нет подтверждённого снимка.";
         _restDocument = null;
         _searchTimer.Stop();
         _building = true;
@@ -86,12 +91,14 @@ public partial class StagesDialog : Window
                 using var conn = await SqlServerDatabase.OpenAsync(_connectionString, token).ConfigureAwait(false);
                 var revision = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
                 var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, _fullId, token);
+                var problem = SqlServerStages.ReadFullStageMutationProblem(conn, _fullId, token);
                 if (string.IsNullOrWhiteSpace(revision) ||
                     revision != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились при загрузке этапов. Откройте окно снова.");
-                return (Stages: stages, Remaining: rest, Revision: revision, Table: BuildTable(stages, rows, token));
+                return (Stages: stages, Remaining: rest, Revision: revision, Table: BuildTable(stages, rows, token), Problem: problem);
             }, token);
             if (_closed || token.IsCancellationRequested) return;
+            _fullMutationProblem = data.Problem;
             PublishSnapshot(data.Stages, data.Remaining, data.Table, data.Revision);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -118,7 +125,7 @@ public partial class StagesDialog : Window
         {
             var shortName = ShortStageName(stage.Name);
             var column = MakeColumn(shortName, $"S{stageIndex}", 92,
-                readOnly: stage.Locked || stage.StageSum is not null);
+                readOnly: !FullEditable || stage.Locked || stage.StageSum is not null);
             TableColumnMenu.SetStableId(column, "stage-" + stage.Id.ToString(CultureInfo.InvariantCulture));
             StagesGrid.Columns.Add(column);
             _columnStages[StagesGrid.Columns.IndexOf(column)] = stage.Id;
@@ -269,7 +276,7 @@ public partial class StagesDialog : Window
 
     private void StagesGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision) ||
+        if (!FullEditable || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision) ||
             !_columnStages.ContainsKey(StagesGrid.Columns.IndexOf(e.Column)))
             e.Cancel = true;
     }
@@ -277,7 +284,7 @@ public partial class StagesDialog : Window
     private async void StagesGrid_CellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
     {
         if (e.EditAction != DataGridEditAction.Commit || _building) return;
-        if (string.IsNullOrWhiteSpace(_revision)) { e.Cancel = true; return; }
+        if (!FullEditable || string.IsNullOrWhiteSpace(_revision)) { e.Cancel = true; return; }
         if (_quantityWriteBusy) { e.Cancel = true; return; }
         if (!_columnStages.TryGetValue(StagesGrid.Columns.IndexOf(e.Column), out var stageId)) return;
         if (e.Row.Item is not DataRowView row) return;
@@ -387,7 +394,7 @@ public partial class StagesDialog : Window
         {
             var revision = _revision;
             var rest = _restDocument;
-            var item = ContextMenuIcons.Create(rest is null ? "Создать документ «Остаток»" : "Открыть КП «Остаток»", rest is null ? "FilePlus" : "File");
+            var item = ContextMenuIcons.Create(rest is null ? "Создать документ «Остаток»" : "Открыть КП «Остаток»", rest is null ? "FilePlus" : "File", rest is not null || FullEditable);
             item.Click += (_, _) =>
             {
                 if (_closed || _building || _quantityWriteBusy || revision != _revision ||
@@ -414,7 +421,7 @@ public partial class StagesDialog : Window
             e.Handled = StageMenu.Items.Count == 0;
             return;
         }
-        var editableStage = !selectedStage.Locked && selectedStage.StageSum is null;
+        var editableStage = FullEditable && !selectedStage.Locked && selectedStage.StageSum is null;
         var menuRevision = _revision;
         MenuItem Add(string header, string glyph, RoutedEventHandler onClick, bool enabled = true, bool danger = false)
         {
@@ -430,7 +437,7 @@ public partial class StagesDialog : Window
         }
         Add($"Открыть КП «{stageName}»", "File", (_, _) => OpenStage(stageId));
         Add("Название…", "Edit", (_, _) => RenameStage(stageId), editableStage);
-        Add("СМР, транспорт и сумма по договору…", "Edit", (_, _) => EditMoney(stageId));
+        Add("СМР, транспорт и сумма по договору…", "Edit", (_, _) => EditMoney(stageId), editableStage);
         Add("СМР по системам…", "List", (_, _) => EditSystemsMoney(stageId), editableStage);
         Add("Сумма по договору (для сверки)…", "Edit", (_, _) => SetTarget(stageId), editableStage);
         Add("Связанные ДС и КС…", "File", (_, _) => ShowLinks());
@@ -470,7 +477,7 @@ public partial class StagesDialog : Window
         var ids = rows.Select(row => Convert.ToInt64(row.Row["SrcId"])).OrderBy(id => id).ToArray();
         if (ids.Any(id => id <= 0) || ids.Distinct().Count() != ids.Length) return;
         var revision = _revision;
-        bool CanExecute() => !_closed && !_building && !_quantityWriteBusy &&
+        bool CanExecute() => FullEditable && !_closed && !_building && !_quantityWriteBusy &&
             !string.IsNullOrWhiteSpace(revision) && _revision == revision &&
             ReferenceEquals(_table, table) &&
             StagesGrid.SelectedItems.Count == rows.Length &&
@@ -478,7 +485,7 @@ public partial class StagesDialog : Window
                 rows.Any(captured => ReferenceEquals(captured.Row, row.Row)));
         void Add(string title, string glyph, RoutedEventHandler click, bool enabled = true)
         {
-            var item = ContextMenuIcons.Create(title, glyph, enabled);
+            var item = ContextMenuIcons.Create(title, glyph, enabled && FullEditable);
             item.Click += (sender, args) =>
             {
                 if (CanExecute()) click(sender, args);
@@ -508,7 +515,7 @@ public partial class StagesDialog : Window
     private async void ChangeSelectedStageRowsAsync(long stageId, long[] ids,
         bool putRest, string revision)
     {
-        if (_closed || _building || _quantityWriteBusy || ids.Length == 0 ||
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || ids.Length == 0 ||
             string.IsNullOrWhiteSpace(revision) || revision != _revision ||
             !_cachedStages.Any(stage => stage.Id == stageId && !stage.Rest &&
                 !stage.Locked && stage.StageSum is null)) return;
@@ -547,7 +554,7 @@ public partial class StagesDialog : Window
 
     private async void AddStage_Click(object sender, RoutedEventArgs e)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = ServerRevision();
         _quantityWriteBusy = true;
         try
@@ -568,7 +575,7 @@ public partial class StagesDialog : Window
 
     private async void CreateRest_Click(object sender, RoutedEventArgs e)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = ServerRevision();
         _quantityWriteBusy = true;
         try
@@ -604,7 +611,7 @@ public partial class StagesDialog : Window
 
     private async void EditMoney(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         _quantityWriteBusy = true;
         try
@@ -637,7 +644,7 @@ public partial class StagesDialog : Window
 
     private async void EditSystemsMoney(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         _quantityWriteBusy = true;
         try
@@ -682,7 +689,7 @@ public partial class StagesDialog : Window
 
     private async void PutRest(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, "Перенести весь положительный остаток полного КП в этот этап?",
                 "Распределение этапов", MessageBoxButton.YesNo, MessageBoxImage.Question,
@@ -711,7 +718,7 @@ public partial class StagesDialog : Window
 
     private async void ClearStage(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, "Убрать из этапа все строки? Само КП этапа останется пустым.",
                 "Очистить этап", MessageBoxButton.YesNo, MessageBoxImage.Warning,
@@ -740,7 +747,7 @@ public partial class StagesDialog : Window
 
     private async void RenameStage(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
         if (stage is null || stage.Locked || stage.StageSum is not null) return;
         var revision = _revision;
@@ -765,7 +772,7 @@ public partial class StagesDialog : Window
 
     private async void SetTarget(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
         if (stage is null) return;
@@ -800,7 +807,7 @@ public partial class StagesDialog : Window
 
     private async void DeleteStage(long stageId, string name)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         if (MessageBox.Show(this, $"Удалить «{name}»? Копия сохранится в корзине (30 дней).",
                 "Удаление этапа", MessageBoxButton.YesNo, MessageBoxImage.Question,
@@ -824,7 +831,7 @@ public partial class StagesDialog : Window
     // introduce a separate implementation of stage mutations.
     internal void InvokeInlineMenuAction(long stageId, string action, string expectedRevision)
     {
-        if (_quantityWriteBusy || _building || string.IsNullOrWhiteSpace(_revision) ||
+        if (!FullEditable || _closed || _quantityWriteBusy || _building || string.IsNullOrWhiteSpace(_revision) ||
             _revision != expectedRevision)
         {
             SetStatus("Распределение изменилось. Повторите действие из актуального окна этапов.");

@@ -392,7 +392,7 @@ public partial class EstimateView
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
         var name = stage.Rest ? "Остаток" : ShortStageName(stage.Name);
         bool Writable() => BulkStageAllowed && ReferenceEquals(snapshot, _inlineStagesData) &&
-            !stage.Locked && stage.StageSum is null;
+            !stage.Rest && !stage.Locked && stage.StageSum is null;
         var open = ContextMenuIcons.Create($"Открыть КП «{name}»", "File");
         open.Click += (_, _) =>
         {
@@ -412,10 +412,9 @@ public partial class EstimateView
         }
         if (stage.Rest)
         {
-            Add("СМР по системам…", "List", "systems");
-            Add("СМР и транспорт…", "List", "money");
             menu.Items.Add(new Separator());
-            Add("Удалить документ «Остаток»…", "Trash", "delete", danger: true);
+            var info = new MenuItem { Header = "Остаток рассчитывается автоматически", IsEnabled = false };
+            menu.Items.Add(info);
         }
         else
         {

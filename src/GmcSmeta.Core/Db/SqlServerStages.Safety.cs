@@ -64,20 +64,37 @@ public static partial class SqlServerStages
 
     private static void RequireEditableFull(SqlConnection conn, SqlTransaction tx, long fullId)
     {
+        if (FullMutationProblem(conn, tx, fullId, CancellationToken.None) is { } problem)
+            throw new InvalidOperationException(problem);
+    }
+
+    /// <summary>Advisory UI permission; callers must fence the read with meta.rev.
+    /// Writers repeat the same policy with transaction-local locks.</summary>
+    public static string? ReadFullStageMutationProblem(SqlConnection conn, long fullId, CancellationToken token) =>
+        FullMutationProblem(conn, null, fullId, token);
+
+    private static string? FullMutationProblem(SqlConnection conn, SqlTransaction? tx,
+        long fullId, CancellationToken token)
+    {
+        var contractHint = tx is null ? "" : " WITH (UPDLOCK,HOLDLOCK)";
+        var objectHint = tx is null ? "" : " WITH (HOLDLOCK)";
         using var cmd = new SqlCommand(
-            "SELECT c.kind,c.stage_of,c.locked,o.archived FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
-            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id WHERE c.id=@id",
+            "SELECT c.kind,c.stage_of,c.locked,o.archived FROM dbo.contracts c" + contractHint +
+            " JOIN dbo.objects o" + objectHint + " ON o.id=c.object_id WHERE c.id=@id",
             conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = fullId;
-        using var r = cmd.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        token.ThrowIfCancellationRequested();
         if (!r.Read() || r.IsDBNull(0) ||
             !string.Equals(r.GetString(0), "kp", StringComparison.OrdinalIgnoreCase) ||
             !r.IsDBNull(1))
-            throw new InvalidOperationException("Это не полное КП. Операция с остатком отменена.");
+            return "Это не полное КП. Операция с остатком отменена.";
         if (!r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture))
-            throw new InvalidOperationException("Полное КП подписано или заблокировано.");
+            return "Полное КП подписано или заблокировано.";
         if (r.IsDBNull(3) || Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture))
-            throw new InvalidOperationException("Архивный объект нельзя изменять.");
+            return "Архивный объект нельзя изменять.";
+        return null;
     }
 
     private static bool HasReference(SqlConnection conn, SqlTransaction tx, string sql, long id)

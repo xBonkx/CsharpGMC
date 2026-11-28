@@ -913,8 +913,11 @@ public partial class ActsEditorView : UserControl
         var header = ActGrid.CurrentCell.Column?.Header?.ToString();
         if (header is not ("Наименование" or "Цена")) return;
         if (ActGrid.SelectedItem is not KsRowVm row || !row.OutOfKp || !row.InAct) return;
-        if (_signed) return;
-        EditExtraDialog(row.PositionId);
+        if (_signed || _contractLocked) return;
+        var sheet = _sheet;
+        bool RowCurrent() => ReferenceEquals(_sheet, sheet) &&
+            ReferenceEquals(ActGrid.SelectedItem, row) && _rows?.Contains(row) == true;
+        EditExtraDialog(row.PositionId, RowCurrent);
     }
 
     // -------------------------------------------------------------- контекстное меню
@@ -1727,7 +1730,8 @@ public partial class ActsEditorView : UserControl
         if (target is null || current is null || current.Signed || _contractLocked ||
             _sheet is null || menuCurrent?.Invoke() == false) return;
         var line = _sheet.Positions.FirstOrDefault(p => p.PositionId == positionId);
-        if (line is null || !line.OutOfKp) return;
+        if (line is null || !line.OutOfKp ||
+            _rows?.Any(row => !row.IsSection && row.PositionId == positionId && row.InAct) != true) return;
         var dialog = new Window
         {
             Title = "Изменить позицию вне сметы",
@@ -1773,30 +1777,24 @@ public partial class ActsEditorView : UserControl
         buttons.Children.Add(cancel);
         panel.Children.Add(buttons);
         dialog.Content = panel;
-        bool? accepted = null;
-        cancel.Click += (_, _) => dialog.Close();
+        (string Name, string Unit, decimal Price)? edit = null;
+        cancel.IsCancel = true;
         ok.Click += (_, _) =>
         {
             try
             {
                 if (nameBox.Text.Trim().Length == 0)
                     throw new InvalidOperationException("Впишите наименование позиции");
-                if (unitBox.Text.Trim().Length == 0)
-                    throw new InvalidOperationException("Впишите единицу измерения");
+                if (unitBox.Text.Trim().Length == 0 || unitBox.Text.Trim().Length > 32)
+                    throw new InvalidOperationException("Единица измерения должна содержать от 1 до 32 символов");
                 var price = NumberText.Parse(priceBox.Text)
                     ?? throw new InvalidOperationException("Введите неотрицательную цену");
-                if (price < 0m)
-                    throw new InvalidOperationException("Введите неотрицательную цену");
+                if (price < 0m || price > 1000000000000m)
+                    throw new InvalidOperationException("Цена вне допустимого диапазона");
                 RequireCurrentActCommand(target);
                 if (_signed || _contractLocked || menuCurrent?.Invoke() == false)
                     throw new InvalidOperationException("Выбор или состояние акта изменились. Откройте команду снова.");
-                // WPF controls may only be read on the dispatcher thread.
-                var name = nameBox.Text.Trim();
-                var unit = unitBox.Text.Trim();
-                Task.Run(() => SqlServerActs.UpdateExtraLine(target.ConnectionString, target.ActId, positionId,
-                    name, unit, price, target.Revision)).GetAwaiter().GetResult();
-                _revision = "";
-                accepted = true;
+                edit = (nameBox.Text.Trim(), unitBox.Text.Trim(), price);
                 dialog.DialogResult = true;
             }
             catch (Exception ex)
@@ -1804,11 +1802,44 @@ public partial class ActsEditorView : UserControl
                 MessageBox.Show(dialog, ex.Message, "Позиция вне сметы", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
-        if (dialog.ShowDialog() == true && accepted == true)
+        if (dialog.ShowDialog() != true || edit is not { } values) return;
+        if (!IsCurrentActCommand(target) || _signed || _contractLocked || menuCurrent?.Invoke() == false ||
+            !ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) ||
+            !IsCurrentActCommand(target) || _signed || _contractLocked || menuCurrent?.Invoke() == false)
         {
-            SetStatus("Позиция вне сметы изменена");
-            await ReloadActAfterSave();
+            SetStatus("Выбор или данные изменились. Откройте команду заново.", true);
+            return;
         }
+        bool SameAct() => _actId == target.ActId && _contractId == target.ContractId &&
+            _connectionString == target.ConnectionString;
+        _revision = "";
+        SetStatus("Сохранение позиции вне сметы…");
+        long savedId;
+        try
+        {
+            savedId = await RunActWriteAsync(() => SqlServerActs.UpdateExtraLine(
+                target.ConnectionString, target.ActId, positionId,
+                values.Name, values.Unit, values.Price, target.Revision));
+        }
+        catch (Exception ex)
+        {
+            if (!SameAct()) return;
+            SetStatus("Результат сохранения не подтверждён: " + ex.Message +
+                ". Проверьте перечитанные данные перед повтором.", true);
+            await ReloadAsync(target.ActId, reuseList: false);
+            return;
+        }
+        if (!SameAct()) return;
+        await ReloadAsync(target.ActId, reuseList: false);
+        if (!SameAct() || _loadFailed || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_rows?.FirstOrDefault(row => !row.IsSection && row.PositionId == savedId && row.InAct) is { } restored)
+        {
+            ActGrid.SelectedItem = restored;
+            ActGrid.ScrollIntoView(restored);
+            SetStatus("Позиция вне сметы изменена");
+        }
+        else SetStatus("Запись подтверждена SQL, но строка не найдена в текущем представлении.", true);
     }
 
     // -------------------------------------------------------------- свойства акта
