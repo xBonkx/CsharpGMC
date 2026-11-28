@@ -355,16 +355,16 @@ public sealed class TagsWindow : Window
         left.Children.Add(_list);
 
         var right = new StackPanel();
-        right.Children.Add(new TextBlock { Text = "Название", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 4) });
+        right.Children.Add(DynamicFormLayout.Secondary("Название", "LayoutFormGroupHeadingGap"));
         right.Children.Add(_name);
-        right.Children.Add(new TextBlock { Text = "Правила", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 12, 0, 6) });
+        right.Children.Add(DynamicFormLayout.Secondary("Правила", "LayoutReferenceGroupHeadingGap"));
         foreach (var (key, caption) in Rules)
         {
             var cb = new CheckBox { Content = new TextBlock { Text=caption, TextWrapping=TextWrapping.Wrap }, Margin = new Thickness(0, 0, 0, 7) };
             System.Windows.Automation.AutomationProperties.SetName(cb,caption);
             _rules[key] = cb; right.Children.Add(cb);
         }
-        right.Children.Add(new TextBlock { Text = "Примечание", Foreground=System.Windows.Media.Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 4) });
+        right.Children.Add(DynamicFormLayout.Secondary("Примечание", "LayoutReferenceNoteHeadingGap"));
         right.Children.Add(_note);
         _usage.Margin = new Thickness(0, 8, 0, 0);
         right.Children.Add(_usage);
