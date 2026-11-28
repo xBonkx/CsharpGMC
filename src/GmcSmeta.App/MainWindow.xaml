@@ -16,6 +16,7 @@
         <!-- Local single-line search: reserve icon space once, and let the text
              host measure its line at the current font scale instead of clipping it. -->
         <Style x:Key="SidebarSearch" TargetType="TextBox" BasedOn="{StaticResource PythonSearch}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="MinHeight" Value="34"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -91,6 +92,7 @@
             </Setter>
         </Style>
         <Style x:Key="SidebarMenuHeader" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Setter Property="Foreground" Value="#0F172A"/>
             <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Width" Value="34"/>
             <Setter Property="Height" Value="32"/>
@@ -155,7 +157,9 @@
                     <Grid>
                         <!-- Indent content, not the full-width selection background. -->
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <Border x:Name="HeaderBorder" Grid.Row="0" CornerRadius="6" Background="Transparent" Padding="{TemplateBinding Padding}" MinHeight="31">
+                        <Border x:Name="HeaderBorder" Grid.Row="0" CornerRadius="6" Background="Transparent"
+                                HorizontalAlignment="Stretch" SnapsToDevicePixels="True"
+                                Padding="{TemplateBinding Padding}" MinHeight="31">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <ToggleButton x:Name="Expander" Style="{StaticResource NavigationExpander}" Focusable="False" ClickMode="Press" VerticalAlignment="Center"
@@ -163,8 +167,9 @@
                                 <ContentPresenter x:Name="PART_Header" Grid.Column="1" ContentSource="Header" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="4,0,0,0"/>
                             </Grid>
                         </Border>
-                        <Border x:Name="SelectionMark" Grid.Row="0" Width="3" Background="#2563EB" CornerRadius="2"
-                                HorizontalAlignment="Left" Margin="0,2,0,2" IsHitTestVisible="False" Visibility="Collapsed"/>
+                        <Border x:Name="SelectionMark" Grid.Row="0" Width="3" Background="#2563EB" CornerRadius="2,0,0,2"
+                                HorizontalAlignment="Left" VerticalAlignment="Stretch" Margin="0"
+                                SnapsToDevicePixels="True" IsHitTestVisible="False" Visibility="Collapsed"/>
                         <Border x:Name="KeyboardFrame" Grid.Row="0" CornerRadius="6" BorderBrush="#2563EB" BorderThickness="1" IsHitTestVisible="False" Visibility="Collapsed"/>
                         <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" HorizontalAlignment="Stretch"/>
                     </Grid>
@@ -175,6 +180,8 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="HeaderBorder" Property="Background" Value="#E8F0FE"/>
                             <Setter TargetName="SelectionMark" Property="Visibility" Value="Visible"/>
+                            <!-- Only the active header becomes semibold; never its descendants. -->
+                            <Setter TargetName="PART_Header" Property="TextElement.FontWeight" Value="SemiBold"/>
                             <Setter Property="Foreground" Value="#1E40AF"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
@@ -373,7 +380,8 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="#2563EB" x:Name="DocumentIcon"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"
+                           TextWrapping="NoWrap" VerticalAlignment="Center" Margin="6,0,4,0"/>
                 <!-- Python NavDelegate: 10pt body × 0.88 = 8.8pt (11.733 DIP). -->
                 <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" Width="17" Height="17"
                         Padding="0" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -446,7 +454,8 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
                         <DockPanel Margin="{StaticResource LayoutSidebarSectionGap}">
-                            <Button DockPanel.Dock="Right" Style="{StaticResource SidebarIconButton}" ToolTip="Спрятать панель (Ctrl+B)"
+                            <Button x:Name="SidebarCollapseButton" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                    Style="{StaticResource SidebarIconButton}" ToolTip="Спрятать панель (Ctrl+B)"
                                     AutomationProperties.Name="Спрятать панель" Click="ToggleSidebar_Click">
                                 <Viewbox Width="18" Height="18" Stretch="Uniform" IsHitTestVisible="False">
                                     <Canvas Width="24" Height="24">
@@ -471,7 +480,8 @@
                                     <MenuItem x:Name="PtoMenuItem" Header="Исполнительная документация (АОСР / ПТО)" Click="Pto_Click" Visibility="Collapsed"/>
                                 </MenuItem>
                             </Menu>
-                            <Button Style="{StaticResource SidebarHomeButton}" Click="Home_Click" ToolTip="На главную: сводка по договорам и группам">
+                            <Button x:Name="SidebarBrandButton" Style="{StaticResource SidebarHomeButton}" VerticalAlignment="Center"
+                                    Click="Home_Click" ToolTip="На главную: сводка по договорам и группам">
                                 <StackPanel Orientation="Horizontal">
                                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" Margin="0,0,6,0" VerticalAlignment="Center">
                                         <Canvas Width="24" Height="24">
@@ -490,7 +500,8 @@
                             </Grid.ColumnDefinitions>
                             <Button x:Name="NewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewObject_Click" ToolTip="Создать карточку договора (Ctrl+N)"
                                     Style="{StaticResource PrimaryButton}" Padding="5,4" MinHeight="32"/>
-                            <Button Grid.Column="2" Style="{StaticResource PythonToolbarButton}" Padding="5,4"
+                            <Button x:Name="SidebarImportButton" Grid.Column="2" Style="{StaticResource PythonToolbarButton}"
+                                    BorderBrush="#D0D7E2" Padding="5,4"
                                     Content="Из Excel" ContentTemplate="{StaticResource IconLabelUpload}"
                                     IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}"
                                     ToolTip="Загрузить КП из Excel (Ctrl+I)" Click="ImportExcelFromObject_Click"/>
@@ -500,7 +511,7 @@
                                      AutomationProperties.Name="Поиск договора"
                                      ToolTip="Договор, приложение или КП: несколько слов в любом порядке. Esc — очистить; Ctrl+P — поиск по всей базе."
                                      TextChanged="ObjectSearch_TextChanged" KeyDown="ObjectSearch_KeyDown"/>
-                            <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" HorizontalAlignment="Left" Margin="9,0,0,0">
+                            <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" HorizontalAlignment="Left" Margin="9,0,0,0" IsHitTestVisible="False">
                                 <Canvas Width="24" Height="24">
                                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/>
                                 </Canvas>

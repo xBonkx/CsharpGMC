@@ -15,6 +15,7 @@ internal static class VisualAuditChecks
 {
     internal static void RunLayoutChecks()
     {
+        RunNavigationGlyphChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
         var right = new WrapPanel();
@@ -32,6 +33,43 @@ internal static class VisualAuditChecks
         Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
             "Toolbar must restore one row when width returns.");
         Console.WriteLine("Responsive toolbar measured at narrow and wide sizes (no SQL).");
+    }
+
+    private static void RunNavigationGlyphChecks()
+    {
+        var pen = new Pen(Brushes.Black, 1.9)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+            LineJoin = PenLineJoin.Round
+        };
+        // Independent SVG contours must retain their absolute starts. Bounds
+        // alone cannot catch a disconnected, but still in-viewBox, lower layer.
+        var fixtures = new (string Key, Point[] Starts)[]
+        {
+            ("GlyphLayers", new[] { new Point(12, 3), new Point(3, 13) }),
+            ("GlyphStage", new[] { new Point(6, 4), new Point(15, 11) }),
+            ("GlyphChevronLeft", new[] { new Point(11, 6), new Point(19, 6) }),
+            ("GlyphMenu", new[] { new Point(4, 6), new Point(4, 12), new Point(4, 18) }),
+            ("GlyphHistory", new[] { new Point(3, 12), new Point(3, 3), new Point(12, 7) }),
+            ("GlyphFolder", new[] { new Point(3, 7) }),
+            ("GlyphFile", new[] { new Point(14, 3), new Point(14, 3), new Point(9, 13), new Point(9, 17) }),
+            ("GlyphSearch", new[] { new Point(18, 11), new Point(20, 20) }),
+        };
+        foreach (var (key, starts) in fixtures)
+        {
+            var geometry = (PathGeometry)Application.Current.FindResource(key);
+            Require(geometry.Figures.Select(f => f.StartPoint).SequenceEqual(starts),
+                key + ": independent contours shifted or missing.");
+            var bounds = geometry.GetRenderBounds(pen);
+            Require(!bounds.IsEmpty && bounds.Left >= -0.01 && bounds.Top >= -0.01 &&
+                bounds.Right <= 24.01 && bounds.Bottom <= 24.01,
+                key + ": painted geometry outside the 24x24 SVG viewBox: " + bounds);
+            if (key == "GlyphMenu")
+                Require(Math.Abs(bounds.Width - 17.9) < 0.1 && Math.Abs(bounds.Height - 13.9) < 0.1,
+                    "Hamburger painted bounds differ from the original three lines.");
+        }
+        Console.WriteLine("Navigation glyph contour starts and stroked bounds checked (no SQL).");
     }
 
     internal static void Export(string directory)
