@@ -413,6 +413,7 @@ public partial class ContractActsWorkspace : UserControl
                 ElementStyle = (Style)FindResource("CompactCostCenter"),
                 HeaderStyle = (Style)FindResource("KsQuantityHeader"),
             };
+            TableColumnMenu.SetStableId(column, "act-" + act.Id.ToString(CultureInfo.InvariantCulture));
             TableColumnMenu.SetFitDisplayPath(column, nameof(KsSummaryVm.PerAct));
             SummaryGrid.Columns.Add(column);
         }
@@ -421,6 +422,7 @@ public partial class ContractActsWorkspace : UserControl
         AddTextColumn("Остаток, ₽", nameof(KsSummaryVm.LeftSum), 110, right: true);
         AddTextColumn("Выдано на объект", nameof(KsSummaryVm.Issued), 110);
         _summaryColumnKeys = keys;
+        TableColumnMenu.RefreshDynamic(SummaryGrid, "contract-acts-summary", ownHeaderMenu: true);
     }
 
     private void AddTextColumn(string header, string property, double width, bool right = false)

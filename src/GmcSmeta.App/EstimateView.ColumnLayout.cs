@@ -19,6 +19,7 @@ public partial class EstimateView
     private (FontFamily Family, double Size, FontStyle Style, FontStretch Stretch, double Dpi, double Pixels) _estimateMeasuredFont;
     private (DataGridColumn Column, string Header)[] _estimateMeasuredColumns = [];
     private Dictionary<DataGridColumn, double>? _estimateMeasuredMinimums;
+    private long _estimateMeasuredStageVersion;
 
     private void InitializeEstimateColumnLayout()
     {
@@ -119,9 +120,10 @@ public partial class EstimateView
         if (_estimateMeasuredMinimums is null ||
             !IsMeasuredIdentity(_estimateMeasuredSource, EstimateGrid.ItemsSource) ||
             !IsMeasuredIdentity(_estimateMeasuredRows, _rows) ||
-            !_estimateMeasuredFont.Equals(EstimateMeasurementFont())) return false;
+            !_estimateMeasuredFont.Equals(EstimateMeasurementFont()) ||
+            _estimateMeasuredStageVersion != _inlineStagesVersion) return false;
         int index = 0;
-        foreach (var column in _defaultEstimateColumns)
+        foreach (var column in _defaultEstimateColumns.Concat(_inlineStageColumns))
         {
             if (column.Visibility != Visibility.Visible) continue;
             if (index >= _estimateMeasuredColumns.Length ||
@@ -135,17 +137,23 @@ public partial class EstimateView
     private IReadOnlyDictionary<DataGridColumn, double> EstimateMeasuredMinimums()
     {
         if (EstimateMeasurementsCurrent()) return _estimateMeasuredMinimums!;
-        var visible = _defaultEstimateColumns.Where(c => c.Visibility == Visibility.Visible).ToArray();
+        var visible = _defaultEstimateColumns.Concat(_inlineStageColumns)
+            .Where(c => c.Visibility == Visibility.Visible).ToArray();
         var measure = new GridDisplayWidthMeasure(EstimateGrid);
         var widths = visible.ToDictionary(c => c, c => measure.Header(c.Header?.ToString() ?? ""));
         // Name/notes and normative references can be arbitrary prose. Keep
         // their existing wrap/ellipsis and flex policy, not full-text widths.
         var numeric = visible.Where(c => c.SortMemberPath is "number" or "unit" or "qty" or
             "price" or "sum" or "purchase" or "work" or "workTotal" or "areaUnit" or "areaTotal").ToArray();
+        var stageColumns = _inlineStageColumns.Select((column, index) => (column, index))
+            .Where(x => x.column.Visibility == Visibility.Visible).ToArray();
         if (EstimateGrid.ItemsSource is IEnumerable<EditableEstimateRow> rows)
         {
             foreach (var row in rows)
             {
+                foreach (var (column, index) in stageColumns)
+                    if (index < row.StageDisplay.Count)
+                        widths[column] = Math.Max(widths[column], measure.Cell(row.StageDisplay[index]));
                 foreach (var column in numeric)
                 {
                     string value;
@@ -175,6 +183,7 @@ public partial class EstimateView
         _estimateMeasuredSource = EstimateGrid.ItemsSource is { } source ? new WeakReference<object>(source) : null;
         _estimateMeasuredRows = new WeakReference<object>(_rows);
         _estimateMeasuredFont = EstimateMeasurementFont();
+        _estimateMeasuredStageVersion = _inlineStagesVersion;
         _estimateMeasuredColumns = visible.Select(c => (c, c.Header?.ToString() ?? "")).ToArray();
         return _estimateMeasuredMinimums = widths;
     }
@@ -191,14 +200,23 @@ public partial class EstimateView
         var visible = _defaultEstimateColumns.Where(c => c.Visibility == Visibility.Visible).ToList();
         if (visible.Count == 0) return;
 
-        var available = viewport - 2 - _inlineStageColumns
-            .Where(c => c.Visibility == Visibility.Visible).Sum(c => c.ActualWidth);
         var widths = _uiSettings.ColumnWidths;
         var manual = widths.Count > 0;
         // Never change a live editor's geometry. The normal readback and the
         // next layout pass will request a fit after it has closed.
         if (HasActiveEstimateEdit()) return;
         var measured = manual ? null : EstimateMeasuredMinimums();
+        if (!manual)
+            foreach (var column in _inlineStageColumns.Where(c => c.Visibility == Visibility.Visible &&
+                !_inlineStageManualWidths.Contains(c)))
+            {
+                var width = Math.Clamp(Math.Max(_inlineStageDefaultWidths[column], measured![column]),
+                    column.MinWidth, Math.Max(column.MinWidth, column.MaxWidth));
+                if (!column.Width.IsAbsolute || Math.Abs(column.Width.Value - width) > .1)
+                    column.Width = new DataGridLength(width);
+            }
+        var available = viewport - 2 - _inlineStageColumns.Where(c => c.Visibility == Visibility.Visible)
+            .Sum(c => c.Width.IsAbsolute ? c.Width.Value : c.ActualWidth);
         var inputs = visible.Select(column =>
         {
             var key = ColumnPreferenceKey(column);
@@ -253,7 +271,7 @@ public partial class EstimateView
         VisualAncestor<DataGridColumnHeader>(hit) is not null;
 
     private Dictionary<DataGridColumn, double> SnapshotEstimateWidths() =>
-        _defaultEstimateColumns.Where(c => c.Visibility == Visibility.Visible)
+        _defaultEstimateColumns.Concat(_inlineStageColumns).Where(c => c.Visibility == Visibility.Visible)
             .ToDictionary(c => c, c => c.ActualWidth);
 
     private void EstimateHeaderDragStarted(object sender, DragStartedEventArgs e)
@@ -290,13 +308,17 @@ public partial class EstimateView
                 if (before is not null && EstimateGrid.IsLoaded)
                 {
                     var current = SnapshotEstimateWidths();
-                    if (current.Any(pair => before.TryGetValue(pair.Key, out var previous) &&
-                        double.IsFinite(pair.Value) && Math.Abs(pair.Value - previous) > 0.5))
+                    bool Changed(KeyValuePair<DataGridColumn, double> pair) =>
+                        before.TryGetValue(pair.Key, out var previous) && double.IsFinite(pair.Value) &&
+                        Math.Abs(pair.Value - previous) > 0.5;
+                    foreach (var pair in current.Where(pair => _inlineStageColumns.Contains(pair.Key) && Changed(pair)))
+                        _inlineStageManualWidths.Add(pair.Key);
+                    if (current.Any(pair => _defaultEstimateWidths.ContainsKey(pair.Key) && Changed(pair)))
                     {
                         // Freeze the visible layout, not just the dragged column:
                         // the next fit must not redistribute space to its neighbours.
                         foreach (var (column, actual) in current)
-                            if (double.IsFinite(actual) && actual >= 36)
+                            if (_defaultEstimateWidths.ContainsKey(column) && double.IsFinite(actual) && actual >= 36)
                                 _uiSettings.ColumnWidths[ColumnPreferenceKey(column)] = Math.Clamp(actual, 36, 1600);
                         SaveEstimateUiSettings();
                     }

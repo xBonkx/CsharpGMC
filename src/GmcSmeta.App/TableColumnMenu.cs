@@ -270,6 +270,7 @@ public static class TableColumnMenu
                 }
                 finally { _applying = false; }
             }
+            var retained = key == newKey ? _entries.Where(e => grid.Columns.Contains(e.Column)).ToArray() : [];
             _initialized = false;
             _resizeStart = null;
             if (_summaryFit is not null) _summaryFit.Suspended = false;
@@ -277,7 +278,7 @@ public static class TableColumnMenu
             if (_documentFit is not null) _documentFit.Suspended = false;
             _entries = Array.Empty<Entry>();
             key = newKey;
-            Initialize();
+            Initialize(retained);
         }
         private bool _initialized, _applying;
         private Preferences _prefs = new();
@@ -327,7 +328,7 @@ public static class TableColumnMenu
             value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToHashSet(StringComparer.Ordinal);
 
-        internal void Initialize()
+        internal void Initialize(Entry[]? retained = null)
         {
             if (_initialized || grid.Columns.Count == 0) return;
             var exclude = Names(GetExclude(grid));
@@ -343,13 +344,14 @@ public static class TableColumnMenu
             }
             _entries = columns.Select((column, index) =>
             {
+                var prior = retained?.FirstOrDefault(e => e.Column == column);
                 var title = Title(column);
                 var identity = Identity(column);
                 var id = identity + "#" + columns.Take(index).Count(c => Identity(c) == identity);
                 var excluded = exclude.Contains(title) ||
                     (column.Visibility != Visibility.Visible && !GetDefaultHidden(column) && !protect.Contains(title));
-                return new Entry(column, id, title, column.Width, index,
-                    index == 0 || protect.Contains(title), excluded,
+                return new Entry(column, id, title, prior?.Width ?? column.Width, index,
+                    index == 0 || protect.Contains(title), prior?.Excluded ?? excluded,
                     index == 0 || index < grid.FrozenColumnCount || excluded || !column.CanUserReorder);
             }).ToArray();
             _initialized = true;

@@ -135,11 +135,11 @@
                           ScrollViewer.VerticalScrollBarVisibility="Auto"
                           EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="56" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Num" Header="№" Binding="{Binding Num}" Width="56" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
                         <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                        <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48"
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="48"
                                             ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                        <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="84"
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Qty" Header="По смете" Binding="{Binding Qty}" Width="84"
                                             ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                     </DataGrid.Columns>
                 </DataGrid>
@@ -177,15 +177,15 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Система" Binding="{Binding System}" Width="160" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                             <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                            <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="50"
                                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                             <DataGridTextColumn Header="Подписано" Binding="{Binding SignedQty}" Width="90"
                                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                             <DataGridTextColumn Header="Черновики" Binding="{Binding DraftQty}" Width="90"
                                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                            <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="110"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Price" Header="Цена" Binding="{Binding Price}" Width="110"
                                                 ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="Сумма" Binding="{Binding Amount}" Width="120"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Amount" Header="Сумма" Binding="{Binding Amount}" Width="120"
                                                 ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn Header="Акт / статус" Binding="{Binding ActStatus}" Width="190"
                                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>

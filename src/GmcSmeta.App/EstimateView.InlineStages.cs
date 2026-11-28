@@ -39,6 +39,8 @@ public partial class EstimateView
     // (zero denotes the computed remainder, not a document).
     private readonly HashSet<long> _hiddenInlineStageIds = new();
     private readonly Dictionary<DataGridColumn, long> _inlineStageIds = new();
+    private readonly Dictionary<DataGridColumn, double> _inlineStageDefaultWidths = new();
+    private readonly HashSet<DataGridColumn> _inlineStageManualWidths = new();
 
     private bool SetInlineStageColumnVisibility(DataGridColumn column, bool visible)
     {
@@ -116,6 +118,9 @@ public partial class EstimateView
             EstimateGrid.Columns.Remove(column);
         _inlineStageColumns.Clear();
         _inlineStageIds.Clear();
+        _inlineStageDefaultWidths.Clear();
+        _inlineStageManualWidths.Clear();
+        _estimateMeasuredMinimums = null;
         _hiddenInlineStageIds.Clear();
         _inlineStageColumnKeys = Array.Empty<StageColumnKey>();
         _blankStageLabels = Array.Empty<string>();
@@ -264,6 +269,9 @@ public partial class EstimateView
         foreach (var col in _inlineStageColumns) EstimateGrid.Columns.Remove(col);
         _inlineStageColumns.Clear();
         _inlineStageIds.Clear();
+        _inlineStageDefaultWidths.Clear();
+        _inlineStageManualWidths.Clear();
+        _estimateMeasuredMinimums = null;
         _hiddenInlineStageIds.RemoveWhere(id => id != 0 && !keys.Any(key => key.Id == id));
         _inlineStageColumnKeys = keys;
         for (var i = 0; i <= data.Stages.Count; i++)
@@ -324,6 +332,7 @@ public partial class EstimateView
             };
             _inlineStageColumns.Add(column);
             _inlineStageIds.Add(column, id);
+            _inlineStageDefaultWidths[column] = column.Width.Value;
             if (_hiddenInlineStageIds.Contains(id))
                 column.Visibility = Visibility.Collapsed;
             EstimateGrid.Columns.Add(column);
