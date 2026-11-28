@@ -7,10 +7,11 @@ namespace GmcSmeta.App;
 /// <summary>Qt procurement dialog metrics, shared by code-created WPF windows.</summary>
 internal static class ProcurementDialogChrome
 {
-    public static Thickness Outer => new(22, 18, 22, 18);
-    public static Thickness RequestOuter => new(22, 18, 22, 16);
-    public static Thickness SectionGap => new(0, 0, 0, 10);
-    public static Thickness FooterGap => new(0, 10, 0, 0);
+    private static Thickness Metric(string key) => (Thickness)Application.Current.FindResource(key);
+    public static Thickness Outer => Metric("LayoutFormDialogMargin");
+    public static Thickness RequestOuter => Metric("LayoutDialogMargin");
+    public static Thickness SectionGap => Metric("LayoutFormGroupSeparatorGap");
+    public static Thickness FooterGap => Metric("LayoutFormFooterGap");
     public static void Apply(Window window)
     {
         window.SetResourceReference(Control.FontFamilyProperty, "UiFontFamily");
@@ -26,8 +27,7 @@ internal static class ProcurementDialogChrome
     }
     public static TextBlock Heading(string text)
     {
-        var label = new TextBlock { Text = text, FontWeight = FontWeights.SemiBold,
-            TextWrapping = TextWrapping.Wrap };
+        var label = new TextBlock { Text = text };
         label.SetResourceReference(FrameworkElement.StyleProperty, "UiHeadingText");
         label.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
         return label;
@@ -65,7 +65,8 @@ internal static class ProcurementDialogChrome
     {
         primary.SetResourceReference(FrameworkElement.StyleProperty, primaryStyle);
         cancel.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
-        primary.MinHeight = cancel.MinHeight = 30;
+        primary.SetResourceReference(FrameworkElement.MinHeightProperty, "LayoutFieldMinHeight");
+        cancel.SetResourceReference(FrameworkElement.MinHeightProperty, "LayoutFieldMinHeight");
         primary.IsDefault = true;
         cancel.IsCancel = true;
     }
