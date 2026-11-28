@@ -220,11 +220,11 @@ internal sealed class ExcelAppendPreviewDialog : Window
                 Margin = new Thickness(20, 0, 0, 5)
             });
             foreach (var s in b.Sections.Take(12))
-                body.Children.Add(new TextBlock { Text = $"{s.Name}: {s.Positions.Sum(p => 1 + p.Children.Count)} поз.",
-                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 0, 0, 1) });
+                body.Children.Add(DynamicFormLayout.Secondary(
+                    $"{s.Name}: {s.Positions.Sum(p => 1 + p.Children.Count)} поз.", "LayoutDialogDetailInset"));
             if (b.Sections.Count > 12)
-                body.Children.Add(new TextBlock { Text = $"… ещё {b.Sections.Count - 12} разделов.",
-                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 0, 0, 1) });
+                body.Children.Add(DynamicFormLayout.Secondary(
+                    $"… ещё {b.Sections.Count - 12} разделов.", "LayoutDialogDetailInset"));
             foreach (var warning in b.Warnings.Take(6))
                 body.Children.Add(new TextBlock { Text = "⚠ " + warning,
                     TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20, 3, 0, 0),
