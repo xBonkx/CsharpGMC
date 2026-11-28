@@ -54,8 +54,9 @@ public sealed partial class SqlServerMetalWarehouse
         using (var rev = new SqlCommand(
             "SELECT [value] FROM dbo.meta WHERE [key]=N'rev'", conn, tx))
         {
-            revision = Convert.ToString(rev.ExecuteScalar(), CultureInfo.InvariantCulture)
-                ?? throw new InvalidOperationException("Нет meta.rev.");
+            revision = Convert.ToString(rev.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "";
+            if (string.IsNullOrWhiteSpace(revision))
+                throw new InvalidOperationException("Нет meta.rev.");
         }
         bool initialized;
         using (var cmd = new SqlCommand(
@@ -190,9 +191,10 @@ ORDER BY l.created_utc DESC,l.id DESC
         ReadJournalCore(page, pageSize, search, category, lookAhead: false, beforeId: null);
 
     public (IReadOnlyList<MetalMovement> Rows, bool HasNext) ReadJournalPage(
-        int page, int pageSize, string search = "", string category = "")
+        int page, int pageSize, string search = "", string category = "", CancellationToken cancellationToken = default)
     {
-        var rows = ReadJournalCore(page, pageSize, search, category, lookAhead: true, beforeId: null);
+        var rows = ReadJournalCore(page, pageSize, search, category, lookAhead: true, beforeId: null,
+            cancellationToken: cancellationToken);
         return (rows.Take(pageSize).ToArray(), rows.Count > pageSize);
     }
 
@@ -201,11 +203,13 @@ ORDER BY l.created_utc DESC,l.id DESC
         ReadJournalCore(0, pageSize, "", "", lookAhead: false, beforeId: beforeId);
 
     private IReadOnlyList<MetalMovement> ReadJournalCore(int page, int pageSize,
-        string search, string category, bool lookAhead, long? beforeId)
+        string search, string category, bool lookAhead, long? beforeId, CancellationToken cancellationToken = default)
     {
         if (page < 0 || pageSize is < 1 or > 1000)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
+        cancellationToken.ThrowIfCancellationRequested();
         using var conn = Open();
+        cancellationToken.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand("""
 SELECT e.id,e.material_id,m.category,m.material,e.kind,e.area_milli,e.pieces,
        e.reservation_milli,e.source_place,e.target_place,e.object_id,e.object_name,
@@ -225,14 +229,19 @@ ORDER BY e.id DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
             "%" + search.Trim()[..Math.Min(100, search.Trim().Length)].Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]") + "%";
         cmd.Parameters.Add("@offset", SqlDbType.Int).Value = checked(page * pageSize);
         cmd.Parameters.Add("@size", SqlDbType.Int).Value = pageSize + (lookAhead ? 1 : 0);
-        using var r = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, cancellationToken);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, cancellationToken);
         var result = new List<MetalMovement>();
         while (r.Read())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             result.Add(new MetalMovement(SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2), r.GetString(3),
                 r.GetString(4), SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6), SqlInteger.ReadInt64(r, 7), r.GetString(8),
                 r.GetString(9), r.IsDBNull(10) ? null : SqlInteger.ReadInt64(r, 10), r.GetString(11),
                 r.GetString(12), r.GetString(13), r.IsDBNull(14) ? null : SqlInteger.ReadInt64(r, 14),
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
         return result;
     }
 }

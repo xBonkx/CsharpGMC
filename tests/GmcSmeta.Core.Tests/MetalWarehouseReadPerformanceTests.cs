@@ -49,6 +49,30 @@ public sealed class MetalWarehouseReadPerformanceTests
     }
 
     [Fact]
+    public void HiddenOrClosedJournalCancelsItsReadAndFencesPublication()
+    {
+        var code = Source("GmcSmeta.App/MetalWarehouseWindow.xaml.cs");
+        Assert.Contains("_journalRead?.Cancel();", code);
+        Assert.Contains("if (_journalLoading) InvalidateJournal();", code);
+        Assert.Contains("_closed = true;", code);
+        Assert.Contains("cancellationToken: token), token", code);
+        Assert.Contains("token.IsCancellationRequested", code);
+        Assert.Contains("!ReferenceEquals(snapshot, _snapshot)", code);
+        Assert.Contains("if (!_closed && version != _journalVersion", code);
+        var sql = Source("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Reads.cs");
+        Assert.Contains("SqlReadCancellation.Register(cmd, cancellationToken)", sql);
+        Assert.Contains("SqlReadCancellation.ExecuteReader(cmd, cancellationToken)", sql);
+        Assert.Contains("cancellationToken.ThrowIfCancellationRequested();", sql);
+    }
+
+    [Fact]
+    public void EmptyRevisionCannotPublishWritableWarehouseSnapshot()
+    {
+        var sql = Source("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Reads.cs");
+        Assert.Contains("if (string.IsNullOrWhiteSpace(revision))", sql);
+    }
+
+    [Fact]
     public void ReportUsesKeysetAndChecksRevisionAfterStaging()
     {
         var code = Source("GmcSmeta.App/MetalWarehouseReport.cs");

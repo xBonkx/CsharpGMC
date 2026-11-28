@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.05 PARTIAL: cancellation/fence for warehouse journal, reject empty snapshot revision; 11 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — PERF-047.03 CODE READY: приказы — согласованный снимок и файловые операции на worker; письма — отмена SQL connect и точный double-click. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
 - 29.11.2026 — приёмка BUG-F29/F30/F51: 3 новых регрессионных сценария, не запускались. BUG-F11/F12 оставлены zcode-sess-bugf125; параллельный агент устранил merge-конфликты, повторно проверены уникальные ID. [Отчёт](docs/ACCEPTANCE_PROCUREMENT_SHIPMENT_20261129.md).
 

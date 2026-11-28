@@ -36,6 +36,8 @@ public partial class MetalWarehouseWindow : Window
     private bool _busy;
     private int _reloadVersion;
     private int _journalVersion;
+    private CancellationTokenSource? _journalRead;
+    private bool _closed;
     private bool _journalLoading, _journalDirty = true, _journalHasNext, _publishingStock;
     private string _journalSearch = "";
     private int _publishedJournalPage;
@@ -61,6 +63,11 @@ public partial class MetalWarehouseWindow : Window
         InitializeComponent();
         Loaded += async (_, _) => await Reload();
         Tabs.SelectionChanged += Tabs_SelectionChanged;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            InvalidateJournal();
+        };
         UpdateJournalControls();
         Closing += (_, args) =>
         {
@@ -77,7 +84,7 @@ public partial class MetalWarehouseWindow : Window
         if (_busy) return;
         _busy = true;
         var version = ++_reloadVersion;
-        ++_journalVersion;
+        InvalidateJournal();
         _snapshot = null; // An unsuccessful read must not leave a writable stale dashboard.
         _stockSearch = null;
         _placesByMaterial = null;
@@ -186,10 +193,22 @@ public partial class MetalWarehouseWindow : Window
 
     private bool JournalVisible => ReferenceEquals(Tabs.SelectedItem, JournalTab);
 
+    private void InvalidateJournal()
+    {
+        ++_journalVersion;
+        _journalDirty = true;
+        _journalRead?.Cancel();
+    }
+
     private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!ReferenceEquals(e.Source, Tabs) || !JournalVisible || !_journalDirty) return;
-        _ = LoadJournal();
+        if (!ReferenceEquals(e.Source, Tabs) || _closed) return;
+        if (!JournalVisible)
+        {
+            if (_journalLoading) InvalidateJournal();
+            return;
+        }
+        if (_journalDirty) _ = LoadJournal();
     }
 
     private void UpdateJournalControls()
@@ -202,7 +221,7 @@ public partial class MetalWarehouseWindow : Window
 
     private async Task LoadJournal()
     {
-        if (!IsLoaded || !JournalVisible || _busy || _journalLoading || !_journalDirty ||
+        if (_closed || !IsLoaded || !JournalVisible || _busy || _journalLoading || !_journalDirty ||
             _snapshot is null || _store is not { } store) return;
         _journalLoading = true;
         _journalDirty = false;
@@ -210,11 +229,16 @@ public partial class MetalWarehouseWindow : Window
         var page = _page;
         var search = _journalSearch;
         var version = ++_journalVersion;
+        var snapshot = _snapshot;
+        using var request = new CancellationTokenSource();
+        _journalRead = request;
+        var token = request.Token;
         JournalPage.Text = "Загрузка журнала…";
         try
         {
-            var rows = await Task.Run(() => store.ReadJournalPage(page, JournalSize, search));
-            if (!IsLoaded || version != _journalVersion) return;
+            var rows = await Task.Run(() => store.ReadJournalPage(page, JournalSize, search, cancellationToken: token), token);
+            if (_closed || !IsLoaded || !JournalVisible || token.IsCancellationRequested ||
+                version != _journalVersion || !ReferenceEquals(snapshot, _snapshot)) return;
             JournalGrid.ItemsSource = rows.Rows;
             _publishedJournalPage = page;
             _journalHasNext = rows.HasNext;
@@ -222,7 +246,8 @@ public partial class MetalWarehouseWindow : Window
         }
         catch (Exception ex)
         {
-            if (!IsLoaded || version != _journalVersion) return;
+            if (_closed || !IsLoaded || !JournalVisible || token.IsCancellationRequested ||
+                version != _journalVersion || !ReferenceEquals(snapshot, _snapshot)) return;
             JournalGrid.ItemsSource = null;
             _journalHasNext = false;
             _journalDirty = true;
@@ -230,11 +255,12 @@ public partial class MetalWarehouseWindow : Window
         }
         finally
         {
+            if (ReferenceEquals(_journalRead, request)) _journalRead = null;
             _journalLoading = false;
-            UpdateJournalControls();
+            if (!_closed) UpdateJournalControls();
             // A reload invalidated this page while its query was running.
             // Start the replacement only when the new snapshot is ready.
-            if (version != _journalVersion && _journalDirty && JournalVisible)
+            if (!_closed && version != _journalVersion && _journalDirty && JournalVisible)
                 _ = LoadJournal();
         }
     }
@@ -247,6 +273,7 @@ public partial class MetalWarehouseWindow : Window
             return;
         }
         _busy = true;
+        InvalidateJournal();
         UpdateJournalControls();
         StatusText.Text = "Складская запись…";
         try
