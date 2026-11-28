@@ -643,7 +643,24 @@ public static partial class SqlServerWorkspace
             if (children.ExecuteScalar() is not null)
                 throw new InvalidOperationException("У документа есть дочерние документы. Сначала проверь связи.");
         }
-        if (linkChanged)
+        var legalEnabled = SqlServerAgreements.Enabled(conn, tx);
+        var previousLegal = legalEnabled ? SqlServerAgreements.DocumentAgreementId(conn, id, tx) : null;
+        var requestedLegal = legalEnabled
+            ? AgreementEditPolicy.ResolveRequested(value.Kind, old.Kind, previousLegal, value.AgreementId,
+                linkChanged, value.BaseContractId is long legalBase
+                    ? SqlServerAgreements.DocumentAgreementId(conn, legalBase, tx) : null)
+            : null;
+        var legalChanged = legalEnabled && previousLegal != requestedLegal;
+        if (legalChanged && previousLegal.HasValue)
+        {
+            using var children = new SqlCommand(
+                "SELECT TOP(1) id FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) " +
+                "WHERE base_contract_id=@id OR stage_of=@id", conn, tx);
+            children.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            if (children.ExecuteScalar() is not null)
+                throw new InvalidOperationException("У документа есть дочерние документы. Перепривязка юридического договора запрещена.");
+        }
+        if (linkChanged || legalChanged)
         {
             using var signed = new SqlCommand(
                 "SELECT TOP(1) id FROM dbo.acts WITH (UPDLOCK,HOLDLOCK) WHERE contract_id=@id AND signed=1", conn, tx);
@@ -680,19 +697,19 @@ public static partial class SqlServerWorkspace
         Compare("note", old.Note, value.Note);
         Compare("form", old.Form, value.Form);
 
-        if (SqlServerAgreements.Enabled(conn,tx))
+        if (legalEnabled)
         {
-            if(value.AgreementId is long chosen)
-            {
-                if(SqlServerAgreements.Read(conn,old.ObjectId,tx).All(a=>a.Id!=chosen))throw new ArgumentException("Выбранный договор относится к другому объекту.");
-                Compare("agreement_id",SqlServerAgreements.DocumentAgreementId(conn,id,tx),chosen);
-            }
-            else if(value.Kind=="kp") Compare("agreement_id",SqlServerAgreements.DocumentAgreementId(conn,id,tx),null);
-            if(value.AnnexNumber is not null)
+            if (requestedLegal is long chosen &&
+                SqlServerAgreements.Read(conn, old.ObjectId, tx).All(a => a.Id != chosen))
+                throw new ArgumentException("Выбранный договор относится к другому объекту или архивирован.");
+            Compare("agreement_id", previousLegal, requestedLegal);
+            if (value.AnnexNumber is not null && value.Kind == "main")
             {
                 if(value.AnnexNumber.Length>200)throw new ArgumentException("Номер приложения превышает 200 символов.");
                 Compare("annex_number",SqlServerAgreements.AnnexNumber(conn,id,tx),value.AnnexNumber.Trim());
             }
+            else if (old.Kind == "main" && value.Kind != "main")
+                Compare("annex_number", SqlServerAgreements.AnnexNumber(conn,id,tx), "");
         }
         if (changes.Count == 0) return false;
 
@@ -707,7 +724,8 @@ public static partial class SqlServerWorkspace
             else update.Parameters.AddWithValue($"@{field}", after);
         }
         if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Документ был удалён.");
-        SqlServerAgreements.AttachNewDocument(conn, tx, id, linkChanged ? null : SqlServerAgreements.DocumentAgreementId(conn,id,tx));
+        if (legalEnabled && (linkChanged || legalChanged))
+            SqlServerAgreements.AttachNewDocument(conn, tx, id, requestedLegal);
         Log(conn, tx, "contract", id, "update", string.Join("; ", details), id, old.ObjectId);
         BumpRevision(conn, tx);
         tx.Commit();

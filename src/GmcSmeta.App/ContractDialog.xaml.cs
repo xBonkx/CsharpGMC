@@ -43,6 +43,7 @@ public partial class ContractDialog : Window
     private readonly bool _isNew;
     private readonly AgreementPresentation.Requisites? _agreement;
     private readonly Dictionary<long, decimal> _vatByCompany = new();
+    private IReadOnlyDictionary<long, long?>? _baseCompanies;
 
     public ContractDialogResult? Result { get; private set; }
     public bool ImportExcelRequested { get; private set; }
@@ -95,16 +96,11 @@ public partial class ContractDialog : Window
         FillTags(tags, "");
         FillBase(contracts.Where(x => (x.Kind is "main" or "kp") && (baseCompanies is null || baseCompanies.ContainsKey(x.Id)))
             .Select(x => (x.Id, x.Title)), baseId);
+        _baseCompanies = baseCompanies;
         if (baseCompanies is not null)
         {
             BaseCombo.ToolTip = "При выборе основания нового ДС подставляется его организация; проверьте реквизиты перед созданием.";
-            BaseCombo.SelectionChanged += (_, _) =>
-            {
-                if (SelectedKind() != "dop" || SelectedId(BaseCombo) is not long id ||
-                    !baseCompanies.TryGetValue(id, out var companyId)) return;
-                if (CompanyCombo.ItemsSource is IEnumerable<IdItem> items)
-                    CompanyCombo.SelectedItem = items.FirstOrDefault(c => c.Id == companyId) ?? items.First();
-            };
+            BaseCombo.SelectionChanged += (_, _) => ApplySelectedBaseCompany();
         }
 
         SourceCombo.ItemsSource = contracts.Select(c => new IdItem(c.Id, c.Title)).ToList();
@@ -125,6 +121,7 @@ public partial class ContractDialog : Window
 
         ApplyCompanyVat();
         SyncKind();
+        ApplySelectedBaseCompany();
         if (SelectedKind() == "main" && copyFromId is null) ApplyAgreementDefaults();
     }
 
@@ -166,7 +163,20 @@ public partial class ContractDialog : Window
         BaseCombo.SelectedItem = items.FirstOrDefault(x => x.Id == current) ?? items[0];
     }
 
-    private void Kind_SelectionChanged(object sender, SelectionChangedEventArgs e) => SyncKind();
+    private void Kind_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SyncKind();
+        ApplySelectedBaseCompany();
+    }
+
+    private void ApplySelectedBaseCompany()
+    {
+        if (SelectedKind() != "dop" || BaseCombo is null || CompanyCombo is null ||
+            _baseCompanies is null || SelectedId(BaseCombo) is not long id ||
+            !_baseCompanies.TryGetValue(id, out var companyId)) return;
+        if (CompanyCombo.ItemsSource is IEnumerable<IdItem> items)
+            CompanyCombo.SelectedItem = items.FirstOrDefault(c => c.Id == companyId) ?? items.First();
+    }
 
     private void SyncKind()
     {
@@ -250,7 +260,7 @@ public partial class ContractDialog : Window
         Result = new ContractDialogResult(kind, _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } original ? original.Number : NumberBox.Text.Trim(),
             _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } originalDate ? originalDate.Date : date, NameBox.Text.Trim(),
             _preserveLegacyLegalMetadata && kind=="main" && _legacyLegalMetadata is { } originalCompany ? originalCompany.Company : SelectedId(CompanyCombo), kind == "dop" ? SelectedId(BaseCombo) : null,
-            VatValue(), NoteBox.Text, (TagCombo.SelectedItem as TagItem)?.Key ?? "", copyFrom) { AgreementId = LegalAgreementCombo.SelectedValue is long agreementId ? agreementId : null, AnnexNumber = LegalAnnexNumberBox.Text.Trim() };
+            VatValue(), NoteBox.Text, (TagCombo.SelectedItem as TagItem)?.Key ?? "", copyFrom) { AgreementId = kind == "main" && LegalAgreementCombo.SelectedValue is long agreementId ? agreementId : null, AnnexNumber = kind == "main" ? LegalAnnexNumberBox.Text.Trim() : "" };
         DialogResult = true;
     }
 

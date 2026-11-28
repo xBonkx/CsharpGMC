@@ -7,6 +7,8 @@ public partial class ContractDialog
 {
     private bool _preserveLegacyLegalMetadata;
     private (string Number,string Date,long? Company)? _legacyLegalMetadata;
+    private (string Number,string Date,long? Company,string Vat)? _independentMetadata;
+    private bool _legalFieldsApplied;
     internal void ConfigureAgreements(IReadOnlyList<SqlServerAgreements.Values> cards,long? selectedId=null,string annexNumber="")
     {
         if (cards.Count == 0) return;
@@ -18,6 +20,9 @@ public partial class ContractDialog
         void Apply()
         {
             if (SelectedKind() != "main" || LegalAgreementCombo.SelectedItem is not SqlServerAgreements.Values selected) return;
+            if (!_legalFieldsApplied)
+                _independentMetadata = (NumberBox.Text, DateBox.Text, SelectedId(CompanyCombo), VatBox.Text);
+            _legalFieldsApplied = true;
             NumberBox.Text = selected.Number;
             DateBox.Text = selected.Date;
             CompanyCombo.SelectedValue = selected.CompanyId;
@@ -28,7 +33,24 @@ public partial class ContractDialog
         KindCombo.SelectionChanged += (_, _) =>
         {
             LegalAgreementPanel.Visibility = SelectedKind() == "main" ? Visibility.Visible : Visibility.Collapsed;
-            if(SelectedKind()!="main") { NumberBox.IsReadOnly=DateBox.IsReadOnly=false;CompanyCombo.IsEnabled=true; }
+            if (SelectedKind() != "main")
+            {
+                NumberBox.IsReadOnly = DateBox.IsReadOnly = false;
+                CompanyCombo.IsEnabled = true;
+                if (_legalFieldsApplied && _independentMetadata is { } previous)
+                {
+                    NumberBox.Text = previous.Number;
+                    DateBox.Text = previous.Date;
+                    // DS must keep the organization of its selected base.
+                    if (SelectedKind() == "dop") ApplySelectedBaseCompany();
+                    else
+                    {
+                        CompanyCombo.SelectedValue = previous.Company;
+                        VatBox.Text = previous.Vat;
+                    }
+                }
+                _legalFieldsApplied = false;
+            }
             else Apply();
         };
         LegalAgreementPanel.Visibility = SelectedKind() == "main" ? Visibility.Visible : Visibility.Collapsed;
