@@ -97,13 +97,17 @@ def snapshot(root, revision, languages):
 
 def validate_review(review, rows):
     """Check identity and traceability only; do not certify behavioral parity."""
+    if not isinstance(review, list):
+        raise ValueError("Review must be a JSON array")
     index = {row["candidate_id"]: row for row in rows}
+    if len(index) != len(rows):
+        raise ValueError("Duplicate inventory candidate identity")
     keys = set()
     for command in review:
         if not isinstance(command, dict) or set(command) != set(REVIEW_FIELDS):
             raise ValueError("Invalid reviewed command fields")
         key = tuple(command[name] for name in ("menu_id", "state", "command_id"))
-        if any(not isinstance(value, str) or not value.strip() for value in key) or key in keys:
+        if any(not isinstance(value, str) or not value.strip() or value != value.strip() for value in key) or key in keys:
             raise ValueError("Missing or repeated menu/state/command identity")
         keys.add(key)
         classification = command["classification"]
@@ -114,21 +118,32 @@ def validate_review(review, rows):
         for field in ("module", "target", "text", "shortcut", "icon", "enabled", "visible", "handler", "dialog", "notes"):
             if not isinstance(command[field], str) or not command[field].strip():
                 raise ValueError("Missing explicit value (use N/A when justified): " + field)
-        if command["enabled"] == "unknown" or command["visible"] == "unknown":
-            raise ValueError("Availability must be reviewed")
-        counts = {}
+            if command[field].strip().casefold() in {"unknown", "todo", "tbd", "unverified", "review"}:
+                raise ValueError("Unreviewed value: " + field)
+        sources = {}
         for language in ("python", "csharp"):
             ids = command[language + "_candidate_ids"]
             if not isinstance(ids, list) or not all(isinstance(item, str) for item in ids) or len(set(ids)) != len(ids):
                 raise ValueError("Invalid candidate reference list")
             if any(item not in index or index[item]["language"] != language for item in ids):
                 raise ValueError("Unknown or wrong-language candidate reference")
-            counts[language] = len(ids)
-        if classification == "MATCH" and not all(counts.values()):
-            raise ValueError("A match requires evidence from both languages")
-        if not any(counts.values()):
-            raise ValueError("A reviewed entry requires a source candidate")
+            sources[language] = any(index[item]["scope"] == "source" for item in ids)
+        if classification == "MATCH" and not all(sources.values()):
+            raise ValueError("A match requires implementation evidence from both languages")
+        if classification == "EXTENSION" and not sources["csharp"]:
+            raise ValueError("A C# extension requires C# implementation evidence")
+        if not any(sources.values()):
+            raise ValueError("A reviewed entry requires a source candidate; tests alone are insufficient")
     return len(keys)
+
+
+def resolve_review_sources(review, rows):
+    index = {row["candidate_id"]: row for row in rows}
+    return [dict(menu_id=command["menu_id"], state=command["state"], command_id=command["command_id"],
+                 **{language: [{field: index[item][field] for field in ("candidate_id", "revision", "path", "line", "scope")}
+                               for item in command[language + "_candidate_ids"]]
+                    for language in ("python", "csharp")}) for command in review]
+
 
 def write_csv(path, rows):
     # Prefix potential spreadsheet formulas in source snippets. JSON retains
@@ -161,7 +176,8 @@ def main():
     args.out.mkdir(parents=True, exist_ok=False)
     write_csv(args.out / "candidates.csv", rows)
     result = dict(status="REVIEW_REQUIRED", csharp=cs, python=py, candidates=rows,
-                  reviewed_commands=review, reviewed_count=reviewed)
+                  reviewed_commands=review, reviewed_count=reviewed,
+                  reviewed_sources=resolve_review_sources(review, rows))
     (args.out / "manifest.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (args.out / "review-fields.json").write_text(json.dumps(REVIEW_FIELDS, indent=2) + "\n", encoding="utf-8")
     (args.out / "review-template.json").write_text("[]\n", encoding="utf-8")
