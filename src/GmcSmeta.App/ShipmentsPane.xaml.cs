@@ -256,8 +256,8 @@ public partial class ShipmentsPane : UserControl
         public string RecipientCaption => HasRecipient ? Info.Recipient : "кому — не указано";
         public string StateCaption => Info.Fixed ? "✓ Выдано" : "Готовится";
         public string LineCountCaption => ShipmentCardText.PositionCount(Info.Lines);
-        public string Details => RecipientCaption + "\n" + StateCaption + " · " + LineCountCaption;
-        public override string ToString() => Title + " · " + Details;
+        public string Details => Title + "\n" + RecipientCaption + "\n" + StateCaption + " · " + LineCountCaption;
+        public override string ToString() => Title + " · " + RecipientCaption + "\n" + StateCaption + " · " + LineCountCaption;
     }
 
     private SqlServerShipments.ShipmentInfo? Current =>

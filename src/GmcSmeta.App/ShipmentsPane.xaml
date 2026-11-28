@@ -281,6 +281,7 @@
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="Margin" Value="0,0,2,6"/>
                         <Setter Property="ToolTip" Value="{Binding Details}"/>
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
                         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
                             <Border x:Name="Card" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="9" Padding="10,7,8,7">
                                 <ContentPresenter HorizontalAlignment="Stretch"/>
@@ -295,8 +296,7 @@
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate><DataTemplate>
                     <StackPanel>
-                        <TextBlock Text="{Binding Title}" FontWeight="Bold" TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding Title}"/>
+                        <TextBlock Text="{Binding Title}" FontWeight="Bold" TextWrapping="Wrap" ToolTip="{Binding Title}"/>
                         <TextBlock Text="{Binding RecipientCaption}" TextWrapping="Wrap" Margin="0,2,0,0"
                                    ToolTip="{Binding RecipientCaption}">
                             <TextBlock.Style>
@@ -377,15 +377,15 @@
             <WrapPanel Orientation="Horizontal">
                 <ContentControl x:Name="ShipmentStepPositions" Style="{StaticResource ShipmentStep}"/>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="→" Style="{StaticResource ShipmentStepArrow}"/>
+                    <Viewbox Width="12" Height="12" Margin="2,0" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="#94A3B8"/></Canvas></Viewbox>
                     <ContentControl x:Name="ShipmentStepRecipient" Style="{StaticResource ShipmentStep}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="→" Style="{StaticResource ShipmentStepArrow}"/>
+                    <Viewbox Width="12" Height="12" Margin="2,0" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="#94A3B8"/></Canvas></Viewbox>
                     <ContentControl x:Name="ShipmentStepExport" Style="{StaticResource ShipmentStep}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="→" Style="{StaticResource ShipmentStepArrow}"/>
+                    <Viewbox Width="12" Height="12" Margin="2,0" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="#94A3B8"/></Canvas></Viewbox>
                     <ContentControl x:Name="ShipmentStepIssue" Style="{StaticResource ShipmentStep}"/>
                 </StackPanel>
             </WrapPanel>
@@ -407,7 +407,7 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,14,6">
                 <TextBlock Text="Выдал:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                <TextBox x:Name="IssuedByBox" Width="160" Height="32"
+                <TextBox x:Name="IssuedByBox" Width="160" MinHeight="{StaticResource LayoutFieldMinHeight}"
                          MaxLength="255" KeyDown="Header_KeyDown"/>
             </StackPanel>
             <Button x:Name="SaveHeaderButton" Content="Сохранить реквизиты" Style="{StaticResource PythonToolbarButton}"
@@ -422,7 +422,7 @@
                     Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Добавить выделенные или все отфильтрованные позиции: со склада или остаток, если склада нет"/>
             <Button x:Name="RemoveRowsButton" Content="Убрать из ведомости" ContentTemplate="{StaticResource IconLabelX}" Click="RemoveRows_Click"
                     Margin="0,0,8,4" Style="{StaticResource PythonToolbarButton}" ToolTip="Убрать выделенные позиции из текущей ведомости"/>
-            <Border x:Name="RowFilter" MinWidth="330" Margin="0,0,6,4" Padding="3"
+            <Border x:Name="RowFilter" AutomationProperties.Name="Фильтр позиций ведомости" MinWidth="330" Margin="0,0,6,4" Padding="3"
                     Background="#F1F4F9" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="11"
                     IsEnabled="False">
                 <Grid>
@@ -446,9 +446,9 @@
                       DisplayMemberPath="Title" SelectionChanged="RowFilter_Changed"
                       ToolTip="Показать позиции одного договора или дополнительного соглашения" Visibility="Collapsed"/>
             <Grid Width="190" Margin="0,0,0,4">
-                <TextBox x:Name="RowSearch" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="RowSearch_Changed"
+                <TextBox x:Name="RowSearch" AutomationProperties.Name="Поиск позиций выдачи" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="RowSearch_Changed"
                          ToolTip="Поиск по названию позиции или системы"/>
-                <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center"
+                <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center"
                          Margin="9,0,0,0" IsHitTestVisible="False">
                     <Canvas Width="24" Height="24">
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/>
@@ -487,7 +487,7 @@
         </WrapPanel>
         <DataGrid local:TableColumnMenu.Key="shipments" CellStyle="{StaticResource CompactCostCell}" ColumnHeaderStyle="{StaticResource CompactCostHeader}" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
-                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="LinesGrid" Grid.Row="4" Margin="0,2,0,0"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="LinesGrid" Grid.Row="4" Margin="0,2,0,0" CanUserResizeRows="False"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
                   SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="0" CanUserSortColumns="False" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
@@ -567,25 +567,29 @@
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>
             </DataGrid.RowStyle>
         </DataGrid>
-        <StackPanel Grid.Row="5" Margin="0,8,0,0">
+        <StackPanel Grid.Row="5">
             <TextBlock x:Name="StockWarningText" Foreground="#B45309" FontWeight="SemiBold"
-                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,0,0,3"/>
-            <TextBlock x:Name="ShipmentHelpText" Foreground="#64748B" TextWrapping="Wrap"
+                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,8,0,3"/>
+            <TextBlock x:Name="ShipmentHelpText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"
                        Text="Галочка ставит столько, сколько есть на складе. Другое количество — двойной щелчок в столбце «Выдать сейчас»."
                        Visibility="Collapsed"/>
-            <TextBlock x:Name="FooterText" Foreground="#64748B" Margin="0,2,0,0" TextWrapping="Wrap"/>
+            <TextBlock x:Name="FooterText" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap">
+                <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource UiCaption}">
+                    <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
+                </Style></TextBlock.Style>
+            </TextBlock>
         </StackPanel>
         <UniformGrid Grid.Row="6" Columns="3" Margin="0,10,0,0">
             <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
-                <TextBlock Text="В этой ведомости" Style="{StaticResource PythonTileLabel}"/>
-                <TextBlock x:Name="LinesTile" Style="{StaticResource PythonTileValue}"/>
+                <TextBlock Text="В этой ведомости" TextWrapping="Wrap" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock x:Name="LinesTile" TextWrapping="Wrap" Style="{StaticResource PythonTileValue}"/>
             </StackPanel></Border>
             <Border Style="{StaticResource PythonTile}" Margin="0,0,10,0"><StackPanel>
                 <TextBlock Text="Выдаём больше, чем есть на складе" Style="{StaticResource PythonTileLabel}" TextWrapping="Wrap"/>
-                <TextBlock x:Name="OverTile" Style="{StaticResource PythonTileValue}"/>
+                <TextBlock x:Name="OverTile" TextWrapping="Wrap" Style="{StaticResource PythonTileValue}"/>
             </StackPanel></Border>
             <Border Style="{StaticResource PythonTileAccent}"><StackPanel>
-                <TextBlock Text="По всему объекту" Foreground="#DBEAFE" Style="{StaticResource PythonTileLabel}"/>
+                <TextBlock Text="По всему объекту" TextWrapping="Wrap" Foreground="#DBEAFE" Style="{StaticResource PythonTileLabel}"/>
                 <TextBlock x:Name="TotalTile" Foreground="White" Style="{StaticResource PythonTileValue}" TextWrapping="Wrap"/>
             </StackPanel></Border>
         </UniformGrid>

@@ -227,7 +227,7 @@
                                 <TextBlock Text="Системы договора" FontWeight="SemiBold"
                                            VerticalAlignment="Center" Foreground="#334155"/>
                             </DockPanel>
-                            <TextBox x:Name="ProcurementSystemSearch" Height="28" Margin="0,0,0,8"
+                            <TextBox x:Name="ProcurementSystemSearch" AutomationProperties.Name="Поиск систем договора" Height="28" Margin="0,0,0,8"
                                      Padding="7,3" ToolTip="Поиск систем по названию"
                                      TextChanged="ProcurementSystemSearch_TextChanged"/>
                             <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
@@ -255,9 +255,9 @@
                           SelectionChanged="ProcurementSupplier_Changed"
                           ToolTip="Все поставщики, не указан или конкретный поставщик"/>
                 <Grid Grid.Column="2" MinWidth="100" Margin="0,0,0,4">
-                    <TextBox x:Name="ProcurementSearchBox" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
+                    <TextBox x:Name="ProcurementSearchBox" AutomationProperties.Name="Поиск позиций закупок" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
                              ToolTip="Поиск по названию, системе, поставщику, заявке и счёту"/>
-                    <Viewbox Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
+                    <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
                     <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,32,0"
                                VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style><Style TargetType="TextBlock">
@@ -323,7 +323,7 @@
         </DockPanel>
         <DataGrid local:TableColumnMenu.Key="procurement" local:TableColumnMenu.Exclude="Наша цена|Цена клиенту|Маржа" CellStyle="{StaticResource ProcurementCell}" ColumnHeaderStyle="{StaticResource ProcurementHeader}" local:AdaptiveGridRowHeight.Enabled="True" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
-                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="BuyGrid" Grid.Row="2" Margin="0,0,0,0"
+                  Background="#FFFFFF" BorderBrush="#E4E8EF" BorderThickness="1" x:Name="BuyGrid" Grid.Row="2" Margin="0,0,0,0" CanUserResizeRows="False"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0" CanUserSortColumns="False"
                   SelectionMode="Extended" SelectionUnit="FullRow"
@@ -438,7 +438,7 @@
                                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSettings}" Stroke="#A21CAF"/>
                                     </Canvas>
                                 </Viewbox>
-                                <TextBlock Text="{Binding Supplier}" TextTrimming="CharacterEllipsis"
+                                <TextBlock Text="{Binding Supplier}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SupplierTooltip}"
                                            VerticalAlignment="Center"/>
                             </DockPanel>
                         </DataTemplate>
@@ -480,7 +480,7 @@
                                 <Style TargetType="Border" BasedOn="{StaticResource ProcurementBadge}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ExpectedCaption}" Value="">
-                                            <Setter Property="Visibility" Value="Hidden"/>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -548,7 +548,7 @@
                     <TextBlock Text="Поставки и выдачи" Style="{StaticResource PythonTileLabel}"
                                VerticalAlignment="Center"/>
                 </DockPanel>
-                <DataGrid local:TableColumnMenu.Key="procurement-history" CellStyle="{StaticResource CompactCostCell}" x:Name="MovementHistoryGrid" Height="155"
+                <DataGrid local:TableColumnMenu.Key="procurement-history" CellStyle="{StaticResource CompactCostCell}" x:Name="MovementHistoryGrid" Height="155" CanUserResizeRows="False" MinRowHeight="{StaticResource LayoutDocumentRowMinHeight}"
                           ColumnHeaderStyle="{StaticResource CompactCostHeader}"
                           Background="White" BorderBrush="#E4E8EF"
                           AutoGenerateColumns="False" IsReadOnly="True"
@@ -568,7 +568,7 @@
                                             Binding="{Binding Qty, StringFormat={}{0:0.###}}" HeaderStyle="{StaticResource CompactCostMoneyHeader}" ElementStyle="{StaticResource CompactCostMoney}"/>
                         <DataGridTextColumn Header="Документ" Width="150"
                                             Binding="{Binding Document}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                        <DataGridTextColumn Header="Примечание" Width="*"
+                        <DataGridTextColumn Header="Примечание" Width="*" MinWidth="130"
                                             Binding="{Binding Note}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                         <DataGridTextColumn Header="Кто" Width="115"
                                             Binding="{Binding User}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
