@@ -19,7 +19,8 @@
         <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#C9DBFB"/>
         <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#0F172A"/>
         <!-- Python theme.py uses points; WPF uses 96-DPI units (pt * 4/3). -->
-        <FontFamily x:Key="UiFontFamily">Segoe UI</FontFamily>
+        <!-- Qt theme.py _pick_font preference; WPF ordered family fallback preserves unavailable/glyph fallback. -->
+        <FontFamily x:Key="UiFontFamily">Segoe UI Variable Text, Segoe UI Variable, Segoe UI</FontFamily>
         <sys:Double x:Key="UiBodySize">13.333333333333334</sys:Double>
         <sys:Double x:Key="UiCaptionSize">11.333333333333334</sys:Double>
         <sys:Double x:Key="UiSectionSize">10.666666666666666</sys:Double>

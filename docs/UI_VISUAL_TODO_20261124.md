@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 — NAV-06 and FONT-01 CODE READY after source review: explicit accessible brand tab stop + one keyboard adorner and existing startup search focus; Qt _pick_font order in WPF resource, help/history typography, source guards and resolved-family offline diagnostic. Windows build/paired screenshots/physical focus not run. Design 205/253 CODE READY, 48 PARTIAL; +2. [Details](DESIGN_PASS_20261128_DYNAMIC_FORMS.md).
+
 28.11.2026 — 10 scoped CODE READY dynamic form design changes in seven dialogs: shared font/rendering, one inset/pinned actions, Python two-row markup, wrapping/scrolling, semantic KS money columns. 11 source cases and offline WPF fixture added, not run. Broad FONT/SPACE/GRID IDs remain PARTIAL; canonical count unchanged by this pass. [Details](DESIGN_PASS_20261128_DYNAMIC_FORMS.md).
 
 28.11.2026 — correction to a6ec37a auxiliary pass: checked Python text-only controls, reverted speculative caption icons, retained vector move arrows and implemented adaptive status/role/address/stock/history/company fields and wrap; interactive icon catalog and NAV-17/ICON-15 CODE READY unchanged. 10 scoped implementation changes; 17 source cases and repaired older contradictory office icon test, not run. Canonical 203/253 CODE READY, 50 PARTIAL. [Final scope](DESIGN_PASS_20261128_AUX_ICONS.md).

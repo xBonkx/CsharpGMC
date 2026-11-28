@@ -22,7 +22,8 @@ public sealed class EstimateTypographyAndToolsSourceTests
     [Fact]
     public void PythonFontAndEstimateZoomRatioAreShared()
     {
-        Assert.Equal("Segoe UI", Key(XDocument.Parse(Source("App.xaml")), "UiFontFamily").Value);
+        Assert.Equal("Segoe UI Variable Text, Segoe UI Variable, Segoe UI",
+            Key(XDocument.Parse(Source("App.xaml")), "UiFontFamily").Value);
         Assert.Equal("0.95", Key(XDocument.Parse(Source("Theme/TypographyMetrics.xaml")), "UiEstimateHeaderZoomRatio").Value);
         var code = Source("EstimateView.TemporaryView.cs");
         Assert.Contains("EstimateGrid.FontSize = baseSize * zoom", code);

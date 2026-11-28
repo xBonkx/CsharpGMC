@@ -471,8 +471,11 @@ public partial class LetterEditorWindow : Window
                 IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontSize = 13
+                
             };
+            WorkspaceWindowUi.ApplyChrome(dialog);
+            details.SetResourceReference(Control.FontFamilyProperty, "UiFontFamily");
+            details.SetResourceReference(Control.FontSizeProperty, "UiBodySize");
             list.SelectionChanged += (_, _) =>
             {
                 if (list.SelectedIndex < 0 || list.SelectedIndex >= history.Count) return;

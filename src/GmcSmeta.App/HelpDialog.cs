@@ -73,6 +73,7 @@ public sealed class HelpDialog : Window
         var document = new FlowDocument
         {
             PagePadding = new Thickness(16, 10, 16, 10),
+            FontFamily = (FontFamily)Application.Current.FindResource("UiFontFamily"),
             FontSize = (double)Application.Current.FindResource("UiHelpBodySize"),
             Foreground = Brushes.Black
         };

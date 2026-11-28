@@ -485,7 +485,7 @@
                                     <MenuItem x:Name="PtoMenuItem" Header="Исполнительная документация (АОСР / ПТО)" Click="Pto_Click" Visibility="Collapsed"/>
                                 </MenuItem>
                             </Menu>
-                            <Button x:Name="SidebarBrandButton" Style="{StaticResource SidebarHomeButton}" VerticalAlignment="Center" AutomationProperties.Name="Главная"
+                            <Button x:Name="SidebarBrandButton" Style="{StaticResource SidebarHomeButton}" VerticalAlignment="Center" Focusable="True" IsTabStop="True" AutomationProperties.Name="Главная"
                                     Click="Home_Click" ToolTip="На главную: сводка по договорам и группам">
                                 <StackPanel Orientation="Horizontal">
                                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" Margin="0,0,6,0" VerticalAlignment="Center">

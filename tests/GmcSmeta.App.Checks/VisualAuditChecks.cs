@@ -118,6 +118,13 @@ internal static class VisualAuditChecks
     private static void RunSharedTypographyChecks()
     {
         double Size(string key) => (double)Application.Current.FindResource(key);
+        var family = (FontFamily)Application.Current.FindResource("UiFontFamily");
+        Require(family.Source == "Segoe UI Variable Text, Segoe UI Variable, Segoe UI",
+            "Qt font preference order must be retained");
+        var face = new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        Console.WriteLine(face.TryGetGlyphTypeface(out var resolved)
+            ? "Resolved UI font: " + string.Join(", ", resolved.FamilyNames.Values.Distinct())
+            : "UI font uses composite/fallback resolution; inspect actual Windows text render.");
         Require(Math.Abs(Size("UiBodySize") - 10 * 96d / 72) < .001, "Body pt conversion");
         Require(Math.Abs(Size("UiCaptionSize") - 8.5 * 96d / 72) < .001, "Caption pt conversion");
         Require(Math.Abs(Size("UiH1Size") - 18 * 96d / 72) < .001, "Heading pt conversion");
