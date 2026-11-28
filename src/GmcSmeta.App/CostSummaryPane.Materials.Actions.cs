@@ -71,7 +71,7 @@ public partial class CostSummaryPane
         var choice = MessageBox.Show(Window.GetWindow(this),
             "Что очистить у выбранных позиций?\nДа — цену клиенту (розница).\n" +
             "Нет — закупочную цену.\nОтмена — ничего не менять.",
-            "Очистка материалов", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+            "Очистка материалов", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
         if (choice == MessageBoxResult.Cancel) return;
         var field = choice == MessageBoxResult.Yes ? "price" : "purchase_price";
         try

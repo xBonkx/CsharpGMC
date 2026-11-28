@@ -153,7 +153,7 @@ public partial class EstimateView
                 "Есть неподтверждённые правки или не завершена сверка с SQL Server. " +
                 "Закрыть без повторной отправки этих правок?",
                 "GMC-Смета — проверка сохранения",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
             if (result != MessageBoxResult.Yes)
             {
                 e.Cancel = true;

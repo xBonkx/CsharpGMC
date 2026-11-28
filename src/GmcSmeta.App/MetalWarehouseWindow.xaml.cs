@@ -313,7 +313,7 @@ public partial class MetalWarehouseWindow : Window
             if (new MetalOpeningPreviewDialog(preview) { Owner = this }.ShowDialog() != true) return;
             if (MessageBox.Show(this, "Перенести начальные остатки и потребности? " +
                 "Операцию можно выполнить только один раз.",
-                "Начальный импорт", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                "Начальный импорт", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
             await Apply(snapshot, () => store.ImportOpening(preview.Records, preview.FileName,
                 preview.Original, snapshot.Revision));

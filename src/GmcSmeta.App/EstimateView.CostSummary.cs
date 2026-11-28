@@ -1194,7 +1194,7 @@ public partial class EstimateView
             "Смета перейдёт в режим «По системам». Розница СМР по всем позициям, " +
             "включая скрытые фильтром, заменит суммы СМР соответствующих систем. " +
             "Системы без рассчитанных цен сохранят свои суммы.",
-            "Перенести СМР в смету?", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            "Перенести СМР в смету?", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes || revision != _summaryRevision) return;
         await RunSummaryWriteAsync(revision, async expected =>
         {

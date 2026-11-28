@@ -169,13 +169,18 @@ public partial class PassportsWindow
 
     private async void Delete_Click(object sender, RoutedEventArgs e) => await RunWriteAsync(async () =>
     {
-        if (_current < 0) return;
+        if (_current < 0 || _current >= _rows.Count) return;
+        var index = _current;
+        var p = _rows[index];
+        var id = p.Id;
+        var revision = p.Revision;
         if (MessageBox.Show(this, "Удалить выбранный паспорт? Ранее выпущенные PDF сохранятся в архиве.",
-                "Удаление паспорта", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                "Удаление паспорта", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
-        var p = _rows[_current];
-        await Task.Run(() => _sql.Delete(_objectId, p.Id, p.Revision));
-        _rows.RemoveAt(_current);
+        if (_closed || _current != index || index >= _rows.Count ||
+            !ReferenceEquals(_rows[index], p) || p.Id != id || p.Revision != revision) return;
+        await Task.Run(() => _sql.Delete(_objectId, id, revision));
+        _rows.RemoveAt(index);
         _current = -1;
         if (_rows.Count > 0) SelectPassport(0);
         else

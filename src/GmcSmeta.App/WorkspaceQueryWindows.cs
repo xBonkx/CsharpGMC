@@ -464,7 +464,7 @@ public sealed class CatalogWindow : Window
         if (name.Value == item.Name && unit.Value == item.Unit) return;
         if (MessageBox.Show(this,
             "Если позиция с таким названием и единицей уже есть, записи будут объединены. Продолжить?",
-            "Справочник", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            "Справочник", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         var newName = name.Value;
         var newUnit = unit.Value;
         await RunCatalogWriteAsync(item, revision, generation, "Переименование", () =>
@@ -478,7 +478,7 @@ public sealed class CatalogWindow : Window
         var generation = _request;
         if (MessageBox.Show(this,
             $"Удалить «{item.Name}» из каталога? Привязки у {item.Uses} существующих позиций будут сняты, сами позиции останутся.",
-            "Удаление", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            "Удаление", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         await RunCatalogWriteAsync(item, revision, generation, "Удаление", () =>
             SqlServerCatalog.DeleteCatalogItem(_connectionString, item.Id, revision));
     }

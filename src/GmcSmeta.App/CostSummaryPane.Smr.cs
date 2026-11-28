@@ -127,7 +127,7 @@ public partial class CostSummaryPane
         }
         if (MessageBox.Show(Window.GetWindow(this),
             $"Очистить {field} у {ids.Count} позиций?",
-            "Очистка СМР", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            "Очистка СМР", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         try
         {
@@ -183,7 +183,7 @@ public partial class CostSummaryPane
             .Select(x => x.Id).Distinct().ToArray();
         if (ids.Length == 0) { SetStatus("Выделите затраты для удаления."); return; }
         if (MessageBox.Show(Window.GetWindow(this), $"Удалить затраты: {ids.Length} строк?",
-            "Удаление СМР", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            "Удаление СМР", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         try
         {
@@ -279,7 +279,7 @@ public partial class CostSummaryPane
             if (MessageBox.Show(Window.GetWindow(this),
                 "SAFE — смена режима без изменения денежных величин.\n\n" +
                 money + "\n" + diff + "\n\nПродолжить?",
-                "Предпросмотр СМР", MessageBoxButton.YesNo, MessageBoxImage.Question)
+                "Предпросмотр СМР", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No)
                 != MessageBoxResult.Yes)
             {
                 await ReloadAsync();

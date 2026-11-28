@@ -176,14 +176,14 @@ public partial class CostSummaryPane
         var choice = MessageBox.Show(Window.GetWindow(this),
             "Да — рассчитать розницу из закупа.\nНет — рассчитать закуп из розницы.\n" +
             "Отмена — ничего не менять.",
-            "Направление пересчёта", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            "Направление пересчёта", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
         if (choice == MessageBoxResult.Cancel) return;
         var fromCost = choice == MessageBoxResult.Yes;
         var onlyEmptyAnswer = MessageBox.Show(Window.GetWindow(this),
             "Применить только к позициям с незаполненной целевой ценой?\n" +
             "Да — только пустые; нет — все выбранные.",
             "Только пустые", MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question, MessageBoxResult.No);
+            MessageBoxImage.Question, MessageBoxResult.Cancel);
         if (onlyEmptyAnswer == MessageBoxResult.Cancel) return;
         var onlyEmpty = onlyEmptyAnswer == MessageBoxResult.Yes;
         // Python cost_view.MarkupDialog defaults to whole rubles for retail.
@@ -195,7 +195,7 @@ public partial class CostSummaryPane
                 "Округлять розничную цену до целых рублей?\n" +
                 "Да — как по умолчанию в Python; нет — до копеек.",
                 "Округление цены", MessageBoxButton.YesNoCancel,
-                MessageBoxImage.Question, MessageBoxResult.Yes);
+                MessageBoxImage.Question, MessageBoxResult.Cancel);
             if (wholeAnswer == MessageBoxResult.Cancel) return;
             wholeRubles = wholeAnswer == MessageBoxResult.Yes;
         }
@@ -223,7 +223,7 @@ public partial class CostSummaryPane
         if (MessageBox.Show(Window.GetWindow(this),
             "Заполнить пустые закупочные цены последними ценами из справочника?\n" +
             "Цены с фактом по счёту не изменятся.",
-            "Закуп из справочника", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            "Закуп из справочника", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
         try
         {

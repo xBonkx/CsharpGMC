@@ -96,7 +96,7 @@ internal sealed class MetalRegisterWindow : Window
 
     private bool ConfirmDiscard() => !_dirty || MessageBox.Show(this,
         "Отбросить несохранённые изменения?", "Учёт металла",
-        MessageBoxButton.YesNo,MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        MessageBoxButton.YesNo,MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     private void MarkDirty()
     {

@@ -406,7 +406,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
                     "\nSQL ID " + old.Id + ": " + old.Name + " / " + old.Unit + " / " + old.Quantity +
                     "\n\nЗафиксировать исключительно это соответствие 1:1? " +
                     "Все действия останутся SKIP до отдельного подтверждения.",
-                    "Ручное соответствие", MessageBoxButton.YesNo, MessageBoxImage.Warning) !=
+                    "Ручное соответствие", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) !=
                 MessageBoxResult.Yes) return;
             mapping = true;
             accept.IsEnabled = choices.IsEnabled = false;
@@ -468,7 +468,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
                 "Применить " + selected.Count + " изменений в существующее КП?\n" +
                 "Цены и примечания существующих строк не изменятся. " +
                 "Удаление отсутствующих в Excel позиций не выполняется.",
-                "Подтверждение Excel", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                "Подтверждение Excel", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
             if (confirmed == MessageBoxResult.Yes) DialogResult = true;
         }
         catch (Exception ex)
