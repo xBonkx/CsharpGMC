@@ -42,9 +42,10 @@ internal static class PreviewGridPaste
         if (!grid.CurrentCell.IsValid || grid.IsReadOnly || !grid.IsEnabled ||
             grid.SelectionUnit != DataGridSelectionUnit.Cell) return false;
         if (!TryParse(text, out var values)) { error = "Нужен прямоугольный диапазон до 10 000 ячеек."; return false; }
+        var anchor = grid.CurrentCell;
         if (!grid.CommitEdit(DataGridEditingUnit.Cell, true) || !grid.CommitEdit(DataGridEditingUnit.Row, true))
         { error = "Сначала исправьте текущую ячейку."; return false; }
-        var anchor = grid.CurrentCell;
+        if (grid.CurrentCell != anchor) { error = "Начальная ячейка изменилась."; return false; }
         var columns = grid.Columns.Where(c => c.Visibility == Visibility.Visible).OrderBy(c => c.DisplayIndex).ToArray();
         int col = Array.IndexOf(columns, anchor.Column), row = grid.Items.IndexOf(anchor.Item);
         if (row < 0 || col < 0 || row + values.Count > grid.Items.Count || col + values[0].Count > columns.Length)
@@ -82,13 +83,17 @@ internal static class PreviewGridPaste
 
         // Only public auto-properties of the three detached preview DTOs are allowed.
         // Setters do not write to storage or invoke application commands.
+        var affectedRows = targets.Select(t => t.Row).Distinct<T>(ReferenceEqualityComparer.Instance).ToArray();
         foreach (var target in targets) target.Property.SetValue(target.Row, target.Value);
         grid.Items.Refresh();
         grid.SelectedCells.Clear();
-        foreach (var targetRow in Enumerable.Range(row, values.Count))
-            foreach (var targetColumn in columns.Skip(col).Take(values[0].Count))
-                grid.SelectedCells.Add(new DataGridCellInfo(grid.Items[targetRow], targetColumn));
         if (grid.Items.Contains(anchor.Item)) grid.CurrentCell = anchor;
+        foreach (var targetRow in affectedRows.Where(r => grid.Items.Contains(r)))
+            foreach (var targetColumn in columns.Skip(col).Take(values[0].Count))
+            {
+                var cell = new DataGridCellInfo(targetRow, targetColumn);
+                if (!grid.SelectedCells.Contains(cell)) grid.SelectedCells.Add(cell);
+            }
         error = "";
         return true;
     }
