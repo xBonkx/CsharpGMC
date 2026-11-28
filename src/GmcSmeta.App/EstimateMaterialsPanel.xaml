@@ -97,7 +97,7 @@
                              AutomationProperties.Name="Найти позицию…"  ToolTip="Найти позицию…"/>
                     <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center"
                              Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,32,0"
+                    <TextBlock Text="Найти позицию…" Foreground="{StaticResource UiMutedTextBrush}" Margin="30,0,32,0"
                                VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
