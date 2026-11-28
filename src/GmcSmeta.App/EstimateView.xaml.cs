@@ -515,7 +515,7 @@ public partial class EstimateView : UserControl
     {
         var pending = Volatile.Read(ref _pendingWrites);
         if (CostTabRevisionPolicy.CanPublish(expected, _serverRevision, observed, pending)) return true;
-        if (CostTabRevisionPolicy.NeedsParentReadback(_serverRevision, observed, pending))
+        if (CostTabRevisionPolicy.NeedsParentReadback(expected, _serverRevision, observed, pending))
         {
             _serverConflict = true;
             _publishedEstimateRevision = "";

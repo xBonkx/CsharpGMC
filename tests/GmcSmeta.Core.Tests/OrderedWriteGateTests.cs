@@ -72,7 +72,7 @@ public sealed class OrderedWriteGateTests
         using var third = gate.Reserve();
         await first.WaitAsync();
         discarded.Dispose();
-        Assert.Throws<InvalidOperationException>(() => discarded.WaitAsync());
+        Assert.Throws<InvalidOperationException>(() => { _ = discarded.WaitAsync(); });
         var next = third.WaitAsync();
         Assert.False(next.IsCompleted);
         first.Dispose();

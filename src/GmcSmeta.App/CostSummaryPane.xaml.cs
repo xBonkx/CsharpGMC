@@ -202,10 +202,14 @@ public partial class CostSummaryPane : UserControl
     private void CostTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, CostTabs) || !_attached || _restoringCostTab) return;
-        _materialSearchDebounce?.Stop(); // preserve dirty search for the next materials activation
-        if (_loadingCosts) return; // the worker checks the selected tab again before publishing
+        if (_loadingCosts)
+        {
+            _materialSearchDebounce?.Stop();
+            return; // the worker checks the selected tab again before publishing
+        }
         if (_operationActive)
         {
+            _materialSearchDebounce?.Stop();
             _needsReloadAfterAttach = true; // mandatory readback or operation disposal loads the selected tab
             return;
         }
@@ -218,6 +222,7 @@ public partial class CostSummaryPane : UserControl
             SetStatus("Завершите редактирование ячейки перед сменой вкладки.");
             return;
         }
+        _materialSearchDebounce?.Stop(); // retain dirty search for the next activation
         _ = ReloadAsync(allowReuse: true);
     }
 

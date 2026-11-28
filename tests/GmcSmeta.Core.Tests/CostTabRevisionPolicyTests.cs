@@ -16,7 +16,7 @@ public sealed class CostTabRevisionPolicyTests
     [Theory]
     [InlineData("r", "r", "r", 0, true, false)]
     [InlineData("r", "r", "foreign", 0, false, true)]
-    [InlineData("r", "new", "r", 0, false, true)]
+    [InlineData("r", "new", "r", 0, false, false)]
     [InlineData("r", "r", "r", 1, false, false)]
     [InlineData("r", "r", "foreign", 1, false, false)]
     [InlineData("", "", "", 0, false, false)]
@@ -24,6 +24,6 @@ public sealed class CostTabRevisionPolicyTests
         int pending, bool publish, bool reconcile)
     {
         Assert.Equal(publish, CostTabRevisionPolicy.CanPublish(expected, current, observed, pending));
-        Assert.Equal(reconcile, CostTabRevisionPolicy.NeedsParentReadback(current, observed, pending));
+        Assert.Equal(reconcile, CostTabRevisionPolicy.NeedsParentReadback(expected, current, observed, pending));
     }
 }
