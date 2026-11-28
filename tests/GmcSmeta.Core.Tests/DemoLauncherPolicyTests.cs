@@ -149,6 +149,8 @@ public sealed class DemoLauncherPolicyTests
             if (tamper)
             {
                 File.WriteAllText(exe, "changed");
+                var recorded = InstalledApp.Read(apps, previous, allowDemoSeed: true)!;
+                Assert.Throws<InvalidOperationException>(() => DemoReleasePolicy.RequireInstalledIntegrity(recorded, verifyFiles: true));
                 Assert.Throws<InvalidOperationException>(() => InstalledApp.RecoverDemoPrevious(apps, state, previous));
                 Assert.Equal("damaged", File.ReadAllText(state));
             }
@@ -158,6 +160,36 @@ public sealed class DemoLauncherPolicyTests
                 Assert.Equal(exe, InstalledApp.Read(apps, state, allowDemoSeed: true)?.Exe);
             }
             Assert.Equal(previousBytes, File.ReadAllBytes(previous));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void LauncherDirectoriesAreCreatedOnlyUnderOwnedSegments()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gmc-launcher-paths-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            AppPaths.EnsureUnredirectedDirectories(root, "demo", "launcher", "apps");
+            Assert.True(Directory.Exists(Path.Combine(root, "demo", "launcher", "apps")));
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, "..", "office"));
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, Path.GetFullPath(root)));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void LauncherRejectsFileInsteadOfDirectoryBeforeCreatingChildren()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "gmc-launcher-paths-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var existing = Path.Combine(root, "launcher");
+            File.WriteAllText(existing, "do not replace");
+            Assert.Throws<InvalidOperationException>(() => AppPaths.EnsureUnredirectedDirectories(root, "launcher", "apps"));
+            Assert.Equal("do not replace", File.ReadAllText(existing));
         }
         finally { Directory.Delete(root, true); }
     }
