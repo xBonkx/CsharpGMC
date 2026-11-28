@@ -126,6 +126,34 @@ SQL smoke-test и скриншоты 1366/1920 НЕ ПРОВЕРЕНЫ.
   меню для выбора файла. В WPF у DocumentCardTemplate нет обработчика
   этого действия; C#-агент должен предоставить команду/биндинг.
 
+## Нужна поддержка кода — семантика выделения и метрики (28–29.11)
+
+- **GRID-28**: Excel-подобный drag-прямоугольник в структурных таблицах
+  (Смета, закупки, выдача, КС, сводная) требует .cs-редизайна: эти таблицы
+  держат `SelectionUnit="FullRow"`, потому что пакетные команды читают
+  `SelectedItems` как строки модели (~40+ вызовов). Перевод на `Cell` нужно
+  делать вместе с переработкой команд на `SelectedCells` и восстановлением
+  текущей ячейки/выделения после refresh. Дизайн-семантика и исключения —
+  [отчёт](DESIGN_PASS_20261129_SEMANTICS_CLOSURE.md).
+- **SPACE-19**: ~200 присвоений `new Thickness(...)` в 40+ .cs-файлах
+  (лидеры: ExcelExistingUpdatePreviewWindow 17, EstimateView.Sections 13,
+  ExcelImportPreviewWindow 13, PtoCertificatesWindow 13, PtoEditorWindow 12,
+  PeopleImportPreviewWindow 12) стоит перевести на ключи
+  `Theme/LayoutMetrics.xaml` (сканер уже распознаёт SetResourceReference).
+  Инвентарь read-only, конверсия — работа основного агента.
+
+2026-11-29 · Блок 15, семантика и метрики · 19 файлов `*.xaml` ·
+Инвентарь и закрытие D-вопросов GRID-28.01-02, HOME-03.01, SPACE-15.01-02,
+SPACE-18.01-02, SPACE-19.01-02: 16 окнам добавлены monitor-aware
+MaxWidth/MaxHeight по WorkArea (паттерн блок-3), ConfirmDeleteDialog переведён
+на SizeToContent=Height, удалены 3 неиспользуемых локальных стиля
+(EstimateMenuHeader, EstimateMenuItem, ShipmentStepArrow — проверены тройной
+проверкой ссылок; YearChip/EstimateStageEditor сохранены как используемые из
+кода), корневые поля 4 окон переведены на LayoutDialogMargin.
+SelectionUnit/команды/биндинги/x:Name/Visibility не изменены.
+Отчёт: [DESIGN_PASS_20261129_SEMANTICS_CLOSURE.md](DESIGN_PASS_20261129_SEMANTICS_CLOSURE.md).
+dotnet build — 0 ошибок; Windows-кадры/DPI не проверялись (A-приёмки).
+
 2026-11-21 · Блок 5, диалоги · `ArchiveYearDialog.xaml`,
 `CompareDialog.xaml`, `ConfirmDeleteDialog.xaml`, `ContractDialog.xaml`,
 `ObjectDialog.xaml`, `RateTransferDialog.xaml`, `ReplaceDialog.xaml`,
