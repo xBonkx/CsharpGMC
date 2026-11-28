@@ -149,8 +149,15 @@ public partial class EstimateView
             SetStatus("Сначала включите СМР «по поз.» в итогах внизу", true);
             return;
         }
-        var ids = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
-            .Where(r => !r.IsSystem && !r.IsVirtual && r.Source.ParentPositionId is null)
+        var snapshot = _estimate;
+        var revision = _serverRevision;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        bool Current() => CanChangeHeader(snapshot, revision, false) && !_doc.IsStage &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
+                .SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
+            selection.All(r => _rows.Contains(r) && !r.IsVirtual);
+        if (!Current()) return;
+        var ids = selection.Where(r => !r.IsSystem && r.Id > 0 && r.Source.ParentPositionId is null)
             .Select(r => (long)r.Id).Distinct().ToList();
         if (ids.Count == 0)
         {
@@ -166,15 +173,21 @@ public partial class EstimateView
             return;
         }
 
+        if (!Current()) return;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Сохранение… ({count})", false);
         await _writeLock.WaitAsync();
         try
         {
+            if (_serverConflict || _detached || !ReferenceEquals(snapshot, _estimate) || revision != _serverRevision ||
+                !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance))
+                throw new DBConcurrencyException("Смета или выделение изменились.");
             var saved = await Task.Run(() => SqlServerDatabase.SetWorkPrice(
-                _sqlConnectionString, _contractId, ids, value, _serverRevision));
+                _sqlConnectionString, _contractId, ids, value, revision));
             _serverRevision = saved.Revision;
+            _saveAwaitingReadback = true;
             SetStatus($"Цена работы поставлена: {saved.Updated} поз.", false);
         }
         catch (DBConcurrencyException ex)
@@ -184,6 +197,8 @@ public partial class EstimateView
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally
@@ -214,7 +229,7 @@ public partial class EstimateView
     private async void Discount_Click(object sender, RoutedEventArgs e)
     {
         if (_estimate is not {Locked:false} estimate) return;
-        if (_serverConflict || HasUnsettledCacheWrites)
+        if (_doc.IsStage || !CanChangeHeader(estimate, _serverRevision, false))
         { SetStatus("Сначала завершите сохранение и обновите смету.",true); return; }
         var totals=estimate.Totals;
         var baselineRevision=_serverRevision;
@@ -224,14 +239,18 @@ public partial class EstimateView
             SqlSchemaCompatibility.Schema31WritesAllowed(_sqlConnectionString)&&estimate.SupportsFinalDiscount&&!_doc.IsStage))
             {Owner=Window.GetWindow(this)};
         if(dialog.ShowDialog()!=true||dialog.Result is not {Changed:true} result)return;
-        if(_serverRevision!=baselineRevision||_serverConflict||HasUnsettledCacheWrites)
+        if(!CanChangeHeader(estimate, baselineRevision, false))
         { SetStatus("Смета изменилась. Откройте окно скидки заново.",true);return; }
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Сохранение… ({pending})", false);
         await _writeLock.WaitAsync();
         try
         {
+            if (_serverConflict || _detached || baselineRevision != _serverRevision ||
+                !ReferenceEquals(estimate, _estimate))
+                throw new DBConcurrencyException("Смета изменилась после подтверждения скидки.");
             var saved=await Task.Run(()=>result.OnTotal
                 ? SqlServerActs.SaveContractDiscount(_sqlConnectionString,_contractId,result.Percent,baselineRevision)
                 : SqlServerEditorOps.ApplyDiscount(_sqlConnectionString,_contractId,result.Percent,result.Smr,
@@ -240,10 +259,11 @@ public partial class EstimateView
             else
             {
                 _serverRevision = saved.Revision;
+                _saveAwaitingReadback = true;
                 SetStatus($"Скидка применена", false);
             }
         }
-        catch (Exception ex) { _saveError = ex.Message; }
+        catch (Exception ex) { _serverConflict = true; _saveAwaitingReadback = true; _saveError = ex.Message; }
         finally
         {
             _writeLock.Release();
@@ -270,14 +290,23 @@ public partial class EstimateView
             return;
         }
         var systemId = row.Source.SystemId;
+        var snapshot = _estimate!;
+        var displayedRevision = _serverRevision;
+        bool Current() => !_doc.IsStage && CanChangeHeader(snapshot, displayedRevision, false) &&
+            ReferenceEquals(row, EstimateGrid.SelectedItem) && _rows.Contains(row);
+        if (!Current()) return;
         var menu = new ContextMenu();
         MenuItem Add(string header, string how)
         {
             var item = new MenuItem { Header = header };
-            item.Click += async (_, _) => await RunEstimateMutationAsync(
-                "Сортировка…", revision => SqlServerEditorOps.SortPositions(
-                    _sqlConnectionString, _contractId, systemId, how, revision),
-                "Сортировка выполнена ✓");
+            item.Click += async (_, _) =>
+            {
+                if (!Current()) return;
+                await RunEstimateMutationAsync("Сортировка…", revision => revision != displayedRevision
+                    ? SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повторите сортировку.", revision)
+                    : SqlServerEditorOps.SortPositions(_sqlConnectionString, _contractId, systemId, how, displayedRevision),
+                    "Сортировка выполнена ✓");
+            };
             return item;
         }
         menu.Items.Add(Add("По названию (А→Я)", "name"));

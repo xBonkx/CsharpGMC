@@ -11,8 +11,8 @@ public partial class EstimateView
     private readonly HashSet<int> _expandedAreaSummaries = new();
 
     private bool CanTransformArea =>
-        _estimate is { Locked: false } && !_serverConflict &&
-        Volatile.Read(ref _pendingWrites) == 0;
+        _estimate is { } snapshot && !_doc.IsStage &&
+        CanChangeHeader(snapshot, _serverRevision, false);
 
     private void CollapseAreaSystem_Click(object sender, RoutedEventArgs e) =>
         TransformArea(whole: false);
@@ -25,8 +25,8 @@ public partial class EstimateView
 
     private void TransformArea(bool whole)
     {
-        ExtraActionsExpander.IsOpen = false;
         if (!CanTransformArea) return;
+        var revision = _serverRevision;
         var subject = whole ? "на всё КП" : "по системам";
         if (MessageBox.Show(Window.GetWindow(this),
             $"Свернуть воздуховоды, фасонку и изоляцию в м² {subject}?\n\n" +
@@ -35,44 +35,47 @@ public partial class EstimateView
             "При ошибке SQL отменит все изменения.",
             "Сворачивание в м²", MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        _ = ExecuteAreaTransformAsync(whole, null, false);
+        if (revision == _serverRevision) _ = ExecuteAreaTransformAsync(whole, null, false, revision);
     }
 
     private void ExpandArea(long? only)
     {
-        ExtraActionsExpander.IsOpen = false;
         if (!CanTransformArea) return;
+        var revision = _serverRevision;
         if (MessageBox.Show(Window.GetWindow(this),
             "Вернуть вложенные позиции в исходные системы и порядок? " +
             "Их прежние цены и количества сохранятся, сводные строки м² удалятся. " +
             "При связанных актах и выдачах операция полностью отменится.",
             "Развернуть м²", MessageBoxButton.YesNo, MessageBoxImage.Question,
             MessageBoxResult.No) != MessageBoxResult.Yes) return;
-        _ = ExecuteAreaTransformAsync(false, only, true);
+        if (revision == _serverRevision) _ = ExecuteAreaTransformAsync(false, only, true, revision);
     }
 
-    private async Task ExecuteAreaTransformAsync(bool whole, long? only, bool expand)
+    private async Task ExecuteAreaTransformAsync(bool whole, long? only, bool expand, string revision)
     {
-        if (!CanTransformArea) return;
+        if (!CanTransformArea || revision != _serverRevision) return;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
         SetStatus(expand ? "Разворачивание м²…" : "Сворачивание м²…", false);
         await _writeLock.WaitAsync();
         var saved = false;
         try
         {
-            if (_serverConflict) return;
-            var revision = _serverRevision;
+            if (_serverConflict || _detached || revision != _serverRevision ||
+                _estimate?.Locked != false)
+                throw new InvalidOperationException("Смета изменилась после подтверждения.");
             var result = await Task.Run(() => expand
                 ? SqlServerDatabase.ExpandArea(_sqlConnectionString, _contractId, only, revision)
                 : SqlServerDatabase.CollapseArea(_sqlConnectionString, _contractId, whole, revision));
             if (!result.Saved)
             {
-                SetStatus("м²: " + result.Error, true);
-                if (result.Revision != _serverRevision) _serverConflict = true;
+                _saveError = "м²: " + result.Error;
+                _serverConflict = true;
                 return;
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             _expandedAreaSummaries.Clear();
             SetStatus(expand
                 ? $"Развёрнуто: {result.Rows} позиций из {result.Groups} сводных строк."
@@ -83,13 +86,17 @@ public partial class EstimateView
         }
         catch (Exception ex)
         {
-            SetStatus("Ошибка преобразования м²: " + ex.Message, true);
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
+            _saveError = "Преобразование м² не подтверждено: " + ex.Message;
+            SetStatus(_saveError, true);
         }
         finally
         {
             _writeLock.Release();
-            Interlocked.Decrement(ref _pendingWrites);
+            if (Interlocked.Decrement(ref _pendingWrites) == 0)
+                _reloadTimer.Start();
         }
-        if (saved) await ReloadDocumentAsync();
+        if (saved && Volatile.Read(ref _pendingWrites) == 0) await ReloadDocumentAsync();
     }
 }

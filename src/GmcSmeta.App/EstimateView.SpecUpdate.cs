@@ -35,12 +35,13 @@ public partial class EstimateView
 
     private async void UpdateSpec_Click(object sender, RoutedEventArgs e)
     {
-        if (!_isKp || _estimate?.Locked != false)
+        if (!_isKp || _doc.IsStage || _estimate is not { Locked: false } snapshot)
         {
             SetStatus("Обновление спецификации доступно только в неподписанном КП.", true);
             return;
         }
-        if (_serverConflict || Volatile.Read(ref _pendingWrites) > 0)
+        var revision = _serverRevision;
+        if (!CanChangeHeader(snapshot, revision, false))
         {
             SetStatus("Прежде чем обновлять спецификацию, дождись записи и обнови КП.", true);
             return;
@@ -51,7 +52,8 @@ public partial class EstimateView
             Filter = "Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls",
             Multiselect = false
         };
-        if (pick.ShowDialog(Window.GetWindow(this)) != true) return;
+        if (pick.ShowDialog(Window.GetWindow(this)) != true ||
+            !CanChangeHeader(snapshot, revision, false)) return;
 
         try
         {
@@ -74,30 +76,34 @@ public partial class EstimateView
                     "Обновление спецификации", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (!string.Equals(preview.Revision, _serverRevision, StringComparison.Ordinal))
+            if (!CanChangeHeader(snapshot, revision, false) ||
+                !string.Equals(preview.Revision, revision, StringComparison.Ordinal))
             {
                 _serverConflict = true;
                 SetStatus("КП изменился во время чтения Excel. Обнови смету и повтори сравнение.", true);
                 return;
             }
             var dialog = new SpecUpdatePreviewWindow(Window.GetWindow(this)!, pick.FileName, preview);
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog() != true || !CanChangeHeader(snapshot, revision, false)) return;
             var keys = dialog.SelectedKeys;
+            var keepOrder = dialog.KeepOrder;
             if (keys.Count == 0) return;
 
             _reloadTimer.Stop();
+            AttachSaveCloseGuard();
             Interlocked.Increment(ref _pendingWrites);
             await _writeLock.WaitAsync();
             try
             {
                 _saveError = null;
-                if (_serverConflict ||
-                    !string.Equals(preview.Revision, _serverRevision, StringComparison.Ordinal))
+                if (_serverConflict || _detached || !ReferenceEquals(snapshot, _estimate) ||
+                    !string.Equals(revision, _serverRevision, StringComparison.Ordinal))
                     throw new DBConcurrencyException("Другой пользователь изменил КП.");
                 var result = await Task.Run(() => SqlServerSpecUpdate.Apply(
                     _sqlConnectionString, _contractId, pick.FileName,
-                    incoming, keys, dialog.KeepOrder, preview.Revision));
+                    incoming, keys, keepOrder, revision));
                 _serverRevision = result.Revision;
+                _saveAwaitingReadback = true;
                 SetStatus($"Спецификация обновлена: {result.Title}. Итого " +
                     $"{result.TotalBefore:N2} → {result.TotalAfter:N2} ₽. " +
                     "Отчёт — «Изменения спецификации», вернуть — Ctrl+Z.", false);

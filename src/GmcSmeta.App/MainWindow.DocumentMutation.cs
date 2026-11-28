@@ -37,6 +37,11 @@ public partial class MainWindow
         return true;
     }
 
+    internal bool IsCurrentEstimatePage(int documentId, int objectId, EstimateView page) =>
+        !_startupClosed && _openDocumentId == documentId &&
+        ReferenceEquals(PageHost.Content, page) &&
+        _docs.Any(d => d.Id == documentId && d.ObjectId == objectId);
+
     internal bool CanEditEstimateHeader(int documentId, int objectId) =>
         SqlWritesEnabled && !_startupClosed && _openDocumentId == documentId &&
         _objects.Any(o => o.Id == objectId && !o.Archived) &&

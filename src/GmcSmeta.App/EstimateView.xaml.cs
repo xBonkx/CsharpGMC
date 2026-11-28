@@ -122,7 +122,6 @@ public partial class EstimateView : UserControl
             EnsureUndoBaselineAsync);
         _cellSaveQueue = new ContractCellSaveQueue(WriteCellOnBackgroundAsync);
         InitializeComponent();
-        MoveContractItem.Visibility=doc.Kind=="main"?Visibility.Visible:Visibility.Collapsed;
         // Python kp_table: «Обоснование» — последний столбец сметы.
         BasisColumn.DisplayIndex = EstimateGrid.Columns.Count - 1;
         BasisColumn.CanUserReorder = false;
@@ -519,46 +518,6 @@ public partial class EstimateView : UserControl
         TotalsPanel.Visibility = _visibleEstimateMode == "totals" ? Visibility.Visible : Visibility.Collapsed;
         // The "Итоги" page does not reset the user's independent
         // bottom-footer visibility preference (kp_editor.toggle_totals).
-    }
-
-    private void MoreActions_Click(object sender, RoutedEventArgs e)
-    {
-        ExtraActionsExpander.IsOpen = !ExtraActionsExpander.IsOpen;
-        if (ExtraActionsExpander.IsOpen)
-        {
-            RefreshDocumentActionsMenu();
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
-            {
-                if (ExtraActionsExpander.IsOpen)
-                    ActionsMenuPanel.Children.OfType<Button>().FirstOrDefault(b => b.IsVisible && b.IsEnabled)?.Focus();
-            }));
-        }
-    }
-
-    private void ActionsMenu_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape)
-        {
-            ExtraActionsExpander.IsOpen = false;
-            MoreActionsButton.Focus();
-            e.Handled = true;
-            return;
-        }
-        if (e.Key != Key.Up && e.Key != Key.Down && e.Key != Key.Home && e.Key != Key.End) return;
-        var available = ActionsMenuPanel.Children.OfType<Button>()
-            .Where(b => b.IsVisible && b.IsEnabled).ToArray();
-        if (available.Length == 0) return;
-        var current = Array.FindIndex(available, b => b.IsKeyboardFocusWithin);
-        var next = e.Key switch
-        {
-            Key.Home => 0,
-            Key.End => available.Length - 1,
-            Key.Up => current < 0 ? available.Length - 1 : (current + available.Length - 1) % available.Length,
-            _ => (current + 1) % available.Length
-        };
-        available[next].Focus();
-        available[next].BringIntoView();
-        e.Handled = true;
     }
 
     private void AddOptions_Click(object sender, RoutedEventArgs e)

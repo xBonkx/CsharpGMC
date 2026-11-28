@@ -38,10 +38,10 @@ public sealed class EstimateHeaderMutationSourceTests
     [Fact]
     public void ActionsMenuReflectsActualLockAndDocumentKind()
     {
-        var code = Source("GmcSmeta.App", "EstimateView.Header.cs");
-        Assert.Contains("LockMenuItem.Content = _estimate?.Locked == true", code);
-        Assert.Contains("MakeContractItem.Visibility = _isKp && !_doc.IsStage", code);
-        Assert.Contains("CreateDopItem.Visibility = _doc.Kind == \"main\"", code);
-        Assert.Contains("DeleteDocumentMenuItem.IsEnabled = ready && !_doc.IsStage", code);
+        var code = Source("GmcSmeta.App", "EstimateView.DocumentActions.cs");
+        Assert.Contains("snapshot.Locked ? \"Снять блокировку сметы\"", code);
+        Assert.Contains("var kp = ordinary && _isKp", code);
+        Assert.Contains("var annex = ordinary && _doc.Kind == \"main\"", code);
+        Assert.Contains("DeleteContract_Click, \"Trash\", () => ordinary && Write(true)", code);
     }
 }

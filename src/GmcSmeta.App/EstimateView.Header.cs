@@ -156,14 +156,16 @@ public partial class EstimateView
     // ---------------------------------------------------------------- Скопировать расценки (btn_transfer_rates)
     private void TransferRates_Click(object sender, RoutedEventArgs e)
     {
-        if (_estimate is null || !_isKp) return;
-        var dialog = new RateTransferDialog(_sqlConnectionString, _contractId, _estimate.Title)
+        if (_estimate is not { } snapshot || !_isKp || _doc.IsStage ||
+            !CanChangeHeader(snapshot, _serverRevision, false)) return;
+        var dialog = new RateTransferDialog(_sqlConnectionString, _contractId, snapshot.Title)
         {
             Owner = Window.GetWindow(this)
         };
-        dialog.ShowDialog();
-        _reloadTimer.Stop();
-        _reloadTimer.Start();
+        if (dialog.ShowDialog() != true) return;
+        _serverConflict = true;
+        _saveAwaitingReadback = true;
+        RequestRefresh();
     }
 
     // ---------------------------------------------------------------- Сохранить в Excel / PDF (btn_export)
@@ -186,49 +188,26 @@ public partial class EstimateView
     }
 
     // ---------------------------------------------------------------- Действия документа (btn_more menu)
-    private void RefreshDocumentActionsMenu()
-    {
-        var ready = _estimate is { } snapshot && CanChangeHeader(snapshot, _serverRevision, allowLocked: true);
-        var editable = ready && _estimate?.Locked == false && !_doc.IsStage;
-        LockMenuItem.Content = _estimate?.Locked == true ? "Снять блокировку сметы" : "Заблокировать — смета подписана";
-        LockMenuItem.IsEnabled = ready;
-        MakeContractItem.Visibility = _isKp && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
-        MakeContractItem.IsEnabled = editable;
-        CreateDopItem.Visibility = _doc.Kind == "main" && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
-        CreateDopItem.IsEnabled = ready;
-        MoveContractItem.IsEnabled = ready && !_doc.IsStage;
-        TransferRatesMenuItem.IsEnabled = editable && _isKp;
-        TransferRatesMenuItem.Visibility = _isKp && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
-        CopyContractMenuItem.Visibility = _isKp && !_doc.StageRest ? Visibility.Visible : Visibility.Collapsed;
-        CopyContractMenuItem.IsEnabled = ready;
-        EditPropertiesMenuItem.IsEnabled = editable;
-        DeleteDocumentMenuItem.IsEnabled = ready && !_doc.IsStage;
-    }
-
     private void CopyContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null && _estimate is not null)
             main.CopyCurrentDocument(_doc);
-        ExtraActionsExpander.IsOpen = false;
     }
 
     private void MakeContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
             main.MakeCurrentDocumentContract(_doc);
-        ExtraActionsExpander.IsOpen = false;
     }
 
     private void CreateDop_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
             main.CreateDopAgreement(_doc);
-        ExtraActionsExpander.IsOpen = false;
     }
 
     private void MoveContract_Click(object sender,RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen=false;
         if(Window.GetWindow(this) is MainWindow main && _doc.Kind=="main")
             main.MoveCurrentContract(_doc);
     }
@@ -237,18 +216,15 @@ public partial class EstimateView
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
             main.DeleteCurrentDocument(_doc);
-        ExtraActionsExpander.IsOpen = false;
     }
 
     private void ShowPeople_Click(object sender, RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen = false;
         new PeopleWindow(_sqlConnectionString, _objectId) { Owner = Window.GetWindow(this) }.ShowDialog();
     }
 
     private void ShowOrders_Click(object sender, RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen = false;
         new OrdersWindow(_sqlConnectionString, _objectId, _contractId)
         {
             Owner = Window.GetWindow(this)
@@ -257,7 +233,6 @@ public partial class EstimateView
 
     private void ShowHistory_Click(object sender, RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen = false;
         try
         {
             new HistoryWindow(_sqlConnectionString, contractId: _contractId)
@@ -274,7 +249,6 @@ public partial class EstimateView
 
     private void SaveDocumentLink_Click(object sender, RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen = false;
         if (Window.GetWindow(this) is MainWindow main)
             main.CreateGmcsLink(_doc);
     }
@@ -283,13 +257,11 @@ public partial class EstimateView
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
             main.CompareCurrentDocument(_doc);
-        ExtraActionsExpander.IsOpen = false;
     }
 
     // ---------------------------------------------------------------- блокировка (toggle_lock)
     private async void LockToggle_Click(object sender, RoutedEventArgs e)
     {
-        ExtraActionsExpander.IsOpen = false;
         if (_estimate is not { } snapshot) return;
         var revision = _serverRevision;
         if (!CanChangeHeader(snapshot, revision, allowLocked: true)) return;
