@@ -264,6 +264,104 @@ def verify_pair(before_path, after_path):
             "dpi": before["dpi_x"], "page": before["page"], "state": before["state"],
             "python_png_sha256": before["png_sha256"], "csharp_png_sha256": after["png_sha256"]}
 
+def read_capture_rgb(path):
+    """Decode only our capture encoder's RGB8/filter-0 PNG, with bounded output."""
+    width, height = png_size(path)
+    if not (0 < width <= 2560 and 0 < height <= 1440):
+        raise ValueError("capture raster outside supported monitor bounds")
+    if path.stat().st_size > 32_000_000:
+        raise ValueError("capture PNG too large")
+    data = path.read_bytes()
+    chunks, at, finished = [], len(PNG), False
+    while at + 12 <= len(data):
+        length, kind = struct.unpack_from(">I4s", data, at)
+        end = at + 8 + length
+        if end + 4 > len(data):
+            raise ValueError("truncated PNG chunk")
+        payload = data[at+8:end]
+        if zlib.crc32(kind + payload) & 0xffffffff != struct.unpack_from(">I", data, end)[0]:
+            raise ValueError("PNG CRC mismatch")
+        if kind == b"IHDR":
+            if at != len(PNG) or payload != struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0):
+                raise ValueError("unsupported capture encoding")
+        elif kind == b"IDAT":
+            chunks.append(payload)
+        elif kind == b"IEND":
+            finished = length == 0 and end + 4 == len(data)
+            break
+        else:
+            raise ValueError("unsupported capture chunk")
+        at = end + 4
+    if not finished or not chunks:
+        raise ValueError("incomplete capture PNG")
+    stride = width * 3 + 1
+    decoder = zlib.decompressobj()
+    raw = decoder.decompress(b"".join(chunks), stride * height + 1)
+    if len(raw) != stride * height or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+        raise ValueError("unexpected capture decompressed length")
+    if any(raw[y*stride] != 0 for y in range(height)):
+        raise ValueError("unsupported PNG row filter")
+    return width, height, b"".join(raw[y*stride+1:(y+1)*stride] for y in range(height))
+
+
+def crop_rgb(width, height, rgb, region=None):
+    if len(rgb) != width * height * 3:
+        raise ValueError("invalid RGB buffer")
+    x, y, w, h = region if region is not None else (0, 0, width, height)
+    if min(x, y) < 0 or min(w, h) <= 0 or x+w > width or y+h > height:
+        raise ValueError("region outside capture")
+    return w, h, b"".join(rgb[(row*width+x)*3:(row*width+x+w)*3] for row in range(y, y+h))
+
+
+def compare_rgb(width, height, before, after):
+    """Unthresholded raster difference; NOT a pass/fail visual score."""
+    if len(before) != len(after) or len(before) != width * height * 3 or width <= 0 or height <= 0:
+        raise ValueError("incompatible RGB buffers")
+    difference = bytes(abs(a-b) for a,b in zip(before, after))
+    changed = 0
+    left, top, right, bottom = width, height, -1, -1
+    for i in range(0, len(difference), 3):
+        if difference[i] or difference[i+1] or difference[i+2]:
+            changed += 1
+            y, x = divmod(i//3, width)
+            left, top, right, bottom = min(left,x), min(top,y), max(right,x), max(bottom,y)
+    return {
+        "pixels": width*height, "different_pixels": changed,
+        "different_fraction": changed/(width*height),
+        "mean_absolute_channel_difference_0_255": sum(difference)/len(difference),
+        "difference_bounds_xywh": [left,top,right-left+1,bottom-top+1] if changed else None,
+        "status": "RASTER_DIFFERENCE_NOT_VISUAL_ACCEPTANCE"
+    }, difference
+
+
+def rgb_png(width, height, rgb):
+    bgra = bytearray(width*height*4)
+    bgra[0::4] = rgb[2::3]
+    bgra[1::4] = rgb[1::3]
+    bgra[2::4] = rgb[0::3]
+    bgra[3::4] = b"\xff" * (width*height)
+    return png_bytes(width, height, bgra)
+
+
+def compare_capture_pair(before_path, after_path, output, region=None):
+    meta = verify_pair(before_path, after_path)
+    w, h, before = read_capture_rgb(before_path.with_name("capture.png"))
+    aw, ah, after = read_capture_rgb(after_path.with_name("capture.png"))
+    if (w,h) != (aw,ah):
+        raise ValueError("capture sizes differ")
+    cw, ch, before = crop_rgb(w, h, before, region)
+    _, _, after = crop_rgb(w, h, after, region)
+    metrics, diff = compare_rgb(cw, ch, before, after)
+    result = dict(meta, **{k:v for k,v in metrics.items() if k != "status"},
+                  status=metrics["status"], region_xywh=list(region or (0,0,w,h)))
+    output.mkdir(parents=True, exist_ok=False)
+    for name, pixels in (("python.png", before), ("csharp.png", after), ("difference.png", diff)):
+        (output / name).write_bytes(rgb_png(cw, ch, pixels))
+    result["derived_png_sha256"] = {name: digest(output/name) for name in ("python.png", "csharp.png", "difference.png")}
+    (output / "difference.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return result
+
+
 def matrix():
     return [{"page": page, "state": state, "resolution": f"{w}x{h}", "dpi": dpi,
              "app_scale": scale, "status": "NOT_RUN"}
@@ -285,6 +383,11 @@ def main():
     pair = sub.add_parser("pair")
     pair.add_argument("python", type=Path)
     pair.add_argument("csharp", type=Path)
+    diff = sub.add_parser("diff")
+    diff.add_argument("python", type=Path)
+    diff.add_argument("csharp", type=Path)
+    diff.add_argument("--out", type=Path, required=True)
+    diff.add_argument("--region", type=int, nargs=4, metavar=("X","Y","W","H"))
     mat = sub.add_parser("matrix")
     mat.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -292,6 +395,8 @@ def main():
         capture(args)
     elif args.command == "pair":
         print(json.dumps(verify_pair(args.python, args.csharp), ensure_ascii=False, indent=2))
+    elif args.command == "diff":
+        print(json.dumps(compare_capture_pair(args.python, args.csharp, args.out, args.region), ensure_ascii=False, indent=2))
     else:
         with args.out.open("x", encoding="utf-8") as f:
             json.dump(matrix(), f, ensure_ascii=False, indent=2)
