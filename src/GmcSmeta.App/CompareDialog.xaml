@@ -17,7 +17,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Text="Что изменилось между документами" FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}"/>
+        <TextBlock Text="Что изменилось между документами" TextWrapping="Wrap" FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}"/>
         <Grid Grid.Row="1" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -27,11 +27,11 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="Было:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="ComboA" Grid.Column="1" MinWidth="260" SelectionChanged="Combo_Changed"/>
-            <Button x:Name="SwapButton" Style="{StaticResource PythonToolbarButton}" Grid.Column="2" Content="" ContentTemplate="{StaticResource IconLabelRefresh}" AutomationProperties.Name="Поменять местами" Click="Swap_Click" Margin="8,0"
+            <ComboBox x:Name="ComboA" Grid.Column="1" MinWidth="0" SelectionChanged="Combo_Changed"/>
+            <Button x:Name="SwapButton" Style="{StaticResource PythonToolbarButton}" Grid.Column="2" Content="" ContentTemplate="{StaticResource IconLabelRefresh}" MinWidth="34" MinHeight="34" AutomationProperties.Name="Поменять местами" Click="Swap_Click" Margin="8,0"
                     ToolTip="Поменять местами" Padding="8,2"/>
             <TextBlock Text="Стало:" Foreground="#64748B" Grid.Column="3" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="ComboB" Grid.Column="4" MinWidth="260" SelectionChanged="Combo_Changed"/>
+            <ComboBox x:Name="ComboB" Grid.Column="4" MinWidth="0" SelectionChanged="Combo_Changed"/>
         </Grid>
         <UniformGrid Grid.Row="2" Columns="4" Margin="0,10,0,0">
             <Border x:Name="TileCount" Margin="0,0,10,0" Style="{StaticResource PythonTile}">

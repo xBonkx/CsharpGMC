@@ -5,7 +5,8 @@
         Title="Связи этапов, ДС и КС" Width="910" Height="560"
         MinWidth="680" MinHeight="420" WindowStartupLocation="CenterOwner"
         Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}"
-        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True">
+        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <Grid Margin="20,16,20,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -13,12 +14,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="Документы полного КП и их зависимости"
-                   FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}" Margin="0,0,0,12"/>
+                   FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}" TextWrapping="Wrap" Margin="0,0,0,12"/>
         <DataGrid local:TableColumnMenu.Key="stage-links" local:TableColumnMenu.Protect="Документ" x:Name="LinksGrid" Grid.Row="1"
                   AutoGenerateColumns="False" CanUserAddRows="False"
                   CanUserDeleteRows="False" IsReadOnly="True"
                   GridLinesVisibility="Horizontal" HeadersVisibility="Column"
-                  MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True" BorderBrush="#E4E8EF"
+                  MinRowHeight="{StaticResource LayoutDocumentRowMinHeight}" CanUserResizeRows="False" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto" EnableRowVirtualization="True" EnableColumnVirtualization="True" BorderBrush="#E4E8EF"
                   Background="White" RowHeaderWidth="0" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="95" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>

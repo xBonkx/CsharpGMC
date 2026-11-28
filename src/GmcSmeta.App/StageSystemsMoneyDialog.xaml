@@ -5,7 +5,8 @@
         Title="СМР по системам" Width="690" Height="535"
         MinWidth="580" MinHeight="420" WindowStartupLocation="CenterOwner"
         Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}"
-        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True">
+        FontSize="{StaticResource UiBodySize}" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <Grid Margin="20,18,20,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,14 +19,14 @@
         <DataGrid local:TableColumnMenu.Key="stage-systems-money" local:TableColumnMenu.Protect="Система" x:Name="SystemsGrid" Grid.Row="1" CanUserAddRows="False"
                   CanUserDeleteRows="False" AutoGenerateColumns="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  RowHeaderWidth="0" MinRowHeight="27" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  RowHeaderWidth="0" MinRowHeight="{StaticResource LayoutDocumentRowMinHeight}" CanUserResizeRows="False" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto" EnableRowVirtualization="True" EnableColumnVirtualization="True"
                   BorderBrush="#E4E8EF" Background="White" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Система" Binding="{Binding Name}"
-                                    Width="*" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
+                                    Width="*" MinWidth="150" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="СМР, ₽"
                     Binding="{Binding AmountText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                    Width="180" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"/>
+                    Width="180" MinWidth="100" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"/>
             </DataGrid.Columns>
         </DataGrid>
         <TextBlock x:Name="SummaryText" Grid.Row="2" Margin="0,10,0,0"

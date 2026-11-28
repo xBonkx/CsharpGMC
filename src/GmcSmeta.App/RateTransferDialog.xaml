@@ -27,12 +27,13 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="Из" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox x:Name="SourceCombo" Grid.Column="1" SelectionChanged="Source_Changed"/>
+            <ComboBox x:Name="SourceCombo" Grid.Column="1" MinWidth="0" SelectionChanged="Source_Changed"/>
             <Grid Grid.Column="2" Width="220" Margin="10,0,0,0">
                 <TextBox x:Name="SourceSearch" Style="{StaticResource PythonSearch}" TextChanged="Search_Changed"
-                         Padding="8,5,32,5" AutomationProperties.Name="Поиск КП" ToolTip="Поиск КП"/>
+                         Padding="32,5,32,5" AutomationProperties.Name="Поиск КП" ToolTip="Поиск КП"/>
                 
-                <TextBlock Text="Поиск КП" Foreground="#94A3B8" Margin="8,0,32,0" VerticalAlignment="Center"
+                <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
+                <TextBlock Text="Поиск КП" Foreground="#94A3B8" Margin="32,0,32,0" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">

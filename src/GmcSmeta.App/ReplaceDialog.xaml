@@ -21,16 +21,16 @@
         <TextBlock x:Name="CaptionText" FontWeight="SemiBold" FontSize="{StaticResource UiH2Size}" TextWrapping="Wrap"/>
         <TextBlock x:Name="HintText" Grid.Row="1" Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0"/>
         <WrapPanel Grid.Row="2" VerticalAlignment="Center" Margin="0,10,0,0">
-            <TextBlock Text="Взять из буфера: " VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <CheckBox x:Name="TakeName" Style="{StaticResource PythonFilterChip}" Content="наименование" IsChecked="True" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <CheckBox x:Name="TakeUnit" Style="{StaticResource PythonFilterChip}" Content="ед." IsChecked="True" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <CheckBox x:Name="TakeQty" Style="{StaticResource PythonFilterChip}" Content="кол-во" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,20,0"/>
-            <TextBlock Text="Цену из буфера — " VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <RadioButton x:Name="ModePurch" Content="в закупку" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <RadioButton x:Name="ModePrice" Content="в цену клиенту" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <RadioButton x:Name="ModeMarkup" Content="в закупку, цена клиенту = закупка ×" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,4,0"/>
-            <TextBox x:Name="MarkupBox" Style="{StaticResource PythonSearch}" Width="66" Margin="0,0,8,0" TextChanged="OnChanged"/>
-            <RadioButton x:Name="ModeNone" Content="не брать" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center"/>
+            <TextBlock Text="Взять из буфера: " VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <CheckBox x:Name="TakeName" Style="{StaticResource PythonFilterChip}" Content="наименование" IsChecked="True" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,6"/>
+            <CheckBox x:Name="TakeUnit" Style="{StaticResource PythonFilterChip}" Content="ед." IsChecked="True" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,6"/>
+            <CheckBox x:Name="TakeQty" Style="{StaticResource PythonFilterChip}" Content="кол-во" Checked="OnChanged" Unchecked="OnChanged" VerticalAlignment="Center" Margin="0,0,20,6"/>
+            <TextBlock Text="Цену из буфера — " VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <RadioButton x:Name="ModePurch" Content="в закупку" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,6"/>
+            <RadioButton x:Name="ModePrice" Content="в цену клиенту" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,8,6"/>
+            <RadioButton x:Name="ModeMarkup" Content="в закупку, цена клиенту = закупка ×" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,4,6"/>
+            <TextBox x:Name="MarkupBox" Style="{StaticResource PythonSearch}" Width="82" TextAlignment="Right" Margin="0,0,8,6" TextChanged="OnChanged"/>
+            <RadioButton x:Name="ModeNone" Content="не брать" GroupName="PriceMode" Checked="OnChanged" VerticalAlignment="Center" Margin="0,0,0,6"/>
         </WrapPanel>
         <DataGrid local:TableColumnMenu.Key="replace-preview" local:TableColumnMenu.Protect="Было в КП|Станет" MinRowHeight="27"
                  

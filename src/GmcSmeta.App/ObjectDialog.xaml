@@ -8,12 +8,12 @@
     <Grid Margin="{StaticResource LayoutFormDialogMargin}">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="{StaticResource LayoutFormFieldMargin}">
-            <TextBlock x:Name="Heading" Text="Новый договор" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
+            <TextBlock x:Name="Heading" Text="Новый договор" TextWrapping="Wrap" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
             <TextBlock x:Name="AgreementInfoText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"/>
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid>
-            <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid.Resources>
                 <Style TargetType="Label"><Setter Property="Foreground" Value="#475569"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/><Setter Property="FontSize" Value="{StaticResource UiBodySize}"/><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="{StaticResource LayoutFormLabelMargin}"/><Setter Property="Padding" Value="0"/></Style>
@@ -47,8 +47,8 @@
                 </TextBlock.Style>
         </TextBlock>
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" Width="122" Height="34" Margin="0,0,8,0"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Width="122" Height="34"/>
+            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="122" MinHeight="34" Margin="0,0,8,0"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" MinWidth="122" MinHeight="34"/>
         </StackPanel>
     </Grid>
 </Window>

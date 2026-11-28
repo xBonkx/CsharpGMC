@@ -16,6 +16,7 @@
             <Setter Property="Padding" Value="19,10"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -29,9 +30,7 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="#F1F5F9"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB"/>
-                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -57,9 +56,7 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Chrome" Property="Background" Value="#991B1B"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#FCA5A5"/>
-                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -83,12 +80,12 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,10,0">
-                    <TextBlock x:Name="Heading" FontSize="19" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Heading" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     <TextBlock Text="Подтверждение удаления" Margin="0,3,0,0" Foreground="#64748B"/>
                 </StackPanel>
-                <Button Grid.Column="2" Content="×" Click="Cancel_Click"
-                        FontSize="22" Foreground="#64748B" Background="Transparent"
-                        BorderThickness="0" Cursor="Hand" ToolTip="Закрыть" Focusable="False"/>
+                <Button Grid.Column="2" Content="Закрыть" ContentTemplate="{StaticResource IconOnlyX}" Click="Cancel_Click"
+                        Style="{StaticResource PythonToolbarButton}" Foreground="#64748B" Background="Transparent"
+                        BorderThickness="0" Cursor="Hand" ToolTip="Закрыть" AutomationProperties.Name="Закрыть" MinWidth="0" Padding="0"/>
             </Grid>
             <TextBlock x:Name="Description" Margin="24,20,24,12" TextWrapping="Wrap" Foreground="#334155"/>
             <Border Margin="24,0,24,0" BorderBrush="#E2E8F0" BorderThickness="1"
@@ -118,7 +115,7 @@
                 </StackPanel>
             </Border>
             <TextBlock Text="Проверьте выделение перед подтверждением — будут удалены все показанные строки."
-                       Foreground="#64748B" Margin="24,11,24,0" FontSize="12"/>
+                       Foreground="#64748B" Margin="24,11,24,0" FontSize="12" TextWrapping="Wrap"/>
             <Border BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="24,15,24,18">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Отмена" Style="{StaticResource DeleteCancelButton}"
