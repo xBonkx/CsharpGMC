@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — ARCH-SIZE-01.01/.02 PARTIAL: pinned tree, 1042 candidates, 30 files counted, family map. Full clone unavailable; [evidence](docs/ARCH_SIZE_PINNED_SAMPLE_20261129.md). Бронь снята.
+
 - 29.11.2026 — DEMO-01.01 CODE READY / DEMO-05.01 PARTIAL: изоляция до WPF/trace, отказ прямого тестового EXE без аргументов, безопасные пути настроек. 3 test methods added, not run; [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.
 
 - 29.11.2026 — DEMO-02.01 PARTIAL: generator preflight + metal and catalog price fixture, 2 tests added (not run), Python main a76b032a. [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.

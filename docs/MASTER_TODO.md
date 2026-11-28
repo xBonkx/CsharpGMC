@@ -1,3 +1,5 @@
+29.11: ARCH-SIZE-01.01/.02 PARTIAL — [pinned metadata, 30-file line sample, family map](ARCH_SIZE_PINNED_SAMPLE_20261129.md); full local inventory remains.
+
 # Единый реестр замечаний GMC-Смета C#
 
 DEMO-01.01 CODE READY, DEMO-05.01 PARTIAL: [early isolated startup](DEMO_MODE_TODO_20261128.md); полная приёмка отдельно.
