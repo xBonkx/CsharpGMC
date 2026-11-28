@@ -4,7 +4,8 @@
         xmlns:local="clr-namespace:GmcSmeta.App"
         Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
-        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="DirectorBoolVisibility"/>
         <Style x:Key="DirectorExportButton" TargetType="Button" BasedOn="{StaticResource PythonToolbarButton}">
@@ -13,7 +14,7 @@
             <Setter Property="Padding" Value="9,6"/>
         </Style>
         <Style x:Key="DirectorHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource ReportGridHeader}">
-            <Setter Property="Height" Value="48"/>
+            <Setter Property="MinHeight" Value="48"/>
             <Setter Property="Padding" Value="5,3"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="ContentTemplate">
@@ -40,7 +41,7 @@
             <Setter Property="Padding" Value="4,3"/>
         </Style>
         <Style x:Key="DirectorRow" TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
-            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="MinHeight" Value="{Binding MinRowHeight, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             <Style.Triggers>
                 <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F9FAFC"/></Trigger>
                 <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#F1F4F9"/></Trigger>
@@ -86,7 +87,7 @@
         </Style>
         <Style x:Key="DirectorLate" TargetType="TextBlock" BasedOn="{StaticResource DirectorCenter}">
             <Style.Triggers>
-                <DataTrigger Binding="{Binding HasLate}" Value="True"><Setter Property="Foreground" Value="#DC2626"/><Setter Property="FontWeight" Value="Bold"/></DataTrigger>
+                <DataTrigger Binding="{Binding HasLate}" Value="True"><Setter Property="Foreground" Value="#DC2626"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="ToolTip" Value="Поставки, которые не пришли в срок. Откройте карточку → «Закупки» → «Просрочено»."/></DataTrigger>
                 <DataTrigger Binding="{Binding KpOnly}" Value="True"><Setter Property="Foreground" Value="#64748B"/></DataTrigger><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
@@ -169,12 +170,15 @@
             </Border>
         </UniformGrid>
         <Border Grid.Row="3" Margin="{StaticResource LayoutDirectorSectionGap}" Style="{StaticResource DirectorTableFrame}">
+            <!-- Outer border owns shadow and stroke; the inner clip keeps scrolling content inside the rounded corners. -->
+            <local:SummaryTableFrame Background="White" CornerRadius="11" BorderThickness="0">
             <DataGrid local:TableColumnMenu.Key="director" local:TableColumnMenu.Exclude="Сдано по КС|Докуплено вне сметы|Выдано на объект|Просрочено поставок|Закуп известен" local:TableColumnMenu.Protect="Карточка" x:Name="DirectorGrid" CellStyle="{StaticResource DirectorCell}" ColumnHeaderStyle="{StaticResource DirectorHeader}"
                       RowStyle="{StaticResource DirectorRow}" MinRowHeight="40" AlternationCount="2" Background="White" BorderThickness="0"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
                       HorizontalGridLinesBrush="#E4E8EF" VerticalGridLinesBrush="#E4E8EF"
                       AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
                       HeadersVisibility="Column" GridLinesVisibility="All" RowHeaderWidth="0"
+                      CanUserResizeRows="False" CanUserResizeColumns="True" CanUserSortColumns="True"
                       SelectionMode="Single" SelectionUnit="FullRow" MouseDoubleClick="Grid_DoubleClick"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                       VirtualizingPanel.VirtualizationMode="Recycling">
@@ -223,6 +227,7 @@
                     <DataGridTextColumn Header="Просрочено&#10;поставок" Binding="{Binding Late}" Width="1.1*" MinWidth="95" ElementStyle="{StaticResource DirectorLate}" SortMemberPath="LateValue" x:Name="LateColumn"/>
                 </DataGrid.Columns>
             </DataGrid>
+            </local:SummaryTableFrame>
         </Border>
         <StackPanel Grid.Row="4" Margin="{StaticResource LayoutDirectorSectionGap}">
             <DockPanel x:Name="LoadStatusPanel" Visibility="Collapsed" Margin="0,0,0,6">
