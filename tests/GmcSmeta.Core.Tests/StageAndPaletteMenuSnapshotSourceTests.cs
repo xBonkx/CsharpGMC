@@ -23,6 +23,41 @@ public sealed class StageAndPaletteMenuSnapshotSourceTests
     }
 
     [Fact]
+    public void InlineStageNavigationAwaitsRevisionFencedMetadataAndChecksFullIdentity()
+    {
+        var menu = Read("GmcSmeta.App", "EstimateView.InlineStages.cs");
+        Assert.Contains("snapshot.Revision, CanOpen", menu);
+        Assert.Contains("ReferenceEquals(snapshot.Rest, stage)", menu);
+        Assert.Contains("!_serverConflict", menu);
+        var code = Read("GmcSmeta.App", "MainWindow.SqlServer.cs");
+        var start = code.IndexOf("internal async void NavigateToStageEstimate", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var end = code.IndexOf("private void TransferRates", start, StringComparison.Ordinal);
+        Assert.True(end > start);
+        var method = code[start..end];
+        Assert.Contains("var loaded = await Task.Run", method);
+        Assert.Contains("SqlServerDatabase.Revision(conn) != expectedRevision", method);
+        Assert.Contains("if (!Current()) return;", method);
+        Assert.Contains("d.StageOf == fullId", method);
+        Assert.Contains("d.StageRest == isRest", method);
+        Assert.Contains("d.ObjectId == objectId", method);
+        Assert.Contains("ReferenceEquals(PageHost.Content, source)", method);
+        Assert.DoesNotContain("ReloadAndSelect(objectId);", method);
+        Assert.True(method.IndexOf("ApplyNavigationData", StringComparison.Ordinal) <
+            method.IndexOf("OpenEstimate(stageId);", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LegacyStageDialogChecksServerRevisionBeforePublishingOpenRequest()
+    {
+        var code = Read("GmcSmeta.App", "StagesDialog.xaml.cs");
+        Assert.Contains("private async void OpenStage", code);
+        Assert.Contains("if (OpenStageRequested is null)", code);
+        Assert.Contains("actualRevision != revision", code);
+        Assert.Contains("!ReferenceEquals(stage, _restDocument)", code);
+    }
+
+    [Fact]
     public void SelectedStageWriterRejectsDuplicateAndForeignIds()
     {
         var code = Read("GmcSmeta.Core", "Db/SqlServerStages.SelectedRows.cs");

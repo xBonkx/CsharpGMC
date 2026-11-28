@@ -349,11 +349,56 @@ public partial class MainWindow
     /// Open a stage from the embedded estimate stage card. The existing main
     /// window remains the sole owner of navigation and document selection.
     /// </summary>
-    internal void NavigateToStageEstimate(int stageId, int objectId)
+    private long _stageNavigationRequest;
+
+    internal async void NavigateToStageEstimate(EstimateView source, int stageId, int objectId,
+        int fullId, bool isRest, string expectedRevision, Func<bool> sourceCurrent)
     {
-        if (_serverConn is null) return;
-        ReloadAndSelect(objectId);
-        OpenEstimate(stageId);
+        if (_serverConn is null || _sqlConnectionString is not { } connection ||
+            string.IsNullOrWhiteSpace(expectedRevision) || !sourceCurrent() ||
+            !ReferenceEquals(PageHost.Content, source)) return;
+        var request = ++_stageNavigationRequest;
+        var navigation = _estimateOpenGeneration;
+        var dataGeneration = _navigationDataGeneration;
+        bool Current() => !_startupClosed && _ready && request == _stageNavigationRequest &&
+            navigation == _estimateOpenGeneration && dataGeneration == _navigationDataGeneration &&
+            connection == _sqlConnectionString && ReferenceEquals(PageHost.Content, source) &&
+            sourceCurrent();
+        try
+        {
+            // Do not call async-void ReloadAndSelect: its late completion used to
+            // replace the opened stage with the object page. Fence the metadata
+            // against the same revision as the clicked distribution snapshot.
+            var loaded = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(connection);
+                if (SqlServerDatabase.Revision(conn) != expectedRevision)
+                    throw new InvalidOperationException("Распределение изменилось. Обновите смету.");
+                var data = Workspace.ReadConsistentNavigation(conn);
+                if (SqlServerDatabase.Revision(conn) != expectedRevision)
+                    throw new InvalidOperationException("Распределение изменилось. Обновите смету.");
+                return data;
+            });
+            if (!Current()) return;
+            var doc = loaded.Documents.FirstOrDefault(d => d.Id == stageId &&
+                d.ObjectId == objectId && d.Kind == "kp" && d.StageOf == fullId &&
+                d.StageRest == isRest);
+            if (doc is null || !loaded.Objects.Any(o => o.Id == objectId) ||
+                !loaded.Documents.Any(d => d.Id == fullId && d.ObjectId == objectId &&
+                    d.Kind == "kp" && !d.IsStage && !d.StageRest))
+                throw new InvalidOperationException("КП больше не принадлежит выбранному распределению.");
+            ++_navigationDataGeneration;
+            CancelNavigationRefresh();
+            ApplyNavigationData(loaded.Objects, loaded.Documents);
+            SynchronizeNavigation(doc, rebuildTree: true);
+            OpenEstimate(stageId);
+        }
+        catch (Exception ex)
+        {
+            if (!Current()) return;
+            LogError(ex);
+            StatusText.Text = "Не удалось открыть КП этапа: " + ex.Message;
+        }
     }
 
     /// <summary>Скопировать расценки из другого КП (rate_transfer_dialog): диалог, перенос, перечитывание.</summary>

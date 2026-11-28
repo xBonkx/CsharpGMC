@@ -419,14 +419,19 @@ public partial class EstimateView
         var name = stage.Rest ? "Остаток" : ShortStageName(stage.Name);
         bool Writable() => BulkStageAllowed && ReferenceEquals(snapshot, _inlineStagesData) &&
             !stage.Rest && !stage.Locked && stage.StageSum is null;
-        bool CanOpen() => !_detached && !_inlineStagesLoading && !_inlineStageCommandBusy &&
+        bool CanOpen() => IsEnabled && _inlineStagesOn && !_detached && !_serverConflict &&
+            !_inlineStagesLoading && !_inlineStageCommandBusy &&
             ReferenceEquals(snapshot, _inlineStagesData) && snapshot.Revision == _serverRevision &&
-            !HasUnsettledCacheWrites && !HasActiveEstimateEdit() && stage.Id is > 0 and <= int.MaxValue;
+            !string.IsNullOrWhiteSpace(snapshot.Revision) &&
+            !HasUnsettledCacheWrites && !HasActiveEstimateEdit() && stage.Id is > 0 and <= int.MaxValue &&
+            (stage.Rest ? ReferenceEquals(snapshot.Rest, stage) :
+                snapshot.Stages.Any(item => ReferenceEquals(item, stage)));
         var open = ContextMenuIcons.Create($"Открыть КП «{name}»", "File", CanOpen());
         open.Click += (_, _) =>
         {
             if (CanOpen() && Window.GetWindow(this) is MainWindow main)
-                main.NavigateToStageEstimate(checked((int)stage.Id), _objectId);
+                main.NavigateToStageEstimate(this, checked((int)stage.Id), _objectId,
+                    _contractId, stage.Rest, snapshot.Revision, CanOpen);
         };
         menu.Items.Add(open);
         void Add(string label, string glyph, string action, bool danger = false)

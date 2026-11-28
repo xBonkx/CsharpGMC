@@ -4,6 +4,8 @@
 
 **Начать с [рабочей очереди](docs/EXECUTION_TODO_20261128.md) или [приёмки старых CODE READY](docs/ACCEPTANCE_TODO.md), сверить обе очереди, забронировать ID и подтвердить коммит в main.** Не читать весь исторический журнал для выбора задач.
 
+- 29.11.2026 — CTX-034.01 CODE READY: исправлена гонка открытия КП этапа/остатка, проверена точная принадлежность и ревизия до навигации; два source-теста не запускались. CTX-034.02 BLOCKED: удаление computed rest требует согласованного правила, SQL-защита сохранена. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md); родитель PARTIAL, Pilot остаётся.
+
 - 29.11.2026 — AGR-04/05: изоляция реквизитов и точный readback карточки, явный выбор legal target; 2 дочерних CODE READY, 3 PARTIAL, 0 DONE. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-card-scope-20261129). Сборка/SQL не запускались, бронь снята.
 - 29.11.2026 — CTX-009.04 PARTIAL: 7 consequential confirmation defaults corrected (Excel/PTO/metal/replace/archive), seven source-test cases added, not run; dynamic inventory and WPF/Pilot pending. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята, родитель PARTIAL.
 - 29.11.2026 — CTX-014.01 CODE READY: эксклюзивная индикация сохранённого масштаба шрифта, привязка команды к собственному подменю, два новых source-теста (не запускались). Родитель PARTIAL; фактическая Windows-приёмка и дизайн остаются. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).

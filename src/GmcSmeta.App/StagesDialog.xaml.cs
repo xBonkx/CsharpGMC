@@ -884,18 +884,50 @@ public partial class StagesDialog : Window
         }
     }
 
-    private void OpenStage(long stageId)
+    private bool _stageOpenBusy;
+
+    private async void OpenStage(long stageId)
     {
-        if (_closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
-        if (stageId is <= 0 or > int.MaxValue ||
-            (!_cachedStages.Any(stage => stage.Id == stageId) && _restDocument?.Id != stageId))
+        if (_closed || _building || _quantityWriteBusy || _stageOpenBusy ||
+            string.IsNullOrWhiteSpace(_revision)) return;
+        var revision = _revision;
+        var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId) ??
+            (_restDocument?.Id == stageId ? _restDocument : null);
+        if (stageId is <= 0 or > int.MaxValue || stage is null)
         {
             SetStatus("Документ этапа не входит в текущий снимок или его идентификатор не поддерживается.");
             return;
         }
-        // Открытие КП этапа — через главное окно (оно перечитает список и откроет смету).
-        OpenStageRequested?.Invoke(checked((int)stageId));
-        Close();
+        if (OpenStageRequested is null)
+        {
+            SetStatus("Открытие КП недоступно: используйте этапы внутри сметы.");
+            return;
+        }
+        _stageOpenBusy = true;
+        try
+        {
+            var actualRevision = await Task.Run(() =>
+            {
+                using var conn = SqlServerDatabase.Open(_connectionString);
+                return SqlServerDatabase.Revision(conn);
+            });
+            if (_closed || _building || _quantityWriteBusy || revision != _revision ||
+                (stage.Rest ? !ReferenceEquals(stage, _restDocument) :
+                    !_cachedStages.Any(item => ReferenceEquals(item, stage)))) return;
+            if (actualRevision != revision)
+            {
+                SetStatus("Распределение изменилось. Обновите этапы перед открытием КП.");
+                return;
+            }
+            if (OpenStageRequested is null) return;
+            OpenStageRequested?.Invoke(checked((int)stageId));
+            Close();
+        }
+        catch (Exception ex)
+        {
+            if (!_closed) SetStatus("Не удалось открыть КП этапа: " + ex.Message);
+        }
+        finally { _stageOpenBusy = false; }
     }
 
     /// <summary>Главное окно подписывается: открыть смету этапа после закрытия окна этапов.</summary>
