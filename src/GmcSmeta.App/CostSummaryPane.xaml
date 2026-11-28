@@ -285,7 +285,7 @@
                               EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderThickness="0"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                               CanUserReorderColumns="False" HeadersVisibility="Column" GridLinesVisibility="None" RowHeaderWidth="0"
-                              SelectionMode="Single" SelectionUnit="Cell" AlternationCount="2"
+                              SelectionMode="Extended" SelectionUnit="Cell" ClipboardCopyMode="ExcludeHeader" AlternationCount="2"
                               BeginningEdit="TotalsGrid_BeginningEdit" CellEditEnding="TotalsGrid_CellEditEnding"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" VirtualizingPanel.VirtualizationMode="Recycling">
                         <DataGrid.Columns>
