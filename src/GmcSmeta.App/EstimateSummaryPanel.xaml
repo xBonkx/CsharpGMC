@@ -803,7 +803,7 @@
             </Style>
             <Style x:Key="SummaryTileDetail" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="{StaticResource UiCaptionSize}"/>
-                <Setter Property="Foreground" Value="#64748B"/>
+                <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
                 <Setter Property="Margin" Value="0,2,0,0"/>
             </Style>
