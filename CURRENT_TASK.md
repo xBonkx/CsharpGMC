@@ -2,7 +2,7 @@
 
 - 29.11.2026 — CTX-047.01–03/048.03 PARTIAL: file inventory and candidate coverage gate; 9 isolated assertions passed, full scan and mapping pending. Correction: preceding CTX-048.01 test count lacks execution evidence. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
-- 29.11.2026 — CTX-048.01 CODE READY: усилен валидатор реестра меню, вывод точных исходных ссылок; 7 изолированных Python-проверок OK. CTX-048 остаётся PARTIAL. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
+- 29.11.2026 — CTX-048.01 CODE READY: усилен валидатор реестра меню, вывод точных исходных ссылок; тесты добавлены, выполнение не подтверждено. CTX-048 остаётся PARTIAL. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
 **Начать с [рабочей очереди](docs/EXECUTION_TODO_20261128.md) или [приёмки старых CODE READY](docs/ACCEPTANCE_TODO.md), сверить обе очереди, забронировать ID и подтвердить коммит в main.** Не читать весь исторический журнал для выбора задач.
 
