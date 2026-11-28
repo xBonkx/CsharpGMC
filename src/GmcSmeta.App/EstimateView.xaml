@@ -444,7 +444,7 @@
                     </Border>
                         <Border local:DocumentCrumbPanel.CanShrink="True" x:Name="CompanyChip" ToolTip="{Binding Text, ElementName=CompanyText}" Margin="{StaticResource LayoutHeaderChipGap}" Background="#F1F4F9"
                             CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center">
-                        <TextBlock x:Name="CompanyText" VerticalAlignment="Center" Foreground="#64748B" MaxWidth="180" TextTrimming="CharacterEllipsis"
+                        <TextBlock x:Name="CompanyText" VerticalAlignment="Center" Foreground="{StaticResource UiMutedTextBrush}" MaxWidth="180" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    FontSize="{StaticResource UiCaptionSize}"/>
                     </Border>
@@ -624,7 +624,7 @@
                 <TextBox x:Name="EstimateSearch" Style="{StaticResource PythonIconSearch}" TextChanged="EstimateSearch_TextChanged"
                          ToolTip="Найти в смете…" AutomationProperties.Name="Найти в смете"/>
                  <Viewbox Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                <TextBlock Text="Найти в смете…" Foreground="#64748B" Margin="30,0,32,0"
+                <TextBlock Text="Найти в смете…" Foreground="{StaticResource UiMutedTextBrush}" Margin="30,0,32,0"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style><Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -724,7 +724,7 @@
                             <WrapPanel x:Name="InlineStagesCards"/>
                         </ScrollViewer>
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Показать:" VerticalAlignment="Center" Foreground="#64748B"
+                            <TextBlock Text="Показать:" VerticalAlignment="Center" Foreground="{StaticResource UiMutedTextBrush}"
                                        Margin="0,0,7,0"/>
                             <ComboBox x:Name="InlineStagesFilter" Width="183" SelectedIndex="0"
                                       SelectionChanged="InlineStagesFilter_SelectionChanged"
@@ -741,7 +741,7 @@
                         <!-- Keep selection tools on one compact line; locked stages stay in cards. -->
                         <DockPanel Margin="0,5,0,0" LastChildFill="True">
                             <TextBlock DockPanel.Dock="Left" x:Name="InlineStagesSelectionInfo"
-                                       FontSize="{StaticResource UiCaptionSize}" Foreground="#64748B"
+                                       FontSize="{StaticResource UiCaptionSize}" Foreground="{StaticResource UiMutedTextBrush}"
                                        VerticalAlignment="Center" Margin="0,0,10,0"/>
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto" MaxHeight="78">
@@ -989,7 +989,7 @@
                         ToolTip="Свернуть итоги в одну строку — таблице больше места"/>
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
-                               Foreground="#64748B" VerticalAlignment="Center"/>
+                               Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center"/>
                     <ScrollViewer x:Name="TotalsCardsViewport" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="360" Focusable="False">
                     <local:EstimateTotalsCardsPanel x:Name="TotalsCards" Columns="4">
                 <Border x:Name="MaterialsCard" Style="{StaticResource Card}" MinHeight="70">
