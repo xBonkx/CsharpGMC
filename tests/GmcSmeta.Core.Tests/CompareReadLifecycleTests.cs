@@ -63,10 +63,16 @@ public sealed class CompareReadLifecycleTests
         var stage = ui.IndexOf("await Task.Run(() => ExportFilePublication.Stage", StringComparison.Ordinal);
         Assert.True(stage >= 0);
         var guard = ui.IndexOf("!ReferenceEquals(res, _result)) return;", stage, StringComparison.Ordinal);
-        var publish = ui.IndexOf("prepared.Publish();", stage, StringComparison.Ordinal);
+        var publish = ui.IndexOf("await Task.Run(() => prepared.Publish());", stage, StringComparison.Ordinal);
         Assert.True(guard > stage && publish > guard);
         Assert.Contains("_exportCancellation?.Cancel();", ui);
         Assert.Contains("sheet.Range(5, 6, row - 1, 10)", ui);
-        Assert.Contains("if (!_closed) ExportButton.IsEnabled = _result is not null;", ui);
+        Assert.Contains("ExportButton.IsEnabled = _result is not null;", ui);
+        var fence = ui.IndexOf("_publishingExport = true;", guard, StringComparison.Ordinal);
+        Assert.True(fence > guard && fence < publish);
+        Assert.Contains("ComboA.IsEnabled = ComboB.IsEnabled = SwapButton.IsEnabled = false;", ui);
+        Assert.Contains("Closing += (_, e) => { if (_publishingExport) e.Cancel = true; };", ui);
+        Assert.Contains("if (_closed || _publishingExport) return;", ui);
+        Assert.Contains("await Task.Run(prepared.Dispose)", ui);
     }
 }

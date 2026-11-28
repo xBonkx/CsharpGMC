@@ -1,5 +1,6 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.06 CODE READY: attachment selection cancellation and off-dispatcher comparison publication; .01 PARTIAL (history snapshot SQL fence pending). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Tests not run, reservations released.
 - 29.11.2026 — AGR-05.01–03 CODE READY: явная серверная привязка, проверка ДС и пакетный импорт; AGR-06.01 ранее реализован, AGR-07.02 PARTIAL. 3 новых CODE READY, 0 DONE, Windows/SQL не запускались. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-server-scope-20261129). Бронь снята.
 
 - 29.11.2026 — CTX-047.01–03/048.03 PARTIAL: file inventory and candidate coverage gate; 9 isolated assertions passed, full scan and mapping pending. Correction: preceding CTX-048.01 test count lacks execution evidence. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).

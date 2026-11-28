@@ -85,7 +85,13 @@ public sealed class AttachmentWindow : Window
         _grid.ItemsSource = _rows;
         _grid.ContextMenu = new ContextMenu();
         _grid.ContextMenuOpening += AttachmentMenu_Opening;
-        _grid.MouseDoubleClick += async (_, _) => await OpenSelectedAsync();
+        _grid.MouseDoubleClick += async (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source &&
+                ItemsControl.ContainerFromElement(_grid, source) is DataGridRow row &&
+                ReferenceEquals(row.Item, _grid.SelectedItem))
+                await OpenSelectedAsync();
+        };
 
         var root = new DockPanel { Margin = new Thickness(22,18,22,18) };
         Content = root;
@@ -156,7 +162,12 @@ public sealed class AttachmentWindow : Window
         AddRole("Сделать основным PDF", "File", true, true, row => IsPdf(row) && (row.Role != "signed_contract" || !row.IsPrimary));
         AddRole("Снять отметку", "X", false, false, row => row.Role == "signed_contract");
         DockPanel.SetDock(roleBar, Dock.Top); root.Children.Add(roleBar);
-        _grid.SelectionChanged += (_, _) => UpdateCommands();
+        _grid.SelectionChanged += (_, _) =>
+        {
+            // Even A → B → A invalidates an in-flight file-open request.
+            _openCancellation?.Cancel();
+            UpdateCommands();
+        };
         UpdateCommands();
 
         DockPanel.SetDock(_grid, Dock.Top);
