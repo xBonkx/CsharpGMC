@@ -24,6 +24,8 @@ public partial class PeopleView : UserControl
     private List<AccessCompany> _companies = new();
     private List<PeoplePerson> _people = new();
     private List<PeopleCar> _cars = new();
+    private Dictionary<long, string> _peopleSearch = new();
+    private Dictionary<long, string> _carSearch = new();
     private List<HistoryOption> _history = new();
     private readonly HashSet<long> _checkedPeople = new();
     private readonly HashSet<long> _checkedCars = new();
@@ -274,9 +276,14 @@ public partial class PeopleView : UserControl
     private void ApplyDirectory(IReadOnlyList<PeoplePerson> people, IReadOnlyList<PeopleCar> cars,
         string revision, long? selectedP, long? selectedC)
     {
-        _revision = revision;
+        if (string.IsNullOrWhiteSpace(revision))
+            throw new DBConcurrencyException("Справочник получен без ревизии. Повторите загрузку.");
         _people = people.ToList();
         _cars = cars.ToList();
+        // Text fields are immutable until the next authoritative directory readback.
+        _peopleSearch = _people.ToDictionary(p => p.Id, p => p.Fio + " " + p.Post + " " + p.Birth + " " + p.Note);
+        _carSearch = _cars.ToDictionary(c => c.Id, c => c.Model + " " + c.Plate + " " + c.Note);
+        _revision = revision;
         if (IsAccess)
         {
             // Python first-ever access list selects all active employees/vehicles.
@@ -305,10 +312,10 @@ public partial class PeopleView : UserControl
         {
             if (view is null) continue;
             view.Filter = row => person
-                ? row is PeoplePerson p && (p.Fio + " " + p.Post + " " + p.Birth + " " + p.Note)
-                    .Contains(query, StringComparison.CurrentCultureIgnoreCase)
-                : row is PeopleCar c && (c.Model + " " + c.Plate + " " + c.Note)
-                    .Contains(query, StringComparison.CurrentCultureIgnoreCase);
+                ? row is PeoplePerson p && _peopleSearch.TryGetValue(p.Id, out var personText) &&
+                    personText.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                : row is PeopleCar c && _carSearch.TryGetValue(c.Id, out var carText) &&
+                    carText.Contains(query, StringComparison.CurrentCultureIgnoreCase);
         }
         UpdateCounts();
     }
@@ -596,15 +603,18 @@ public partial class PeopleView : UserControl
         }
     });
 
-    private async Task RefreshHistoryAsync()
+    private async Task RefreshHistoryAsync(long registeredId)
     {
         if (!IsAccess) return;
         var id = _objectId!.Value;
         var history = await Task.Run(() => _db.History(id, "list"));
-        ApplyHistory(history);
+        if (_closed) return;
+        if (!history.Any(h => h.Id == registeredId))
+            throw new DBConcurrencyException("Созданный список отсутствует в обновлённой истории.");
+        ApplyHistory(history, registeredId);
     }
 
-    private void ApplyHistory(IReadOnlyList<AccessHistory> history)
+    private void ApplyHistory(IReadOnlyList<AccessHistory> history, long? registeredId = null)
     {
         _history = history.Select(h => new HistoryOption(h, $"{h.CreatedAt:dd.MM.yyyy HH:mm} · {h.User}")).ToList();
         var wasLoading = _loading;
@@ -612,7 +622,13 @@ public partial class PeopleView : UserControl
         try
         {
             HistoryBox.ItemsSource = _history;
-            if (_history.Count > 0)
+            if (registeredId.HasValue)
+            {
+                // A concurrent export may precede ours in the list. Keep the current
+                // draft/checkmarks, and select exactly the registered export receipt.
+                HistoryBox.SelectedItem = _history.FirstOrDefault(h => h.History.Id == registeredId.Value);
+            }
+            else if (_history.Count > 0)
             {
                 HistoryBox.SelectedIndex = 0;
                 RestoreHistory(_history[0].History);
@@ -727,10 +743,13 @@ public partial class PeopleView : UserControl
             // No history record if XLSX was not successfully saved.
             PeopleDocuments.ExportAccessList(path, company, req, intro, people, cars, signer);
         });
+        long registeredId;
         try
         {
-            _revision = (await MutateAsync(expected => _db.RegisterExport(objectId, "list", path,
-                JsonSerializer.Serialize(snapshot), operation, expected))).Revision;
+            var registered = await MutateAsync(expected => _db.RegisterExport(objectId, "list", path,
+                JsonSerializer.Serialize(snapshot), operation, expected));
+            registeredId = registered.Id;
+            _revision = registered.Revision;
         }
         catch (Exception)
         {
@@ -741,7 +760,7 @@ public partial class PeopleView : UserControl
             throw;
         }
         HintText.Text = "Список создан и зарегистрирован в SQL Server.";
-        try { await RefreshHistoryAsync(); }
+        try { await RefreshHistoryAsync(registeredId); }
         catch (Exception ex)
         {
             HintText.Text = "Список зарегистрирован. Не удалось обновить историю.";
