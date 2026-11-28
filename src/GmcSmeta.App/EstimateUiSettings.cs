@@ -28,6 +28,12 @@ internal sealed class EstimateUiSettings
         _purchaseChoiceChanged = true;
     }
 
+    internal void ResetPurchaseVisibility()
+    {
+        PurchaseVisible = null;
+        _purchaseChoiceChanged = true;
+    }
+
     internal void RefreshPurchasePreference()
     {
         if (!_purchaseChoiceChanged && File.Exists(FilePath))

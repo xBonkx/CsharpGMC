@@ -1210,6 +1210,31 @@ public partial class EstimateView : UserControl
             SaveEstimateUiSettings();
         };
         menu.Items.Add(showAll);
+        var resetVisibility = new MenuItem { Header = "Вернуть видимость столбцов по умолчанию" };
+        resetVisibility.Click += (_, _) =>
+        {
+            if (HasActiveEstimateEdit() || _detached) return;
+            foreach (var (item, column) in items)
+            {
+                if (!Allowed(column) || column == BasisColumn && _estimate?.Form == "r4") continue;
+                if (SetInlineStageColumnVisibility(column, true)) { item.IsChecked = true; continue; }
+                if (column == PurchaseColumn) continue; // automatic rule is restored below
+                var visible = column != AreaUnitColumn && column != AreaTotalColumn && column != BasisColumn;
+                column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                item.IsChecked = visible;
+            }
+            if (includePurchase)
+            {
+                _uiSettings.ResetPurchaseVisibility();
+                _purchaseAutoInitialized = false;
+                ApplyPurchaseVisibility(_estimate);
+                foreach (var (item, column) in items)
+                    if (column == PurchaseColumn) item.IsChecked = column.Visibility == Visibility.Visible;
+            }
+            RefreshAreaColumnValues();
+            SaveEstimateUiSettings();
+        };
+        menu.Items.Add(resetVisibility);
         var resetWidths = new MenuItem { Header = "Вернуть ширину столбцов по умолчанию" };
         resetWidths.Click += (_, _) =>
         {

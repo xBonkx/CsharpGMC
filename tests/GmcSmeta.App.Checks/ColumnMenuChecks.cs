@@ -73,6 +73,16 @@ internal static class ColumnMenuChecks
             TableColumnMenu.RefreshDynamic(sized, "width-order", ownHeaderMenu: true);
             Require(sized.Columns[1].Width.Value == 147 && sized.Columns[1].DisplayIndex == 3,
                 "Width/order profile not restored after reuse.");
+            var reset = Menu(sized);
+            Item(reset, "Вернуть видимость столбцов по умолчанию").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Require(sized.Columns[3].Visibility == Visibility.Collapsed && sized.Columns[1].Visibility == Visibility.Visible &&
+                sized.Columns[2].Visibility == Visibility.Collapsed, "Visibility reset changed mode-controlled or default-hidden columns.");
+            Require(sized.Columns[1].Width.Value == 147 && sized.Columns[1].DisplayIndex == 3,
+                "Visibility reset unexpectedly changed width/order.");
+            var resetReopened = CreateGrid("width-order");
+            Require(resetReopened.Columns[3].Visibility == Visibility.Collapsed &&
+                resetReopened.Columns[1].Width.Value == 147 && resetReopened.Columns[1].DisplayIndex == 3,
+                "Visibility-only reset was not persisted.");
             Console.WriteLine("Column menu profile/visibility/width/order checks passed (no SQL).");
         }
         finally
