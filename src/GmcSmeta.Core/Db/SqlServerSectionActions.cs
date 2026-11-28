@@ -19,9 +19,9 @@ public static partial class SqlServerDatabase
         cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            result.Add(new SectionEntry(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture), r.GetString(3)));
+            result.Add(new SectionEntry(SqlInteger.ReadInt64(r, 0),
+                r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1),
+                SqlInteger.ReadInt32(r, 2), r.GetString(3)));
         return result;
     }
 

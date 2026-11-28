@@ -27,19 +27,19 @@ public static partial class SqlServerStages
         if (!r.Read())
             return "Этап не найден.";
         if (r.IsDBNull(7) || r.IsDBNull(8) || r.IsDBNull(9) || r.IsDBNull(10) ||
-            Convert.ToInt64(r.GetValue(9), CultureInfo.InvariantCulture) != Convert.ToInt64(r.GetValue(10), CultureInfo.InvariantCulture))
+            SqlInteger.ReadInt64(r, 9) != SqlInteger.ReadInt64(r, 10))
             return "Этап не принадлежит объекту полного КП.";
-        if (Convert.ToBoolean(r.GetValue(7), CultureInfo.InvariantCulture) ||
-            Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture))
+        if (SqlFlag.Read(r, 7) ||
+            SqlFlag.Read(r, 8))
             return "Архивный объект нельзя изменять.";
         var state = new StageMutationPolicy.State(
-            r.IsDBNull(0) ? null : Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-            !r.IsDBNull(1) && Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture),
-            !r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture),
+            r.IsDBNull(0) ? null : SqlInteger.ReadInt64(r, 0),
+            !r.IsDBNull(1) && SqlFlag.Read(r, 1),
+            !r.IsDBNull(2) && SqlFlag.Read(r, 2),
             r.IsDBNull(3) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture)),
-            !r.IsDBNull(4) && Convert.ToBoolean(r.GetValue(4), CultureInfo.InvariantCulture),
+            !r.IsDBNull(4) && SqlFlag.Read(r, 4),
             r.IsDBNull(5) ? "" : r.GetString(5),
-            r.IsDBNull(6) ? null : Convert.ToInt64(r.GetValue(6), CultureInfo.InvariantCulture));
+            r.IsDBNull(6) ? null : SqlInteger.ReadInt64(r, 6));
         return StageMutationPolicy.Denial(fullId, state, operation);
     }
 
@@ -90,9 +90,9 @@ public static partial class SqlServerStages
             !string.Equals(r.GetString(0), "kp", StringComparison.OrdinalIgnoreCase) ||
             !r.IsDBNull(1))
             return "Это не полное КП. Операция с остатком отменена.";
-        if (!r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture))
+        if (!r.IsDBNull(2) && SqlFlag.Read(r, 2))
             return "Полное КП подписано или заблокировано.";
-        if (r.IsDBNull(3) || Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture))
+        if (r.IsDBNull(3) || SqlFlag.Read(r, 3))
             return "Архивный объект нельзя изменять.";
         return null;
     }

@@ -313,7 +313,7 @@ public static partial class SqlServerCostSummary
             {
                 while (r.Read())
                     candidates.Add((
-                        Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                        SqlInteger.ReadInt64(r, 0),
                         r.IsDBNull(1) ? 0m : Convert.ToDecimal(r.GetValue(1), CultureInfo.InvariantCulture),
                         r.IsDBNull(2) ? null : Convert.ToDecimal(r.GetValue(2), CultureInfo.InvariantCulture)));
             }
@@ -390,8 +390,8 @@ public static partial class SqlServerCostSummary
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = read.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
-            locked = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
-            stageOf = r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
+            locked = SqlFlag.Read(r, 0);
+            stageOf = r.IsDBNull(1) ? null : SqlInteger.ReadInt32(r, 1);
             smrMode = r.IsDBNull(2) ? "sum" : r.GetString(2);
         }
         if (locked) throw new InvalidOperationException("СМР сметы заблокирован или рассчитывается по этапам");
@@ -419,7 +419,7 @@ public static partial class SqlServerCostSummary
             using var r = read.ExecuteReader();
             while (r.Read())
                 amounts.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     Money.FromDouble(FinanceReader.PythonRound(
                         Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture), 2))));
         }
@@ -437,7 +437,7 @@ public static partial class SqlServerCostSummary
                 using var r = check.ExecuteReader();
                 var current = new Dictionary<long, decimal>();
                 while (r.Read())
-                    current[Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture)] =
+                    current[SqlInteger.ReadInt64(r, 0)] =
                         Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
                 foreach (var (systemId, amount) in amounts)
                     if (!current.TryGetValue(systemId, out var value) || value != amount) same = false;
@@ -532,8 +532,8 @@ public static partial class SqlServerCostSummary
             using var r = find.ExecuteReader();
             if (r.Read())
             {
-                procurementId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-                var currentSupplier = r.IsDBNull(1) ? (long?)null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                procurementId = SqlInteger.ReadInt64(r, 0);
+                var currentSupplier = r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1);
                 unchanged = currentSupplier == supplierId;
             }
         }

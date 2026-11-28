@@ -50,7 +50,7 @@ public static class SqlServerRateTransfer
             {
                 read.Parameters.Add("@id", SqlDbType.BigInt).Value = targetId;
                 using var r = read.ExecuteReader();
-                while (r.Read()) ids.Add(Convert.ToInt32(r.GetValue(0), CultureInfo.InvariantCulture));
+                while (r.Read()) ids.Add(SqlInteger.ReadInt32(r, 0));
             }
             using (var read = new SqlCommand(
                 "SELECT DISTINCT p.stage_src FROM dbo.positions p " +
@@ -64,7 +64,7 @@ public static class SqlServerRateTransfer
                 using var r = read.ExecuteReader();
                 while (r.Read())
                 {
-                    if (!r.IsDBNull(0)) ids.Add(Convert.ToInt32(r.GetValue(0), CultureInfo.InvariantCulture));
+                    if (!r.IsDBNull(0)) ids.Add(SqlInteger.ReadInt32(r, 0));
                 }
             }
             protectedPrices = ids.ToImmutableHashSet();
@@ -244,8 +244,8 @@ public static class SqlServerRateTransfer
             using var r = head.ExecuteReader();
             if (!r.Read()) return (null, "", false, null);
             kind = r.GetString(0);
-            locked = Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture);
-            stageOf = r.IsDBNull(2) ? (int?)null : Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture);
+            locked = SqlFlag.Read(r, 1);
+            stageOf = r.IsDBNull(2) ? (int?)null : SqlInteger.ReadInt32(r, 2);
             form = r.IsDBNull(3) ? "" : r.GetString(3);
             vatRate = r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture));
             number = r.IsDBNull(5) ? "" : r.GetString(5);
@@ -262,8 +262,8 @@ public static class SqlServerRateTransfer
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
             using var r = read.ExecuteReader();
             while (r.Read())
-                systems[Convert.ToInt32(r.GetValue(0), CultureInfo.InvariantCulture)] = (
-                    r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture),
+                systems[SqlInteger.ReadInt32(r, 0)] = (
+                    r.IsDBNull(1) ? null : SqlInteger.ReadInt32(r, 1),
                     r.IsDBNull(2) ? "" : r.GetString(2));
         }
 
@@ -280,28 +280,28 @@ public static class SqlServerRateTransfer
             decimal? Dec(int i) => r.IsDBNull(i) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(i), CultureInfo.InvariantCulture));
             while (r.Read())
             {
-                var rowId = Convert.ToInt32(r.GetValue(0), CultureInfo.InvariantCulture);
-                var systemId = Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
-                var parentId = r.IsDBNull(2) ? (int?)null : Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture);
+                var rowId = SqlInteger.ReadInt32(r, 0);
+                var systemId = SqlInteger.ReadInt32(r, 1);
+                var parentId = r.IsDBNull(2) ? (int?)null : SqlInteger.ReadInt32(r, 2);
                 if (!systems.TryGetValue(systemId, out var system)) continue;
                 var path = system.ParentId is int pid && systems.TryGetValue(pid, out var parent)
                     ? ImmutableArray.Create(parent.Name, system.Name)
                     : ImmutableArray.Create(system.Name);
                 var row = new RateRow(
                     rowId,
-                    r.IsDBNull(15) ? rowId : Convert.ToInt32(r.GetValue(15), CultureInfo.InvariantCulture),
+                    r.IsDBNull(15) ? rowId : SqlInteger.ReadInt32(r, 15),
                     r.IsDBNull(4) ? "" : r.GetString(4),
                     r.IsDBNull(3) ? "" : r.GetString(3),
                     r.IsDBNull(5) ? "" : r.GetString(5),
                     path,
                     RateTransfer.Norm(r.IsDBNull(6) ? "" : r.GetString(6)),
                     null, "", // владелец заполняется вторым проходом
-                    r.IsDBNull(7) ? null : Convert.ToInt32(r.GetValue(7), CultureInfo.InvariantCulture),
+                    r.IsDBNull(7) ? null : SqlInteger.ReadInt32(r, 7),
                     r.IsDBNull(8) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(8), CultureInfo.InvariantCulture)),
                     ImmutableArray.Create(Dec(9), Dec(10), Dec(11), Dec(12)),
                     r.IsDBNull(13) ? "" : r.GetString(13));
                 all.Add((row, systemId, parentId,
-                    !r.IsDBNull(14) && Convert.ToBoolean(r.GetValue(14), CultureInfo.InvariantCulture)));
+                    !r.IsDBNull(14) && SqlFlag.Read(r, 14)));
             }
         }
         var byId = all.ToDictionary(x => x.Row.Id, x => x);

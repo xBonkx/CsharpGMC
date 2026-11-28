@@ -265,8 +265,8 @@ public static partial class SqlServerDatabase
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return (0, "Документ больше не существует.", false);
-            objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            if (Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture))
+            objectId = SqlInteger.ReadInt64(r, 0);
+            if (SqlFlag.Read(r, 1))
                 return (objectId, "Подписанный договор нельзя перемещать.", false);
             if (!r.IsDBNull(2))
                 return (objectId, "Внутри КП этапа перетаскивание пока запрещено.", false);
@@ -295,9 +295,9 @@ public static partial class SqlServerDatabase
         using var r = cmd.ExecuteReader();
         while (r.Read())
             list.Add(new EstimateDragPlan.Section(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
+                r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1),
+                SqlInteger.ReadInt32(r, 2),
                 r.IsDBNull(3) ? "" : r.GetString(3)));
         return list;
     }
@@ -314,10 +314,10 @@ public static partial class SqlServerDatabase
         using var r = cmd.ExecuteReader();
         while (r.Read())
             rows.Add(new EstimateDragPlan.Position(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                r.IsDBNull(2) ? null : Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(3), CultureInfo.InvariantCulture)));
+                SqlInteger.ReadInt64(r, 0),
+                SqlInteger.ReadInt64(r, 1),
+                r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2),
+                SqlInteger.ReadInt32(r, 3)));
         return rows;
     }
 }

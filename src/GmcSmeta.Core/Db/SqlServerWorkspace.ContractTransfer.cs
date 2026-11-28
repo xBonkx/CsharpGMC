@@ -20,8 +20,8 @@ public static partial class SqlServerWorkspace
         cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=contractId;
         using var r=cmd.ExecuteReader();
         var result=new List<TransferDocument>();
-        while(r.Read()) result.Add(new(Convert.ToInt64(r.GetValue(0)),Convert.ToInt64(r.GetValue(1)),
-            r.GetString(2),r.IsDBNull(3)?null:Convert.ToInt64(r.GetValue(3))));
+        while(r.Read()) result.Add(new(SqlInteger.ReadInt64(r, 0),SqlInteger.ReadInt64(r, 1),
+            r.GetString(2),r.IsDBNull(3)?null:SqlInteger.ReadInt64(r, 3)));
         ValidateTransferGroup(contractId,result);
         return result;
     }
@@ -97,7 +97,7 @@ public static partial class SqlServerWorkspace
             {
                 stages.Parameters.Add("@id",SqlDbType.BigInt).Value=id;
                 using var r=stages.ExecuteReader();
-                while(r.Read()) if(!ids.Contains(Convert.ToInt64(r.GetValue(0))))
+                while(r.Read()) if(!ids.Contains(SqlInteger.ReadInt64(r, 0)))
                     throw new InvalidOperationException("Перенос разорвёт группу этапов.");
             }
             using var shipments=new SqlCommand(

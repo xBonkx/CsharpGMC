@@ -76,9 +76,9 @@ public static class SqlServerHistory
         {
             token.ThrowIfCancellationRequested();
             string Text(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-            long? Id(int i) => r.IsDBNull(i) ? null : Convert.ToInt64(r.GetValue(i), CultureInfo.InvariantCulture);
+            long? Id(int i) => r.IsDBNull(i) ? null : SqlInteger.ReadInt64(r, i);
             rows.Add(new HistoryEntry(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
                 r.IsDBNull(1) ? null : Convert.ToDateTime(r.GetValue(1), CultureInfo.InvariantCulture),
                 Text(2), Text(3), Id(4), Text(5), Text(6), Id(7), Id(8)));
         }

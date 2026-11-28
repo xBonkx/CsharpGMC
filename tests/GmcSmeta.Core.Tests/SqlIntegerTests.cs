@@ -157,4 +157,26 @@ public sealed class SqlIntegerTests
         Assert.True(source.Contains("SqlInteger.ReadInt") || source.Contains("SqlFlag.Read"));
         Assert.DoesNotMatch(@"\b(?:r|reader)\.Get(?:Int32|Int64|Boolean)\(", source);
     }
+
+    [Theory]
+    [InlineData("GmcSmeta.Core/Db/SqlServerSystemCopy.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerSectionActions.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerRateTransfer.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerDatabase.DragDrop.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerStages.Safety.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerWorkspace.ContractTransfer.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerStages.Links.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerCostTotals.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerCostSummary.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerHistory.cs")]
+    public void TransactionAndNavigationReadersUseStrictSqlTypes(string relative)
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", relative)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var source = File.ReadAllText(Path.Combine(root!.FullName, "src", relative));
+        Assert.True(source.Contains("SqlInteger.ReadInt") || source.Contains("SqlFlag.Read"));
+        Assert.DoesNotMatch(@"Convert\.To(?:Int32|Int64|Boolean)\(r\.GetValue\(", source);
+    }
 }

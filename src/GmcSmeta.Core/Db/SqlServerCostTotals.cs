@@ -86,8 +86,8 @@ public static class SqlServerCostTotals
                 var found = r.Read();
                 token.ThrowIfCancellationRequested();
                 if (!found) throw new ArgumentException("Документ не найден.");
-                locked = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
-                stageOf = r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
+                locked = SqlFlag.Read(r, 0);
+                stageOf = r.IsDBNull(1) ? null : SqlInteger.ReadInt32(r, 1);
                 smrMode = r.IsDBNull(2) ? "sum" : r.GetString(2);
                 form = r.IsDBNull(3) ? "" : r.GetString(3);
                 pnrCost = r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture));
@@ -178,8 +178,8 @@ public static class SqlServerCostTotals
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Документ не найден.", rev);
-            locked = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
-            stageOf = r.IsDBNull(1) ? null : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
+            locked = SqlFlag.Read(r, 0);
+            stageOf = r.IsDBNull(1) ? null : SqlInteger.ReadInt32(r, 1);
             smrMode = r.IsDBNull(2) ? "sum" : r.GetString(2);
             form = r.IsDBNull(3) ? "" : r.GetString(3);
             var values = new Dictionary<string, decimal>();

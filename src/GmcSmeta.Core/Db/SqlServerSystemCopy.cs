@@ -149,12 +149,12 @@ public static class SqlServerSystemCopy
         using var r = cmd.ExecuteReader();
         if (!r.Read()) return (-1, null, 0, "", "", null);
         var name = r.IsDBNull(3) ? "" : r.GetString(3);
-        var parent = r.IsDBNull(1) ? (long?)null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+        var parent = r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1);
         var label = parent is not null ? "" : name;
         return (
-            Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt64(r, 0),
             parent,
-            Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt32(r, 2),
             name,
             parent is null ? name : name, // label уточняется родителем в окне; для журнала достаточно имени
             r.IsDBNull(4) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)));
@@ -171,8 +171,8 @@ public static class SqlServerSystemCopy
         using var r = cmd.ExecuteReader();
         while (r.Read())
             list.Add((
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
+                SqlInteger.ReadInt32(r, 1),
                 r.IsDBNull(2) ? "" : r.GetString(2),
                 r.IsDBNull(3) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture)),
                 ""));
@@ -204,9 +204,9 @@ public static class SqlServerSystemCopy
             read.Parameters.Add("@sys", SqlDbType.BigInt).Value = srcSystemId;
             using var r = read.ExecuteReader();
             while (r.Read())
-                rows.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                    Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture)));
+                rows.Add((SqlInteger.ReadInt64(r, 0),
+                    r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1),
+                    SqlFlag.Read(r, 2)));
         }
         var roots = rows.Where(r => r.ParentId is null).ToDictionary(r => r.Id);
         if (rows.Any(r => r.ParentId is long parent && !roots.ContainsKey(parent)))

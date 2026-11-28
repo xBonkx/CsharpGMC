@@ -28,14 +28,14 @@ public static partial class SqlServerStages
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 docs.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     r.IsDBNull(1) ? "" : r.GetString(1),
                     r.IsDBNull(2) ? "" : r.GetString(2),
                     r.IsDBNull(3) ? r.IsDBNull(4) ? null
-                        : Convert.ToInt64(r.GetValue(4), CultureInfo.InvariantCulture)
-                        : Convert.ToInt64(r.GetValue(3), CultureInfo.InvariantCulture),
-                    !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture),
-                    !r.IsDBNull(6) && Convert.ToBoolean(r.GetValue(6), CultureInfo.InvariantCulture)));
+                        : SqlInteger.ReadInt64(r, 4)
+                        : SqlInteger.ReadInt64(r, 3),
+                    !r.IsDBNull(5) && SqlFlag.Read(r, 5),
+                    !r.IsDBNull(6) && SqlFlag.Read(r, 6)));
         }
         var names = docs.ToDictionary(x => x.Id, x => x.Name);
         var result = docs.Select(d => new StageDocumentLink(d.Id,
@@ -54,10 +54,10 @@ public static partial class SqlServerStages
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var owner = Convert.ToInt64(r.GetValue(3), CultureInfo.InvariantCulture);
-                var signed = !r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
+                var owner = SqlInteger.ReadInt64(r, 3);
+                var signed = !r.IsDBNull(2) && SqlFlag.Read(r, 2);
                 result.Add(new StageDocumentLink(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     "КС-2", "КС-2 № " + (r.IsDBNull(1) ? "" :
                         Convert.ToString(r.GetValue(1), CultureInfo.InvariantCulture)),
                     owner, names.GetValueOrDefault(owner, $"ID {owner}"),
