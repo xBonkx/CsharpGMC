@@ -82,4 +82,50 @@ public sealed class SharedTypographyMetricsTests
         Assert.DoesNotContain("FontSize=\"11.733333333333333\"", source);
     }
 
+    [Theory]
+    [InlineData("UiMutedTextBrush", "FFFFFF")]
+    [InlineData("UiMutedTextBrush", "F4F6FA")]
+    [InlineData("UiDisabledTextBrush", "FFFFFF")]
+    [InlineData("UiDisabledTextBrush", "F4F6FA")]
+    public void SemanticTextHasReadableContrastOnLightSurfaces(string key, string background)
+    {
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var metrics = XDocument.Parse(Source("Theme/TypographyMetrics.xaml"));
+        var color = (string)metrics.Descendants().Single(e => (string?)e.Attribute(x + "Key") == key).Attribute("Color")!;
+        static double Luminance(string rgb)
+        {
+            rgb = rgb.TrimStart('#');
+            double Channel(int offset)
+            {
+                var value = Convert.ToInt32(rgb.Substring(offset, 2), 16) / 255d;
+                return value <= .04045 ? value / 12.92 : Math.Pow((value + .055) / 1.055, 2.4);
+            }
+            return .2126 * Channel(0) + .7152 * Channel(2) + .0722 * Channel(4);
+        }
+        var a = Luminance(color);
+        var b = Luminance(background);
+        Assert.True((Math.Max(a, b) + .05) / (Math.Min(a, b) + .05) >= 4.5);
+    }
+
+    [Theory]
+    [InlineData("ReportGridReviewText")]
+    [InlineData("ReportGridMuted")]
+    [InlineData("ReportGridStrongRight")]
+    [InlineData("ReportGridCenter")]
+    [InlineData("ReportGridRight")]
+    public void ReportTextExposesCompleteValue(string key)
+    {
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XNamespace w = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var style = XDocument.Parse(Source("App.xaml")).Descendants(w + "Style")
+            .Single(e => (string?)e.Attribute(x + "Key") == key);
+        Assert.Contains(style.Elements(w + "Setter"), s =>
+            (string?)s.Attribute("Property") == "ToolTip" &&
+            (string?)s.Attribute("Value") == "{Binding Text, RelativeSource={RelativeSource Self}}");
+        if (key is "ReportGridReviewText" or "ReportGridMuted")
+            Assert.Contains(style.Descendants(w + "Setter"), s =>
+                (string?)s.Attribute("Property") == "Foreground" &&
+                (string?)s.Attribute("Value") == "{StaticResource GridSelectionTextBrush}");
+    }
+
 }
