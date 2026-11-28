@@ -24,6 +24,7 @@ internal sealed class SummaryColumnFit
     private FontStretch _measuredStretch;
     private (DataGridColumn Column, string Key, string Header)[] _measuredColumns = [];
     private Dictionary<DataGridColumn, double>? _minimums;
+    private (FontFamily Family, double Size, FontStyle Style, FontStretch Stretch, double Dpi, double PixelsPerDip)? _observedMetrics;
 
     internal bool Suspended { get; set; }
 
@@ -37,7 +38,19 @@ internal sealed class SummaryColumnFit
         grid.IsVisibleChanged += (_, _) => Request();
         grid.SizeChanged += (_, e) => { if (e.WidthChanged) Request(); };
         grid.Columns.CollectionChanged += (_, _) => Request();
+        grid.LayoutUpdated += (_, _) => ObserveMetrics();
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(ViewportChanged), true);
+    }
+
+    private void ObserveMetrics()
+    {
+        if (!_grid.IsLoaded || !_grid.IsVisible || Suspended) return;
+        var dpi = VisualTreeHelper.GetDpi(_grid);
+        var metrics = (_grid.FontFamily, _grid.FontSize, _grid.FontStyle, _grid.FontStretch,
+            dpi.DpiScaleX, dpi.PixelsPerDip);
+        if (_observedMetrics is { } previous && previous.Equals(metrics)) return;
+        _observedMetrics = metrics;
+        Request();
     }
 
     private ScrollViewer? Viewer() =>
