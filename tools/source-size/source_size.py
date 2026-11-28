@@ -67,16 +67,33 @@ def read_blobs(root, blobs):
     return result
 
 
+def project_scope(path, project_dirs):
+    # The nearest tracked project is a better boundary than src/<project>,
+    # particularly for nested tools. Multiple projects in one directory are
+    # ambiguous without MSBuild evaluation; keep an explicitly marked scope.
+    for parent in PurePosixPath(path).parents:
+        candidates = project_dirs.get(str(parent), [])
+        if len(candidates) == 1:
+            return candidates[0]
+        if candidates:
+            return str(parent) + '/<multiple-projects>'
+    parts = PurePosixPath(path).parts
+    return '/'.join(parts[:2]) if len(parts) > 2 else '.'
+
+
 def inventory(root, revision):
     sha = git(root, 'rev-parse', '--verify', revision + '^{commit}').decode().strip()
     tracked = git(root, 'ls-tree', '-r', '-z', sha).split(b'\0')
     files, excluded = {}, {}
+    project_dirs = defaultdict(list)
     for entry in tracked:
         if not entry:
             continue
         meta, name = entry.split(b'\t', 1)
         mode, kind, oid = meta.decode().split()
         path = name.decode('utf-8')
+        if kind == 'blob' and mode != '120000' and path.lower().endswith('.csproj'):
+            project_dirs[str(PurePosixPath(path).parent)].append(path)
         reason = exclusion(path)
         if reason == 'not C#/XAML':
             continue
@@ -93,33 +110,69 @@ def inventory(root, revision):
             continue
         lines = physical_lines(text)
         rows[path] = {'lines': lines, 'band': band(lines),
+                      'project': project_scope(path, project_dirs),
                       'partial': partial_keys(text) if path.endswith('.cs') else []}
     groups = defaultdict(list)
     for path, row in rows.items():
         for key in row['partial']:
-            # Keep assemblies/projects separate using the nearest project directory.
-            # Here the repository layout is src/<project>, tests/<project>, etc.
-            parts = PurePosixPath(path).parts
-            scope = '/'.join(parts[:2]) if len(parts) > 2 else '.'
-            groups[scope + ':' + key].append(path)
+            groups[row['project'] + ':' + key].append(path)
     partials = [{'type': key, 'files': paths, 'lines': sum(rows[p]['lines'] for p in paths)}
                 for key, paths in groups.items() if len(paths) > 1]
     partials.sort(key=lambda r: (-r['lines'], r['type']))
     return {'revision': sha, 'files': rows, 'excluded': excluded, 'partials': partials}
 
 
-def growth(before, after):
+def renamed_paths(root, before_sha, after_sha):
+    # NUL framing preserves spaces, tabs and non-ASCII paths. Only Git-detected
+    # renames are matched; copies remain new files.
+    fields = git(root, 'diff', '--name-status', '-z', '--find-renames',
+                 before_sha, after_sha, '--').split(b'\0')
+    result = {}
+    i = 0
+    while i < len(fields) - 1:
+        status = fields[i].decode('ascii')
+        i += 1
+        if status.startswith(('R', 'C')):
+            old, new = (fields[i + j].decode('utf-8') for j in (0, 1))
+            i += 2
+            if status.startswith('R'):
+                result[new] = old
+        else:
+            i += 1
+    return result
+
+
+def growth(before, after, renames=None):
     changes = []
+    renames = renames or {}
     for path, row in after.items():
-        old = before.get(path, {}).get('lines', 0)
+        previous = renames.get(path, path)
+        old = before.get(previous, {}).get('lines', 0)
         new = row['lines']
-        if new > old and (new > 4000 or new > 1000):
-            changes.append({'path': path, 'before': old, 'after': new, 'delta': new - old,
+        if new > old and new > 1000:
+            changes.append({'path': path, 'previous_path': previous,
+                            'before': old, 'after': new, 'delta': new - old,
                             'reason': '>4000 lines' if new > 4000 else 'large file grew'})
     return sorted(changes, key=lambda r: (-r['delta'], r['path']))
 
 
-def report(data, baseline=None):
+def partial_growth(before, after):
+    # Include single-file partial types so splitting an existing class does not
+    # falsely count its entire previous size as new code.
+    def sizes(rows):
+        totals = Counter()
+        for row in rows.values():
+            for key in row['partial']:
+                totals[row['project'] + ':' + key] += row['lines']
+        return totals
+    old, new = sizes(before), sizes(after)
+    return sorted(
+        ({'type': key, 'before': old[key], 'after': size, 'delta': size - old[key]}
+         for key, size in new.items() if size > 1000 and size > old[key]),
+        key=lambda row: (-row['delta'], row['type']))
+
+
+def report(data, baseline=None, renames=None):
     print('Revision:', data['revision'])
     for scope in ('src', 'tests', 'other'):
         rows = {p: r for p, r in data['files'].items()
@@ -137,10 +190,15 @@ def report(data, baseline=None):
     for path, reason in sorted(data['excluded'].items()):
         print(f'  {path}: {reason}')
     if baseline is not None:
-        warnings = growth(baseline['files'], data['files'])
+        warnings = growth(baseline['files'], data['files'], renames)
         print(f'\nGrowth warnings against {baseline["revision"]}: {len(warnings)} (nonblocking)')
         for row in warnings:
-            print(f'  {row["path"]}: {row["before"]} -> {row["after"]} (+{row["delta"]}); {row["reason"]}')
+            previous = f' (was {row["previous_path"]})' if row['previous_path'] != row['path'] else ''
+            print(f'  {row["path"]}{previous}: {row["before"]} -> {row["after"]} (+{row["delta"]}); {row["reason"]}')
+        logical = partial_growth(baseline['files'], data['files'])
+        print(f'\nPartial type growth warnings (approximate, nonblocking): {len(logical)}')
+        for row in logical:
+            print(f'  {row["type"]}: {row["before"]} -> {row["after"]} (+{row["delta"]})')
 
 
 def main():
@@ -152,10 +210,13 @@ def main():
     args = parser.parse_args()
     data = inventory(args.repo, args.ref)
     baseline = inventory(args.repo, args.base) if args.base else None
-    report(data, baseline)
+    renames = renamed_paths(args.repo, baseline['revision'], data['revision']) if baseline else {}
+    report(data, baseline, renames)
     if args.json:
         data['baseline'] = baseline['revision'] if baseline else None
-        data['warnings'] = growth(baseline['files'], data['files']) if baseline else []
+        data['warnings'] = growth(baseline['files'], data['files'], renames) if baseline else []
+        data['partial_warnings'] = partial_growth(baseline['files'], data['files']) if baseline else []
+        data['renames'] = renames
         args.json.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 

@@ -62,8 +62,10 @@ App.xaml: тематические словари ресурсов для таб
 ### ARCH-SIZE-07 (P2) — PARTIAL
 SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить разделение запросов, маппинга, валидации, транзакций, денежной логики. Выделять компоненты без изменения SQL-контрактов, схемы, границ транзакций и защит. Приёмка: тесты SQL только на GmcSmetaPilot_*, двухклиентные сценарии, rollback, прежние суммы/остатки и защита рабочей БД.
 
-### ARCH-SIZE-08 (P2) — PARTIAL
+### ARCH-SIZE-08 (P2) — CODE READY
 Добавить воспроизводимый локальный скрипт отчёта размеров и проверку роста для изменённых файлов; существующий долг фиксировать baseline, не блокировать исправления из-за прежнего размера, не разрешать необоснованное разрастание. Сначала предупреждения, затем согласованный порог/исключения; не зависеть от платных GitHub Actions. Приёмка: тесты скрипта на границах диапазонов, generated/partial и понятный отчёт до/после.
+
+28.11.2026 ChatGPT/main (base 04e4391) — ARCH-SIZE-08 CODE READY: existing offline source-size report now matches Git-detected renames, preserves unchanged historical debt, reports growth of approximate logical partial types even when each part is small, including single-to-multiple-file transitions. Nearest tracked csproj scopes nested projects; ambiguous directory and fallback explicit. Added JSON previous_path/renames/project/partial_warnings, documented nonblocking warning policy, four extra unittest cases (including real Git rename with Cyrillic and spaces). No mandatory gate/threshold change without owner approval. Static source verification only; Python tests not executed against repository, actual full inventory and ARCH-SIZE-01 method/dependency audit remain PARTIAL. No design, schema, DB or release changes.
 
 ## Общая приёмка и ограничения
 

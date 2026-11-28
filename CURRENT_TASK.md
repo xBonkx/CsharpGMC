@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base 04e4391) — ARCH-SIZE-08 CODE READY: existing offline source-size report now matches Git-detected renames, preserves unchanged historical debt, reports growth of approximate logical partial types even when each part is small, including single-to-multiple-file transitions. Nearest tracked csproj scopes nested projects; ambiguous directory and fallback explicit. Added JSON previous_path/renames/project/partial_warnings, documented nonblocking warning policy, four extra unittest cases (including real Git rename with Cyrillic and spaces). No mandatory gate/threshold change without owner approval. Static source verification only; Python tests not executed against repository, actual full inventory and ARCH-SIZE-01 method/dependency audit remain PARTIAL. No design, schema, DB or release changes.
+
 28.11.2026 ChatGPT/main — проход всех 14 оставшихся визуальных ID: TOT-11 и FONT-13 CODE READY; 12 PARTIAL. Summary width effective-metrics fit, adaptive dynamic forms, legacy totals frame/extended cell copy, SMR silent restore + Pilot tests, Python heading/weight comparison, 34 icon labels × 3 sizes WPF fixture, physical QA matrix and maintained replacement audit wrappers. FullRow batch command semantics preserved. No Windows build/tests, SQL Pilot execution or real captures; no production DB, schema, finance or release changes. [Отчёт](docs/DESIGN_PASS_20261128_ALL_REMAINING.md).
 
 
