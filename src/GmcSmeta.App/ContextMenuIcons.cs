@@ -70,6 +70,18 @@ internal static class ContextMenuIcons
         return item;
     }
 
+    private static readonly Brush NormalStroke = FrozenStroke(0x64, 0x74, 0x8B);
+    private static readonly Brush DangerStroke = FrozenStroke(0xDC, 0x26, 0x26);
+    private static readonly Brush HighlightStroke = FrozenStroke(0x1E, 0x40, 0xAF);
+    private static readonly Brush DisabledStroke = FrozenStroke(0x94, 0xA3, 0xB8);
+
+    private static Brush FrozenStroke(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
     internal static void Set(MenuItem item, string glyph, bool danger = false)
     {
         if (Application.Current.TryFindResource("Glyph" + glyph) is not Geometry geometry ||
@@ -78,7 +90,7 @@ internal static class ContextMenuIcons
 
         var style = new Style(typeof(System.Windows.Shapes.Path), baseStyle);
         style.Setters.Add(new Setter(Shape.StrokeProperty,
-            new SolidColorBrush((Color)ColorConverter.ConvertFromString(danger ? "#DC2626" : "#64748B"))));
+            danger ? DangerStroke : NormalStroke));
         var highlight = new DataTrigger
         {
             Binding = new Binding(nameof(MenuItem.IsHighlighted)) { Source = item },
@@ -87,7 +99,7 @@ internal static class ContextMenuIcons
         if (!danger)
         {
             highlight.Setters.Add(new Setter(Shape.StrokeProperty,
-                new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF))));
+                HighlightStroke));
             style.Triggers.Add(highlight);
         }
         var disabled = new DataTrigger
@@ -96,7 +108,7 @@ internal static class ContextMenuIcons
             Value = false
         };
         disabled.Setters.Add(new Setter(Shape.StrokeProperty,
-            new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8))));
+            DisabledStroke));
         style.Triggers.Add(disabled);
         item.Icon = VectorGlyph.Create(geometry, style);
     }

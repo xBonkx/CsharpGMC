@@ -124,9 +124,16 @@ public sealed class KsRowVm : INotifyPropertyChanged
     public string LeftToolTip => OverLeft ? "Больше, чем по смете!" : "";
     public string NameToolTip { get; init; } = "";
 
-    internal static readonly Brush TextBrush = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-    internal static readonly Brush WarnBrush = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
-    internal static readonly Brush DangerBrush = new SolidColorBrush(Color.FromRgb(0xDC, 0x26, 0x26));
+    internal static readonly Brush TextBrush = FrozenBrush(0x0F, 0x17, 0x2A);
+    internal static readonly Brush WarnBrush = FrozenBrush(0xB4, 0x53, 0x09);
+    internal static readonly Brush DangerBrush = FrozenBrush(0xDC, 0x26, 0x26);
+
+    private static Brush FrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
