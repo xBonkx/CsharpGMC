@@ -142,6 +142,31 @@ SQL smoke-test и скриншоты 1366/1920 НЕ ПРОВЕРЕНЫ.
   `Theme/LayoutMetrics.xaml` (сканер уже распознаёт SetResourceReference).
   Инвентарь read-only, конверсия — работа основного агента.
 
+## Нужна поддержка кода — меню, диалоги, декомпозиция (29.11)
+
+- **ARCH-SIZE-03.04/06.01 (BLOCKED для дизайн-линии)**: source-тесты
+  (EstimateGridGeometrySourceTests, EstimateMoneyCardSourceTests,
+  EstimateFooterSourceTests, EstimateHeaderCountSourceTests,
+  ButtonFocusVisualSourceTests и др.) парсят `EstimateView.xaml`/`App.xaml`
+  и требуют определения ресурсов на месте (`Assert.Single(Style(key))`).
+  Сплит ресурсов в отдельные словари возможен только координированно:
+  основным агентом одним коммитом с обновлением тестов на загрузку
+  App.xaml + все Theme/*.xaml.
+- **PeopleWindow**: окно собирается в .cs (PeopleWindow.cs) без явного
+  WindowStartupLocation — все XAML-окна уже CenterOwner; добавить
+  CenterOwner/Owner в кодовую сборку окна.
+
+2026-11-29 · Проход 2, CTX-меню/диалоги · без изменений XAML ·
+Сверка уже реализованного с file:line-доказательствами: CTX-036.01
+(MenuPopupChrome App.xaml:302–313 — radius 10, padding 6, тень 18/3/.18),
+CTX-038.01 (локальных красных Foreground на MenuItem нет, danger — значок),
+CTX-039.01 (ContextMenu offsets −10/−6), CTX-040.01 (разделители единые,
+висячих нет), CTX-042.01 (SidebarMenuHeader наследует общий шаблон),
+CTX-046.01 (все Window CenterOwner, Owner в коде), AGR-02.01
+(терминология прохода 27.11 подтверждена). ARCH-SIZE-03.04/06.01 BLOCKED
+(контракты source-тестов). Иконные CTX-037/014 не брались: нет локального
+Python-эталона. Отчёт: [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md).
+
 2026-11-29 · Блок 15, семантика и метрики · 19 файлов `*.xaml` ·
 Инвентарь и закрытие D-вопросов GRID-28.01-02, HOME-03.01, SPACE-15.01-02,
 SPACE-18.01-02, SPACE-19.01-02: 16 окнам добавлены monitor-aware
