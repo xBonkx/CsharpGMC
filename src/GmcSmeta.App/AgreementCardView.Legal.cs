@@ -52,7 +52,7 @@ public partial class AgreementCardView
 
     private async void LegalSelector_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (_loadingLegal || _saving || LegalSelector.SelectedValue is not long id || id == _snapshot?.SelectedLegal?.Id) return;
+        if (_loadingLegal || _saving || _loadingCard || LegalSelector.SelectedValue is not long id || id == _snapshot?.SelectedLegal?.Id) return;
         if (HasUnsavedChanges())
         {
             StatusText.Text = "Сначала сохраните текущие реквизиты.";
@@ -67,7 +67,7 @@ public partial class AgreementCardView
 
     private async void NewLegal_Click(object sender, RoutedEventArgs e)
     {
-        if (_saving) return;
+        if (_saving || _loadingCard || _snapshot is null) return;
         if (HasUnsavedChanges()) { StatusText.Text = "Сначала сохраните текущие реквизиты."; return; }
         Fields.IsEnabled = SaveButton.IsEnabled = false;
         await LoadCard(0);
@@ -75,26 +75,49 @@ public partial class AgreementCardView
 
     private async void LegalPdf_Add(object sender, RoutedEventArgs e)
     {
-        if (_saving || _snapshot?.SelectedLegal is not { } legal) { StatusText.Text = "Сначала сохраните договор."; return; }
+        if (_saving || _loadingCard || _snapshot is not { SelectedLegal: { } legal } snapshot)
+        { StatusText.Text = "Сначала сохраните договор."; return; }
         if (HasUnsavedChanges()) { StatusText.Text = "Сначала сохраните реквизиты и папку документов."; return; }
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "PDF (*.pdf)|*.pdf", Title = "Подписанный договор" };
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        if (!IsLoaded || _saving || _loadingCard || !ReferenceEquals(snapshot, _snapshot) || HasUnsavedChanges()) return;
+        var source = dialog.FileName;
         _saving = true; Fields.IsEnabled = SaveButton.IsEnabled = false;
         try
         {
-            await Task.Run(() => SqlServerAgreementFiles.AddSignedPdf(_connection, legal.Id, dialog.FileName, _snapshot.Revision));
-            await LoadCard(legal.Id);
-            StatusText.Text = "Добавлен новый PDF. Ранее добавленные файлы сохранены.";
+            await Task.Run(() => SqlServerAgreementFiles.AddSignedPdf(_connection, legal.Id, source, snapshot.Revision));
+            if (await LoadCard(legal.Id))
+                StatusText.Text = "Добавлен новый PDF. Ранее добавленные файлы сохранены.";
+            else if (IsLoaded)
+                StatusText.Text = "PDF зарегистрирован, но перечитывание карточки не удалось. Откройте её заново.";
         }
-        catch (Exception error) { StatusText.Text = error.Message; }
-        finally { _saving = false; Fields.IsEnabled = SaveButton.IsEnabled = true; }
+        catch (Exception error)
+        {
+            _snapshot = null;
+            if (IsLoaded) StatusText.Text = error.Message + " Откройте карточку заново перед повтором.";
+        }
+        finally { _saving = false; }
     }
 
-    private void LegalPdf_Open(object sender, RoutedEventArgs e)
+    private async void LegalPdf_Open(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(LegalPdfBox.Text)) return;
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(LegalPdfBox.Text) { UseShellExecute = true }); }
-        catch (Exception error) { StatusText.Text = error.Message; }
+        if (_saving || _loadingCard || _snapshot is not { SelectedLegal: { } legal } snapshot ||
+            string.IsNullOrWhiteSpace(snapshot.SignedLegalPdf)) return;
+        _saving = true;
+        Fields.IsEnabled = SaveButton.IsEnabled = false;
+        try
+        {
+            var path = await Task.Run(() => SqlServerAgreementFiles.VerifyLatest(_connection,
+                _objectId, legal.Id, snapshot.SignedLegalPdf, snapshot.Revision));
+            if (IsLoaded && ReferenceEquals(snapshot, _snapshot))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception error) { if (IsLoaded) StatusText.Text = error.Message; }
+        finally
+        {
+            _saving = false;
+            if (IsLoaded && ReferenceEquals(snapshot, _snapshot)) Fields.IsEnabled = SaveButton.IsEnabled = true;
+        }
     }
 
     private void LegalCompany_Changed(object sender, SelectionChangedEventArgs e)

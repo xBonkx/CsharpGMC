@@ -13,6 +13,7 @@ public partial class AgreementCardView : UserControl
     private readonly long? _initialLegalId;
     private SqlServerWorkspace.AgreementCardSnapshot? _snapshot;
     private bool _saving;
+    private bool _loadingCard;
     public event Action? BackRequested;
     public event Action? Saved;
     public event Action<DocRow>? EditDocumentRequested;
@@ -32,14 +33,17 @@ public partial class AgreementCardView : UserControl
         await LoadCard(_initialLegalId);
     }
 
-    private async Task LoadCard(long? legalId)
+    private async Task<bool> LoadCard(long? legalId)
     {
+        if (_loadingCard) return false;
+        _loadingCard = true;
+        _snapshot = null; // never retain writable stale identity after failed load
         Fields.IsEnabled = SaveButton.IsEnabled = false;
         StatusText.Text = "Загрузка реквизитов…";
         try
         {
             var snapshot = await Task.Run(() => SqlServerWorkspace.ReadAgreementCard(_connection, _objectId, legalId));
-            if (!IsLoaded) return;
+            if (!IsLoaded) return false;
             _snapshot = snapshot;
             var p = snapshot.Properties;
             var v = snapshot.Print;
@@ -77,8 +81,16 @@ public partial class AgreementCardView : UserControl
             InitializeLegal(snapshot);
             Fields.IsEnabled = SaveButton.IsEnabled = true;
             StatusText.Text = "Изменения вступят в силу после сохранения. Переход на другую карточку отменяет несохранённые правки.";
+            return true;
         }
-        catch (Exception ex) { if (IsLoaded) StatusText.Text = "Не удалось загрузить: " + ex.Message; }
+        catch (Exception ex)
+        {
+            _snapshot = null;
+            Fields.IsEnabled = SaveButton.IsEnabled = false;
+            if (IsLoaded) StatusText.Text = "Не удалось загрузить: " + ex.Message;
+            return false;
+        }
+        finally { _loadingCard = false; }
     }
 
     private ObjectProperties ReadProperties() => new(NameBox.Text, CustomerBox.Text, AddressBox.Text,
@@ -95,7 +107,7 @@ public partial class AgreementCardView : UserControl
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (_saving || _snapshot is not { } snapshot || !SaveButton.IsEnabled) return;
+        if (_saving || _loadingCard || _snapshot is not { } snapshot || !SaveButton.IsEnabled) return;
         var properties = ReadProperties();
         var print = ReadPrint(snapshot.Print);
         var legal = ReadLegal(print);
@@ -127,7 +139,7 @@ public partial class AgreementCardView : UserControl
 
     private void EditDocument_Click(object sender, RoutedEventArgs e)
     {
-        if (_saving || sender is not Button { DataContext: SqlServerWorkspace.AgreementCardDocument { CanEdit: true } source }) return;
+        if (_saving || _loadingCard || _snapshot is null || sender is not Button { DataContext: SqlServerWorkspace.AgreementCardDocument { CanEdit: true } source }) return;
         if (HasUnsavedChanges())
         {
             StatusText.Text = "Сначала сохраните общие реквизиты или вернитесь к карточке без сохранения.";
@@ -138,7 +150,7 @@ public partial class AgreementCardView : UserControl
 
     private void Back_Click(object sender, RoutedEventArgs e)
     {
-        if (_saving) return;
+        if (_saving || _loadingCard) return;
         if (HasUnsavedChanges() &&
             MessageBox.Show(Window.GetWindow(this), "Вернуться без сохранения изменений?", "Реквизиты",
                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
