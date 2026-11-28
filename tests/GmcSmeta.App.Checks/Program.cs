@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using GmcSmeta.App;
+using GmcSmeta.App.Checks;
 using GmcSmeta.Core.Db;
 
 /// <summary>
@@ -221,6 +222,8 @@ internal static class Program
             PumpUntil(() => grid.Items.Count == count, "filter restore");
             Console.WriteLine("SQL Server editor WPF smoke OK. No writes performed.");
             CheckSettingsMenu(window);
+            // BUG-F54.07: живые маршруты продакшн-кода на демо-БД + отказ-сценарии.
+            SqlRouteAcceptanceChecks.Run(cs);
             window.Close();
             app.Shutdown();
             return 0;

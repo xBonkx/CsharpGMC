@@ -4,7 +4,7 @@
 
 - Основной реестр: [MASTER_TODO](docs/MASTER_TODO.md), на момент реорганизации 380/418 CODE READY, 36 PARTIAL, 2 BLOCKED. Дочерние статусы и занятость — в рабочей очереди; не суммировать.
 - Приоритет: [перенос Python](docs/PYTHON_0664_TO_0679_PARITY.md), [SQL/релиз](docs/SQL_MIGRATION_RELEASE_TODO.md), [договоры/приложения](docs/AGREEMENT_ANNEX_TODO_20261127.md). Схема 32 применена по отдельному разрешению; релиз не подтверждён данным проходом.
-- Последний функциональный блок BUG-F54: **CODE READY** (28.11 scalar-проход, см. ниже), ранее — [коммит 7a222c2](https://github.com/xBonkx/CsharpGMC/commit/7a222c2790d3781abe67a9f361a993b51dd5fc77).
+- Последний функциональный блок BUG-F54: **DONE** (28.11 scalar-проход + повторная приёмка маршрутов, см. ниже), ранее — [коммит 7a222c2](https://github.com/xBonkx/CsharpGMC/commit/7a222c2790d3781abe67a9f361a993b51dd5fc77).
 - Последний дизайн: GRID-19/SUM-VIS-01 CODE READY, QA-09/19 BLOCKED на Windows captures, 246/253 CODE READY. [Отчёт](docs/DESIGN_PASS_20261128_WIDTHS_SUMMARY_CLOSURE.md).
 - 28.11.2026 — реорганизация документации и кооперативная бронь задач; код, БД, релиз и статусы задач не изменены. [Правила](AGENTS.md), [карта](docs/README.md).
 
@@ -12,7 +12,7 @@
 
 - 28.11.2026 — T-проход (zcode-sess-fd0f): build 0 ошибок, **3059/3059** тестов (было 3022/3057 — отремонтированы 35 source-паттерн регрессий: 33 устаревших теста + 2 дефекта, вкл. Opacity-затемнение в EstimateSummaryPanel.xaml), офлайн App.Checks зелёные после правок харнесса, штатный smoke продакшн-EXE exit 0, валидаторы local-qa 24/24. AGR-11.01 и BUG-F54.06 закрыты и удалены из очереди; CTX-049.01/DEMO-07.01/PERF-053.05 — PARTIAL. [Подробности](docs/T_TEST_PASS_20261128.md).
 
-- 28.11.2026 — scalar-проход (zcode-sess-f54x): **BUG-F54 → CODE READY**; строки BUG-F54.01–05/07 и CTX-049.01 закрыты и удалены из очереди. Все scalar ExecuteScalar строго (NULL не →0: applock/OUTPUT/COUNT/CASE), reader-инвентарь закрыт по схеме демо-БД, границы Int32 проверяемые (RequireInt32). Build 0 ошибок, **3096/3096** тестов (+37), SQL Pilot живьём: SQL-режим App.Checks exit 0 (2504 строк, фильтр, 1366/1920, smoke OK), продакшн EXE `--demo --smoke-test` exit 0, rev демо-БД не изменился. Корень гонки SQL-харнесса — отсутствие DispatcherSynchronizationContext без Application.Run (правка в тестовом харнессе, продакшн не менялся). [Отчёт](docs/BUG_F54_SCALAR_PASS_20261128.md).
+- 28.11.2026 — scalar-проход (zcode-sess-f54x): **BUG-F54 → DONE**; строки BUG-F54.01–05/07 и CTX-049.01 закрыты и удалены из очереди. Все scalar ExecuteScalar строго (NULL не →0: applock/OUTPUT/COUNT/CASE), reader-инвентарь закрыт по схеме демо-БД, границы Int32 проверяемые (RequireInt32). Build 0 ошибок, **3096/3096** тестов (+37), SQL Pilot живьём: SQL-режим App.Checks exit 0 (2504 строк, фильтр, 1366/1920, smoke OK) + вечером — повторная полная приёмка всех шести маршрутов (справочники/ПТО/паспорта/металл/Excel непустыми данными через штатные API, корзина/undo чтением; каждый с отказ-гвардом, rev демо-БД не изменился). Корень гонки SQL-харнесса — отсутствие DispatcherSynchronizationContext без Application.Run (правка в тестовом харнессе, продакшн не менялся). [Отчёт](docs/BUG_F54_SCALAR_PASS_20261128.md).
 
 ## История до реорганизации
 

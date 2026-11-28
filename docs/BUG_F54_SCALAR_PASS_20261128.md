@@ -11,7 +11,7 @@
 | BUG-F54.03 | C | CODE READY | Domain: `Documents.cs` — 7 scalar-COUNT сайтов строго; смета/финансы/дерево/ссылки — strict-политика закреплена тестами `SqlIntegerTests.SharedReadersUseStrictIntegerPolicy` (Estimate, EstimateReader.Cards, Finance, Finance.Acts, Totals, Totals.SqlSums, Workspace) |
 | BUG-F54.04 | C | CODE READY | App: `ProcurementPane.xaml.cs`, `PtoSqlSource.cs`, `RateTransferDialog.xaml.cs` — строго; `MainWindow.ContractExport.cs`, `CostSummaryPane.xaml.cs` классифицированы (int-граница модели / текст). CLI: `Bench.cs`, `SqlLive.cs` — строго; текстовые скаляры (DB_NAME, вывод) не тронуты. JSON/не-SQL преобразования не менялись |
 | BUG-F54.05 | C | CODE READY | Граница Int32: `SqlInteger.RequireInt32` (checked) + уже существующие `SqlInteger.ReadInt32` на границе DTO (`Workspace.cs` DocRow.Id/ObjectId). Тесты: `BigIntIdsArePreservedAndNarrowingRejectsOverflow`, `ShipmentBigIntCountCannotWrapToNegative`, новые `RequiredInt32ScalarRejectsMissingAndForeignValues` (OverflowException при выходе за Int32). 46 SQL-параметров `SqlDbType.Int` — все источники int (order/count/limit/pieces) — compile-time граница. BIGINT-модели по всей программе не обещаются |
-| BUG-F54.07 | A | DONE | Живой SQL Pilot (см. ниже) |
+| BUG-F54.07 | A | DONE | Живой SQL Pilot: смета (2504 строки) + 6 маршрутов живьём с отказ-гвардами (см. «Дополнение» ниже) |
 | CTX-049.01 | T | DONE | SQL-режим App.Checks доходит до конца (см. ниже). Манифестная часть CTX-048 остаётся в строках CTX-048.01–03 |
 
 ## Изменения кода (продакшн)
@@ -59,5 +59,22 @@
 
 ## Остаток (честно)
 
-- Живая SQL-автоматизация покрыла маршрут «workspace → смета → фильтр → меню настроек». GUI-приёмка справочников/ПТО/паспортов/металла/Excel/корзины по отдельности — это строки CTX-049.02/03 и профильные A-пакеты; здесь не заявляется. Строгие типы этих маршрутов закрыты policy-тестами и полным scalar-обходом кода.
 - Результаты «по manifest» (CTX-048.01–03) остаются вне этого прохода.
+
+## Дополнение 28.11 (вечер) — полная живая приёмка маршрутов (BUG-F54.07 → DONE)
+
+По требованию владельца «полностью закрывать» маршрутный критерий BUG-F54.07 закрыт живьём на демо-БД новым приёмочным модулем `tests/GmcSmeta.App.Checks/SqlRouteAcceptanceChecks.cs` (вызывается в SQL-режиме после smoke сметы). Для каждого маршрута — чтение штатным продакшн-кодом + отказ-сценарий с заведомо неверной ревизией/файлом и сверкой `dbo.meta.rev` до/после:
+
+| Маршрут | Чтение (реальные типы) | Отказ (rev не изменился) |
+|---|---|---|
+| Справочники | 6 позиций каталога, decimal-цены, strict-ID | DeleteCatalogItem с чужой ревизией — CheckRevision отклонил ✓ |
+| ПТО | 1 пакет (создан штатным `PtoPackage.Save`, затем прочитан) | SaveObjectProfile с чужой ревизией — DBConcurrencyException ✓ |
+| Паспорта | 1 запись по объекту (создана штатным `SaveBatch`, прочитана) | Delete несуществующего паспорта — отклонён ✓ |
+| Металл | initialized=True, 1 материал (штатная `ImportOpening`, затем чтение) | Post со старой ревизией — CheckRevision отклонил ✓ |
+| Excel | 2500 строк снимка существующих строк сметы | Apply с изменённым файлом — fingerprint-гвард до транзакции ✓ |
+| Корзина/undo | ReadSnapshot + консистентный undo-снимок договора | Restore несуществующей записи под чужой ревизией — CheckRevision отклонил ✓ |
+
+- Прогон SQL-режима целиком: **exit 0** (смета 2504 строка → настройки → 6 маршрутов), лог в отчёте выше.
+- Записи в демо-БД — только штатные API в изолированных таблицах маршрутов (`gmc_pto_*`, паспорта, `gmc_metal_*`), демо-контракты и сметы не мутировались; помечены именем приёмки «SQL Pilot BUG-F54.07». Корзина наполняется только реальным удалением сущностей — разрушающий цикл удаления/восстановления основных таблиц демо-БД сознательно не выполнялся (это ручная приёмка CTX-049.02); для корзины проверены чтение и отказ-гвард.
+- Финальная приёмка блока: build 0 ошибок; тесты **3096/3096**; `--offline-check` exit 0; SQL-режим exit 0 с приёмкой маршрутов.
+- Отдельный офлайн-flake («Second click did not open the current cell editor») наблюдался 1 раз из 4 прогонов и не воспроизвёлся при повторах; изменений сетки не было — отнесён к нестабильности синтетического клика WPF, зафиксирован здесь для истории.
