@@ -24,25 +24,23 @@ public sealed class ProcurementExtraDialog : Window
             "Редактировать дополнительную закупку";
         Width = 540;
         SizeToContent = SizeToContent.Height;
-        MinWidth = 430;
-        ResizeMode = ResizeMode.CanMinimize;
+        MinWidth = 340;
+        ResizeMode = ResizeMode.CanResize;
         Background = System.Windows.Media.Brushes.White;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ProcurementDialogChrome.Apply(this);
-        var pane = new StackPanel { Margin = ProcurementDialogChrome.Outer };
-        Content = pane;
+        var pane = new StackPanel();
         var title = ProcurementDialogChrome.Heading(Title);
-        title.Margin = new Thickness(0, 0, 0, 10);
+        title.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupSeparatorGap");
         pane.Children.Add(title);
 
         static TextBox Field(StackPanel container, string title, string value)
         {
-            container.Children.Add(new TextBlock { Text = title });
-            var box = new TextBox
-            {
-                Text = value, MinHeight = 30,
-                Margin = new Thickness(0, 4, 0, 10)
-            };
+            container.Children.Add(DynamicFormLayout.Secondary(title));
+            var box = new TextBox { Text = value };
+            DynamicFormLayout.Field(box);
+            box.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormStackedFieldGap");
+            System.Windows.Automation.AutomationProperties.SetName(box, title);
             container.Children.Add(box);
             return box;
         }
@@ -50,9 +48,13 @@ public sealed class ProcurementExtraDialog : Window
         _name.TextWrapping = TextWrapping.Wrap;
         _name.MinHeight = 54;
         _name.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var unitWrap = new StackPanel { Width = 140, Margin = new Thickness(0, 0, 16, 0) };
-        var qtyWrap = new StackPanel { Width = 160 };
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var unitWrap = new StackPanel();
+        unitWrap.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormColumnGap");
+        var qtyWrap = new StackPanel();
+        Grid.SetColumn(qtyWrap, 1);
         _unit = Field(unitWrap, "Ед.", item?.Unit ?? "шт");
         _quantity = Field(qtyWrap, "Количество", item?.Qty ?? "1");
         _quantity.TextAlignment = TextAlignment.Right;
@@ -66,19 +68,18 @@ public sealed class ProcurementExtraDialog : Window
             _cost.IsEnabled = false;
             _cost.ToolTip = "Закупочная цена редактируется непосредственно в таблице.";
         }
-        var actions = new StackPanel
+        var actions = new WrapPanel
         {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
-        var save = new Button { Content = "Сохранить", MinWidth = 110,
-            Margin = new Thickness(0, 0, 8, 0), Height = 32 };
+        var save = new Button { Content = "Сохранить", MinWidth = 110 };
+        save.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         save.Click += (_, _) => Accept();
-        var cancel = new Button { Content = "Отмена", MinWidth = 85, Height = 32 };
-        cancel.Click += (_, _) => DialogResult = false;
+        var cancel = new Button { Content = "Отмена", MinWidth = 85 };
         ProcurementDialogChrome.Buttons(save, cancel);
         actions.Children.Add(save);
         actions.Children.Add(cancel);
-        pane.Children.Add(actions);
+        Content = DynamicFormLayout.WithFooter(pane, actions);
     }
 
     private void Accept()
