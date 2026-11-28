@@ -30,6 +30,7 @@ internal static class KsActPropertiesDialog
             var box = new TextBox { Text = text };
             box.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
             DynamicFormLayout.Field(box);
+            System.Windows.Automation.AutomationProperties.SetName(box, caption);
             Grid.SetRow(label, row);
             Grid.SetColumn(label, 0);
             Grid.SetRow(box, row);
@@ -56,22 +57,21 @@ internal static class KsActPropertiesDialog
             dsExtra.TextWrapping = TextWrapping.Wrap;
             dsExtra.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         }
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 12, 0, 0),
         };
         var ok = new Button
         {
             Content = "Сохранить",
-            Style = (Style)owner.FindResource("PythonToolbarPrimary"),
-            Padding = new Thickness(14, 5, 14, 5),
+            IsDefault = true,
         };
-        var cancel = new Button { Content = "Отмена", Style = (Style)owner.FindResource("PythonToolbarButton"),
-            Margin = new Thickness(8, 0, 0, 0) };
-        buttons.Children.Add(ok);
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
+        DynamicFormLayout.StyleActions(ok, cancel);
         buttons.Children.Add(cancel);
+        buttons.Children.Add(ok);
         dialog.Content = DynamicFormLayout.WithFooter(grid, buttons);
 
         SqlServerActs.ActDraftEdit? edit = null;
