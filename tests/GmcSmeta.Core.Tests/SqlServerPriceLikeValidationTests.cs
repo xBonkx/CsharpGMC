@@ -27,6 +27,17 @@ public sealed class SqlServerPriceLikeValidationTests
         Assert.False(result.Saved);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void MissingRevisionIsRejectedBeforeConnection(string revision)
+    {
+        var result = SqlServerPriceLike.SetPriceLike("bad", 10, 100, "price", revision);
+        Assert.False(result.Saved);
+        Assert.Equal(0, result.Changed);
+        Assert.Equal(revision, result.Revision);
+    }
+
     [Fact]
     public void InvalidIdentifiersAreRejectedBeforeConnection()
     {

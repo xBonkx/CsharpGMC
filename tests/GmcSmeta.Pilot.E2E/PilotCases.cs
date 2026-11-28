@@ -454,6 +454,21 @@ internal static class PilotCases
         var stale = SqlServerDatabase.SaveNumericPasteAtomic(cs, full, "price", [new(first, 170m)], previous);
         PilotRunner.Check(!stale.Saved && p.Revision() == pasted.Revision, "Stale price paste changed revision");
         AssertPrices(150m, 160m);
+        var beforePriceLike = p.Revision();
+        var staleLike = SqlServerPriceLike.SetPriceLike(cs, full, first, "price", previous);
+        PilotRunner.Check(!staleLike.Saved && staleLike.Changed == 0 && p.Revision() == beforePriceLike,
+            "Stale price-like command changed data or revision");
+        var signedPosition = PilotRunner.Long(readback, """
+            SELECT p.id FROM dbo.positions p JOIN dbo.systems s ON s.id=p.system_id
+            WHERE s.contract_id=@stage AND p.stage_src=@source
+            """, ("@stage", signed), ("@source", second));
+        foreach (var field in new[] { "price", "purchase_price" })
+        {
+            var denied = SqlServerPriceLike.SetPriceLike(cs, signed, signedPosition, field, beforePriceLike);
+            PilotRunner.Check(!denied.Saved && denied.Changed == 0 && p.Revision() == beforePriceLike,
+                "Signed stage allowed bulk price-like command: " + field);
+        }
+        AssertPrices(150m, 160m);
 
         PilotRunner.Execute(readback, "INSERT dbo.acts(contract_id,number) VALUES(@rest,N'Legacy KS')",
             ("@rest", rest));

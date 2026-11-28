@@ -154,7 +154,7 @@ public partial class EstimateView
             Add("Превратить в раздел", () => ToSections_Click(this, new RoutedEventArgs()), canWrite, needsAnchor: false, glyph: "Layers");
             Add("Перенести в другую систему…", () => MoveSection_Click(this, new RoutedEventArgs()),
                 canWrite && selected is { IsSystem: false }, "Ctrl+M", needsAnchor: false, glyph: "Layers");
-            if (canWrite && sameAnchor && !selected.IsSub &&
+            if (canWrite && CanStartPriceLike() && sameAnchor && !selected.IsSub &&
                 selected.Source.ParentPositionId is null && _estimate is { } snapshot)
             {
                 var preview = PriceLikeBatchPlan.Preview(snapshot.PositionsInOrder, selected.Id);

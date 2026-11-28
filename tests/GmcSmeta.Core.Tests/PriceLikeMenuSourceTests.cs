@@ -53,7 +53,7 @@ public sealed class PriceLikeMenuSourceTests
         Assert.Contains("exportKp.Items.Add(exportEstimate)", menu);
         Assert.Equal(8, menu.Split("            AddKpExport(").Length - 1);
         Assert.Contains("OpenHistory(doc.Id)", menu);
-        Assert.Contains("AddDocumentFileMenu(menu, doc)", menu);
+        Assert.Contains("AddDocumentFileMenu(menu, doc, ValidDocumentTarget)", menu);
         var global = Source("MainWindow.Navigation.cs");
         Assert.Contains("OpenHistory(null)", global);
         Assert.Contains("OpenTrash", global);

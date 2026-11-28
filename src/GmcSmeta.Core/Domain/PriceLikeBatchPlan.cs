@@ -11,6 +11,9 @@ public static class PriceLikeBatchPlan
 {
     public const int MaxChanges = 10000;
 
+    public static bool CanStart(bool? locked, bool conflict, bool unsettled, bool detached, string revision) =>
+        locked == false && !conflict && !unsettled && !detached && !string.IsNullOrWhiteSpace(revision);
+
     public sealed record Position(long Id, string Name, string Unit, bool IsRoot,
         bool Outside, decimal Price, decimal? PurchasePrice, string? Formulas);
     public sealed record Plan(decimal? Price, IReadOnlyList<long> TargetIds);

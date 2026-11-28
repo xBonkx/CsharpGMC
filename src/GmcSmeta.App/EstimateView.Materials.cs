@@ -998,7 +998,8 @@ public partial class EstimateView
     private void MaterialsGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         var cell = ContextMenuTarget.TargetCell(MaterialsGrid, e);
-        if (!MaterialsSnapshotReady || ContextMenuTarget.SelectRow<MaterialsRow>(MaterialsGrid, e) is null)
+        var hit = ContextMenuTarget.SelectRow<MaterialsRow>(MaterialsGrid, e);
+        if (!MaterialsSnapshotReady || hit is null)
         {
             e.Handled = true;
             return;
@@ -1014,9 +1015,12 @@ public partial class EstimateView
         var menu = new ContextMenu { PlacementTarget = MaterialsGrid,
             Placement = e.CursorLeft < 0 && e.CursorTop < 0 ? PlacementMode.Bottom : PlacementMode.MousePoint };
         var selectedIds = ids.OrderBy(id => id).ToArray();
+        var selection = MaterialsGrid.SelectedItems.OfType<MaterialsRow>().ToArray();
         var contractId = _contractId;
         var revision = _materialsRevision;
-        bool CanExecute() => MaterialsSnapshotReady && contractId == _contractId && revision == _materialsRevision &&
+        bool CanExecute() => MaterialsSnapshotReady && !_detached && contractId == _contractId && revision == _materialsRevision &&
+            MaterialsGrid.Items.Contains(hit) &&
+            MaterialsGrid.SelectedItems.OfType<MaterialsRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
             MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(selectedIds);
         void Add(string header, RoutedEventHandler handler, string glyph)
         {

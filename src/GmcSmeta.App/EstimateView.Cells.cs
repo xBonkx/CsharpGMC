@@ -361,33 +361,42 @@ public partial class EstimateView
             $"Система скопирована: «{newName}» ✓");
     }
 
+    private bool CanStartPriceLike() => PriceLikeBatchPlan.CanStart(
+        _estimate?.Locked, _serverConflict, HasUnsettledCacheWrites, _detached, _serverRevision);
+
     private async Task SavePriceLikeAsync(long sourceId, string field)
     {
-        // Состояние могло измениться, пока было открыто меню выбора цены.
-        if (_estimate?.Locked != false || _serverConflict ||
-            Volatile.Read(ref _pendingWrites) != 0) return;
+        // Preserve the exact revision and source the user saw, not a later queue revision.
+        if (!CanStartPriceLike() || sourceId <= 0 || field is not ("price" or "purchase_price")) return;
+        var revision = _serverRevision;
+        var snapshot = _estimate;
+        if (snapshot is null || !snapshot.PositionsInOrder.Any(row => row.Id == sourceId && !row.IsSystem)) return;
         // One operation on the same queue as ordinary cell writes: no stale
         // revision and no interleaving of a bulk edit with single-cell edits.
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Перенос цены… ({pending} операций)", false);
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict)
+            if (_serverConflict || _detached || _estimate?.Locked != false ||
+                revision != _serverRevision || !ReferenceEquals(snapshot, _estimate) ||
+                _cellSaveQueue.Blocked || _saveAwaitingReadback || _saveError is not null)
             {
-                _saveError ??= "Сначала обнови смету — произошёл конфликт изменений.";
+                _saveError ??= "Смета изменилась во время ожидания. Повторите перенос цены после обновления.";
                 return;
             }
             var result = await Task.Run(() => SqlServerPriceLike.SetPriceLike(
-                _sqlConnectionString, _contractId, sourceId, field, _serverRevision));
+                _sqlConnectionString, _contractId, sourceId, field, revision));
             if (!result.Saved)
             {
                 _saveError = result.Error ?? "Не удалось перенести цену.";
-                if (result.Revision != _serverRevision) _serverConflict = true;
+                if (result.Revision != revision) _serverConflict = true;
                 return;
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             SetStatus($"Перенесена цена у {result.Changed} одинаковых позиций ✓", false);
         }
         catch (Exception ex)

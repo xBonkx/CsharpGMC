@@ -645,10 +645,10 @@ public partial class ProcurementPane : UserControl
     {
         // A synthetic group heading is never sent to SQL. Use only real IDs
         // already in this contract's current server snapshot.
-        var valid = _allRows.Where(row => !row.Work)
-            .Select(row => row.PositionId).ToHashSet();
+        var valid = _allRows.Where(row => !row.Work && row.PositionId > 0)
+            .ToHashSet(ReferenceEqualityComparer.Instance);
         return BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
-            .Select(row => row.PositionId).Where(valid.Contains)
+            .Where(valid.Contains).Select(row => row.PositionId)
             .Distinct().ToArray();
     }
 
@@ -929,15 +929,21 @@ public partial class ProcurementPane : UserControl
             return;
         }
         var row = ContextMenuTarget.SelectRow<ProcurementPreviewRow>(BuyGrid, e);
-        if (row is null || row.Work || !_allRows.Contains(row))
+        if (row is null || row.Work || row.PositionId <= 0 ||
+            !_allRows.Any(current => ReferenceEquals(current, row)))
         {
             e.Handled = true;
             return;
         }
         var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var selection = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds().OrderBy(id => id).ToArray();
         bool CanExecute() => CanStartOperation && _revision == revision &&
-            _allRows.Contains(row) && SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids);
+            attachment == _attachmentGeneration &&
+            _allRows.Any(current => ReferenceEquals(current, row)) &&
+            BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
+            ids.Contains(row.PositionId) && SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids);
         void Add(string header, string kind, string? glyph = null, string defaultDocument = "")
         {
             var item = glyph is null ? new MenuItem { Header = header } : ContextMenuIcons.Create(header, glyph);
@@ -971,7 +977,9 @@ public partial class ProcurementPane : UserControl
         Add("Возврат с объекта…", "back");
         Add("Возврат поставщику…", "back_supplier");
         MovementMenu.PlacementTarget = BuyGrid;
-        MovementMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        MovementMenu.Placement = e.CursorLeft < 0 && e.CursorTop < 0
+            ? System.Windows.Controls.Primitives.PlacementMode.Bottom
+            : System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         e.Handled = true;
         MovementMenu.IsOpen = true;
     }

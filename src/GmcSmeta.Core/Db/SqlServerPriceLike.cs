@@ -66,7 +66,7 @@ public static class SqlServerPriceLike
     public static PriceLikeResult SetPriceLike(string connectionString,
         long contractId, long positionId, string field, string expectedRevision)
     {
-        if (contractId <= 0 || positionId <= 0 ||
+        if (contractId <= 0 || positionId <= 0 || string.IsNullOrWhiteSpace(expectedRevision) ||
             field is not ("price" or "purchase_price"))
             return PriceLikeResult.Fail("Некорректный документ, позиция или колонка цены.",
                 expectedRevision);
@@ -75,8 +75,8 @@ public static class SqlServerPriceLike
         // before enabling it for other databases.
         try
         {
-            if (!new SqlConnectionStringBuilder(connectionString).InitialCatalog
-                    .StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            if (!SqlSchemaCompatibility.IsWritablePilot(builder.InitialCatalog, builder.DataSource))
                 return PriceLikeResult.Fail(
                     "Массовое копирование цены пока доступно только в GmcSmetaPilot_*.",
                     expectedRevision);
@@ -112,9 +112,11 @@ public static class SqlServerPriceLike
             locked = !reader.IsDBNull(2) &&
                 Convert.ToBoolean(reader.GetValue(2), CultureInfo.InvariantCulture);
         }
-        if (locked && field == "price")
+        // This bulk command is disabled for signed estimates in the editor.
+        // Ordinary individual procurement price editing uses a separate writer.
+        if (locked)
             return PriceLikeResult.Fail(
-                "Документ подписан — клиентскую цену менять нельзя.", revision);
+                "Документ подписан — массовый перенос цены недоступен.", revision);
 
         // All rows are read under the same revision lock before any write.
         // Input names/units are normalized in .NET exactly as for source rows.

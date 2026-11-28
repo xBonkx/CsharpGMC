@@ -11,9 +11,11 @@ public partial class ProcurementPane
     {
         using var operation = TryBeginOperation();
         if (operation is null) return;
-        if (!_allRows.Contains(clicked)) { SetStatus("Выбор изменился. Повторите действие."); return; }
+        var valid = _allRows.Where(row => !row.Work && row.PositionId > 0)
+            .ToHashSet(ReferenceEqualityComparer.Instance);
+        if (!valid.Contains(clicked)) { SetStatus("Выбор изменился. Повторите действие."); return; }
         var chosen = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
-            .Where(x => !x.Work && _allRows.Any(y => y.PositionId == x.PositionId))
+            .Where(valid.Contains)
             .DistinctBy(x => x.PositionId).ToList();
         if (!chosen.Any(x => x.PositionId == clicked.PositionId))
             chosen = new List<ProcurementPreviewRow> { clicked };
