@@ -66,7 +66,7 @@ public partial class EstimateView
         });
         body.Children.Add(new TextBlock
         {
-            Text = status, Foreground = StageBrush(warning ? "#B91C1C" : "#64748B"),
+            Text = status, Foreground = warning ? StageBrush("#B91C1C") : (Brush)FindResource("UiMutedTextBrush"),
             FontSize = (double)FindResource("UiCaptionSize"),
             TextTrimming = TextTrimming.CharacterEllipsis
         });
