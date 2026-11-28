@@ -22,6 +22,7 @@ internal static class VisualAuditChecks
         RunEqualGapAndRenderingChecks();
         RunDirectorTextLayoutChecks();
         RunSharedTypographyChecks();
+        RunDisabledTextContrastChecks();
         RunEstimateHeaderToolbarParityChecks();
         RunDynamicFormLayoutChecks();
         RunSharedSpacingChecks();
@@ -355,6 +356,51 @@ internal static class VisualAuditChecks
             tile.TextWrapping == TextWrapping.Wrap && tile.DesiredSize.Height > tile.FontSize,
             "Money tile text must grow rather than trim");
         Console.WriteLine("Shared typography roles and natural line heights checked (no SQL).");
+    }
+
+    private static void RunDisabledTextContrastChecks()
+    {
+        var disabled = ((SolidColorBrush)Application.Current.FindResource("UiDisabledTextBrush")).Color;
+        var fixtures = new (Control Control, string Key, string Chrome)[]
+        {
+            (new RadioButton { Content = "Режим" }, "Segment", "SegmentBorder"),
+            (new RadioButton { Content = "Договор" }, "ObjectTab", "TabBorder"),
+            (new RadioButton { Content = "Этап" }, "ObjectSubTab", "SubTabBorder"),
+            (new Button { Content = "Свойства" }, "PythonTabAction", "TabSurface"),
+            (new CheckBox { Content = "Без закупа" }, "PythonFilterChip", "FilterChrome"),
+            (new RadioButton { Content = "Все" }, "PythonFilterRadio", "FilterSurface"),
+            (new Button { Content = "Сохранить" }, "PrimaryButton", "PrimaryBorder"),
+            (new Button { Content = "Сохранить" }, "PythonToolbarPrimary", "PrimaryChrome"),
+            (new Button { Content = "Сформировать" }, "ProcurementRequestPrimary", "Chrome"),
+            (new Button { Content = "Удалить" }, "DangerButton", "DangerSurface")
+        };
+        foreach (var (control, key, chromeName) in fixtures)
+        {
+            control.Style = (Style)Application.Current.FindResource(key);
+            Layout(control, 240, 64);
+            var border = (Border)control.Template.FindName(chromeName, control);
+            var enabledForeground = ((SolidColorBrush)control.Foreground).Color;
+            control.IsEnabled = false;
+            Layout(control, 240, 64);
+            Require(control.Opacity == 1 && ((SolidColorBrush)control.Foreground).Color == disabled,
+                key + ": disabled control caption must use shared contrast without opacity");
+            Require(border.Background is SolidColorBrush normal && normal.Color == Color.FromRgb(247, 249, 252),
+                key + ": disabled unselected surface must be neutral");
+            if (control is ToggleButton toggle)
+            {
+                toggle.IsChecked = true;
+                Layout(control, 240, 64);
+                Require(border.Background is SolidColorBrush selected && selected.Color == Color.FromRgb(232, 240, 254),
+                    key + ": disabled selected state must stay distinct");
+                Require(((SolidColorBrush)control.Foreground).Color == disabled, key + ": disabled selected text");
+                toggle.IsChecked = false;
+            }
+            control.IsEnabled = true;
+            Layout(control, 240, 64);
+            Require(((SolidColorBrush)control.Foreground).Color == enabledForeground,
+                key + ": re-enable must restore original foreground");
+        }
+        Console.WriteLine("Shared disabled and selected control contrast states checked (no SQL).");
     }
 
     private static void RunDynamicFormLayoutChecks()
