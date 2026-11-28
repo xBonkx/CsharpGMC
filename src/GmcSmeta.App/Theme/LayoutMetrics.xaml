@@ -87,6 +87,12 @@
     <Thickness x:Key="LayoutCostTabStripGap">0,10,0,0</Thickness>
     <Thickness x:Key="LayoutCostToolbarItemGap">0,0,6,4</Thickness>
     <Thickness x:Key="LayoutFormScrollInset">12</Thickness>
+    <Thickness x:Key="LayoutDialogActionGap">0,0,8,0</Thickness>
+    <Thickness x:Key="LayoutDialogIntroGap">0,0,0,12</Thickness>
+    <Thickness x:Key="LayoutDialogListGap">0,12,0,12</Thickness>
+    <Thickness x:Key="LayoutDialogListItemGap">0,0,0,4</Thickness>
+    <Thickness x:Key="LayoutDialogActionRowGap">0,8,0,12</Thickness>
+    <Thickness x:Key="LayoutDialogDetailInset">16,0,0,1</Thickness>
     <Thickness x:Key="LayoutFormStackedFieldGap">0,4,0,9</Thickness>
     <Thickness x:Key="LayoutFormLabelFieldGap">0,4,0,0</Thickness>
     <Thickness x:Key="LayoutFormGroupHeadingGap">0,0,0,7</Thickness>
