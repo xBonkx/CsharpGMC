@@ -41,6 +41,16 @@ public sealed class AgreementCardTests
     }
 
     [Fact]
+    public void SearchDistinguishesLegalCardsWithIdenticalVisibleRequisites()
+    {
+        var first = SqlServerWorkspaceNavigation.AgreementSearchTitle(1, "7", "27.11.2026", "Монтаж");
+        var second = SqlServerWorkspaceNavigation.AgreementSearchTitle(2, "7", "27.11.2026", "Монтаж");
+        Assert.NotEqual(first, second);
+        Assert.Contains("ID 1", first);
+        Assert.Contains("ID 2", second);
+    }
+
+    [Fact]
     public void EmbeddedPageAndKsReadTheSameSharedObjectFields()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
@@ -72,5 +82,9 @@ public sealed class AgreementCardTests
         var read = File.ReadAllText(Path.Combine(db, "SqlServerKsRequisites.cs"));
         Assert.Contains("FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id", read);
         Assert.Contains("customer_full,site_full,cust_org,cust_post,cust_name", read);
+        Assert.Contains("SqlServerWorkspace.RequirePilotDatabase(connectionString);", read);
+        Assert.Contains("Нет действующей привязки юридического договора", read);
+        Assert.Contains("UPDATE dbo.objects SET site_full=@site WHERE id=@id", read);
+        Assert.Contains("if (legal is not null)", read);
     }
 }

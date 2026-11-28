@@ -225,8 +225,9 @@ public static partial class SqlServerKsPrintData
             var objectId = scope.Documents[0].ObjectId;
             var cards = SqlServerAgreements.Read(conn, objectId, token: token).ToDictionary(c => c.Id);
             var companies = SqlServerWorkspace.Companies(conn, token).ToDictionary(c => c.Id, c => c.Name);
-            var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
-            using (var mapping = new SqlCommand("SELECT id,agreement_id FROM dbo.contracts WHERE object_id=@object AND agreement_id IS NOT NULL", conn))
+            // Keep the full object's legal map for the completeness guard.
+            // Report rows and money still use the original scope.
+            using (var mapping = new SqlCommand("SELECT id,agreement_id FROM dbo.contracts WHERE object_id=@object AND kind IN (N'main',N'dop') AND agreement_id IS NOT NULL", conn))
             {
                 mapping.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
                 using var registration = SqlReadCancellation.Register(mapping, token);
@@ -235,7 +236,6 @@ public static partial class SqlServerKsPrintData
                 {
                     token.ThrowIfCancellationRequested();
                     var id = Convert.ToInt64(reader.GetValue(0));
-                    if (!documentIds.Contains(id)) continue;
                     // Missing/archived cards are rejected by the guard only when relevant to this report.
                     if (!cards.TryGetValue(Convert.ToInt64(reader.GetValue(1)), out var legal)) continue;
                     var companyName = legal.CompanyId is long companyId ? companies.GetValueOrDefault(companyId) ?? "" : "";

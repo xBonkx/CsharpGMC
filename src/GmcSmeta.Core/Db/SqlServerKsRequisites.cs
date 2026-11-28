@@ -78,9 +78,7 @@ public static class SqlServerKsRequisites
     public static SqlServerDatabase.SaveResult Save(
         string connectionString, long contractId, Values data, string expectedRevision)
     {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        if (!builder.InitialCatalog.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Запись в реквизиты разрешена только в тестовую базу GmcSmetaPilot_*.");
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         // Reject oversized text before touching any database rows.
         foreach (var value in new[] { data.CustomerFull, data.SiteFull, data.CustomerOrganization,
             data.CustomerPosition, data.CustomerName, data.SecondRole, data.SecondOrganization,
@@ -97,18 +95,45 @@ public static class SqlServerKsRequisites
             return SqlServerDatabase.SaveResult.Fail("Реквизиты уже изменены другим сотрудником. Обновите окно.", revision);
 
         long objectId;
+        string kind;
         using (var ownership = new SqlCommand(
-            "SELECT object_id FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
+            "SELECT c.object_id,c.kind,o.archived FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (UPDLOCK,HOLDLOCK) ON o.id=c.object_id WHERE c.id=@id", conn, tx))
         {
             ownership.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            var id = ownership.ExecuteScalar();
-            if (id is null || id is DBNull)
+            using var reader = ownership.ExecuteReader();
+            if (!reader.Read())
                 return SqlServerDatabase.SaveResult.Fail("Договор больше не существует.", revision);
-            objectId = Convert.ToInt64(id, CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(reader, 0);
+            kind = reader.GetString(1);
+            if (SqlFlag.Read(reader, 2))
+                return SqlServerDatabase.SaveResult.Fail("Объект в архиве. Реквизиты не изменены.", revision);
         }
         if (objectId != data.ObjectId)
             return SqlServerDatabase.SaveResult.Fail("Реквизиты относятся к другому объекту.", revision);
 
+        SqlServerAgreements.Values? legal = null;
+        if (SqlServerAgreements.Enabled(conn, tx))
+        {
+            var legalId = SqlServerAgreements.DocumentAgreementId(conn, contractId, tx);
+            if (legalId is long selected)
+                legal = SqlServerAgreements.Read(conn, objectId, tx).SingleOrDefault(a => a.Id == selected);
+            if (legal is null && (legalId.HasValue || kind is "main" or "dop"))
+                return SqlServerDatabase.SaveResult.Fail("Нет действующей привязки юридического договора. Реквизиты не изменены.", revision);
+        }
+        SqlServerWorkspace.ValidateSharedPrint(objectId, data with { SitePart = "" });
+
+        // Site text is intentionally object-wide. Legal signatories and work
+        // requisites belong to the selected legal card, not the legacy fallback.
+        if (legal is not null)
+        {
+            using var site = new SqlCommand("UPDATE dbo.objects SET site_full=@site WHERE id=@id", conn, tx);
+            site.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
+            site.Parameters.Add("@site", SqlDbType.NVarChar, -1).Value = data.SiteFull ?? "";
+            if (site.ExecuteNonQuery() != 1)
+                return SqlServerDatabase.SaveResult.Fail("Объект больше не существует.", revision);
+        }
+        else
         using (var update = new SqlCommand(
             "UPDATE dbo.objects SET customer_full=@customer,site_full=@site, " +
             "cust_org=@cust_org,cust_post=@cust_post,cust_name=@cust_name, " +
@@ -154,11 +179,8 @@ public static class SqlServerKsRequisites
             log.ExecuteNonQuery();
         }
 
-        if (SqlServerAgreements.DocumentAgreementId(conn, contractId, tx) is long legalId)
-        {
-            var legal = SqlServerAgreements.Read(conn, objectId, tx).Single(a => a.Id == legalId);
+        if (legal is not null)
             SqlServerAgreements.Save(conn, tx, legal with { Print = data with { SitePart = "" } });
-        }
         var savedRevision = SqlServerDatabase.BumpPositionRevision(conn, tx);
         tx.Commit();
         return new SqlServerDatabase.SaveResult(true, null, savedRevision);

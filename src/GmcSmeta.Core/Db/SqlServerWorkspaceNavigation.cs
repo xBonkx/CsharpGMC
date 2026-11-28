@@ -184,8 +184,9 @@ public static class SqlServerWorkspaceNavigation
     }
 
     public static string AgreementSearchTitle(long id, string number, string date, string subject) =>
-        (string.IsNullOrWhiteSpace(number) ? $"Договор без номера (ID {id})" : "Договор № " + number) +
+        (string.IsNullOrWhiteSpace(number) ? "Договор без номера" : "Договор № " + number) +
         (string.IsNullOrWhiteSpace(date) ? "" : " от " + date) +
+        $" (ID {id})" +
         (string.IsNullOrWhiteSpace(subject) ? "" : " — " + subject);
 
     public static IReadOnlyList<CatalogEntry> Catalog(string connectionString, string? query, int skip = 0, int take = 200)

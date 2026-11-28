@@ -206,6 +206,32 @@ public sealed class KsLegalRequisitesTests
             KsLegalScopePolicy.RequireReport(scope, report, ownership, false));
     }
 
+    [Fact]
+    public void MissingSameAgreementAnnexBlocksOverviewAndGroupedButNotSingleWithoutOpening()
+    {
+        var p = Fixture();
+        var mapping = new Dictionary<long, long> { [1] = 101, [2] = 101, [3] = 101 };
+        Assert.Throws<InvalidOperationException>(() => KsLegalScopePolicy.RequireOverview(p.Scope, mapping));
+        Assert.Throws<InvalidOperationException>(() => KsLegalScopePolicy.RequireReport(p.Scope, p.Report, mapping, true));
+        Assert.Equal(101L, KsLegalScopePolicy.RequireReport(p.Scope,
+            KsGroupReport.CalculateSingle(p.Scope, p.Report.Acts[0].Id), mapping, false));
+        mapping[3] = 202;
+        KsLegalScopePolicy.RequireOverview(p.Scope, mapping);
+        Assert.Equal(101L, KsLegalScopePolicy.RequireReport(p.Scope, p.Report, mapping, true));
+    }
+
+    [Fact]
+    public void OmittedAnnexBlocksSingleWithHistoricalOpening()
+    {
+        var p = Fixture();
+        var act = p.Report.Acts[0];
+        var scope = p.Scope with { Opening = new Ks3OpeningBalance(act.Date.AddDays(-1), 100m) };
+        var mapping = new Dictionary<long, long> { [1] = 101, [2] = 101, [3] = 101 };
+        var report = KsGroupReport.CalculateSingle(scope, act.Id);
+        Assert.True(report.GrossCumulative);
+        Assert.Throws<InvalidOperationException>(() => KsLegalScopePolicy.RequireReport(scope, report, mapping, false));
+    }
+
     private static Dictionary<long, KsLegalRequisites.Agreement> PrintAgreements(SqlServerKsPrintData.Package p) =>
         new()
         {

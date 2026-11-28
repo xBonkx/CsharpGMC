@@ -156,11 +156,12 @@ public static class SqlServerKsContractScope
     {
         if (!SqlServerAgreements.Enabled(conn, token: token)) return null;
         var selected = scope.Documents.Single(d => d.Id == scope.SelectedDocumentId);
-        var documentIds = scope.Documents.Select(d => d.Id).ToHashSet();
+        // Include all active main/DS mappings of the object, not just the
+        // legacy number group. The completeness guard needs omitted IDs too.
         using var cmd = new SqlCommand(
             "SELECT c.id,a.id FROM dbo.contracts c JOIN dbo.agreements a " +
             "ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 " +
-            "WHERE c.object_id=@object", conn);
+            "WHERE c.object_id=@object AND c.kind IN (N'main',N'dop')", conn);
         cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = selected.ObjectId;
         using var registration = SqlReadCancellation.Register(cmd, token);
         using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
@@ -169,8 +170,7 @@ public static class SqlServerKsContractScope
         {
             token.ThrowIfCancellationRequested();
             var id = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
-            if (documentIds.Contains(id))
-                result.Add(id, Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture));
+            result.Add(id, Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture));
         }
         token.ThrowIfCancellationRequested();
         return result;

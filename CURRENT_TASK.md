@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — AGR-07/08: защита от неполной исторической группы КС, изоляция печатных реквизитов и ID в поиске; AGR-08.01 CODE READY, 4 PARTIAL, 0 DONE. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-financial-scope-20261129). Windows/SQL не запускались, бронь снята.
+
 - 29.11.2026 — PERF-047.01 CODE READY: история читает заголовок и строки одним соединением с контролем ревизии, старый API сохранён. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
 - 29.11.2026 — PERF-047.06 CODE READY: attachment selection cancellation and off-dispatcher comparison publication; .01 PARTIAL (history snapshot SQL fence pending). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Tests not run, reservations released.
 - 29.11.2026 — AGR-05.01–03 CODE READY: явная серверная привязка, проверка ДС и пакетный импорт; AGR-06.01 ранее реализован, AGR-07.02 PARTIAL. 3 новых CODE READY, 0 DONE, Windows/SQL не запускались. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-server-scope-20261129). Бронь снята.
