@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-022.02 CODE READY: общая таблица при повторной загрузке применяет актуальный профиль, независимые сбросы сохранены; .01 PARTIAL — исправлен недопустимый ключ agreement.sources. 12 key cases + 1 source test добавлены, не запускались. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — PERF-047.04 PARTIAL: cancellation initial passport list/catalogue, exact PDF click, scoped PTO SQL; tests not run, [evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-read-20261129), reservation released.
 
 - 29.11.2026 — PERF-047.05 CODE READY: cancellable metal snapshots/register and save-refresh fence; 15 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
