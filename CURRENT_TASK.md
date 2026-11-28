@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-009.01/.04 PARTIAL: явное подтверждение удаления, фокус отмены и предупреждение полного выделения; 4 source-test cases добавлены, не запущены. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). 0 CODE READY/DONE; бронь снята.
+
 - 29.11.2026 — CTX-041.01–03 PARTIAL: integrated prepared keyboard patch; 9 prior static checks, 3 source tests added (not run). [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
 - 29.11.2026 — PERF-042.01/.02 PARTIAL: явные флаги Recycling/content scroll для трёх дополнительных таблиц, 3 source-проверки добавлены, не запускались. Полный инвентарь и Windows-приёмка остаются. [Доказательства](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.

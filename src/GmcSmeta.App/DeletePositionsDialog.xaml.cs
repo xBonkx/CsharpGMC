@@ -24,6 +24,7 @@ public partial class DeletePositionsDialog : Window
             ? $"Дополнительно будут удалены комплектующие: {additionalComponents}."
             : "Удаление затронет только выбранные позиции.";
         DeleteButton.Content = count == 1 ? "Удалить позицию" : $"Удалить {count} позиций";
+        Loaded += (_, _) => CancelButton.Focus();
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
