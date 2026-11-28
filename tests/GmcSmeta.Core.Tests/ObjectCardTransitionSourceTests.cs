@@ -40,6 +40,9 @@ public sealed class ObjectCardTransitionSourceTests
         Assert.Contains("Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot, token)", cards);
         Assert.Contains("cached.Revision == before", cards);
         Assert.Contains("_docs.Where(d => d.ObjectId == o.Id).ToArray()", cards);
+        Assert.Contains("ReferenceEquals(_publishedObjectCardItems, _objectCardItems)", cards);
+        Assert.Contains("DocumentCards.ItemsSource = _objectCardItems.Skip(range.First).Take(range.Count).ToArray()", cards);
+        Assert.Contains("StartupTrace.Sample(\"object_cards_page_items\", range.Count)", cards);
         Assert.Contains("CancelObjectCardRead();", main);
         Assert.Contains("if (_objectCardTransitionPending || !ReferenceEquals(PageHost.Content, ObjectPage)", main);
         Assert.Contains("_openDocumentId is not null && PageHost.Content is EstimateView editing", navigation);

@@ -19,6 +19,7 @@ public partial class MainWindow
     private bool _objectCardTransitionPending;
     private IReadOnlyList<object> _objectCardItems = Array.Empty<object>();
     private int _objectCardPage;
+    private IReadOnlyList<object>? _publishedObjectCardItems;
     private bool? _objectTotalsUserVisible;
 
     internal void PresentObjectCardItems(IReadOnlyList<object> items, int requestedPage, bool resetScroll)
@@ -30,8 +31,19 @@ public partial class MainWindow
     private void PublishObjectCardPage(int requestedPage, bool resetScroll)
     {
         var range = ObjectCardLayout.PageRange(_objectCardItems.Count, requestedPage);
-        _objectCardPage = range.Page;
-        DocumentCards.ItemsSource = _objectCardItems.Skip(range.First).Take(range.Count).ToArray();
+        // A repeated page request must not recreate its WrapPanel containers.
+        if (!ReferenceEquals(_publishedObjectCardItems, _objectCardItems) || _objectCardPage != range.Page)
+        {
+            using var timing = StartupTrace.Measure("object_cards_page_bind");
+            DocumentCards.ItemsSource = _objectCardItems.Skip(range.First).Take(range.Count).ToArray();
+            _publishedObjectCardItems = _objectCardItems;
+            _objectCardPage = range.Page;
+            if (StartupTrace.Enabled)
+            {
+                StartupTrace.Sample("object_cards_page_items", range.Count);
+                StartupTrace.Sample("object_cards_total_items", _objectCardItems.Count);
+            }
+        }
         ObjectCardPager.Visibility = range.Pages > 1 ? Visibility.Visible : Visibility.Collapsed;
         ObjectCardsPrevious.IsEnabled = range.Page > 0;
         ObjectCardsNext.IsEnabled = range.Page + 1 < range.Pages;

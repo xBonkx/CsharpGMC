@@ -134,33 +134,41 @@ internal static class LayoutPerformanceChecks
                 {
                     var data = Enumerable.Range(1, count).Select(SyntheticCard).ToArray();
                     var items = ObjectCardLayout.AppendNewContract(data, canCreate: false);
-                    var watch = Stopwatch.StartNew();
-                    host.PresentObjectCardItems(items, 0, true);
-                    viewer.ScrollToTop();
-                    Flush(host);
-                    watch.Stop();
-                    Record("top", watch.Elapsed.TotalMilliseconds);
-                    watch.Restart();
                     var last = ObjectCardLayout.PageRange(items.Count, int.MaxValue);
-                    host.PresentObjectCardItems(items, last.Page, true);
-                    viewer.ScrollToBottom();
-                    Flush(host);
-                    watch.Stop();
-                    Record("bottom", watch.Elapsed.TotalMilliseconds);
-                    if (cards.Items.Count == 0 || cards.Items[cards.Items.Count - 1] is not NewContractCardItem)
-                        failures++;
-                    // Bound actual production page realization, not the underlying data count.
-                    void Record(string phase, double elapsed)
+                    // Warm-up and 30 measured complete forward/back traversals.
+                    // Distinct phases keep middle-page and return timings separate.
+                    for (iteration = 0; iteration <= 30; iteration++)
                     {
+                        for (var pageIndex = 0; pageIndex <= last.Page; pageIndex++)
+                            Visit(pageIndex, pageIndex == 0 ? "top" : pageIndex == last.Page ? "bottom" : "page_" + pageIndex);
+                        for (var pageIndex = last.Page - 1; pageIndex >= 0; pageIndex--)
+                            Visit(pageIndex, "back_" + pageIndex);
+                        // Request the same immutable snapshot and page again.
+                        var sameSource = cards.ItemsSource;
+                        host.PresentObjectCardItems(items, 0, true);
+                        if (!ReferenceEquals(sameSource, cards.ItemsSource)) failures++;
+                    }
+                    void Visit(int pageIndex, string phase)
+                    {
+                        var expected = ObjectCardLayout.PageRange(items.Count, pageIndex);
+                        var watch = Stopwatch.StartNew();
+                        host.PresentObjectCardItems(items, pageIndex, true);
+                        if (phase == "bottom") viewer.ScrollToBottom();
+                        Flush(host);
+                        watch.Stop();
                         var realized = 0;
                         for (var i = 0; i < cards.Items.Count; i++)
                             if (cards.ItemContainerGenerator.ContainerFromIndex(i) is not null) realized++;
                         var counts = CountVisuals(cards);
-                        var valid = realized > 0 && realized <= ObjectCardLayout.CardsPerPage &&
-                            cards.Items.Count <= ObjectCardLayout.CardsPerPage && viewer.ViewportWidth > 0 && viewer.ViewportHeight > 0;
+                        var correctItems = cards.Items.Count == expected.Count &&
+                            Enumerable.Range(0, expected.Count).All(i => ReferenceEquals(cards.Items[i], items[expected.First + i]));
+                        var creationCount = cards.Items.OfType<NewContractCardItem>().Count();
+                        var valid = correctItems && creationCount == (expected.Page == last.Page ? 1 : 0) &&
+                            realized > 0 && realized <= ObjectCardLayout.CardsPerPage &&
+                            viewer.ViewportWidth > 0 && viewer.ViewportHeight > 0;
                         if (!valid) failures++;
-                        Write("object_cards", count + 1, cards, viewer, phase, elapsed, realized, 0,
-                            counts.Nodes, viewer.VerticalOffset, valid ? "PASS" : "FAIL");
+                        Write("object_cards", count + 1, cards, viewer, phase, watch.Elapsed.TotalMilliseconds,
+                            realized, 0, counts.Nodes, viewer.VerticalOffset, valid ? "PASS" : "FAIL");
                     }
                     host.PresentObjectCardItems(Array.Empty<object>(), 0, true);
                     Flush(host);
