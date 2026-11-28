@@ -33,7 +33,7 @@ public sealed class MaterialsMarkupDialog : Window
         DynamicFormLayout.Apply(this);
         var root = new StackPanel();
         var heading = WorkspaceWindowUi.Heading($"Наценка для выделенных строк: {count}");
-        heading.Margin = new Thickness(0, 0, 0, 12);
+        heading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         root.Children.Add(heading);
         _toPrice = new RadioButton
         {
@@ -65,6 +65,7 @@ public sealed class MaterialsMarkupDialog : Window
             label.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormColumnGap");
             field.Children.Add(label);
             DynamicFormLayout.Field(input);
+            System.Windows.Automation.AutomationProperties.SetName(input, caption);
             Grid.SetColumn(input, 1);
             field.Children.Add(input);
             root.Children.Add(field);
@@ -80,18 +81,14 @@ public sealed class MaterialsMarkupDialog : Window
         DynamicFormLayout.WrapCaption(_round);
         root.Children.Add(_onlyEmpty);
         root.Children.Add(_round);
-        var row = new StackPanel
+        var row = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
         };
-        var cancel = new Button { Content = "Отмена", Padding = new Thickness(12, 6, 12, 6) };
-        cancel.Click += (_, _) => DialogResult = false;
-        var apply = new Button
-        {
-            Content = "Применить", Padding = new Thickness(12, 6, 12, 6),
-            Margin = new Thickness(8, 0, 0, 0), IsDefault = true,
-        };
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
+        var apply = new Button { Content = "Применить", IsDefault = true };
         apply.Click += (_, _) => Apply();
         row.Children.Add(cancel);
         row.Children.Add(apply);
