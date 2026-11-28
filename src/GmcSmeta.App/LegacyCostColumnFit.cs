@@ -45,13 +45,16 @@ internal sealed class LegacyCostColumnFit
         return (_grid.FontFamily, _grid.FontSize, _grid.FontStyle, _grid.FontStretch, dpi.DpiScaleX, dpi.PixelsPerDip);
     }
 
-    private static string? NumericPath(DataGridColumn column) =>
-        column is DataGridTextColumn { Binding: Binding binding } &&
-        binding.Converter is null && string.IsNullOrEmpty(binding.StringFormat) &&
-        binding.Path?.Path is ("Unit" or "Qty" or "UCost" or "UPrice" or "SummaryUnitPrice" or "UWcost" or "UWsell"
-        or "MCost" or "MSell" or "MatMargin" or "WCost" or "WSell" or "WorkMargin" or "TotalCost" or "TotalSell"
-        or "TotalMargin" or "MarkupPct" or "MatMarkupPct" or "Amount" or "Date" or "Cost" or "Sell" or "Margin" or "MarginPct") path
-            ? path : null;
+    private static string? NumericPath(DataGridColumn column)
+    {
+        if (column is not DataGridTextColumn { Binding: Binding binding } ||
+            binding.Converter is not null || !string.IsNullOrEmpty(binding.StringFormat)) return null;
+        var path = binding.Path?.Path;
+        return path is "Unit" or "Qty" or "UCost" or "UPrice" or "SummaryUnitPrice" or "UWcost" or "UWsell"
+            or "MCost" or "MSell" or "MatMargin" or "WCost" or "WSell" or "WorkMargin" or "TotalCost" or "TotalSell"
+            or "TotalMargin" or "MarkupPct" or "MatMarkupPct" or "Amount" or "Date" or "Cost" or "Sell" or "Margin" or "MarginPct"
+                ? path : null;
+    }
 
     private IEnumerable<(DataGridColumn Column, string Path, string Header, double Preferred)> Columns()
     {
