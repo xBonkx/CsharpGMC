@@ -24,6 +24,7 @@ internal static class VisualAuditChecks
         RunDynamicFormLayoutChecks();
         RunSharedSpacingChecks();
         RunEstimateScrollLayoutChecks();
+        RunWorkspaceHeightChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
         var right = new WrapPanel();
@@ -41,6 +42,31 @@ internal static class VisualAuditChecks
         Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
             "Toolbar must restore one row when width returns.");
         Console.WriteLine("Responsive toolbar measured at narrow and wide sizes (no SQL).");
+    }
+
+    private static void RunWorkspaceHeightChecks()
+    {
+        // Use the compiled shell, without InitializeWorkspaceAsync or any SQL access.
+        var window = new MainWindow();
+        try
+        {
+            var root = (FrameworkElement)window.FindName("RootLayout");
+            var status = (FrameworkElement)window.FindName("StatusText");
+            var holder = (FrameworkElement)status.Parent;
+            var page = (FrameworkElement)window.FindName("DocumentsWorkspaceSurface");
+            foreach (var (w, h) in new[] { (1366d, 728d), (1920d, 1040d), (2560d, 1400d) })
+            foreach (var scale in new[] { 1.0, 1.1, 1.2 })
+            {
+                window.ApplyFontScale(scale);
+                Layout(root, w, h);
+                Require(holder.Visibility == Visibility.Collapsed && holder.DesiredSize.Height == 0,
+                    "Diagnostics status must reserve no workspace height");
+                Require(page.ActualHeight > 0 && page.ActualWidth > 0, "Workspace must remain measurable");
+                var bounds = page.TransformToAncestor(root).TransformBounds(new Rect(page.RenderSize));
+                Require(bounds.Bottom <= root.ActualHeight + .5, "Workspace extends below shell viewport");
+            }
+        }
+        finally { window.Close(); }
     }
 
     private static void RunNavigationGlyphChecks()

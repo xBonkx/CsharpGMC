@@ -21,6 +21,12 @@ public partial class MainWindow
     private int _objectCardPage;
     private bool? _objectTotalsUserVisible;
 
+    internal void PresentObjectCardItems(IReadOnlyList<object> items, int requestedPage, bool resetScroll)
+    {
+        _objectCardItems = items;
+        PublishObjectCardPage(requestedPage, resetScroll);
+    }
+
     private void PublishObjectCardPage(int requestedPage, bool resetScroll)
     {
         var range = ObjectCardLayout.PageRange(_objectCardItems.Count, requestedPage);
@@ -171,11 +177,11 @@ public partial class MainWindow
         ObjectProgressCard.Visibility = documents.ShowProgress ? Visibility.Visible : Visibility.Collapsed;
         // The final tile is the real Python "Новое КП" action. Financial
         // totals and document count intentionally use documents.Cards only.
-        _objectCardItems = ObjectCardLayout.AppendNewContract(
+        var items = ObjectCardLayout.AppendNewContract(
             documents.Cards, SqlWritesEnabled && !o.Archived,
             mode == NavigationMode.Kp ? "Новое КП" : "Добавить документ");
         if (resetScroll) _objectTotalsUserVisible = null;
-        PublishObjectCardPage(resetScroll ? 0 : _objectCardPage, resetScroll);
+        PresentObjectCardItems(items, resetScroll ? 0 : _objectCardPage, resetScroll);
         ObjectCardsStatus.Visibility = Visibility.Collapsed;
         ObjectCardsScroll.Visibility = Visibility.Visible;
         UpdateObjectTotalsVisibility();

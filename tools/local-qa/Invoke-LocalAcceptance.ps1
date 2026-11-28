@@ -11,10 +11,13 @@ param(
     [string]$PilotDatabase = "",
     [switch]$LayoutPerformance,
     [switch]$PilotE2E,
-    [switch]$RequireAutomatedAcceptance
+    [switch]$RequireAutomatedAcceptance,
+    [switch]$VisualEvidence,
+    [switch]$RequireVisualCodeAcceptance
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($RequireVisualCodeAcceptance) { $VisualEvidence = $true; $LayoutPerformance = $true }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $runName = 'run-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $out = Join-Path $PSScriptRoot ('out\' + $runName)
@@ -79,7 +82,7 @@ function Invoke-OfflineRecorded([string]$id, [string[]]$arguments) {
 
 $pilotReport = Join-Path $out 'pilot-e2e'
 $offlineIds = @('wpf-offline', 'export-offline', 'procurement-export-offline',
-    'contract-export-offline', 'layout-performance-offline')
+    'contract-export-offline', 'layout-performance-offline', 'visual-audit-offline')
 function Record-OfflineSkips([string]$reason) {
     foreach ($id in $script:offlineIds) { Record-Result $id 'SKIP' $reason '' }
 }
@@ -137,6 +140,11 @@ else {
                         '-c', 'Release', '--no-build', '--', '--layout-performance-check', (Join-Path $out 'layout'))
                 }
                 else { Record-Result 'layout-performance-offline' 'SKIP' 'Explicit -LayoutPerformance switch not supplied' '' }
+                if ($VisualEvidence) {
+                    $null = Invoke-OfflineRecorded 'visual-audit-offline' @('run', '--project', $appChecks,
+                        '-c', 'Release', '--no-build', '--', '--visual-audit', (Join-Path $out 'visual-audit'))
+                }
+                else { Record-Result 'visual-audit-offline' 'SKIP' 'Explicit -VisualEvidence switch not supplied' '' }
             }
             else {
                 Record-Result 'dotnet-test' 'SKIP' 'Release build failed; 0 tests run by this step' ''
@@ -156,6 +164,21 @@ else {
         Record-OfflineSkips 'Windows WPF target unavailable'
     }
 }
+
+if ($VisualEvidence) {
+    if ($null -eq (Get-Command python -ErrorAction SilentlyContinue)) {
+        Record-Result 'visual-capture-unit' 'SKIP' 'Python missing; capture validation tests not run' ''
+    }
+    else {
+        Push-Location $PSScriptRoot
+        try {
+            $null = Invoke-Recorded 'visual-capture-unit' 'python' @('-m', 'unittest', 'test_visual_capture')
+            $null = Invoke-Recorded 'visual-capture-matrix' 'python' @('visual_capture.py', 'matrix', '--out', (Join-Path $out 'physical-capture-matrix.json'))
+        }
+        finally { Pop-Location }
+    }
+}
+else { Record-Result 'visual-capture-unit' 'SKIP' 'Explicit -VisualEvidence switch not supplied' '' }
 
 # Explicit credentials are intentionally unsupported. This is a SELECT-only
 # identity probe, not proof that the UI or SQL mutation workflows passed.
@@ -264,6 +287,8 @@ $summary = [pscustomobject]@{
     issue = 'https://github.com/xBonkx/CsharpGMC/issues/55'
     git_sha = $sha; git_uncommitted = $dirty; windows = $windows
     created_at = (Get-Date).ToString('o')
+    visual_code_acceptance_requested = [bool]$RequireVisualCodeAcceptance
+    visual_evidence_requested = [bool]$VisualEvidence
     layout_performance_requested = [bool]$LayoutPerformance
     pilot_e2e_requested = [bool]$PilotE2E
     results = @($results)
@@ -292,6 +317,15 @@ Write-Host ('PASS=' + @($results | Where-Object status -eq 'PASS').Count +
     ' SKIP=' + @($results | Where-Object status -eq 'SKIP').Count)
 # A generated report is not evidence that checks passed. Propagate actual failures.
 if (@($results | Where-Object status -eq 'FAIL').Count -gt 0) { exit 1 }
+if ($RequireVisualCodeAcceptance) {
+    $visualRequired = @('git-head-and-status','dotnet-restore','dotnet-build','dotnet-test','wpf-offline',
+        'export-offline','procurement-export-offline','contract-export-offline','layout-performance-offline',
+        'visual-audit-offline','visual-capture-unit','visual-capture-matrix')
+    foreach ($id in $visualRequired) {
+        if (@($results | Where-Object { $_.id -eq $id -and $_.status -eq 'PASS' }).Count -ne 1) { exit 2 }
+    }
+    if ($dirty -ne 'NO') { exit 2 }
+}
 if ($RequireAutomatedAcceptance) {
     $required = @('git-head-and-status','fixture-generate-verify','fixture-reverify','dotnet-restore','dotnet-build','dotnet-test',
         'wpf-offline','export-offline','procurement-export-offline','contract-export-offline','layout-performance-offline','pilot-e2e')

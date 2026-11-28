@@ -17,7 +17,8 @@ internal static class LayoutPerformanceChecks
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "layout-performance.csv");
         using var output = new StreamWriter(path);
-        output.WriteLine("case,requested_items,viewport_width,viewport_height,dpi_x,dpi_y,phase,elapsed_ms,realized_rows,realized_cells,visual_nodes,scroll_offset,status");
+        output.WriteLine("case,requested_items,viewport_width,viewport_height,dpi_x,dpi_y,phase,elapsed_ms,realized_rows,realized_cells,visual_nodes,scroll_offset,status,iteration");
+        var iteration = 0;
         var failures = 0;
         var materials = new EstimateMaterialsPanel();
         var summary = new EstimateSummaryPanel();
@@ -69,6 +70,9 @@ internal static class LayoutPerformanceChecks
                 foreach (var count in new[] { 300, 2500, 10000, 25000 })
                 {
                     var items = createRows(count);
+                    // Warm-up plus 30 samples on 2500+ rows; retain each raw sample.
+                    for (iteration = 0; iteration <= (count >= 2500 ? 30 : 1); iteration++)
+                    {
                     var watch = Stopwatch.StartNew();
                     grid.ItemsSource = items;
                     // Reset a prior scroll position even if a template kept its viewer.
@@ -87,6 +91,7 @@ internal static class LayoutPerformanceChecks
                         grid.ItemContainerGenerator.ContainerFromIndex(count - 1) is DataGridRow);
                     grid.ItemsSource = null;
                     Flush(host);
+                    }
                 }
             }
             finally { host.Close(); }
@@ -107,6 +112,7 @@ internal static class LayoutPerformanceChecks
 
         void CardCase()
         {
+            iteration = 0;
             // MainWindow's constructor prepares a shell, but only the explicit
             // InitializeWorkspaceAsync call connects to SQL. Never call it here.
             // _ready stays false, so OnClosed does not persist window geometry.
@@ -129,29 +135,34 @@ internal static class LayoutPerformanceChecks
                     var data = Enumerable.Range(1, count).Select(SyntheticCard).ToArray();
                     var items = ObjectCardLayout.AppendNewContract(data, canCreate: false);
                     var watch = Stopwatch.StartNew();
-                    cards.ItemsSource = items;
+                    host.PresentObjectCardItems(items, 0, true);
                     viewer.ScrollToTop();
                     Flush(host);
                     watch.Stop();
                     Record("top", watch.Elapsed.TotalMilliseconds);
                     watch.Restart();
+                    var last = ObjectCardLayout.PageRange(items.Count, int.MaxValue);
+                    host.PresentObjectCardItems(items, last.Page, true);
                     viewer.ScrollToBottom();
                     Flush(host);
                     watch.Stop();
                     Record("bottom", watch.Elapsed.TotalMilliseconds);
-                    // This is a measurement, not a virtualization claim.
+                    if (cards.Items.Count == 0 || cards.Items[cards.Items.Count - 1] is not NewContractCardItem)
+                        failures++;
+                    // Bound actual production page realization, not the underlying data count.
                     void Record(string phase, double elapsed)
                     {
                         var realized = 0;
-                        for (var i = 0; i < items.Count; i++)
+                        for (var i = 0; i < cards.Items.Count; i++)
                             if (cards.ItemContainerGenerator.ContainerFromIndex(i) is not null) realized++;
                         var counts = CountVisuals(cards);
-                        var valid = realized > 0 && viewer.ViewportWidth > 0 && viewer.ViewportHeight > 0;
+                        var valid = realized > 0 && realized <= ObjectCardLayout.CardsPerPage &&
+                            cards.Items.Count <= ObjectCardLayout.CardsPerPage && viewer.ViewportWidth > 0 && viewer.ViewportHeight > 0;
                         if (!valid) failures++;
                         Write("object_cards", count + 1, cards, viewer, phase, elapsed, realized, 0,
-                            counts.Nodes, viewer.VerticalOffset, valid ? "MEASURED" : "FAIL");
+                            counts.Nodes, viewer.VerticalOffset, valid ? "PASS" : "FAIL");
                     }
-                    cards.ItemsSource = null;
+                    host.PresentObjectCardItems(Array.Empty<object>(), 0, true);
                     Flush(host);
                 }
             }
@@ -163,7 +174,7 @@ internal static class LayoutPerformanceChecks
         {
             var dpi = VisualTreeHelper.GetDpi(element);
             output.WriteLine(FormattableString.Invariant(
-                $"{name},{count},{viewer?.ViewportWidth ?? element.ActualWidth:F2},{viewer?.ViewportHeight ?? element.ActualHeight:F2},{dpi.PixelsPerInchX:F2},{dpi.PixelsPerInchY:F2},{phase},{elapsed:F4},{rows},{cells},{nodes},{offset:F2},{status}"));
+                $"{name},{count},{viewer?.ViewportWidth ?? element.ActualWidth:F2},{viewer?.ViewportHeight ?? element.ActualHeight:F2},{dpi.PixelsPerInchX:F2},{dpi.PixelsPerInchY:F2},{phase},{elapsed:F4},{rows},{cells},{nodes},{offset:F2},{status},{iteration}"));
             output.Flush();
         }
     }

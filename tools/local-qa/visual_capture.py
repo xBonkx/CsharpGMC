@@ -110,6 +110,10 @@ def capture_window(pid, resolution, dpi):
     window_dpi = fn(u, "GetDpiForWindow", W.UINT, W.HWND)
     frame_bounds = fn(d, "DwmGetWindowAttribute", W.LONG, W.HWND, W.DWORD, C.c_void_p, W.DWORD)
     awareness = fn(u, "SetThreadDpiAwarenessContext", handle, handle)
+    # The helper is a standalone CLI; make the process per-monitor aware before
+    # querying monitor metrics, then explicitly set/restores the capture thread.
+    set_process_awareness = fn(u, "SetProcessDpiAwarenessContext", W.BOOL, handle)
+    set_process_awareness(C.c_void_p(-4))
     getdc = fn(u, "GetDC", handle, W.HWND)
     releasedc = fn(u, "ReleaseDC", C.c_int, W.HWND, handle)
     memdc = fn(g, "CreateCompatibleDC", handle, handle)

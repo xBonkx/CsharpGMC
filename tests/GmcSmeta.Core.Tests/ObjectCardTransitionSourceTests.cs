@@ -27,8 +27,8 @@ public sealed class ObjectCardTransitionSourceTests
         var success = cards[publish..];
         Assert.Contains("if (!IsCurrent()) return;", success);
         Assert.Contains("_objectCardTransitionPending && _selectedObject?.Id == o.Id", pending);
-        var prepared = success.IndexOf("_objectCardItems = ObjectCardLayout.AppendNewContract", StringComparison.Ordinal);
-        var paged = success.IndexOf("PublishObjectCardPage(", StringComparison.Ordinal);
+        var prepared = success.IndexOf("var items = ObjectCardLayout.AppendNewContract", StringComparison.Ordinal);
+        var paged = success.IndexOf("PresentObjectCardItems(", StringComparison.Ordinal);
         var published = success.IndexOf("ShowPage(ObjectPage)", StringComparison.Ordinal);
         Assert.True(prepared >= 0 && paged > prepared && published > paged);
         Assert.Contains("documents.Cards, SqlWritesEnabled && !o.Archived", success);
