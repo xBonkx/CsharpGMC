@@ -10,7 +10,7 @@
         <!-- Python common.GridDelegate pill: 5px radius, foreground alpha 70 border,
              demi-bold 86% of the normal 10pt font, left inset 6px. -->
         <Style x:Key="ProcurementHistoryExpander" TargetType="Expander">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Expander">
@@ -300,7 +300,7 @@
                            ToolTip="Выделите строки мышкой (Ctrl, Shift или целую систему), потом нажмите «Поставщик…» или «Статус…»">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="#64748B"/>
+                            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                             <Setter Property="FontWeight" Value="Normal"/>
                             <Style.Triggers>
                                 <Trigger Property="Tag" Value="selected">
