@@ -148,7 +148,7 @@
                  TextChanged="SummarySearch_TextChanged"
                  ToolTip="Только строки с этим в названии (или системе / поставщике) — например «решетк»"/>
             <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-            <TextBlock Text="Найти позицию…" Foreground="#64748B" Margin="30,0,32,0"
+            <TextBlock Text="Найти позицию…" Foreground="{StaticResource UiMutedTextBrush}" Margin="30,0,32,0"
                        VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
@@ -778,7 +778,7 @@
         </Grid>
     </local:SummaryTableFrame>
     <!-- примечание под таблицей (⚠ Неполно / Показано по фильтру) -->
-    <TextBlock x:Name="SummaryNote" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap"
+    <TextBlock x:Name="SummaryNote" Grid.Row="3" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"
                Margin="0,10,0,0" Visibility="Collapsed"/>
     <!-- плитки (cost_summary_view tiles): материалы / СМР / себестоимость /
          цена клиенту / маржа материалов + работ -->
