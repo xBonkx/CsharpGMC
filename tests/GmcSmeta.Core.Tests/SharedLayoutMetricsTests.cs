@@ -43,4 +43,20 @@ public sealed class SharedLayoutMetricsTests
         Assert.Contains("{StaticResource LayoutSummaryPageMargin}", Source("EstimateView.xaml"));
         Assert.Contains("36,14,44,30", Source("Theme/LayoutMetrics.xaml"));
     }
+
+    [Fact]
+    public void ObjectCardAndNavigationUseSharedSmallIconAndSpacingRoles()
+    {
+        var metrics = XDocument.Parse(Source("Theme/LayoutMetrics.xaml"));
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        foreach (var key in new[] { "LayoutSmallAffordanceIcon", "LayoutSmallSearchIcon", "LayoutNavigationIcon", "LayoutObjectTileGap" })
+            Assert.Single(metrics.Descendants().Where(e => (string?)e.Attribute(x + "Key") == key));
+        var main = Source("MainWindow.xaml");
+        Assert.Contains("{StaticResource LayoutSmallAffordanceIcon}", main);
+        Assert.Contains("{StaticResource LayoutSmallSearchIcon}", main);
+        Assert.Contains("{StaticResource LayoutNavigationIcon}", main);
+        Assert.Contains("{StaticResource UiWrappedHeading}", main);
+        Assert.Contains("FindResource(\"LayoutObjectTileGap\")", Source("MainWindow.xaml.cs"));
+        Assert.Contains("MaxHeight", Source("Theme/TypographyMetrics.xaml"));
+    }
 }

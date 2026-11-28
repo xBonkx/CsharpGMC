@@ -47,6 +47,11 @@ internal static class Program
                 EstimateFooterLayoutChecks.Run();
                 return 0;
             }
+            if (args.Length == 4 && args[0] == "--visual-diff")
+            {
+                VisualDifferenceChecks.CompareFiles(args[1], args[2], args[3]);
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--visual-audit")
             {
                 var auditApp = CreateApplication();

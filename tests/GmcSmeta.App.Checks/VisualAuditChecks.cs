@@ -39,12 +39,20 @@ internal static class VisualAuditChecks
         var output = Path.GetFullPath(directory);
         Directory.CreateDirectory(output);
         RunLayoutChecks();
+        VisualDifferenceChecks.SelfCheck();
         // These are simulated DIP viewports, not changes to Windows display settings.
         foreach (var (width, height) in new[] { (1366, 768), (1920, 1080), (2560, 1440) })
         {
-            var root = CreateTotalsFixture();
-            Layout(root, width, height);
-            Capture(root, output, $"totals-{width}x{height}", 96);
+            foreach (var scale in new[] { 1.0, 1.1, 1.2 })
+            {
+                var root = CreateTotalsFixture();
+                if (scale != 1.0) root.LayoutTransform = new ScaleTransform(scale, scale);
+                var host = new Border { Child = root, Background = Brushes.White };
+                Layout(host, width, height);
+                // Keep the original 100% file names for existing evidence consumers.
+                var suffix = scale == 1.0 ? "" : $"-scale{scale * 100:0}";
+                Capture(host, output, $"totals-{width}x{height}{suffix}", 96);
+            }
         }
         var narrow = CreateTotalsFixture();
         Layout(narrow, 640, 320);
@@ -53,7 +61,7 @@ internal static class VisualAuditChecks
         var catalog = CreateIconCatalog();
         var catalogHeight = catalog.Children.Count * 42 + 24;
         Layout(catalog, 960, catalogHeight);
-        foreach (var dpi in new[] { 96, 120, 144 })
+        foreach (var dpi in new[] { 96, 120, 144, 192 })
             Capture(catalog, output, $"icons-raster-{dpi}dpi", dpi);
 
         Console.WriteLine("Visual audit written to " + output);

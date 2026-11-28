@@ -36,6 +36,23 @@
     <Thickness x:Key="LayoutDirectorTileInset">5,5</Thickness>
     <Thickness x:Key="LayoutDirectorTilesInset">-5,7,-5,-5</Thickness>
     <Thickness x:Key="LayoutCardLegendGap">0,0,14,0</Thickness>
+    <!-- Small affordances, navigation icons and primary toolbar icons are different roles. -->
+    <Style x:Key="LayoutSmallAffordanceIcon" TargetType="Viewbox">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Height" Value="12"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="LayoutSmallSearchIcon" TargetType="Viewbox" BasedOn="{StaticResource LayoutSmallAffordanceIcon}">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+    </Style>
+    <Style x:Key="LayoutNavigationIcon" TargetType="Viewbox" BasedOn="{StaticResource LayoutSmallAffordanceIcon}">
+        <Setter Property="Width" Value="17"/>
+        <Setter Property="Height" Value="17"/>
+    </Style>
+    <sys:Double x:Key="LayoutObjectTileGap">10</sys:Double>
     <Thickness x:Key="LayoutToolbarPadding">10,4,10,4</Thickness>
     <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>
     <!-- QTabBar: 14/7 padding, pane overlaps the tab strip by one DIP. -->

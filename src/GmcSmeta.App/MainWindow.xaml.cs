@@ -1014,6 +1014,7 @@ public partial class MainWindow : Window
         var state = (Wide: PageHost.ActualWidth >= 1100, Progress: documents.ShowProgress);
         if (_objectTileLayout == state) return;
         _objectTileLayout = state;
+        var gap = (double)FindResource("LayoutObjectTileGap");
         ObjectTotals.RowDefinitions.Clear();
         ObjectTotals.ColumnDefinitions.Clear();
         var cards = new[] { ObjectTotalCard, ObjectProgressCard, ObjectMaterialsCard, ObjectSmrCard, ObjectEarnedCard };
@@ -1025,7 +1026,7 @@ public partial class MainWindow : Window
             {
                 ObjectTotals.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(visible[i] == ObjectProgressCard ? 4 : 2, GridUnitType.Star) });
                 Position(visible[i], 0, i);
-                visible[i].Margin = new Thickness(0, 0, i == visible.Count - 1 ? 0 : 10, 0);
+                visible[i].Margin = new Thickness(0, 0, i == visible.Count - 1 ? 0 : gap, 0);
             }
         }
         else
@@ -1035,9 +1036,9 @@ public partial class MainWindow : Window
             Position(ObjectTotalCard, 0, 0, state.Progress ? 1 : 3);
             Position(ObjectProgressCard, 0, 1, 2);
             Position(ObjectMaterialsCard, 1, 0); Position(ObjectSmrCard, 1, 1); Position(ObjectEarnedCard, 1, 2);
-            ObjectTotalCard.Margin = new Thickness(0, 0, state.Progress ? 10 : 0, 10);
-            ObjectProgressCard.Margin = new Thickness(0, 0, 0, 10);
-            ObjectMaterialsCard.Margin = ObjectSmrCard.Margin = new Thickness(0, 0, 10, 0);
+            ObjectTotalCard.Margin = new Thickness(0, 0, state.Progress ? gap : 0, gap);
+            ObjectProgressCard.Margin = new Thickness(0, 0, 0, gap);
+            ObjectMaterialsCard.Margin = ObjectSmrCard.Margin = new Thickness(0, 0, gap, 0);
             ObjectEarnedCard.Margin = new Thickness(0);
         }
     }

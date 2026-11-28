@@ -129,7 +129,7 @@
             <Setter Property="Template"><Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Border Background="Transparent" Width="16" Height="18">
-                        <Viewbox Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                        <Viewbox Style="{StaticResource LayoutSmallAffordanceIcon}" HorizontalAlignment="Center">
                             <Canvas Width="24" Height="24">
                                 <Path x:Name="Chevron" Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronRight}" Stroke="#64748B"/>
                             </Canvas>
@@ -186,7 +186,7 @@
         </Style>
         <DataTemplate x:Key="YearNavigationTemplate">
             <DockPanel>
-                <Viewbox Width="17" Height="17" Stretch="Uniform" IsHitTestVisible="False" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Viewbox Style="{StaticResource LayoutNavigationIcon}" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,6,0">
                     <Canvas Width="24" Height="24">
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="#64748B"/>
                     </Canvas>
@@ -239,7 +239,7 @@
                             <TextBlock Text="{Binding TagName}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" MaxWidth="220" ToolTip="{Binding TagName}"/>
                         </Border>
                     </WrapPanel>
-                    <TextBlock Text="{Binding DisplayTitle}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap" ToolTip="{Binding Title}"/>
+                    <TextBlock Text="{Binding DisplayTitle}" Style="{StaticResource UiWrappedHeading}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" ToolTip="{Binding Title}"/>
                     <TextBlock Text="{Binding BaseCaption}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding BaseTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
@@ -354,7 +354,7 @@
                 NewDocumentTemplate="{StaticResource NewDocumentCardTemplate}"/>
         <DataTemplate x:Key="ObjectNavigationTemplate">
             <DockPanel>
-                <Viewbox Width="17" Height="17" Stretch="Uniform" IsHitTestVisible="False" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Viewbox Style="{StaticResource LayoutNavigationIcon}" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,6,0">
                     <Canvas Width="24" Height="24">
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFolder}" Stroke="#64748B"/>
                     </Canvas>
@@ -368,7 +368,7 @@
                     <ColumnDefinition Width="17"/><ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Viewbox Width="17" Height="17" Stretch="Uniform" IsHitTestVisible="False" VerticalAlignment="Center">
+                <Viewbox Style="{StaticResource LayoutNavigationIcon}" VerticalAlignment="Center">
                     <Canvas Width="24" Height="24">
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="#2563EB" x:Name="DocumentIcon"/>
                     </Canvas>
@@ -500,7 +500,7 @@
                                      AutomationProperties.Name="Поиск договора"
                                      ToolTip="Договор, приложение или КП: несколько слов в любом порядке. Esc — очистить; Ctrl+P — поиск по всей базе."
                                      TextChanged="ObjectSearch_TextChanged" KeyDown="ObjectSearch_KeyDown"/>
-                            <Viewbox Width="14" Height="14" Stretch="Uniform" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0">
+                            <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" HorizontalAlignment="Left" Margin="9,0,0,0">
                                 <Canvas Width="24" Height="24">
                                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/>
                                 </Canvas>

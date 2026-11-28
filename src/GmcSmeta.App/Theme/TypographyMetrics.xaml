@@ -12,6 +12,12 @@
     <sys:Double x:Key="UiHelpBodySize">15.333333333333334</sys:Double>
     <!-- kp_editor.py _apply_zoom_style: heading = body × 0.95. -->
     <sys:Double x:Key="UiEstimateHeaderZoomRatio">0.95</sys:Double>
+    <!-- Natural font metrics, rather than a fixed line box that can clip
+         wrapped titles at non-default scale or with fallback fonts. -->
+    <Style x:Key="UiWrappedHeading" TargetType="TextBlock">
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineStackingStrategy" Value="MaxHeight"/>
+    </Style>
     <SolidColorBrush x:Key="UiMutedTextBrush" Color="#64748B"/>
     <SolidColorBrush x:Key="UiDisabledTextBrush" Color="#94A3B8"/>
 </ResourceDictionary>
