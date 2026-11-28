@@ -244,29 +244,29 @@
                         <Border Background="#E8F0FE" CornerRadius="9" Padding="9,2"><TextBlock Text="{Binding DisplayKind}" Foreground="#1E40AF" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/></Border>
                         <Border Background="#F1F4F9" CornerRadius="9" Padding="9,2" Margin="6,0,0,0">
                             <Border.Style><Style TargetType="Border"><Style.Triggers><DataTrigger Binding="{Binding TagName}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Border.Style>
-                            <TextBlock Text="{Binding TagName}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" MaxWidth="220" ToolTip="{Binding TagName}"/>
+                            <TextBlock Text="{Binding TagName}" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" MaxWidth="220" ToolTip="{Binding TagName}"/>
                         </Border>
                     </WrapPanel>
                     <TextBlock Text="{Binding DisplayTitle}" Style="{StaticResource UiWrappedHeading}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" ToolTip="{Binding Title}"/>
-                    <TextBlock Text="{Binding BaseCaption}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
+                    <TextBlock Text="{Binding BaseCaption}" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding BaseTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
                     <TextBlock Text="{Binding Meta}" Foreground="{StaticResource UiMutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
                   </StackPanel>
                   <StackPanel DockPanel.Dock="Bottom">
                     <TextBlock Text="{Binding Total, StringFormat={}{0:N2} ₽}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,10,0,4" TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding SplitText}" Foreground="#64748B" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding SplitText}" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
                     <StackPanel Margin="0,8,0,0">
                         <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers><DataTrigger Binding="{Binding ShowProgress}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                         </Style></StackPanel.Style>
                         <local:ContractProgressBar Height="8" SignedFraction="{Binding Progress.SignedFraction}" PendingFraction="{Binding Progress.PendingFraction}"/>
                         <UniformGrid Columns="3" Margin="0,4,0,0">
-                            <StackPanel Margin="{StaticResource LayoutCardLegendGap}"><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#2563EB"/><Run Text="Подписано "/><Run Text="{Binding Progress.SignedPercent, Mode=OneWay}"/></TextBlock>
+                            <StackPanel Margin="{StaticResource LayoutCardLegendGap}"><TextBlock Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#2563EB"/><Run Text="Подписано "/><Run Text="{Binding Progress.SignedPercent, Mode=OneWay}"/></TextBlock>
                                 <TextBlock Text="{Binding Finance.Signed, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
-                            <StackPanel Margin="{StaticResource LayoutCardLegendGap}"><TextBlock Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#F59E0B"/><Run Text="На сдаче "/><Run Text="{Binding Progress.PendingPercent, Mode=OneWay}"/></TextBlock>
+                            <StackPanel Margin="{StaticResource LayoutCardLegendGap}"><TextBlock Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap"><Run Text="● " Foreground="#F59E0B"/><Run Text="На сдаче "/><Run Text="{Binding Progress.PendingPercent, Mode=OneWay}"/></TextBlock>
                                 <TextBlock Text="{Binding Finance.Pending, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
-                            <StackPanel><TextBlock Text="○ Остаток" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
+                            <StackPanel><TextBlock Text="○ Остаток" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"/>
                                 <TextBlock Text="{Binding Progress.Remaining, StringFormat={}{0:N2}}" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
                         </UniformGrid>
                     </StackPanel>
@@ -296,7 +296,7 @@
                         <Button Style="{StaticResource PythonToolbarButton}" Content="Письма" ContentTemplate="{StaticResource IconLabelFile}"
                                 Tag="{Binding Id}" Click="CardLetters_Click" Margin="0,0,0,4" ToolTip="Письма в контексте этого документа"/>
                     </WrapPanel>
-                    <TextBlock Text="Предложение — ещё не договор" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold" Margin="0,6,0,0">
+                    <TextBlock Text="Предложение — ещё не договор" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold" Margin="0,6,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsProposal}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
                   </StackPanel>
@@ -357,7 +357,7 @@
                     <TextBlock Text="{Binding Caption}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
                                Foreground="#2563EB" TextAlignment="Center" Margin="0,8,0,0"/>
                     <TextBlock Text="пустое или копия существующего"
-                               Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
+                               Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0"/>
                 </StackPanel>
             </Button>
@@ -524,7 +524,7 @@
                                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/>
                                 </Canvas>
                             </Viewbox>
-                            <TextBlock x:Name="NavigationSearchPlaceholder" Text="Поиск договора…" Margin="30,0,32,0" Foreground="#64748B"
+                            <TextBlock x:Name="NavigationSearchPlaceholder" Text="Поиск договора…" Margin="30,0,32,0" Foreground="{StaticResource UiMutedTextBrush}"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -619,7 +619,7 @@
                         <TextBlock x:Name="EmptyNavigationHeading" Text="Выберите договор или КП слева" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
                                    TextAlignment="Center" TextWrapping="Wrap"/>
                         <TextBlock x:Name="EmptyNavigationHint" Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
-                                   Foreground="#64748B" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
+                                   Foreground="{StaticResource UiMutedTextBrush}" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
                         <WrapPanel HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
                             <Button Content="Загрузить КП из Excel" ContentTemplate="{StaticResource IconLabelUpload}" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
                             <Button x:Name="EmptyNewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
@@ -647,7 +647,7 @@
                             </Grid.RowDefinitions>
                             <StackPanel Margin="0,0,0,16">
                                 <local:ResponsiveToolbarPanel MinimumLeftWidth="100">
-                                    <TextBlock x:Name="ObjectCrumb" Text="Объект" Foreground="#64748B" Margin="0,0,0,4" Visibility="Collapsed"/>
+                                    <TextBlock x:Name="ObjectCrumb" Text="Объект" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,0,0,4" Visibility="Collapsed"/>
                                     <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,4">
                                         <Button x:Name="ObjectNewKpButton" Content="Новое КП" ContentTemplate="{StaticResource IconLabelPlus}" Click="ObjectNewContract_Click"
                                                 Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="0,0,8,0"
@@ -680,7 +680,7 @@
                                     <TextBlock Text="Выполнение по КС" Style="{StaticResource UiCaption}"/>
                                     <TextBlock Text="{Binding Progress.Caption}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,4,0,6" TextWrapping="Wrap"/>
                                     <local:ContractProgressBar Height="8" SignedFraction="{Binding Progress.SignedFraction}" PendingFraction="{Binding Progress.PendingFraction}"/>
-                                    <TextBlock Text="{Binding Progress.Legend}" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding Progress.Legend}" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 </StackPanel></Border>
                                 <Border x:Name="ObjectMaterialsCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0"><StackPanel>
                                     <TextBlock x:Name="ObjectMaterialsCaption" Text="Материалы" Style="{StaticResource UiCaption}"/>
@@ -706,7 +706,7 @@
                                     </StackPanel>
                                 </WrapPanel>
                             </local:ResponsiveToolbarPanel>
-                            <TextBlock x:Name="ObjectCardsStatus" Grid.Row="3" Foreground="#64748B" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            <TextBlock x:Name="ObjectCardsStatus" Grid.Row="3" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Visibility="Collapsed"/>
                             <ScrollViewer x:Name="ObjectCardsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed" SizeChanged="ObjectCards_SizeChanged" ScrollChanged="ObjectCards_ScrollChanged">
                                 <ItemsControl x:Name="DocumentCards" ItemTemplateSelector="{StaticResource ObjectCardSelector}">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
