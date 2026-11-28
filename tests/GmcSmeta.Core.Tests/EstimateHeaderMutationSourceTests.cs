@@ -44,4 +44,18 @@ public sealed class EstimateHeaderMutationSourceTests
         Assert.Contains("var annex = ordinary && _doc.Kind == \"main\"", code);
         Assert.Contains("DeleteContract_Click, \"Trash\", () => ordinary && Write(true)", code);
     }
+
+    [Fact]
+    public void DirectHeaderEditsUsePublishedRevisionAndCurrentPage()
+    {
+        var code = Source("GmcSmeta.App", "EstimateView.Header.cs");
+        Assert.Contains("revision == _publishedEstimateRevision && CanTransferDocument", code);
+        Assert.Contains("main.IsCurrentEstimatePage(_contractId, _objectId, this)", code);
+        Assert.Contains("CanChangeHeader(snapshot, displayedRevision, false)", code);
+        Assert.Contains("SaveTotalsFieldAsync(field, value, caption, displayedRevision)", code);
+        Assert.Contains("snapshot.MoneyFromStages || !CanChangeHeader(snapshot, revision, false)", code);
+        Assert.Contains("SqlServerSmrMode.SetSmrMode(_sqlConnectionString, _contractId, mode, revision)", code);
+        Assert.Contains("SaveHeaderMutationAsync(snapshot, revision, false, () =>", code);
+        Assert.Contains("CanChangeHeader(snapshot, _serverRevision, false)", code);
+    }
 }

@@ -25,7 +25,9 @@ public partial class EstimateView
     // ---------------------------------------------------------------- свойства документа (pencil / Свойства)
     private void EditTitle_Click(object sender, RoutedEventArgs e)
     {
-        if (Window.GetWindow(this) is MainWindow main && _doc is not null)
+        if (_estimate is { } snapshot && !_doc.IsStage &&
+            CanChangeHeader(snapshot, _serverRevision, false) &&
+            Window.GetWindow(this) is MainWindow main)
             main.OpenContractProperties(_doc);
     }
 
@@ -97,8 +99,11 @@ public partial class EstimateView
     private bool CanChangeHeader(EstimateDocument snapshot, string revision, bool allowLocked) =>
         !_detached && IsLoaded && IsEnabled && !_serverConflict && !_doc.StageRest &&
         ReferenceEquals(snapshot, _estimate) && (allowLocked || !snapshot.Locked) &&
-        !string.IsNullOrWhiteSpace(revision) && revision == _serverRevision && CanTransferDocument &&
-        Window.GetWindow(this) is MainWindow main && main.CanEditEstimateHeader(_contractId, _objectId);
+        !string.IsNullOrWhiteSpace(revision) && revision == _serverRevision &&
+        revision == _publishedEstimateRevision && CanTransferDocument &&
+        Window.GetWindow(this) is MainWindow main &&
+        main.IsCurrentEstimatePage(_contractId, _objectId, this) &&
+        main.CanEditEstimateHeader(_contractId, _objectId);
 
     // Header changes participate in the same FIFO writer gate as estimate cells.
     // The displayed revision remains fixed, including after a modal confirmation.
@@ -119,6 +124,7 @@ public partial class EstimateView
         {
             if (_serverConflict || _detached || !ReferenceEquals(snapshot, _estimate) ||
                 revision != _serverRevision || Window.GetWindow(this) is not MainWindow main ||
+                !main.IsCurrentEstimatePage(_contractId, _objectId, this) ||
                 !main.CanEditEstimateHeader(_contractId, _objectId))
             {
                 _saveError = "Документ изменился до записи.";
@@ -364,19 +370,8 @@ public partial class EstimateView
 
     private async void SaveTotalsFieldFromEdit(TextBox box, string field, decimal? current, string caption)
     {
-        if (_estimate is null || _estimate.Locked || box.IsReadOnly) return;
-        if (_serverConflict)
-        {
-            SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
-            return;
-        }
-        var displayedRevision = field == "smr_percent" ? _publishedEstimateRevision : null;
-        if (field == "smr_percent" && (string.IsNullOrEmpty(displayedRevision) ||
-            displayedRevision != _serverRevision || Volatile.Read(ref _pendingWrites) != 0))
-        {
-            SetStatus("Сначала дождись сверки сметы с сервером.", true);
-            return;
-        }
+        if (_estimate is not { } snapshot || snapshot.Locked || box.IsReadOnly) return;
+        var displayedRevision = _publishedEstimateRevision;
         var text = box.Text.Trim();
         decimal? value;
         if (text.Length == 0)
@@ -394,6 +389,11 @@ public partial class EstimateView
             return;
         }
         if (value == current || (value is null && current == 0m)) return;
+        if (!CanChangeHeader(snapshot, displayedRevision, false))
+        {
+            SetStatus("Итоги не изменены: сначала дождитесь сверки сметы с сервером.", true);
+            return;
+        }
         await SaveTotalsFieldAsync(field, value, caption, displayedRevision);
     }
 
@@ -407,9 +407,12 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict)
+            if (_serverConflict || _detached ||
+                Window.GetWindow(this) is not MainWindow main ||
+                !main.IsCurrentEstimatePage(_contractId, _objectId, this) ||
+                !main.CanEditEstimateHeader(_contractId, _objectId))
             {
-                _saveError ??= "Смета изменилась на сервере. Сначала обнови её.";
+                _saveError ??= "Смета изменилась или недоступна. Сначала обнови её.";
                 return false;
             }
             if (displayedRevision is not null && displayedRevision != _serverRevision)
@@ -456,53 +459,22 @@ public partial class EstimateView
 
     private async void SmrModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_smrComboSilent || _estimate is null) return;
+        if (_smrComboSilent || _estimate is not { } snapshot) return;
         if (SmrModeCombo.SelectedItem is not ComboBoxItem item || item.Tag is not string mode) return;
-        if (_estimate.Locked)
+        if (mode == snapshot.SmrMode) return;
+        var revision = _publishedEstimateRevision;
+        if (snapshot.MoneyFromStages || !CanChangeHeader(snapshot, revision, false))
         {
-            SetStatus("Смета подписана: режим СМР не меняется.", true);
-            SetSmrControls(_estimate);
+            SetStatus("Режим СМР недоступен: проверьте блокировку, этапы и сверку с сервером.", true);
+            SetSmrControls(snapshot);
             return;
         }
-        if (mode == _estimate.SmrMode) return;
-        if (_serverConflict)
+        await SaveHeaderMutationAsync(snapshot, revision, false, () =>
         {
-            SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
-            SetSmrControls(_estimate);
-            return;
-        }
-        _reloadTimer.Stop();
-        var pending = Interlocked.Increment(ref _pendingWrites);
-        SetStatus($"Сохранение… ({pending})", false);
-        await _writeLock.WaitAsync();
-        try
-        {
-            var saved = await Task.Run(() => SqlServerSmrMode.SetSmrMode(
-                _sqlConnectionString, _contractId, mode, _serverRevision));
+            var saved = SqlServerSmrMode.SetSmrMode(_sqlConnectionString, _contractId, mode, revision);
             if (!saved.Saved)
-            {
-                _saveError = saved.Error ?? "Режим СМР не изменён";
-                _serverConflict = true;
-            }
-            else
-            {
-                _serverRevision = saved.Revision;
-                _saveAwaitingReadback = true;
-            }
-        }
-        catch (Exception ex)
-        {
-            _saveError = ex.Message;
-        }
-        finally
-        {
-            _writeLock.Release();
-            if (Interlocked.Decrement(ref _pendingWrites) == 0)
-            {
-                SetStatus(_saveError is null ? "Режим СМР сохранён ✓"
-                    : "Ошибка записи: " + _saveError, _saveError is not null);
-                _reloadTimer.Start();
-            }
-        }
+                throw new InvalidOperationException(saved.Error ?? "Режим СМР не изменён");
+            return true;
+        }, "Режим СМР");
     }
 }
