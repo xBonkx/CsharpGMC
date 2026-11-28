@@ -6,6 +6,8 @@ namespace GmcSmeta.RemoteSqlBench;
 // Format 2 adds explicit dataset/profile labels. No connection is opened.
 internal sealed record BenchmarkRun
 {
+    public BenchmarkRun() { } // Explicit public constructor for System.Text.Json.
+
     public int FormatVersion { get; init; }
     public string RunId { get; init; } = "";
     public string SourceSha { get; init; } = "";
