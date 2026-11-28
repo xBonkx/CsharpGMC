@@ -66,6 +66,37 @@ internal static class AgreementAcceptance
             SqlServerAgreements.DocumentAgreementId(read,annex)!=destination.Id||
             SqlServerAgreements.DocumentAgreementId(read,supplement)!=destination.Id)
             throw new Exception("Transfer did not preserve legal requisites and group identity.");
+        // Independent, nonce-owned empty object with two distinct legal cards.
+        var trashObject=SqlServerWorkspace.CreateObject(connection,new ObjectProperties("Synthetic legal trash "+Guid.NewGuid().ToString("N")),Revision());
+        var trashCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)trashObject));
+        var trashPrint=print with{ObjectId=trashObject};
+        foreach(var number in new[]{"TRASH-1","TRASH-2"})
+        {
+            SqlServerWorkspace.SaveAgreementCard(connection,checked((int)trashObject),trashCard.Properties,
+                trashPrint,Revision(),legal with{ObjectId=trashObject,Number=number,Print=trashPrint});
+        }
+        var original=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)trashObject));
+        var previousTrash=SqlServerTrash.List(connection).Select(t=>t.Id).ToHashSet();
+        SqlServerWorkspace.DeleteObject(connection,trashObject,Revision());
+        var trash=SqlServerTrash.List(connection).Single(t=>!previousTrash.Contains(t.Id)&&t.Title==original.Properties.Name);
+        var trashRevision=Revision();
+        var forgetRejected=false;
+        try { SqlServerTrash.Forget(connection,trash.Id,trashRevision); }
+        catch(InvalidOperationException) { forgetRejected=true; }
+        if(!forgetRejected||Revision()!=trashRevision||!SqlServerTrash.List(connection).Any(t=>t.Id==trash.Id))
+            throw new Exception("Legal trash snapshot was removed or revision changed.");
+        var restored=SqlServerTrash.Restore(connection,trash.Id,trashRevision);
+        var restoredCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)restored.Id));
+        if(restored.Kind!="object"||restored.Id==trashObject||restoredCard.Documents.Count!=0||
+            restoredCard.LegalCards.Count!=2||SqlServerTrash.List(connection).Any(t=>t.Id==trash.Id))
+            throw new Exception("Legal trash restore lost root or cards.");
+        foreach(var old in original.LegalCards)
+        {
+            var actual=restoredCard.LegalCards.Single(c=>c.Number==old.Number);
+            if(actual.Id==old.Id||actual!=(old with{Id=actual.Id,ObjectId=restored.Id,Print=old.Print with{ObjectId=restored.Id}}))
+                throw new Exception("Legal trash restore changed independent requisites.");
+        }
+        Console.WriteLine("PASS independent legal cards trash roundtrip and permanent-delete rejection.");
         Console.WriteLine("PASS agreement CRUD and transfer: before annex, own fields, two agreements, annex/DS inheritance, stale revision, cross-object protection, existing-context rejection and empty-target transfer.");
     }
 }

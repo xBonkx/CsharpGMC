@@ -29,7 +29,7 @@ public static class TrashRestoreSafety
                     "требует отдельной подтверждённой процедуры.");
 
         // Forward schema changes must never be dropped silently by the restore loop.
-        // Only the four explicitly supported, independent table groups may contain rows.
+        // Only explicitly supported, independent table groups may contain rows.
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
             "objects", "contracts", "systems", "positions", "agreements"
@@ -57,11 +57,13 @@ public static class TrashRestoreSafety
         var linkedStage = allowStage && kind == "contract" && HasReference(contracts[0], "stage_of");
         var objectIds = Ids(objects);
         var legalCards = Rows(root, "agreements");
-        var legalIds = Ids(legalCards);
+        _ = Ids(legalCards);
         foreach (var legal in legalCards)
         {
             if (kind != "object") throw new InvalidDataException("Договор должен восстанавливаться вместе со своим объектом.");
             MustReference(legal, "object_id", objectIds);
+            if (!IsFalse(legal, "archived"))
+                throw new InvalidOperationException("Архивный или неполный юридический договор не восстанавливается автоматически.");
         }
         var contractIds = Ids(contracts);
         var systemIds = Ids(systems);
@@ -80,8 +82,11 @@ public static class TrashRestoreSafety
             if (kind == "object")
             {
                 MustReference(contract, "object_id", objectIds);
-                OptionalReference(contract, "agreement_id", legalIds);
             }
+            // KP and its stages are not legal annexes. A populated legal link or
+            // annex number is inconsistent even if the linked card is in this dump.
+            if (HasReference(contract, "agreement_id") || HasAnnexNumber(contract))
+                throw new InvalidOperationException("КП содержит юридическую связь приложения. Требуется отдельная проверка.");
             // The current restore drops missing external company/parent links to NULL.
             // Do not accept that loss under the restricted restoration policy.
             if ((!linkedStage && HasReference(contract, "company_id")) || HasReference(contract, "base_contract_id"))
@@ -106,6 +111,44 @@ public static class TrashRestoreSafety
                 throw new InvalidOperationException("Внешние ссылки позиции требуют проверки.");
         }
     }
+
+    // A snapshot can outlive the schema that created it. Never let the
+    // legacy column filter silently discard an independently stored agreement.
+    public static void ValidateLegalSchema(JsonElement root, bool legalEnabled)
+    {
+        if (!legalEnabled && (Rows(root, "agreements").Count > 0 ||
+            Rows(root, "agreement_files").Count > 0 ||
+            Rows(root, "contracts").Any(c => HasReference(c, "agreement_id") || HasAnnexNumber(c))))
+            throw new InvalidOperationException("Снимок содержит юридические реквизиты. Требуется совместимая схема договоров.");
+    }
+
+    public static void ValidateForget(JsonElement root, string kind)
+    {
+        ValidateSnapshot(root, kind);
+        if (Rows(root, "agreements").Count > 0)
+            throw new InvalidOperationException("Снимок содержит самостоятельные юридические договоры. Окончательное удаление требует отдельного согласования.");
+    }
+
+    // Legal cards have a reviewed complete SQL row snapshot, unlike legacy
+    // optional columns. Missing/unknown/duplicate fields must not default away.
+    public static void ValidateLegalColumns(JsonElement root, IEnumerable<string> columns)
+    {
+        var expected = new HashSet<string>(columns, StringComparer.OrdinalIgnoreCase);
+        foreach (var card in Rows(root, "agreements"))
+        {
+            var actual = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in card.EnumerateObject())
+                if (!actual.Add(property.Name))
+                    throw new InvalidDataException("Повтор поля юридического договора в корзине.");
+            if (!actual.SetEquals(expected))
+                throw new InvalidOperationException("Состав полей юридического договора изменился. Восстановление без потери реквизитов невозможно.");
+        }
+    }
+
+    private static bool HasAnnexNumber(JsonElement row) =>
+        row.TryGetProperty("annex_number", out var value) &&
+        value.ValueKind != JsonValueKind.Null &&
+        (value.ValueKind != JsonValueKind.String || !string.IsNullOrEmpty(value.GetString()));
 
     private static List<JsonElement> Rows(JsonElement root, string name)
     {

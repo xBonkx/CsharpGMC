@@ -141,8 +141,12 @@ public static partial class SqlServerTrash
         // Runs under the existing SERIALIZABLE/meta.rev transaction, before INSERT.
         TrashRestoreSafety.ValidateSnapshot(snapshot.RootElement, kind, allowStage: true);
 
-        var restoreOrder = RestoreOrder.Where(t => t != "agreements" || SqlServerAgreements.Enabled(conn, tx)).ToArray();
+        var legalEnabled = SqlServerAgreements.Enabled(conn, tx);
+        TrashRestoreSafety.ValidateLegalSchema(snapshot.RootElement, legalEnabled);
+        var restoreOrder = RestoreOrder.Where(t => t != "agreements" || legalEnabled).ToArray();
         var columns = LoadColumns(conn, tx, restoreOrder);
+        if (legalEnabled)
+            TrashRestoreSafety.ValidateLegalColumns(snapshot.RootElement, columns["agreements"].Select(c => c.Name));
         var decoded = restoreOrder.ToDictionary(t => t, t => SnapshotRows(snapshot.RootElement, t, columns[t]));
         var maps = restoreOrder.ToDictionary(t => t, _ => new Dictionary<long, long>());
         var copied = decoded.ToDictionary(p => p.Key,
@@ -352,7 +356,7 @@ public static partial class SqlServerTrash
             payload = r.GetString(1);
         }
         using (var snapshot = JsonDocument.Parse(payload))
-            TrashRestoreSafety.ValidateSnapshot(snapshot.RootElement, kind);
+            TrashRestoreSafety.ValidateForget(snapshot.RootElement, kind);
         long removed;
         using (var cmd = new SqlCommand("DELETE dbo.trash WHERE id=@id", conn, tx))
         {

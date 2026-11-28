@@ -77,6 +77,69 @@ public sealed class SqlServerTrashRestoreTests
         Assert.Equal(SqlServerTrash.Days, unknown.DaysLeft);
     }
 
+    private static JsonElement LegalSnapshot() => Json("""
+        {"objects":[{"id":10,"archived":false}],
+         "agreements":[{"id":20,"object_id":10,"archived":false,"number":"D-1"},
+                       {"id":21,"object_id":10,"archived":false,"number":"D-2"}]}
+        """);
+
+    [Fact]
+    public void LegalCardsWithoutAnnexesRequireCompatibleSchema()
+    {
+        var snapshot = LegalSnapshot();
+        TrashRestoreSafety.ValidateSnapshot(snapshot, "object");
+        TrashRestoreSafety.ValidateLegalSchema(snapshot, true);
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateLegalSchema(snapshot, false));
+    }
+
+    [Fact]
+    public void PermanentDeletionOfIndependentLegalCardsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateForget(LegalSnapshot(), "object"));
+        TrashRestoreSafety.ValidateForget(Json("""{"objects":[{"id":10,"archived":false}]}"""), "object");
+    }
+
+    [Theory]
+    [InlineData("""{"id":1,"object_id":10,"kind":"kp","locked":false,"agreement_id":20}""")]
+    [InlineData("""{"id":1,"object_id":10,"kind":"kp","locked":false,"annex_number":"1"}""")]
+    public void KpCannotCarryLegalAnnexIdentity(string contract)
+    {
+        var snapshot = Json("{\"contracts\":[" + contract + "]}");
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateSnapshot(snapshot, "contract"));
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateLegalSchema(snapshot, false));
+    }
+
+    [Fact]
+    public void ArchivedLegalHistoryAndLegalFilesRemainProtected()
+    {
+        var archived = Json("""{"objects":[{"id":10,"archived":false}],"agreements":[{"id":20,"object_id":10,"archived":true}]}""");
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateSnapshot(archived, "object"));
+        var files = Json("""{"objects":[{"id":10,"archived":false}],"agreement_files":[{"id":30,"agreement_id":20}]}""");
+        Assert.Throws<InvalidOperationException>(() => TrashRestoreSafety.ValidateSnapshot(files, "object"));
+    }
+
+    [Fact]
+    public void LegalColumnSetMustBeCompleteAndUnambiguous()
+    {
+        string[] columns = ["id", "object_id", "archived", "number"];
+        TrashRestoreSafety.ValidateLegalColumns(LegalSnapshot(), columns);
+        Assert.Throws<InvalidOperationException>(() =>
+            TrashRestoreSafety.ValidateLegalColumns(LegalSnapshot(), columns.Append("subject")));
+        Assert.Throws<InvalidOperationException>(() =>
+            TrashRestoreSafety.ValidateLegalColumns(LegalSnapshot(), columns.Take(3)));
+        var duplicate = Json("""{"agreements":[{"id":20,"ID":21,"object_id":10,"archived":false,"number":"D-1"}]}""");
+        Assert.Throws<InvalidDataException>(() => TrashRestoreSafety.ValidateLegalColumns(duplicate, columns));
+    }
+
+    [Fact]
+    public void EmptyLegalSectionsAndLegacyKpRemainCompatible()
+    {
+        var snapshot = Json("""{"contracts":[{"id":1,"object_id":10,"kind":"kp","locked":false,"agreement_id":null,"annex_number":""}],"agreements":[]}""");
+        TrashRestoreSafety.ValidateSnapshot(snapshot, "contract");
+        TrashRestoreSafety.ValidateLegalSchema(snapshot, false);
+        TrashRestoreSafety.ValidateForget(snapshot, "contract");
+    }
+
     [Fact]
     public void RestoreForgetAndPurge_RejectNonPilotCatalogsBeforeConnecting()
     {
