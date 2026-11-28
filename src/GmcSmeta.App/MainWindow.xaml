@@ -199,7 +199,7 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="#64748B"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding}"/>
             </DockPanel>
         </DataTemplate>
         <Style x:Key="ObjectTileShadow" TargetType="Border">
@@ -251,7 +251,7 @@
                     <TextBlock Text="{Binding BaseCaption}" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding BaseTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
-                    <TextBlock Text="{Binding Meta}" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
+                    <TextBlock Text="{Binding Meta}" Foreground="{StaticResource UiMutedTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding Meta}"/>
                   </StackPanel>
                   <StackPanel DockPanel.Dock="Bottom">
                     <TextBlock Text="{Binding Total, StringFormat={}{0:N2} ₽}" FontSize="{StaticResource UiValueSize}" FontWeight="Bold" Margin="0,10,0,4" TextWrapping="Wrap"/>
@@ -372,13 +372,13 @@
                         <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFolder}" Stroke="#64748B"/>
                     </Canvas>
                 </Viewbox>
-                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding}"/>
             </DockPanel>
         </DataTemplate>
         <DataTemplate x:Key="DocumentNavigationTemplate">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="17"/><ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="17"/><ColumnDefinition Width="*" MinWidth="0"/>
                     <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Viewbox Style="{StaticResource LayoutNavigationIcon}" VerticalAlignment="Center">
@@ -387,15 +387,16 @@
                     </Canvas>
                 </Viewbox>
                 <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"
-                           TextWrapping="NoWrap" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                           TextWrapping="NoWrap" VerticalAlignment="Center" Margin="6,0,4,0" ToolTip="{Binding DisplayName}"/>
                 <!-- Python NavDelegate: 10pt body × 0.88 = 8.8pt (11.733 DIP). -->
-                <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" Width="17" Height="17"
-                        Padding="0" Margin="0,0,6,0" VerticalAlignment="Center">
+                <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" MinWidth="17" MinHeight="17"
+                        Padding="2,0" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="{Binding Document.NavigationTip}">
                     <TextBlock Text="{Binding Document.PhaseNumber}" FontSize="{StaticResource UiNavigationDetailSize}"
                                Foreground="White" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Grid.Column="3" Text="{Binding Document.NavigationDate}" Foreground="#64748B" FontSize="{StaticResource UiNavigationDetailSize}"
-                           VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,4,0"/>
+                <TextBlock Grid.Column="3" Text="{Binding Document.NavigationDate}" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiNavigationDetailSize}"
+                           VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,4,0"
+                           MaxWidth="76" TextTrimming="CharacterEllipsis" ToolTip="{Binding Document.NavigationDate}"/>
             </Grid>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding Document.Kind}" Value="main"><Setter TargetName="DocumentIcon" Property="Stroke" Value="#15803D"/></DataTrigger>
@@ -425,7 +426,7 @@
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
         </Style>
         <Style TargetType="DataGridRow">
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="ToolTip" Value="{Binding Title}"/>
             <Style.Triggers>
@@ -440,7 +441,8 @@
         </Style>
         <Style TargetType="DataGridCell" BasedOn="{StaticResource PythonGridCell}">
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="6,0"/>
         </Style>
     </Window.Resources>
