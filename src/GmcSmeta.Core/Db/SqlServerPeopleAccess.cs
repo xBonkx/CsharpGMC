@@ -240,8 +240,10 @@ public sealed partial class SqlServerPeopleAccess
     public string SetActive(bool person, long id, bool active, string expectedRevision) =>
         SetActiveBatch(person, new[] { id }, active, expectedRevision);
 
-    private static long[] ValidSelection(IReadOnlyCollection<long> ids)
+    private static long[] ValidSelection(IReadOnlyCollection<long> ids, string expectedRevision)
     {
+        if (string.IsNullOrWhiteSpace(expectedRevision))
+            throw new DBConcurrencyException("Нет актуальной ревизии справочника.");
         if (ids.Count == 0 || ids.Count > 50000 || ids.Any(id => id <= 0) ||
             ids.Count != ids.Distinct().Count())
             throw new ArgumentException("Выберите существующие записи без повторений.");
@@ -250,7 +252,7 @@ public sealed partial class SqlServerPeopleAccess
 
     public string SetActiveBatch(bool person, IReadOnlyCollection<long> ids, bool active, string expectedRevision)
     {
-        var selected = ValidSelection(ids);
+        var selected = ValidSelection(ids, expectedRevision);
         SqlServerWorkspace.RequirePilotDatabase(_connectionString);
         using var conn = Open();
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
@@ -295,7 +297,7 @@ public sealed partial class SqlServerPeopleAccess
     public (string Revision, int Deleted, int Deactivated) DeleteOrDeactivateBatch(
         bool person, IReadOnlyCollection<long> ids, string expectedRevision)
     {
-        var selected = ValidSelection(ids);
+        var selected = ValidSelection(ids, expectedRevision);
         SqlServerWorkspace.RequirePilotDatabase(_connectionString);
         using var conn = Open();
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);

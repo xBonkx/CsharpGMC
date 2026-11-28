@@ -398,9 +398,9 @@ public partial class PeopleView : UserControl
             CarsGrid.SelectedItems.OfType<PeopleCar>()
             .Select(c => (c.Id, c.Active, c.Model + " " + c.Plate)).ToArray();
 
-    private bool IsMenuSnapshot(bool person, long[] ids, string revision) =>
-        !_loading && !string.IsNullOrWhiteSpace(revision) && _revision == revision &&
-        SelectedEntries(person).Select(p => p.Id).OrderBy(id => id).SequenceEqual(ids);
+    private bool IsMenuSnapshot(bool person, (long Id, bool Active, string Name)[] entries, string revision) =>
+        !_closed && !_loading && !_inlinePending &&
+        PeopleEntrySelection.Matches(entries, SelectedEntries(person), revision, _revision);
 
     private void People_ContextMenuOpening(object sender, ContextMenuEventArgs e) =>
         OpenEntryMenu(true, e);
@@ -410,13 +410,12 @@ public partial class PeopleView : UserControl
     private void OpenEntryMenu(bool person, ContextMenuEventArgs e)
     {
         e.Handled = true;
-        if (_loading || _operationBusy || _inlinePending || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_closed || _loading || _operationBusy || _inlinePending || string.IsNullOrWhiteSpace(_revision)) return;
         var grid = person ? PeopleGrid : CarsGrid;
         if (person ? ContextMenuTarget.SelectRow<PeoplePerson>(grid, e) is null :
             ContextMenuTarget.SelectRow<PeopleCar>(grid, e) is null) return;
         var entries = SelectedEntries(person);
         if (entries.Length == 0) return;
-        var ids = entries.Select(p => p.Id).OrderBy(id => id).ToArray();
         var revision = _revision;
         var menu = new ContextMenu { PlacementTarget = grid,
             Placement = e.CursorLeft < 0 && e.CursorTop < 0
@@ -427,26 +426,29 @@ public partial class PeopleView : UserControl
             var item = ContextMenuIcons.Create(title, glyph, enabled, danger: danger);
             item.Click += (_, _) =>
             {
-                if (IsMenuSnapshot(person, ids, revision)) action();
+                if (!_operationBusy && IsMenuSnapshot(person, entries, revision)) action();
                 else MessageBox.Show(OwnerWindow, "Выбор изменился. Откройте меню снова.", Title);
             };
             menu.Items.Add(item);
         }
         Add("Не работает у нас (скрыть из новых списков)", "X",
-            () => ChangeActive(person, entries.Where(p => p.Active).Select(p => p.Id).ToArray(), false, revision),
+            () => ChangeActive(person, entries, false, revision),
             entries.Any(p => p.Active));
         if (ShowInactive.IsChecked == true)
             Add("Снова работает", "Check",
-                () => ChangeActive(person, entries.Where(p => !p.Active).Select(p => p.Id).ToArray(), true, revision),
+                () => ChangeActive(person, entries, true, revision),
                 entries.Any(p => !p.Active));
         menu.Items.Add(new Separator());
         Add("Удалить из базы…", "Trash", () => DeleteEntries(person, entries, revision), danger: true);
         menu.IsOpen = true;
     }
 
-    private async void ChangeActive(bool person, long[] ids, bool active, string revision) => await RunAsync(async () =>
+    private async void ChangeActive(bool person, (long Id, bool Active, string Name)[] entries,
+        bool active, string revision) => await RunAsync(async () =>
     {
-        if (ids.Length == 0 || _revision != revision || _loading) return;
+        if (!IsMenuSnapshot(person, entries, revision)) return;
+        var ids = PeopleEntrySelection.ChangedIds(entries, active);
+        if (ids.Length == 0) return;
         await MutateAsync(expected => _db.SetActiveBatch(person, ids, active, expected));
         if (!active)
         {
@@ -462,8 +464,7 @@ public partial class PeopleView : UserControl
         if (entries.Length == 0) return;
         // Mixed selection: hide active entries, never toggle each independently.
         var active = entries.All(p => !p.Active);
-        ChangeActive(person, entries.Where(p => p.Active != active).Select(p => p.Id).ToArray(),
-            active, _revision);
+        ChangeActive(person, entries, active, _revision);
     }
     private void PersonActive_Click(object sender, RoutedEventArgs e) => ToggleSelectedActive(true);
     private void CarActive_Click(object sender, RoutedEventArgs e) => ToggleSelectedActive(false);
@@ -477,7 +478,7 @@ public partial class PeopleView : UserControl
     {
         if (entries.Length == 0 || string.IsNullOrWhiteSpace(revision)) return;
         var ids = entries.Select(p => p.Id).OrderBy(id => id).ToArray();
-        if (!IsMenuSnapshot(person, ids, revision)) return;
+        if (!IsMenuSnapshot(person, entries, revision)) return;
         var names = string.Join(", ", entries.Take(5).Select(p => p.Name)) +
             (entries.Length > 5 ? "…" : "");
         if (MessageBox.Show(OwnerWindow, $"Удалить из общей базы ({entries.Length}): {names}?\n\n" +
@@ -485,7 +486,7 @@ public partial class PeopleView : UserControl
                 "Если сотрудник просто ушёл, лучше выбрать «Не работает у нас».",
                 "Удаление из базы", MessageBoxButton.YesNo, MessageBoxImage.Warning,
                 MessageBoxResult.No) != MessageBoxResult.Yes ||
-            !IsMenuSnapshot(person, ids, revision)) return;
+            !IsMenuSnapshot(person, entries, revision)) return;
         var result = await MutateAsync(expected => _db.DeleteOrDeactivateBatch(person, ids, expected));
         var checkedIds = person ? _checkedPeople : _checkedCars;
         foreach (var id in ids) checkedIds.Remove(id);
