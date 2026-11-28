@@ -63,7 +63,8 @@ public sealed class ProcurementMovementDialog : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Content = root;
 
-        var head = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var head = new StackPanel();
+        head.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         head.Children.Add(ProcurementDialogChrome.Heading($"{Title} — позиций: {rows.Count}"));
         head.Children.Add(new TextBlock
         {
@@ -80,8 +81,8 @@ public sealed class ProcurementMovementDialog : Window
         root.Children.Add(head);
 
         var form = new Grid { Margin = ProcurementDialogChrome.SectionGap };
-        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(155) });
-        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 155 });
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
         for (var i = 0; i < 3; i++)
             form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
@@ -89,30 +90,32 @@ public sealed class ProcurementMovementDialog : Window
         {
             Grid.SetRow(control, row);
             Grid.SetColumn(control, col);
+            if (control is FrameworkElement element)
+                element.SetResourceReference(FrameworkElement.MarginProperty, col == 0 ? "LayoutFormLabelMargin" : "LayoutFormFieldMargin");
+            if (control is Control input) DynamicFormLayout.Field(input);
             panel.Children.Add(control);
         }
         _date = new DatePicker
         {
             SelectedDate = edit?.Date ?? DateTime.Today,
-            MinHeight = 30,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Width = 180,
-            Margin = new Thickness(0, 0, 0, 7)
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MaxWidth = 180
         };
         _document = new TextBox
         {
             Text = edit?.Document ?? defaultDocument,
             ToolTip = kind == "in" ? "УПД № / накладная №" : "накладная (необязательно)",
-            MinHeight = 32,
-            Margin = new Thickness(0, 0, 0, 7)
+
         };
         _note = new TextBox
         {
             Text = edit?.Note ?? "",
-            MinHeight = 32,
-            Margin = new Thickness(0, 0, 0, 7)
+
         };
-        At(form, new TextBlock { Text = "Дата", VerticalAlignment = VerticalAlignment.Center }, 0, 0);
+        System.Windows.Automation.AutomationProperties.SetName(_date, "Дата");
+        System.Windows.Automation.AutomationProperties.SetName(_document, "Документ");
+        System.Windows.Automation.AutomationProperties.SetName(_note, kind == "out" ? "Получатель" : "Примечание");
+        At(form, new TextBlock { Text = "Дата", TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center }, 0, 0);
         At(form, _date, 0, 1);
         At(form, new TextBlock { Text = "Документ", VerticalAlignment = VerticalAlignment.Center }, 1, 0);
         At(form, _document, 1, 1);
@@ -145,7 +148,8 @@ public sealed class ProcurementMovementDialog : Window
             IsReadOnly = false,
             ItemsSource = _lines,
             HeadersVisibility = DataGridHeadersVisibility.Column,
-            SelectionUnit = DataGridSelectionUnit.FullRow,
+            SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended,
+            ClipboardCopyMode = DataGridClipboardCopyMode.ExcludeHeader,
             MinRowHeight = 27,
             GridLinesVisibility = DataGridGridLinesVisibility.All
         };
@@ -190,7 +194,7 @@ public sealed class ProcurementMovementDialog : Window
         root.Children.Add(_grid);
 
         var footer = new DockPanel { Margin = ProcurementDialogChrome.FooterGap };
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right
@@ -198,16 +202,14 @@ public sealed class ProcurementMovementDialog : Window
         var save = new Button
         {
             Content = edit is null ? "Провести" : "Сохранить изменения",
-            MinWidth = 135, Height = 32,
-            Margin = new Thickness(8, 0, 0, 0)
+            MinWidth = 135
         };
         save.Click += Accept;
         var cancel = new Button
         {
-            Content = "Отмена", MinWidth = 90, Height = 32,
-            Margin = new Thickness(8, 0, 0, 0)
+            Content = "Отмена", MinWidth = 90
         };
-        cancel.Click += (_, _) => DialogResult = false;
+        save.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         ProcurementDialogChrome.Buttons(save, cancel);
         buttons.Children.Add(save);
         buttons.Children.Add(cancel);
