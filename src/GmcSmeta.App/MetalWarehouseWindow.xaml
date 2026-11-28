@@ -60,7 +60,7 @@
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Отчёт Excel…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click" Padding="12,7" Margin="0,0,8,0"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Click="Refresh_Click" Padding="12,7"/>
             </WrapPanel>
-            <TextBlock x:Name="StatusText" Text="Загрузка…" TextWrapping="Wrap" Foreground="#64748B" Margin="1,1,0,8"/>
+            <TextBlock x:Name="StatusText" Text="Загрузка…" TextWrapping="Wrap" Foreground="{StaticResource UiMutedTextBrush}" Margin="1,1,0,8"/>
         </StackPanel>
         <TabControl x:Name="Tabs" Style="{StaticResource PythonTabbedPane}">
             <TabItem Header="Остатки">
@@ -119,7 +119,7 @@
                                      BorderBrush="#D0D7E2" Padding="32,5,10,5" VerticalContentAlignment="Center"
                                      ToolTip="Найти материал или толщину" TextChanged="StockFilter_Changed"/>
                             <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                    <TextBlock Text="Найти материал или толщину" Foreground="#94A3B8" Margin="32,0,10,0" VerticalAlignment="Center"
+                    <TextBlock Text="Найти материал или толщину" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,10,0" VerticalAlignment="Center"
                                        IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                                 <TextBlock.Style><Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -207,7 +207,7 @@
                                      AutomationProperties.Name="Поиск операций склада"
                                      ToolTip="Поиск материала, объекта, операции или счёта"/>
                             <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                            <TextBlock Text="Поиск материала, объекта, операции или счёта" Foreground="#94A3B8" Margin="32,0,10,0" VerticalAlignment="Center"
+                            <TextBlock Text="Поиск материала, объекта, операции или счёта" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,10,0" VerticalAlignment="Center"
                                        IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                                 <TextBlock.Style><Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed"/>
