@@ -54,7 +54,7 @@ def distribution(values):
 def load_run(root, relative):
     file = local_file(root, relative)
     meta = json.loads(file.read_text(encoding="utf-8-sig"))
-    if not SHA.fullmatch(meta["sha"]) or any(k not in meta for k in KEYS):
+    if not SHA.fullmatch(meta["sha"]) or any(k not in meta for k in KEYS) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", meta["run_id"]):
         raise ValueError("missing SHA/metadata")
     if meta["topology"] not in TOPOLOGIES or meta["build"] not in ("Release", "Debug"):
         raise ValueError("invalid topology/build")
@@ -116,7 +116,7 @@ def compare(root, pair, limit):
     x, y = a["meta"], b["meta"]
     if any(x[k] != y[k] for k in KEYS) or x["scenario"] != scenario or \
             x["runs"] != y["runs"] or set(x["required_metrics"]) != set(y["required_metrics"]) or \
-            a["raw_sha256"] == b["raw_sha256"]:
+            x["run_id"] == y["run_id"] or local_file(root, a["raw"]) == local_file(root, b["raw"]):
         raise ValueError("incomparable or reused raw evidence")
     failures = sum(a["outcomes"].values()) + sum(b["outcomes"].values())
     missing = []

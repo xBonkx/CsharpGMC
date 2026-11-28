@@ -24,7 +24,7 @@ class PerformanceMatrixTests(unittest.TestCase):
             for i in range(count + 1):
                 w.writerow({"iteration": i, "status": "WARMUP" if i == 0 else outcome,
                             **{k: "" if k == omit else ms for k in METRICS}})
-        meta = dict(sha=sha, scenario="estimate", client="CSharp", dataset="synthetic",
+        meta = dict(sha=sha, run_id=name, scenario="estimate", client="CSharp", dataset="synthetic",
                     machine_profile="pc-1", topology="LAN", cache="warm", build="Release",
                     runtime="net10", os="Windows", sql_version="16", schema="28",
                     rows=2500, contracts=1, dpi=100, resolution="1920x1080",
@@ -44,6 +44,11 @@ class PerformanceMatrixTests(unittest.TestCase):
         self.assertEqual("DONE", row["status"])
         self.assertEqual(100, row["before"]["metrics"]["elapsed_ms"]["p99"])
         self.assertEqual(-10, row["deltas_pct"]["elapsed_ms"]["p95"])
+
+    def test_equal_independent_runs_are_valid(self):
+        row = self.matrix(self.run_file("before"), self.run_file("after"))
+        self.assertEqual("DONE", row["status"])
+        self.assertEqual(0, row["deltas_pct"]["elapsed_ms"]["p95"])
 
     def test_regression(self):
         self.assertEqual("BLOCKED", self.matrix(self.run_file("before"), self.run_file("after", 115))["status"])

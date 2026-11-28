@@ -163,7 +163,8 @@ if ($SqlServer -eq '' -and $ExpectedSqlServer -eq '' -and $PilotDatabase -eq '')
     Record-Result 'pilot-identity-readonly' 'SKIP' 'No explicit SQL parameters; SQL not contacted' ''
 }
 elseif ($SqlServer -eq '' -or $ExpectedSqlServer -eq '' -or
-        $PilotDatabase -cnotmatch '^GmcSmetaPilot_[A-Za-z0-9_]+ {
+        $PilotDatabase -cnotmatch '^GmcSmetaPilot_[A-Za-z0-9_]+$' -or
+        $PilotDatabase -match '^GmcSmetaPilot_Cutover') {
     Record-Result 'pilot-identity-readonly' 'FAIL' 'Safety gate: require server, expected exact @@SERVERNAME, and GmcSmetaPilot_* DB' ''
 }
 elseif ($null -eq (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
@@ -227,7 +228,11 @@ else {
                 Record-Result 'pilot-e2e' 'FAIL' 'Invalid SHA, failure or owned fixture cleanup not confirmed' $reportFile
             }
             elseif ($pilot.skip -gt 0) {
-                Record-Result 'pilot-e2e' 'PARTIAL' ('pass=' + $pilot.pass + '; skip=' + $pilot.skip + '; see explicit limitations') $reportFile
+                $limitations = @( $pilot.scenarios | Where-Object { $_.Status -eq 'SKIP' } | ForEach-Object {
+                    [pscustomobject]@{ id = $_.Scenario; reason = $_.Detail; status = 'SKIP'; actual = ''; evidence = '' }
+                })
+                $limitations | Export-Csv -LiteralPath (Join-Path $out 'pilot-limitations.csv') -NoTypeInformation -Encoding UTF8
+                Record-Result 'pilot-e2e' 'PARTIAL' ('pass=' + $pilot.pass + '; skip=' + $pilot.skip + '; verify pilot-limitations.csv separately') $reportFile
             }
             else { Record-Result 'pilot-e2e' 'PASS' ('pass=' + $pilot.pass + '; no skips') $reportFile }
         }
@@ -296,84 +301,3 @@ if ($RequireAutomatedAcceptance) {
     if ($dirty -ne 'NO') { exit 2 }
 }
 exit 0
- -or
-        $PilotDatabase -match '^GmcSmetaPilot_Cutover') {
-    Record-Result 'pilot-identity-readonly' 'FAIL' 'Safety gate: require server, expected exact @@SERVERNAME, and GmcSmetaPilot_* DB' ''
-}
-elseif ($null -eq (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
-    Record-Result 'pilot-identity-readonly' 'SKIP' 'sqlcmd not found; no SQL connection made' ''
-}
-else {
-    $sql = "SET NOCOUNT ON; SELECT N'QA_IDENTITY|' + CONVERT(nvarchar(256),@@SERVERNAME) + N'|' + DB_NAME();"
-    $logPath = Join-Path $out 'pilot-identity-readonly.log'
-    try {
-        $response = (& sqlcmd -b -l 5 -S $SqlServer -d $PilotDatabase -E -W -h -1 -Q $sql 2>&1 | Out-String)
-        [IO.File]::WriteAllText($logPath, $response, [Text.Encoding]::UTF8)
-        $match = [regex]::Match($response, '(?m)^\s*QA_IDENTITY\|([^|\r\n]+)\|([^|\r\n]+)\s*$')
-        if ($LASTEXITCODE -ne 0 -or -not $match.Success) {
-            Record-Result 'pilot-identity-readonly' 'FAIL' 'SQL identity query failed; no writes attempted' $logPath
-        }
-        else {
-            $actualServer = $match.Groups[1].Value.Trim()
-            $actualDb = $match.Groups[2].Value.Trim()
-            if (-not [string]::Equals($actualServer, $ExpectedSqlServer, [StringComparison]::OrdinalIgnoreCase) -or
-                -not [string]::Equals($actualDb, $PilotDatabase, [StringComparison]::OrdinalIgnoreCase)) {
-                Record-Result 'pilot-identity-readonly' 'FAIL' 'Actual SQL identity differs from explicit expected values' $logPath
-            }
-            else {
-                Record-Result 'pilot-identity-readonly' 'PASS' ('Read-only identity verified: ' + $actualServer + '/' + $actualDb + '; NOT workflow acceptance') $logPath
-            }
-        }
-    }
-    catch {
-        Record-Result 'pilot-identity-readonly' 'FAIL' ('SQL connectivity failure: ' + $_.Exception.GetType().Name) $logPath
-    }
-}
-
-$scenarioPath = Join-Path $PSScriptRoot 'scenarios.json'
-$manual = @(Get-Content $scenarioPath -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object {
-    [pscustomobject]@{
-        id = $_.id; area = $_.area; severity = $_.severity
-        steps = $_.steps; expected = $_.expected; related_issue = $_.relatedIssue
-        status = 'SKIP'; reason = 'No witnessed interactive Windows/SQL run yet'
-        actual = ''; evidence = ''; issue_url = ''
-    }
-})
-$manualPath = Join-Path $out 'manual-acceptance.csv'
-$manual | Export-Csv -Path $manualPath -NoTypeInformation -Encoding UTF8
-Record-Result 'windows-click-through-25-cases' 'SKIP' '0/25 witnessed; complete manual-acceptance.csv only after actual execution' $manualPath
-Record-Result 'signed-ds-ks-protection' 'SKIP' 'No synthetic real SQL workflow was executed' ''
-Record-Result 'two-client-2500-10000' 'SKIP' 'No two interactive Windows clients or controlled full-schema Pilot session' ''
-Record-Result 'xlsx-pdf-docx-golden' 'SKIP' 'Manual GUI/customer golden acceptance is separate from automated offline export checks' ''
-
-$summary = [pscustomobject]@{
-    issue = 'https://github.com/xBonkx/CsharpGMC/issues/55'
-    git_sha = $sha; git_uncommitted = $dirty; windows = $windows
-    created_at = (Get-Date).ToString('o')
-    layout_performance_requested = [bool]$LayoutPerformance
-    results = @($results)
-}
-$json = Join-Path $out 'automated-results.json'
-$summary | ConvertTo-Json -Depth 8 | Set-Content -Path $json -Encoding UTF8
-$lines = New-Object 'System.Collections.Generic.List[string]'
-$lines.Add('# P0 #55 local QA evidence')
-$lines.Add('')
-$lines.Add('- Git HEAD: ' + $sha)
-$lines.Add('- Windows: ' + $windows + '; working tree modified: ' + $dirty)
-$lines.Add('- Manual cases: 25 SKIP until performed; generated file: manual-acceptance.csv')
-$lines.Add('- SQL: this runner cannot approve write acceptance; optional identity SELECT only')
-$lines.Add('- All log files must be inspected for synthetic-only data before publishing')
-$lines.Add('')
-$lines.Add('| Check | Result | Details | Local evidence |')
-$lines.Add('|---|---|---|---|')
-foreach ($v in $results) {
-    $lines.Add('| ' + $v.id + ' | ' + $v.status + ' | ' +
-        ($v.details -replace '\|', '/') + ' | ' + ($v.evidence -replace '\|', '/') + ' |')
-}
-$lines | Set-Content -Path (Join-Path $out 'report.md') -Encoding UTF8
-Write-Host ('P0 #55 report: ' + (Join-Path $out 'report.md'))
-Write-Host ('PASS=' + @($results | Where-Object status -eq 'PASS').Count +
-    ' FAIL=' + @($results | Where-Object status -eq 'FAIL').Count +
-    ' SKIP=' + @($results | Where-Object status -eq 'SKIP').Count)
-# A generated report is not evidence that checks passed. Propagate actual failures.
-if (@($results | Where-Object status -eq 'FAIL').Count -gt 0) { exit 1 }
