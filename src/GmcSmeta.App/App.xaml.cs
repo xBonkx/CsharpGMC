@@ -34,6 +34,7 @@ public partial class App : Application
             return;
         if (_applicationIcon is null)
         {
+            StartupTrace.Mark("app_icon_decode_begin");
             try
             {
                 var uri = new Uri("pack://application:,,,/GMC-Smeta-Next;component/Assets/app.ico", UriKind.Absolute);
@@ -41,10 +42,12 @@ public partial class App : Application
                 var frame = decoder.Frames.OrderBy(f => Math.Abs(f.PixelWidth - 32)).First();
                 if (frame.CanFreeze) frame.Freeze();
                 _applicationIcon = frame;
+                StartupTrace.Mark("app_icon_decode_end");
             }
             catch (Exception ex) when (ex is System.IO.IOException or FormatException or
                 NotSupportedException or InvalidOperationException or System.Runtime.InteropServices.COMException)
             {
+                StartupTrace.Mark("app_icon_decode_failed");
                 // Optional visual branding must never prevent the main window opening.
                 // Windows can still use the icon embedded in the executable.
                 return;
@@ -55,15 +58,21 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        StartupTrace.Mark("app_startup_enter");
+        StartupTrace.Mark("app_previous_process_wait_begin");
         if (!UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
         {
+            StartupTrace.Mark("app_previous_process_wait_failed");
             MessageBox.Show("Предыдущий процесс не завершился. Откройте программу с ярлыка после его закрытия.",
                 "ГМЦ-Смета — обновление", MessageBoxButton.OK, MessageBoxImage.Warning);
             Shutdown(1);
             return;
         }
-        StartupTrace.Mark("app_startup_enter");
+        StartupTrace.Mark("app_previous_process_wait_end");
+        StartupTrace.Mark("app_branding_begin");
         InstallWindowBranding();
+        StartupTrace.Mark("app_branding_end");
+        StartupTrace.Mark("app_interaction_setup_begin");
         ContextMenuIcons.InstallSeparatorNormalization();
         GridEditInteraction.Install();
         GridSortInteraction.Install();
@@ -71,6 +80,7 @@ public partial class App : Application
         FrameworkElement.LanguageProperty.OverrideMetadata(
             typeof(FrameworkElement),
             new FrameworkPropertyMetadata(XmlLanguage.GetLanguage("ru-RU")));
+        StartupTrace.Mark("app_interaction_setup_end");
         // Smoke-test in SQL-only mode needs a separate SQL Server test database.
         if (e.Args.Length == 1 && e.Args[0] == "--smoke-test")
         {

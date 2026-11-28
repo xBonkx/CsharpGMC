@@ -73,6 +73,14 @@ try
         using var fresh = SqlServerDatabase.Open(cs);
         return 1;
     });
+    // A nonpooled login is not a cold server/cache measurement. Never clear
+    // shared SQL caches or normal client pools merely to benchmark a connection.
+    var nonPooled = new SqlConnectionStringBuilder(cs) { Pooling = false }.ConnectionString;
+    Measure("guarded_open_nonpooled", () =>
+    {
+        using var fresh = SqlServerDatabase.Open(nonPooled);
+        return 1;
+    });
     foreach (var limit in new[] { 300, 2500, 10000, 25000 })
     {
         if (positionCount < limit)

@@ -67,6 +67,8 @@ public partial class MainWindow : Window
     {
         StartupTrace.Mark("main_initialize_component_begin");
         InitializeComponent();
+        StartupTrace.Mark("main_initialize_component_end");
+        StartupTrace.Mark("main_shell_setup_begin");
         Closing += (_, e) => { if (_peopleWorkspace is { } view && !view.TryLeave()) e.Cancel = true; };
         Title = WindowTitle + " — C#";
         _navigationSearchTimer = new System.Windows.Threading.DispatcherTimer(
@@ -80,10 +82,14 @@ public partial class MainWindow : Window
             if (_ready && !_startupClosed) ApplyNavigationFilter();
         };
         InitializeEstimateCacheTrim();
-        StartupTrace.Mark("main_initialize_component_end");
+        StartupTrace.Mark("main_shell_setup_end");
+        StartupTrace.Mark("main_settings_apply_begin");
         ApplyFontScale(_uiSettings.FontScale);
         RestoreWindowGeometry();
+        StartupTrace.Mark("main_settings_apply_end");
+        StartupTrace.Mark("main_pto_menu_begin");
         InitializePtoMenu();
+        StartupTrace.Mark("main_pto_menu_end");
         _sqlConnectionString = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
         var argv = Environment.GetCommandLineArgs();
         var at = Array.IndexOf(argv, "--open");
@@ -182,6 +188,12 @@ public partial class MainWindow : Window
                     _ready = true;
                     RootLayout.IsEnabled = true;
                     StartupTrace.Mark("main_workspace_data_ready");
+                    // Dispatcher idle is a queue/layout milestone, not proof of a physical monitor frame.
+                    if (StartupTrace.Enabled)
+                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(() =>
+                        {
+                            if (_ready && !_startupClosed) StartupTrace.Mark("main_workspace_dispatcher_idle");
+                        }));
                     // CLI and .gmcs navigation must run only after the document list is available.
                     if (_pendingOpen != 0) OpenEstimate(_pendingOpen);
                     if (_pendingGmcs is not null) OpenGmcsLink(_pendingGmcs);

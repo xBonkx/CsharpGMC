@@ -12,9 +12,11 @@ public static class StartupTrace
     private static readonly object Gate = new();
     private static string? _file;
 
+    public static bool Enabled => !string.IsNullOrWhiteSpace(DirectoryPath);
+
     public static void Mark(string phase)
     {
-        if (string.IsNullOrWhiteSpace(DirectoryPath)) return;
+        if (!Enabled) return;
         var timestamp = Stopwatch.GetTimestamp();
         try
         {
@@ -22,8 +24,8 @@ public static class StartupTrace
             {
                 if (_file is null)
                 {
-                    Directory.CreateDirectory(DirectoryPath);
-                    var path = Path.Combine(DirectoryPath, $"startup-{Environment.ProcessId}-{Guid.NewGuid():N}.csv");
+                    Directory.CreateDirectory(DirectoryPath!);
+                    var path = Path.Combine(DirectoryPath!, $"startup-{Environment.ProcessId}-{Guid.NewGuid():N}.csv");
                     File.WriteAllText(path, "Utc,ProcessId,Phase,ElapsedMs,MonotonicTicks,Frequency\n");
                     _file = path;
                 }

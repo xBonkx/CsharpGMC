@@ -8,7 +8,8 @@ Do not publish its logs until checked for synthetic-only information.
 param(
     [string]$SqlServer = "",
     [string]$ExpectedSqlServer = "",
-    [string]$PilotDatabase = ""
+    [string]$PilotDatabase = "",
+    [switch]$LayoutPerformance
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -32,6 +33,7 @@ function Invoke-Recorded([string]$id, [string]$command, [string[]]$arguments) {
     $file = Join-Path $script:out ($id + '.log')
     $exitCode = -1
     $body = ''
+    $watch = [Diagnostics.Stopwatch]::StartNew()
     try {
         $body = (& $command @arguments 2>&1 | Out-String)
         $exitCode = $LASTEXITCODE
@@ -40,7 +42,8 @@ function Invoke-Recorded([string]$id, [string]$command, [string[]]$arguments) {
         $body = $_.Exception.Message
     }
     [IO.File]::WriteAllText($file, [string]$body, [Text.Encoding]::UTF8)
-    $detail = 'exit=' + $exitCode
+    $watch.Stop()
+    $detail = 'exit=' + $exitCode + '; elapsed_ms=' + $watch.ElapsedMilliseconds
     if ($id -eq 'dotnet-test') {
         $found = [regex]::Matches($body, '(?i)(Passed|Failed|Skipped):\s*(\d+)')
         $counts = @($found | ForEach-Object { $_.Groups[1].Value.ToLowerInvariant() + '=' + $_.Groups[2].Value })
@@ -48,6 +51,34 @@ function Invoke-Recorded([string]$id, [string]$command, [string[]]$arguments) {
     }
     Record-Result $id $(if ($exitCode -eq 0) { 'PASS' } else { 'FAIL' }) $detail $file
     return ($exitCode -eq 0)
+}
+
+# Offline checks must not inherit an active office connection or optional SQL
+# export probe. Restore the operator's process environment even on failure.
+function Invoke-OfflineRecorded([string]$id, [string[]]$arguments) {
+    $names = @('GMC_SMETA_SQL_CONNECTION', 'GMC_CONTRACT_EXPORT_SQL_PILOT',
+        'GMC_EXPORT_SAMPLE_DIR', 'GMC_PROCUREMENT_EXPORT_SAMPLE_DIR')
+    $saved = @{}
+    try {
+        foreach ($name in $names) {
+            $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+            [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+        }
+        return (Invoke-Recorded $id 'dotnet' $arguments)
+    }
+    finally {
+        foreach ($name in $names) {
+            if ($saved.ContainsKey($name)) {
+                [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process')
+            }
+        }
+    }
+}
+
+$offlineIds = @('wpf-offline', 'export-offline', 'procurement-export-offline',
+    'contract-export-offline', 'layout-performance-offline')
+function Record-OfflineSkips([string]$reason) {
+    foreach ($id in $script:offlineIds) { Record-Result $id 'SKIP' $reason '' }
 }
 
 $git = Get-Command git -ErrorAction SilentlyContinue
@@ -71,12 +102,13 @@ if ($null -eq $dotnet) {
     foreach ($case in @('fixture-generate-verify', 'dotnet-restore', 'dotnet-build', 'dotnet-test')) {
         Record-Result $case 'SKIP' 'dotnet is not installed; 0 tests executed' ''
     }
+    Record-OfflineSkips 'dotnet is not installed; no offline checks executed'
 }
 else {
     $fixtureProject = Join-Path $repo 'tests\GmcSmeta.Workflow.Acceptance\GmcSmeta.Workflow.Acceptance.csproj'
-    $fixtureOk = Invoke-Recorded 'fixture-generate-verify' 'dotnet' @('run', '--project', $fixtureProject, '--', 'generate', $fixtures)
+    $fixtureOk = Invoke-OfflineRecorded 'fixture-generate-verify' @('run', '--project', $fixtureProject, '--', 'generate', $fixtures)
     if ($fixtureOk) {
-        $verifyOk = Invoke-Recorded 'fixture-reverify' 'dotnet' @('run', '--project', $fixtureProject, '--', 'verify', $fixtures)
+        $verifyOk = Invoke-OfflineRecorded 'fixture-reverify' @('run', '--project', $fixtureProject, '--', 'verify', $fixtures)
     }
     else { Record-Result 'fixture-reverify' 'SKIP' 'fixture generation failed; cannot verify' '' }
 
@@ -87,19 +119,38 @@ else {
             $built = Invoke-Recorded 'dotnet-build' 'dotnet' @('build', $solution, '-c', 'Release', '--no-restore')
             if ($built) {
                 $tests = Join-Path $repo 'tests\GmcSmeta.Core.Tests\GmcSmeta.Core.Tests.csproj'
-                $null = Invoke-Recorded 'dotnet-test' 'dotnet' @('test', $tests, '-c', 'Release', '--no-build')
+                $null = Invoke-OfflineRecorded 'dotnet-test' @('test', $tests, '-c', 'Release', '--no-build')
+                $appChecks = Join-Path $repo 'tests\GmcSmeta.App.Checks\GmcSmeta.App.Checks.csproj'
+                $exportChecks = Join-Path $repo 'tests\GmcSmeta.Export.Checks\GmcSmeta.Export.Checks.csproj'
+                $procurementChecks = Join-Path $repo 'tests\GmcSmeta.Procurement.Checks\GmcSmeta.Procurement.Checks.csproj'
+                $contractChecks = Join-Path $repo 'tests\GmcSmeta.ContractExport.Checks\GmcSmeta.ContractExport.Checks.csproj'
+                $null = Invoke-OfflineRecorded 'wpf-offline' @('run', '--project', $appChecks, '-c', 'Release', '--no-build', '--', '--offline-check')
+                $null = Invoke-OfflineRecorded 'export-offline' @('run', '--project', $exportChecks, '-c', 'Release', '--no-build')
+                # These projects are outside GmcSmeta.slnx; allow their own builds.
+                $null = Invoke-OfflineRecorded 'procurement-export-offline' @('run', '--project', $procurementChecks, '-c', 'Release')
+                $null = Invoke-OfflineRecorded 'contract-export-offline' @('run', '--project', $contractChecks, '-c', 'Release')
+                if ($LayoutPerformance) {
+                    $null = Invoke-OfflineRecorded 'layout-performance-offline' @('run', '--project', $appChecks,
+                        '-c', 'Release', '--no-build', '--', '--layout-performance-check', (Join-Path $out 'layout'))
+                }
+                else { Record-Result 'layout-performance-offline' 'SKIP' 'Explicit -LayoutPerformance switch not supplied' '' }
             }
-            else { Record-Result 'dotnet-test' 'SKIP' 'Release build failed; 0 tests run by this step' '' }
+            else {
+                Record-Result 'dotnet-test' 'SKIP' 'Release build failed; 0 tests run by this step' ''
+                Record-OfflineSkips 'Release build failed'
+            }
         }
         else {
             Record-Result 'dotnet-build' 'SKIP' 'restore failed' ''
             Record-Result 'dotnet-test' 'SKIP' 'restore failed; 0 tests executed' ''
+            Record-OfflineSkips 'restore failed'
         }
     }
     else {
         foreach ($case in @('dotnet-restore', 'dotnet-build', 'dotnet-test')) {
             Record-Result $case 'SKIP' 'Windows WPF target unavailable; 0 solution tests run' ''
         }
+        Record-OfflineSkips 'Windows WPF target unavailable'
     }
 }
 
@@ -156,13 +207,13 @@ $manual | Export-Csv -Path $manualPath -NoTypeInformation -Encoding UTF8
 Record-Result 'windows-click-through-25-cases' 'SKIP' '0/25 witnessed; complete manual-acceptance.csv only after actual execution' $manualPath
 Record-Result 'signed-ds-ks-protection' 'SKIP' 'No synthetic real SQL workflow was executed' ''
 Record-Result 'two-client-2500-10000' 'SKIP' 'No two interactive Windows clients or controlled full-schema Pilot session' ''
-Record-Result 'xlsx-pdf-docx-golden' 'SKIP' 'No synthetic GUI exports were created or compared' ''
+Record-Result 'xlsx-pdf-docx-golden' 'SKIP' 'Manual GUI/customer golden acceptance is separate from automated offline export checks' ''
 
 $summary = [pscustomobject]@{
     issue = 'https://github.com/xBonkx/CsharpGMC/issues/55'
     git_sha = $sha; git_uncommitted = $dirty; windows = $windows
     created_at = (Get-Date).ToString('o')
-    command = $MyInvocation.Line
+    layout_performance_requested = [bool]$LayoutPerformance
     results = @($results)
 }
 $json = Join-Path $out 'automated-results.json'
@@ -187,3 +238,5 @@ Write-Host ('P0 #55 report: ' + (Join-Path $out 'report.md'))
 Write-Host ('PASS=' + @($results | Where-Object status -eq 'PASS').Count +
     ' FAIL=' + @($results | Where-Object status -eq 'FAIL').Count +
     ' SKIP=' + @($results | Where-Object status -eq 'SKIP').Count)
+# A generated report is not evidence that checks passed. Propagate actual failures.
+if (@($results | Where-Object status -eq 'FAIL').Count -gt 0) { exit 1 }
