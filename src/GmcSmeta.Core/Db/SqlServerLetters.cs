@@ -13,7 +13,7 @@ public sealed class LetterCommitUncertainException(string message, Exception inn
 /// Independent SQL Server letter archive. No SQLite connection, provider or migration.
 /// All writes, including DDL, are forbidden outside a verified GmcSmetaPilot_* catalog.
 /// </summary>
-public sealed class SqlServerLetters
+public sealed partial class SqlServerLetters
 {
     private readonly string _connectionString;
 
@@ -260,7 +260,8 @@ END;
         }
     }
 
-    public void Save(LetterDocument document, LetterRelease? release = null, bool validateContext = false)
+    public void Save(LetterDocument document, LetterRelease? release = null, bool validateContext = false,
+        bool useAgreementRecipient = false)
     {
         LettersRules.Validate(document);
         using var conn = Open();
@@ -281,6 +282,8 @@ END;
             throw new InvalidOperationException("Отправленное письмо нельзя изменять. Создайте копию.");
         // The scoped document-picker path validates the association in the
         // very same transaction as the letter revision and history update.
+        if (useAgreementRecipient && (!validateContext || existing is not null || release is not null))
+            throw new InvalidOperationException("Автозаполнение получателя допустимо только для нового письма.");
         if (validateContext)
         {
             if (document.ObjectId is not long objectId || objectId <= 0)
@@ -295,6 +298,7 @@ END;
             scope.Parameters.Add("@contract", SqlDbType.BigInt).Value = document.ContractId is long contractId ? contractId : DBNull.Value;
             if (Convert.ToInt64(scope.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Объект или договор больше не существует либо не соответствует привязке.");
+            ApplyAgreementContext(conn, tx, document, objectId, useAgreementRecipient);
         }
         if (existing is not null && !existing.Releases.SequenceEqual(document.Releases))
             throw new InvalidOperationException("Историю выпусков нельзя редактировать.");

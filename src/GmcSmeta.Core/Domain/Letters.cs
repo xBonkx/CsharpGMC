@@ -65,6 +65,32 @@ public static class LetterContext
             ? existing == obj : letter.ContractId is long legacy && objectContracts?.Contains(legacy) == true;
     }
 
+    // Snapshot only: do not infer a legal identity from equal numbers or update
+    // existing saved letters after a change to the agreement. An empty customer
+    // is deliberately left empty rather than falling back to another agreement.
+    internal static void ApplyAgreementSnapshot(LetterDocument letter, long agreementId,
+        string number, string date, string customerFull, string customerOrganization,
+        string documentKind, string documentName, string annexNumber, string documentNumber,
+        bool useAgreementRecipient)
+    {
+        if (agreementId <= 0 || letter.ObjectId is not > 0 || letter.ContractId is not > 0 ||
+            letter.Status != "Черновик" || letter.Sent is not null || letter.Releases.Count != 0 ||
+            documentKind is not ("main" or "dop"))
+            throw new InvalidOperationException("Нельзя подставить реквизиты юридического договора.");
+        var legal = string.IsNullOrWhiteSpace(number) ? $"Договор (ID {agreementId}, номер не заполнен)" :
+            "Договор № " + number.Trim();
+        if (!string.IsNullOrWhiteSpace(date)) legal += " от " + date.Trim();
+        var ownNumber = documentKind == "main" ? annexNumber : documentNumber;
+        var own = documentKind == "main" ? "Приложение" : "ДС";
+        if (!string.IsNullOrWhiteSpace(ownNumber)) own += " № " + ownNumber.Trim();
+        if (!string.IsNullOrWhiteSpace(documentName)) own += " · " + documentName.Trim();
+        else if (string.IsNullOrWhiteSpace(ownNumber)) own += $" (ID {letter.ContractId})";
+        letter.ContractLabel = legal + " · " + own;
+        if (useAgreementRecipient)
+            letter.Recipient = string.IsNullOrWhiteSpace(customerOrganization)
+                ? customerFull.Trim() : customerOrganization.Trim();
+    }
+
     // Do not change the fingerprint of sent letters or letters with published releases.
     public static bool CanAttach(LetterDocument letter) =>
         letter.ObjectId is null && letter.ContractId is null && letter.Sent is null &&

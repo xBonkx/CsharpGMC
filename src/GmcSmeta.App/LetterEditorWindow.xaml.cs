@@ -62,7 +62,7 @@ public partial class LetterEditorWindow : Window
             SignerBox.Text = _letter.Signer;
             ScanMode.IsChecked = _letter.UseScan;
             BodyBox.Document = LettersPdf.ReadBody(_letter.Body);
-            ContextNote.Text = _letter.ContractId is not null ? "Договор: " + _letter.ContractLabel : "";
+            ContextNote.Text = _letter.ContractId is not null ? "Привязка: " + _letter.ContractLabel : "";
             StatusText.Text = _letter.Sent is { } s
                 ? $"Отправлено {s.Date} · {s.Channel} · {s.Destination}"
                 : "Черновик · отправка учитывается вручную, программа ничего не отправляет";

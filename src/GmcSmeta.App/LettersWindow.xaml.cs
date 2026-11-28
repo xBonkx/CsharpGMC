@@ -223,7 +223,8 @@ public partial class LettersWindow : Window
                 _contractContext?.Id, _contractContext?.Title ?? "");
             doc.Recipient = _objectContext.Customer;
         }
-        await Task.Run(() => archive.Sql.Save(doc, validateContext: _objectContext is not null));
+        await Task.Run(() => archive.Sql.Save(doc, validateContext: _objectContext is not null,
+            useAgreementRecipient: _contractContext is not null));
         Edit(archive, doc);
     });
 

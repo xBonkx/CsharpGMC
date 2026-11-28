@@ -87,4 +87,26 @@ public sealed class LettersWindowLifecycleTests
         Assert.Contains("StringComparison.CurrentCultureIgnoreCase", code);
         Assert.Contains("ORDER BY updated_utc DESC,id DESC", code);
     }
+
+    [Fact]
+    public void NewLetterPrefillsRecipientButExistingAttachmentDoesNot()
+    {
+        var window = Source("LettersWindow.xaml.cs");
+        Assert.Contains("useAgreementRecipient: _contractContext is not null", window);
+        Assert.Contains("archive.Sql.Save(current, validateContext: true)", window);
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerLetters.AgreementContext.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var folder = Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db");
+        var save = File.ReadAllText(Path.Combine(folder, "SqlServerLetters.cs"));
+        Assert.Contains("useAgreementRecipient && (!validateContext || existing is not null || release is not null)", save);
+        Assert.Contains("ApplyAgreementContext(conn, tx, document, objectId, useAgreementRecipient);", save);
+        var context = File.ReadAllText(Path.Combine(folder, "SqlServerLetters.AgreementContext.cs"));
+        Assert.Contains("!SqlServerAgreements.Enabled(conn, tx)", context);
+        Assert.Contains("a.id=c.agreement_id AND a.object_id=c.object_id", context);
+        Assert.Contains("a.archived=0", context);
+        Assert.Contains("c.id=@contract AND c.object_id=@object", context);
+        Assert.Contains("WITH(HOLDLOCK)", context);
+    }
 }
