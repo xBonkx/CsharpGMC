@@ -71,6 +71,8 @@
 
 - 29.11.2026 — ARCH-SIZE-05.01 CODE READY, .02 PARTIAL: material financial projection and edit planning extracted, 15 xUnit cases not run. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
 
+- 29.11.2026 — ARCH-SIZE-05.02 CODE READY: bulk/write/readback receipt + modal guards, 22 unrun tests; both materials implementation packages CODE READY. [Evidence](docs/ARCHITECTURE_SIZE_TODO_20261126.md).
+
 ## История до реорганизации
 
 [Полный CURRENT_TASK до сокращения](https://github.com/xBonkx/CsharpGMC/blob/c00f4c32d3faea3e9db33a31ca07c0207df3a376/CURRENT_TASK.md) — неизменённый снимок со всеми отчётами, результатами и доказательствами. Локально: `git show c00f4c32d3faea3e9db33a31ca07c0207df3a376:CURRENT_TASK.md`. Старые заголовки ниже сохранены для совместимости ссылок. Новые записи — краткий итог со ссылкой на единственный подробный отчёт; не копировать содержимое профильных TODO.

@@ -115,6 +115,24 @@ public partial class EstimateView
         !_detached && !string.IsNullOrWhiteSpace(_materialsRevision) && _materialsRevision == _serverRevision && !_serverConflict &&
         System.Threading.Volatile.Read(ref _pendingWrites) == 0;
 
+    private bool CanContinueMaterialsWrite(string revision) =>
+        MaterialsEditPolicy.CanContinueWrite(revision, _materialsRevision, _serverRevision,
+            _detached || _materialsLoading || _materialsSearchDirty || _serverConflict,
+            System.Threading.Volatile.Read(ref _pendingWrites));
+
+    private void RecordMaterialsWriteReceipt(string expected, string receipt)
+    {
+        if (MaterialsEditPolicy.CanAcceptReceipt(expected, _serverRevision, receipt, _serverConflict,
+                System.Threading.Volatile.Read(ref _pendingWrites)))
+            _serverRevision = receipt;
+        else
+        {
+            _materialsRevision = "";
+            _publishedEstimateRevision = "";
+            RequestRefresh();
+        }
+    }
+
     private static readonly (string Name, string Hex)[] MatRowColors =
     {
         ("Жёлтый", "#FFF1A8"), ("Зелёный", "#D4F0C8"), ("Красный", "#F9D0D0"),
@@ -665,6 +683,13 @@ public partial class EstimateView
                     e.Cancel = true;
                 }
                 return;
+            case "Факт по счёту":
+                if (locked)
+                {
+                    SetStatus("Подписанный документ: факт по счёту недоступен для изменения.", true);
+                    e.Cancel = true;
+                }
+                return;
         }
     }
 
@@ -690,6 +715,12 @@ public partial class EstimateView
         if (editor is null) return;
         var column = e.Column.Header?.ToString() ?? "";
         var text = editor.Text;
+        if (!MaterialsEditPolicy.CellAllowed(column, row.IsSub, MaterialsLocked))
+        {
+            SetStatus("Редактирование недоступно: проверьте блокировку сметы.", true);
+            e.Cancel = true;
+            return;
+        }
         // Opening and leaving an unchanged cell is not a write (including mixed groups).
         if (text == (column switch
         {
@@ -727,6 +758,7 @@ public partial class EstimateView
             var revision = _materialsRevision;
             if (string.IsNullOrWhiteSpace(revision))
                 throw new InvalidOperationException("Снимок материалов не подтверждён.");
+            var expectedRevision = revision;
             _materialsRevision = "";
             switch (column)
             {
@@ -817,7 +849,7 @@ public partial class EstimateView
                     // Тот же поставщик, что на вкладке «Закупки» (procurement.set_proc).
                     var result = await Task.Run(() => SqlServerCostOperations.SetSupplierBatch(
                         _sqlConnectionString, _contractId, ids, text.Trim(), revision));
-                    _serverRevision = result.Revision;
+                    RecordMaterialsWriteReceipt(revision, result.Revision);
                     await LoadMaterialsAsync(force: true);
                     SetStatus(text.Trim().Length == 0
                         ? $"Поставщик убран — у {result.Changed} строк"
@@ -828,12 +860,12 @@ public partial class EstimateView
                 {
                     var result = await Task.Run(() => SqlServerCostOperations.SetCostFormatting(
                         _sqlConnectionString, _contractId, ids, "cost_note", text.Trim(), revision));
-                    _serverRevision = result.Revision;
+                    RecordMaterialsWriteReceipt(revision, result.Revision);
                     await LoadMaterialsAsync(force: true);
                     return;
                 }
             }
-            _serverRevision = revision;
+            RecordMaterialsWriteReceipt(expectedRevision, revision);
             await LoadMaterialsAsync(force: true);
             if (column is "Наименование" or "Цена клиенту" or "Закуп за ед." or "Наценка, %")
                 _ = ReloadDocumentAsync();
@@ -1110,11 +1142,12 @@ public partial class EstimateView
                     "Очистка материалов", MessageBoxButton.YesNo, MessageBoxImage.Warning,
                     MessageBoxResult.No) != MessageBoxResult.Yes) return;
             if (contractId != _contractId || connectionString != _sqlConnectionString ||
-                _materialsRevision != revision || !MaterialsClearIds(field).SequenceEqual(ids) ||
+                !CanContinueMaterialsWrite(revision) || !MaterialsClearIds(field).SequenceEqual(ids) ||
                 (field is "price" or "cost_price") && MaterialsLocked) return;
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.ClearMaterialCells(
                 connectionString, contractId, ids, field, revision));
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus($"Очищено: {result.Changed}; пропущено: {result.Skipped}.", false);
             await LoadMaterialsAsync(force: true);
             _ = ReloadDocumentAsync();
@@ -1169,7 +1202,7 @@ public partial class EstimateView
         try
         {
             if (dialog.ShowDialog() != true) return;
-            if (_materialsRevision != selectedRevision ||
+            if (!CanContinueMaterialsWrite(selectedRevision) ||
                 !MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id)))
             {
                 SetStatus("Данные или выбор изменились. Повторите действие.", true);
@@ -1181,7 +1214,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SetSupplierBatch(
                 _sqlConnectionString, _contractId, ids, dialog.Value, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(dialog.Value.Length == 0
                 ? $"Поставщик убран — у {result.Changed} строк"
                 : $"Поставщик «{dialog.Value}» — у {result.Changed} строк", false);
@@ -1216,7 +1249,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SetCostFormatting(
                 _sqlConnectionString, _contractId, ids, "cost_color", color, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(color.Length == 0
                 ? $"Цвет снят: {result.Changed} строк"
                 : $"Покрашено строк: {result.Changed}", false);
@@ -1242,7 +1275,7 @@ public partial class EstimateView
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.FillPurchaseFromCatalog(
                 _sqlConnectionString, _contractId, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus(result.Changed > 0
                 ? $"Закуп подставлен из справочника: {result.Changed} поз."
                 : "В справочнике нет закупочных цен для пустых строк", false);
@@ -1280,7 +1313,7 @@ public partial class EstimateView
         try
         {
             if (dialog.ShowDialog() != true) return;
-            if (_materialsRevision != selectedRevision ||
+            if (!CanContinueMaterialsWrite(selectedRevision) || MaterialsLocked ||
                 !MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids.OrderBy(id => id)))
             {
                 SetStatus("Данные или выбор изменились. Повторите действие.", true);
@@ -1293,7 +1326,7 @@ public partial class EstimateView
             var result = await Task.Run(() => SqlServerCostOperations.MarkupMaterials(
                 _sqlConnectionString, _contractId, ids, dialog.Factor, dialog.PriceFromCost,
                 dialog.OnlyEmpty, dialog.WholeRubles, revision));
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus($"Пересчитано строк: {result.Changed}" +
                 (result.Skipped > 0 ? $" · без закупа пропущено: {result.Skipped}" : ""), false);
             await LoadMaterialsAsync(force: true);
@@ -1313,6 +1346,8 @@ public partial class EstimateView
     private async void MaterialsRequest_Click(object sender, RoutedEventArgs e)
     {
         if (!MaterialsSnapshotReady) return;
+        var expectedRevision = _materialsRevision;
+        var supplier = (MaterialsGrid.SelectedItem as MaterialsRow)?.Supplier ?? "";
         _materialsBusy = true;
         try
         {
@@ -1320,6 +1355,8 @@ public partial class EstimateView
             {
                 using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                 var revision = SqlServerDatabase.Revision(conn);
+                if (revision != expectedRevision)
+                    throw new InvalidOperationException("Материалы изменились. Обновите таблицу.");
                 var rows = SqlServerProcurement.BuyRows(_sqlConnectionString, _contractId);
                 var children = ProcurementRequestPlanner.ChildPositionIds(_sqlConnectionString, _contractId);
                 var info = ProcurementRequestPlanner.ReadDocumentInfo(_sqlConnectionString, _contractId);
@@ -1328,8 +1365,7 @@ public partial class EstimateView
                     throw new InvalidOperationException("Закупки изменились при чтении. Повторите формирование заявки.");
                 return (revision, rows, children, info, number);
             });
-            var selectedSupplier = (MaterialsGrid.SelectedItem as MaterialsRow)?.Supplier ?? "";
-            var supplier = selectedSupplier.Length > 0 ? selectedSupplier : "";
+            if (!CanContinueMaterialsWrite(expectedRevision)) return;
             var dialog = new ProcurementRequestDialog(
                 snapshot.info, snapshot.rows, snapshot.children,
                 snapshot.number, supplier)
@@ -1341,6 +1377,12 @@ public partial class EstimateView
             }
             if (dialog.MarkedIds.Count > 0)
             {
+                if (!CanContinueMaterialsWrite(snapshot.revision) || MaterialsLocked)
+                {
+                    SetStatus("Excel сохранён, но строки НЕ отмечены заказанными: смета изменилась или заблокирована.", true);
+                    return;
+                }
+                _materialsRevision = "";
                 var saved = await Task.Run(() => SqlServerProcurement.SetProc(
                     _sqlConnectionString, _contractId, dialog.MarkedIds, null, "ordered",
                     $"Заявка №{(string.IsNullOrWhiteSpace(dialog.RequestNumber) ? "б/н" : dialog.RequestNumber)}",
@@ -1351,7 +1393,7 @@ public partial class EstimateView
                     await LoadMaterialsAsync(force: true);
                     return;
                 }
-                _serverRevision = saved.Revision;
+                RecordMaterialsWriteReceipt(snapshot.revision, saved.Revision);
                 SetStatus($"Заявка сохранена; отмечено «Заказано»: {dialog.MarkedIds.Count} позиций.", false);
             }
             else
@@ -1361,6 +1403,7 @@ public partial class EstimateView
         catch (Exception ex)
         {
             SetStatus("Ошибка заявки: " + ex.Message, true);
+            await LoadMaterialsAsync(force: true);
         }
         finally
         {
@@ -1431,9 +1474,11 @@ public partial class EstimateView
                     throw new InvalidOperationException("Материалы изменились при расчёте транспорта.");
                 return (current, suppliers);
             });
+            if (!CanContinueMaterialsWrite(revision) || !ReferenceEquals(data, _materialsData)) return;
             var dialog = new CostTransportDialog(snapshot.current, snapshot.suppliers, data.Locked)
             { Owner = Window.GetWindow(this) };
-            if (dialog.ShowDialog() != true || revision != _materialsRevision) return;
+            if (dialog.ShowDialog() != true || !CanContinueMaterialsWrite(revision) ||
+                !ReferenceEquals(data, _materialsData)) return;
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.SaveTransport(
                 _sqlConnectionString, _contractId, dialog.OurCost, dialog.CustomerAmount,
@@ -1444,7 +1489,7 @@ public partial class EstimateView
                 await LoadMaterialsAsync(force: true);
                 return;
             }
-            _serverRevision = result.Revision;
+            RecordMaterialsWriteReceipt(revision, result.Revision);
             SetStatus("Транспорт сохранён" + (data.Locked ? "" : " — итог сметы тоже обновлён"), false);
             await LoadMaterialsAsync(force: true);
             _ = ReloadDocumentAsync();

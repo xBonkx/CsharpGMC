@@ -34,6 +34,22 @@ public static class MaterialsEditPolicy
         .SelectMany(row => row.IsGroup ? row.MemberIds : new[] { row.PositionId })
         .Where(id => id > 0).Distinct().OrderBy(id => id).ToArray();
 
+    // A modal command owns the busy flag, but not permission to use an obsolete snapshot.
+    public static bool CanContinueWrite(string captured, string materialRevision, string parentRevision,
+        bool blocked, int pendingWrites) =>
+        !blocked && CostTabRevisionPolicy.CanPublish(captured, parentRevision, materialRevision, pendingWrites);
+
+    // Revisions are opaque identifiers. Never overwrite an unrelated newer parent revision.
+    public static bool CanAcceptReceipt(string expected, string current, string receipt,
+        bool conflict, int pendingWrites) =>
+        !conflict && pendingWrites == 0 &&
+        !string.IsNullOrWhiteSpace(expected) && !string.IsNullOrWhiteSpace(receipt) &&
+        (current == expected || current == receipt);
+
+    public static bool CellAllowed(string column, bool sub, bool locked) =>
+        column is "Наименование" or "Цена клиенту" or "Наценка, %" ? !sub && !locked :
+        column == "Факт по счёту" ? !locked : true;
+
     public readonly record struct Validation(bool Handled, bool Allowed, string? Error);
 
     public static Validation Validate(string column, string text)

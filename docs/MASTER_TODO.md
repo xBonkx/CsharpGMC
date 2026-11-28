@@ -600,7 +600,7 @@ DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery](D
 
 - 29.11.2026: ARCH-SIZE-03.04 (XAML ресурсы) BLOCKED для дизайн-линии — source-тесты парсят EstimateView.xaml и утверждают ресурсы на месте; нужен координированный сплит с обновлением тестов. [Отчёт](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md).
 | ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | PARTIAL |
-| ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | PARTIAL |
+| ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | CODE READY |
 | ARCH-SIZE-06 | P2 | App.xaml — тематические словари ресурсов | PARTIAL |
 
 - 29.11.2026: ARCH-SIZE-06.01 BLOCKED для дизайн-линии — source-тесты (ButtonFocusVisualSourceTests и др.) требуют ключи стилей в App.xaml; сплит только координированно с обновлением тестов. [Отчёт](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md).
