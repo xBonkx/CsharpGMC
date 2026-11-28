@@ -96,7 +96,7 @@ public partial class MainWindow
     internal void RefreshSystemCopyTarget(int targetId)
     {
         if (_estimateCache.TryGetValue(targetId, out var cached)) cached.RequestRefresh();
-        ReloadNavigationData();
+        _ = ReloadNavigationAfterWriteAsync(rebuildTree: false);
     }
 
     private bool CanStartDocumentMutation(DocRow expected) =>

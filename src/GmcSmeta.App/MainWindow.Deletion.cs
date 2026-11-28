@@ -52,8 +52,7 @@ public partial class MainWindow
             MessageBox.Show(this, ex.Message +
                 "\nНе повторяйте удаление. Проверьте карточку и корзину; для следующей операции откройте программу заново.",
                 "Результат удаления неизвестен", MessageBoxButton.OK, MessageBoxImage.Warning);
-            try { ReloadNavigationData(); RefreshNavigation(); }
-            catch (Exception refreshError) { LogError(refreshError); }
+            _ = ReloadNavigationAfterWriteAsync(rebuildTree: true);
             return;
         }
         MessageBox.Show(this, ex.Message, writeAttempted ? "Не удалось удалить" : "Удаление недоступно",
@@ -112,7 +111,7 @@ public partial class MainWindow
             finally { _syncingNavigation = false; }
             _selectedObject = null;
             ShowEmptyPage();
-            try { ReloadNavigationData(); RefreshNavigation(); }
+            try { await ReloadNavigationDataAsync(); RefreshNavigation(); }
             catch (Exception ex) { LogError(ex); StatusText.Text = "Карточка удалена. Обновите список (F5)."; return; }
             StatusText.Text = "Карточка удалена. Копия сохранена в корзине.";
         }

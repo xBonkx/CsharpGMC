@@ -48,10 +48,12 @@ public partial class EstimateView
         if (!result.Saved)
         {
             _serverConflict = true; // publish before releasing any next reservation
+            InvalidateSparseReadback(); // unknown outcome: mandatory full readback
             return ContractCellSaveQueue.Receipt.Reject(
                 result.Error ?? "Сервер отказал в сохранении ячейки.", result.Revision);
         }
         _serverRevision = result.Revision;
+        NoteSparseCellWrite(edit.PositionId, edit.Field);
         return ContractCellSaveQueue.Receipt.Success(result.Revision);
     }
 

@@ -327,10 +327,20 @@ public partial class MainWindow
         }
     }
 
-    internal void RefreshStageNavigation(EstimateView page, int contractId)
+    internal async void RefreshStageNavigation(EstimateView page, int contractId)
     {
         if (_serverConn is null || !ReferenceEquals(PageHost.Content, page)) return;
-        ReloadNavigationData();
+        try
+        {
+            await ReloadNavigationDataAsync();
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            StatusText.Text = "Не удалось обновить список: " + ex.Message + " · Повторите F5.";
+            return;
+        }
+        if (_startupClosed || !ReferenceEquals(PageHost.Content, page)) return;
         if (_docs.FirstOrDefault(d => d.Id == contractId) is { } doc)
             SynchronizeNavigation(doc, rebuildTree: true);
     }

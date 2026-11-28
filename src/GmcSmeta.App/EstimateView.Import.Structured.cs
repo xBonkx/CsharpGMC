@@ -62,6 +62,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         await _writeLock.WaitAsync();
         using var cancelWrite = new CancellationTokenSource();
         var progress = new Window

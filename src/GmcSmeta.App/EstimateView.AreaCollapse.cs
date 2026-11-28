@@ -57,6 +57,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus(expand ? "Разворачивание м²…" : "Сворачивание м²…", false);
         await _writeLock.WaitAsync();
         var saved = false;

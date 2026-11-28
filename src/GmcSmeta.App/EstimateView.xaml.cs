@@ -905,8 +905,28 @@ public partial class EstimateView : UserControl
                                 reusableRevision, localRevisionAtStart, before, needUndoCheckpoint))
                                 return (Estimate: (EstimateDocument?)null, Revision: before,
                                     Undo: (UndoSnapshot?)null, SpecHead: (SpecRevisionHead?)null, Metadata: (DocRow?)null);
+                            // PERF-014 sparse readback: only confirmed single-cell
+                            // edits take the narrow path; the drain happens once per
+                            // read so a retry never builds on a partially stale base.
+                            var sparseIds = TakeSparseEligibleEdits();
                             StartupTrace.Mark("estimate_read_begin");
-                            var document = await EstimateReader.LoadSqlAsync(read, _contractId, token).ConfigureAwait(false);
+                            var sparseBase = sparseIds is { Count: > 0 } ? _estimate : null;
+                            var document = sparseBase is not null
+                                ? await EstimateReader.ReadSparseSqlAsync(read, _contractId, sparseBase,
+                                    sparseIds!, token).ConfigureAwait(false)
+                                : null;
+                            if (document is not null && AnySparseEditsSinceDrain())
+                            {
+                                // Edits completed during the read are not covered
+                                // by this narrow snapshot; full reload reconciles all.
+                                StartupTrace.Mark("estimate_sparse_superseded");
+                                document = null;
+                            }
+                            if (document is null)
+                            {
+                                StartupTrace.Mark("estimate_sparse_fallback");
+                                document = await EstimateReader.LoadSqlAsync(read, _contractId, token).ConfigureAwait(false);
+                            }
                             StartupTrace.Mark("estimate_read_end");
                             token.ThrowIfCancellationRequested();
                             DocRow metadata;

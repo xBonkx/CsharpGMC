@@ -23,14 +23,14 @@
 4. Финальным коммитом кода/доказательств снять только свои `☑` (вернуть `☐`), записать итоговый статус, короткое evidence и пересчитать счётчики. Если прервались без результата — отдельным коммитом снять свою бронь и восстановить прежний статус либо PARTIAL/BLOCKED с причиной. Продолжение того же агента использует прежний уникальный ID сессии. Не снимать чужую бронь по возрасту автоматически: только после подтверждения её владельцем/координатором, с записью причины. При длительном блоке обновить время/чекпоинт.
 5. Если доступен только read-only GitHub, нет прав записи или бронь не подтверждена, не менять код по этим ID. Сообщить блокер. Галочки — кооперативная блокировка через Git, а не техническая блокировка локальных файлов.
 
-Счётчик занятости (обновлять по строкам): **15 из 175** (28.11: AGR-11.01, BUG-F54.06 закрыты ранее — [T_TEST_PASS_20261128](T_TEST_PASS_20261128.md); BUG-F54.01–05, BUG-F54.07, CTX-049.01 закрыты и удалены — [BUG_F54_SCALAR_PASS_20261128](BUG_F54_SCALAR_PASS_20261128.md), BUG-F54.07 закрыт DONE после повторной полной живой приёмки маршрутов; 28–29.11: все 9 D-строк «Дизайна» закрыты и удалены — GRID-28.01-02, HOME-03.01, SPACE-15.01-02, SPACE-18.01-02, SPACE-19.01-02 — [DESIGN_PASS_20261129_SEMANTICS_CLOSURE](DESIGN_PASS_20261129_SEMANTICS_CLOSURE.md)). Свободно не означает готово к реализации: учитывать статус, приоритет, зависимости, блокеры и BACKLOG.
+Счётчик занятости (обновлять по строкам): **9 из 175** (28.11: AGR-11.01, BUG-F54.06 закрыты ранее — [T_TEST_PASS_20261128](T_TEST_PASS_20261128.md); BUG-F54.01–05, BUG-F54.07, CTX-049.01 закрыты и удалены — [BUG_F54_SCALAR_PASS_20261128](BUG_F54_SCALAR_PASS_20261128.md), BUG-F54.07 закрыт DONE после повторной полной живой приёмки маршрутов; 28–29.11: все 9 D-строк «Дизайна» закрыты и удалены — GRID-28.01-02, HOME-03.01, SPACE-15.01-02, SPACE-18.01-02, SPACE-19.01-02 — [DESIGN_PASS_20261129_SEMANTICS_CLOSURE](DESIGN_PASS_20261129_SEMANTICS_CLOSURE.md)). 29.11: CTX-036/038/039/040/042/046.01 и AGR-02.01 закрыты сверкой ранее реализованного, ARCH-SIZE-03.04/06.01 BLOCKED (контракты source-тестов, правка тестов вне дизайн-линии) — [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md). Свободно не означает готово к реализации: учитывать статус, приоритет, зависимости, блокеры и BACKLOG.
 
 ## Текущий учёт
 
 | Тип | Количество строк |
 |---|---:|
 | CODE TODO (C, функциональные) | 95 |
-| CODE TODO (D, дизайн) | 14 |
+| CODE TODO (D, дизайн) | 7 |
 | TEST TODO (T) | 4 |
 | ACCEPTANCE TODO (A) | 53 |
 | BACKLOG (B) | 9 |
@@ -50,13 +50,13 @@
 
 | ID | Приоритет | Тип | Конкретный пакет | Критерий окончания | Статус | Evidence / агент | Бронь |
 |---|---|---|---|---|---|---|---|
-| PERF-007.01 | P1 | C | Стартовые DTO объектов/документов | Пакетный набор полей, архивный scope, независимая сверка DTO; устранить только подтверждённые лишние чтения. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.Core/Db/Workspace.cs, EstimateReader*, src/GmcSmeta.App/MainWindow*, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
-| PERF-007.02 | P1 | C | Карточки выбранного объекта | Не читать скрытые необязательные детали; доказать корректность итогов и отмены. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.Core/Db/EstimateReader.Cards.cs, MainWindow.ObjectCards.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
-| PERF-007.03 | P1 | C | Post-write/F5 | Тяжёлое чтение не блокирует UI; обязательный readback и защита ревизии сохранены. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/MainWindow.Navigation.cs, EstimateView.xaml.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-007.01 | P1 | C | Стартовые DTO объектов/документов | Пакетный набор полей, архивный scope, независимая сверка DTO; устранить только подтверждённые лишние чтения. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
+| PERF-007.02 | P1 | C | Карточки выбранного объекта | Не читать скрытые необязательные детали; доказать корректность итогов и отмены. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
+| PERF-007.03 | P1 | C | Post-write/F5 | Тяжёлое чтение не блокирует UI; обязательный readback и защита ревизии сохранены. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
 | PERF-007.04 | P1 | A | Старт и открытие на 10/50/200 документах | Фактические планы, payload, времена и архивный scope на Pilot. | UNVERIFIED | — | ☐ |
-| PERF-014.01 | P1 | C | Классификация полей сметы | Явный whitelist безопасного sparse readback и fallback для остальных полей. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, src/GmcSmeta.Core/Db/EstimateReader*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
-| PERF-014.02 | P1 | C | Одиночное изменение | Затронутые строки и авторитетные итоги совпадают с полным reload; revision fence. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
-| PERF-014.03 | P1 | C | Пакет, формулы, вставка, удаление, Undo | Fallback корректен, FIFO и выбор сохранены; не оптимизировать структурные операции без доказательств. | IN PROGRESS | — | ☑ zcode-sess-perf714 / 2026-11-28T13:40Z / main / src/GmcSmeta.App/EstimateView*.cs, tests/GmcSmeta.Core.Tests / prior=UNVERIFIED |
+| PERF-014.01 | P1 | C | Классификация полей сметы | Явный whitelist безопасного sparse readback и fallback для остальных полей. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
+| PERF-014.02 | P1 | C | Одиночное изменение | Затронутые строки и авторитетные итоги совпадают с полным reload; revision fence. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
+| PERF-014.03 | P1 | C | Пакет, формулы, вставка, удаление, Undo | Fallback корректен, FIFO и выбор сохранены; не оптимизировать структурные операции без доказательств. | CODE READY | [PERF_007_014_SPARSE_PASS_20261129](PERF_007_014_SPARSE_PASS_20261129.md) | ☐ |
 | PERF-014.04 | P1 | A | Нагрузочная приёмка sparse/full | 300/2500/10000/25000 строк, два клиента, время и совпадение итогов. | UNVERIFIED | — | ☐ |
 | PERF-042.01 | P1 | C | Инвентарь всех DataGrid | Каждая XAML/динамическая таблица имеет bounded host, row/column virtualization, Recycling или объяснённое исключение. | UNVERIFIED | — | ☐ |
 | PERF-042.02 | P1 | C | Группировка и динамические таблицы | Устранены подтверждённые бесконечные размеры и отключение виртуализации; targeted fixture. | UNVERIFIED | — | ☐ |
@@ -120,25 +120,19 @@
 | CTX-034.01 | P1 | C | Открытие остатка этапа | Открывается точный документ из карты и заголовка; permission/revision/readiness проверены. | UNVERIFIED | — | ☐ |
 | CTX-034.02 | P1 | C | Правила удаления остатка | Сверить Python и SQL зависимости; разрешить лишь доказанно безопасный сценарий либо документировать несовместимость и запросить решение владельца. | UNVERIFIED | — | ☐ |
 | CTX-034.03 | P1 | A | Этапы и остаток | Pilot: обычный, подписанный, архивный и computed remainder; отказ/открытие/удаление по утверждённому правилу. | UNVERIFIED | — | ☐ |
-| CTX-036.01 | P2 | D | Общий шаблон меню | Скругления и padding сверены с Python; явные исключения. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / App.xaml MenuPopupChrome — сверка с записанными Python-метриками / prior=UNVERIFIED |
-| CTX-036.02 | P2 | A | Парная проверка popup | Фактические WPF/DPI кадры, focus и editable combo. | UNVERIFIED | — | ☐ |
+| CTX-036.02 | P2 | A | Парная проверка popup | Фактические WPF/DPI кадры, focus и editable combo. | UNVERIFIED | D-часть сверена: [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md) | ☐ |
 | CTX-037.01 | P2 | D | Иконки основных меню | MainWindow, смета, закупки, этапы и КС: точное соответствие исходному Python. | UNVERIFIED | — | ☐ |
 | CTX-037.02 | P2 | D | Иконки остальных динамических меню | По инвентарю CTX-047; C#-only без самодельной подмены. | UNVERIFIED | — | ☐ |
-| CTX-038.01 | P2 | D | Опасные команды | Цвет именно иконки и состояния как в Python; исключения записаны. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / *.xaml меню/кнопки danger-роли, App.xaml / prior=UNVERIFIED |
-| CTX-039.01 | P2 | D | Popup, тени и отступы | Направление, offsets, shadow и взаимное исключение check/icon сверены. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / App.xaml popup chrome — сверка / prior=UNVERIFIED |
-| CTX-040.01 | P2 | D | Разделители | Единый стиль; условные команды не оставляют висячие/двойные разделители. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / *.xaml MenuItem Separator роли / prior=UNVERIFIED |
 | CTX-041.01 | P1 | C | Клавиатура меню | Shift+F10/Menu, стрелки, Enter/Esc; точная цель и disabled guards. | UNVERIFIED | — | ☐ |
 | CTX-041.02 | P1 | C | Редактирование и clipboard | F2/F4/Del, Ctrl+C/V/D/M/K, Ctrl+Shift+V; реальные обработчики, не только подписи. | UNVERIFIED | — | ☐ |
 | CTX-041.03 | P1 | C | Вставка и структурные команды | Insert/Shift+Insert/Ctrl+Alt+Insert/Ctrl+[/]; корректный scope. | UNVERIFIED | — | ☐ |
 | CTX-041.04 | P1 | A | Физическая клавиатура | Проверить все перечисленные группы на Windows и Pilot, включая редактор в фокусе. | UNVERIFIED | — | ☐ |
-| CTX-042.01 | P2 | D | Меню Действия и SidebarMenuHeader | Единые состояния, фон, шрифт, hover, separator, shortcut, иконки и тень. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / MainWindow.xaml, App.xaml — сверка уже реализованного / prior=UNVERIFIED |
 | CTX-043.01 | P2 | A | Масштаб и DPI меню | 100/110/120% приложения, 100/125/150/200% DPI, 1920×1080 и 1366×768, увеличенный шрифт; фактические кадры. | UNVERIFIED | — | ☐ |
 | CTX-044.01 | P1 | C | Открытие меню без сетевого ожидания | По инвентарю найти блокирующие SQL/UNC; использовать только revision-safe cache, повторная валидация записи. | UNVERIFIED | — | ☐ |
 | CTX-044.02 | P1 | A | Время открытия | Холодное/повторное, 2500+ строк, p50/p95, ошибки и stale revision. | UNVERIFIED | — | ☐ |
 | CTX-045.01 | P1 | C | Функциональный контракт диалогов | По CTX-047/048 записать поля, defaults, валидацию, права, SQL и Cancel; исправить выявленные функциональные расхождения. | UNVERIFIED | — | ☐ |
 | CTX-045.02 | P1 | D | Визуальный контракт диалогов | Title, размеры, вкладки, подсказки, tab order, empty/error/loading по парному реестру. | UNVERIFIED | — | ☐ |
 | CTX-045.03 | P1 | A | Полный проход команд | Каждая команда открыта до конечного диалога, есть результат и отказ; нет пропусков в manifest. | UNVERIFIED | — | ☐ |
-| CTX-046.01 | P2 | D | Общая chrome диалогов | Owner, CenterOwner, min size, поля, footer, scroll, длинный текст; отличие обосновано. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / только *.xaml диалогов (chrome-инвентарь + правки), без *.cs / prior=UNVERIFIED |
 | CTX-046.02 | P2 | C | Default/Cancel и фокус диалогов | Безопасные Enter/Esc и tab order по реестру; не дублировать исправления CTX-009/041. | UNVERIFIED | — | ☐ |
 | CTX-046.03 | P2 | A | Парные кадры диалогов | Открытие, заполнение, ошибки и длинные значения, Windows/DPI. | UNVERIFIED | — | ☐ |
 | CTX-047.01 | P1 | C | Инвентарь C# | Закрепить SHA и полный список XAML/CS кандидатов: popup, keyboard, editor/default, dynamic; каждый просмотрен или исключён с причиной. | UNVERIFIED | — | ☐ |
@@ -173,8 +167,7 @@ CTX-049.01 закрыт DONE 28.11.2026 и удалён по правилу вл
 |---|---|---|---|---|---|---|---|
 | AGR-01.01 | P0 | C | Карта модели и связей | objects/agreements/contracts, kind/base/stage, реквизиты и archive: конечная таблица по исходникам. | UNVERIFIED | — | ☐ |
 | AGR-01.02 | P0 | A | Неоднозначные исторические случаи | На разрешённой Pilot копии перечислить несколько номеров/дат/компаний, пустые номера, DS без базы, KP; без изменений. | UNVERIFIED | — | ☐ |
-| AGR-02.01 | P1 | D | Терминология главного окна | Согласованные подписи в MainWindow и карточках; не переименовывать строительный объект в ПТО/адресе. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / MainWindow.xaml подписи — сверка прохода 27.11 / prior=UNVERIFIED |
-| AGR-02.02 | P1 | A | Поиск, архив и режим КП | Реальные состояния главного окна, корректные подписи и неизменная навигация. | UNVERIFIED | — | ☐ |
+| AGR-02.02 | P1 | A | Поиск, архив и режим КП | Реальные состояния главного окна, корректные подписи и неизменная навигация. | UNVERIFIED | D-часть сверена: [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md) | ☐ |
 | AGR-03.01 | P1 | C | Дерево и связи приложений | Различать legal agreement, annex, DS/base, KP, stage/rest; отсутствие ошибочного объединения. | UNVERIFIED | — | ☐ |
 | AGR-03.02 | P1 | D | Карточки и заголовки приложений | Корректные названия/fallback без выдуманного номера; сохранить внешний вид. | UNVERIFIED | — | ☐ |
 | AGR-03.03 | P1 | A | Навигация разных юридических карточек | Два договора одного объекта, DS/КП/этапы, поиск и архив; точная цель. | UNVERIFIED | — | ☐ |
@@ -215,12 +208,12 @@ CTX-049.01 закрыт DONE 28.11.2026 и удалён по правилу вл
 | ARCH-SIZE-03.01 | P1 | C | Смета: операции редактирования | Отделить независимые правила cell/clipboard/formula/validation, сохранить поведение. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-03.02 | P1 | C | Смета: очередь сохранения и readback | Выделить тестируемую ответственность без изменения FIFO/транзакции/Undo. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-03.03 | P1 | C | Смета: вкладки и жизненный цикл | Разделить независимую загрузку/состояние/маршруты; не переписывать UI. | UNVERIFIED | — | ☐ |
-| ARCH-SIZE-03.04 | P1 | D | Смета: XAML ресурсы и шаблоны | Декомпозиция только по ответственности, без визуальных изменений. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / EstimateView.xaml Resources → новый Theme/EstimateViewResources.xaml; без *.cs / prior=UNVERIFIED |
+| ARCH-SIZE-03.04 | P1 | D | Смета: XAML ресурсы и шаблоны | BLOCKED  BLOCKED | BLOCKED | Контракты source-тестов парсят XAML на месте: [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md) | ☐ 
 | ARCH-SIZE-04.01 | P1 | C | MainWindow: навигация и ссылки | Независимые политики и маршруты; выбор/архив/открытие без регрессии. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-04.02 | P1 | C | MainWindow: команды и жизненный цикл | Отделить оставшуюся самостоятельную ответственность, сохранить cache/revision/startup. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-05.01 | P1 | C | Материалы: группировка и проекция | Проверить выделенные компоненты, разделить оставшуюся независимую логику; результаты и порядок неизменны. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-05.02 | P1 | C | Материалы: команды и сохранение | Тестируемые правила bulk/write/readback, неизменная стоимость. | UNVERIFIED | — | ☐ |
-| ARCH-SIZE-06.01 | P2 | D | App.xaml: словари ресурсов | Разделить по тематическим ролям без изменения ключей, порядка загрузки и рендера. | IN PROGRESS | — | ☑ zcode-sess-design / 2026-11-28T14:26Z / main / App.xaml → тематические Theme/*.xaml, ключи/порядок сохранены / prior=UNVERIFIED |
+| ARCH-SIZE-06.01 | P2 | D | App.xaml: словари ресурсов | BLOCKED  BLOCKED | BLOCKED | Контракты source-тестов парсят XAML на месте: [DESIGN_PASS_20261129_CTX_MENUS_DIALOGS](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md) | ☐ 
 | ARCH-SIZE-06.02 | P2 | A | Ресурсы после разделения | WPF загрузка и парные кадры ключевых состояний, отсутствие missing resource. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-07.01 | P2 | C | SqlServerStages | Границы чтения, распределения, защиты и транзакции; независимые компоненты вместо только partial, деньги неизменны. | UNVERIFIED | — | ☐ |
 | ARCH-SIZE-07.02 | P2 | C | SqlServerActs | Разделить независимую политику расчёта/проекций/команд, подпись и scope сохранены. | UNVERIFIED | — | ☐ |

@@ -39,7 +39,7 @@ public sealed class NavigationReadCancellationTests
     [InlineData("MainWindow.NavigationTree.cs", "ReconcileNavigationItems(yearNode.Items, desiredObjects)")]
     [InlineData("MainWindow.NavigationTree.cs", "finally { _syncingNavigation = wasSyncing; }")]
     [InlineData("MainWindow.Navigation.cs", "CancelNavigationRefresh();")]
-    [InlineData("MainWindow.Navigation.cs", "Workspace.ReadNavigation(reader)")]
+    [InlineData("MainWindow.Navigation.cs", "Workspace.ReadConsistentNavigation(read, token)")]
     [InlineData("MainWindow.ObjectCards.cs", "Workspace.ObjectCardMetadataMatches(read, o, documentsSnapshot, token)")]
     public void WorkerAndPublicationFencesAreWired(string file, string expected)
     {

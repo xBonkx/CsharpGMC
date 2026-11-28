@@ -73,6 +73,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         UpdateUndoButtons();
         var status = UndoManager.ApplyStatus.Indeterminate;
         await _writeLock.WaitWithoutBaselineAsync();

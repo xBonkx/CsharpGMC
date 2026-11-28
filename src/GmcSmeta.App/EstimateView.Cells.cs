@@ -177,6 +177,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Сохранение… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -234,6 +235,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Сохранение… ({pending})", false);
         await _writeLock.WaitAsync();
         try
@@ -366,6 +368,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Перенос цены… ({pending} операций)", false);
         await _writeLock.WaitAsync();
         try

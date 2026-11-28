@@ -119,6 +119,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Импорт… ({pending})", false);
         await _writeLock.WaitAsync();
         try

@@ -532,6 +532,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         System.Threading.Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Этап «{ShortStageName(stage.Name)}»: сохранение…", false);
         await _writeLock.WaitAsync();
         try

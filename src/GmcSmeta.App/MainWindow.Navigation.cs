@@ -176,7 +176,7 @@ public partial class MainWindow
         }
     }
 
-    private void OpenGlobalSearch()
+    private async void OpenGlobalSearch()
     {
         if (_sqlConnectionString is null) return;
         var dialog = new GlobalSearchWindow(_sqlConnectionString) { Owner = this };
@@ -188,7 +188,18 @@ public partial class MainWindow
             ReloadAndSelect((int)hit.ObjectId);
             return;
         }
-        ReloadNavigationData();
+        try
+        {
+            StatusText.Text = "Обновление списка объектов и документов…";
+            await ReloadNavigationDataAsync();
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            StatusText.Text = "Не удалось обновить список: " + ex.Message + " · Повторите F5.";
+            return;
+        }
+        if (_startupClosed) return;
         if (hit.Kind == "agreement")
         {
             var target = _objects.FirstOrDefault(o => o.Id == hit.ObjectId && !o.Archived);
@@ -330,9 +341,51 @@ public partial class MainWindow
         }
     }
 
-    private void ReloadAndSelect(int objectId)
+    // Post-write refresh runs the same guarded, revision-fenced read as the
+    // manual F5, on a worker thread with its own SQL connection. The heavy
+    // totals and metadata batch never executes on the UI thread; the
+    // navigation generation still invalidates a stale manual F5 snapshot.
+    private async Task ReloadNavigationDataAsync()
     {
-        ReloadNavigationData();
+        ++_navigationDataGeneration;
+        CancelNavigationRefresh();
+        var connection = _sqlConnectionString
+            ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
+        using var cancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+        var loaded = await Task.Run(() =>
+        {
+            using var read = SqlServerDatabase.OpenAsync(connection, token).GetAwaiter().GetResult();
+            return Workspace.ReadConsistentNavigation(read, token);
+        }, token).ConfigureAwait(true);
+        if (_startupClosed) return;
+        ApplyNavigationData(loaded.Objects, loaded.Documents);
+    }
+
+    // Fire-and-forget post-write refresh; failures never crash the caller.
+    private async Task ReloadNavigationAfterWriteAsync(bool rebuildTree)
+    {
+        try
+        {
+            await ReloadNavigationDataAsync();
+            if (rebuildTree) RefreshNavigation();
+        }
+        catch (Exception ex) { LogError(ex); }
+    }
+
+    private async void ReloadAndSelect(int objectId)
+    {
+        try
+        {
+            await ReloadNavigationDataAsync();
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            StatusText.Text = "Не удалось обновить список: " + ex.Message + " · Повторите F5.";
+            return;
+        }
+        if (_startupClosed) return;
         if (_objects.FirstOrDefault(o => o.Id == objectId) is not { } obj)
         {
             RefreshNavigation();
@@ -341,17 +394,6 @@ public partial class MainWindow
             return;
         }
         SelectObjectFromNavigation(obj);
-    }
-
-    private void ReloadNavigationData()
-    {
-        // Invalidate any manual F5 snapshot before a synchronous post-write refresh.
-        ++_navigationDataGeneration;
-        CancelNavigationRefresh();
-        var reader = _serverConn
-            ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
-        var (objects, documents) = Workspace.ReadNavigation(reader);
-        ApplyNavigationData(objects, documents);
     }
 
     private bool ApplyNavigationData(List<ObjectRow> objects, List<DocRow> documents)

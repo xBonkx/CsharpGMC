@@ -54,6 +54,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus("Копирование системы…", false);
         await _writeLock.WaitAsync();
         var saved = false;

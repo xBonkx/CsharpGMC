@@ -28,6 +28,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"{working} ({count})", false);
         await _writeLock.WaitAsync();
         var saved = false;

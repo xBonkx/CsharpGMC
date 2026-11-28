@@ -322,6 +322,7 @@ public partial class EstimateView
         if (!valid) return;
         _reloadTimer.Stop();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus(destination.Description + " — сохранение…", false);
         await _writeLock.WaitAsync();
         try

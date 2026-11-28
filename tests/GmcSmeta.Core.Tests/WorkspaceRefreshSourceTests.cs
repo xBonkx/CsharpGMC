@@ -16,7 +16,7 @@ public sealed class WorkspaceRefreshSourceTests
     {
         var code = Source("MainWindow.Navigation.cs");
         var start = code.IndexOf("private async void RefreshWorkspaceNavigation()", StringComparison.Ordinal);
-        var end = code.IndexOf("private void ReloadAndSelect(", start, StringComparison.Ordinal);
+        var end = code.IndexOf("private async void ReloadAndSelect(", start, StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
         var refresh = code[start..end];
         Assert.Contains("_navigationRefreshInProgress", refresh);
@@ -46,7 +46,10 @@ public sealed class WorkspaceRefreshSourceTests
         Assert.Contains("if (rebuildTree) RefreshNavigation()", code);
         Assert.Contains("_directorView.RequestRefresh()", code);
         Assert.Contains("++_navigationDataGeneration", code);
-        Assert.Contains("Workspace.ReadNavigation(reader)", code);
+        // Post-write refresh: только worker + revision fence, без синхронного чтения.
+        Assert.Contains("private async Task ReloadNavigationDataAsync()", code);
+        Assert.Contains("Workspace.ReadConsistentNavigation(read, token)", code);
+        Assert.DoesNotContain("Workspace.ReadNavigation(", code);
     }
 
     [Fact]

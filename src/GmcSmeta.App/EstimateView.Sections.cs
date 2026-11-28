@@ -74,6 +74,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Создание раздела… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -154,6 +155,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Переименование… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -258,6 +260,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Добавление строки… ({count})", false);
         PendingEstimateInsert? preview = null;
         var acquired = false;
@@ -387,6 +390,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Добавление из справочника… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -469,6 +473,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Изменение вложенности… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -534,6 +539,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Перемещение… ({count})", false);
         await _writeLock.WaitAsync();
         try
@@ -643,6 +649,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"{busy}… ({count})", false);
         string? deleteError = null;
         await _writeLock.WaitAsync();
@@ -870,6 +877,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Вставка из Excel: {parsed.Count} строк…", false);
         string? error = null;
         var saved = false;

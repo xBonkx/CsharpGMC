@@ -156,6 +156,7 @@ public partial class EstimateView
     {
         _reloadTimer.Stop();
         var count = Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         SetStatus($"Групповое сохранение ({count})…", false);
         await _writeLock.WaitAsync();
         try

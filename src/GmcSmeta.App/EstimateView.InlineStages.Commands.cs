@@ -135,6 +135,7 @@ public partial class EstimateView
         _reloadTimer.Stop();
         AttachSaveCloseGuard();
         System.Threading.Interlocked.Increment(ref _pendingWrites);
+        InvalidateSparseReadback(); // структурная правка: только полный reload
         RefreshInlineStagesSelectionButtons();
         SetStatus("Этапы: сохранение…", false);
         await _writeLock.WaitAsync();
