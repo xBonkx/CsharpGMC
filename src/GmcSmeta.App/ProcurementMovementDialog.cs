@@ -188,6 +188,7 @@ public sealed class ProcurementMovementDialog : Window
                 "Ед." => TextAlignment.Center,
                 _ => TextAlignment.Right
             });
+        PreviewGridPaste.Install<Line>(_grid, nameof(Line.Quantity));
         TableColumnMenu.SetProtect(_grid, "Наименование|Ед.|Количество");
         TableColumnMenu.SetKey(_grid, "procurement-movement-preview");
         Grid.SetRow(_grid, 2);
