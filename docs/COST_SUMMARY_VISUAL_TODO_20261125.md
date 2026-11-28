@@ -1,5 +1,8 @@
 # SUM-VIS-01 — Сводная стоимость: визуальный и UX-паритет Python → C# (25.11.2026)
 
+28.11.2026 ChatGPT/main — проход всех 14 оставшихся визуальных ID: TOT-11 и FONT-13 CODE READY; 12 PARTIAL. Summary width effective-metrics fit, adaptive dynamic forms, legacy totals frame/extended cell copy, SMR silent restore + Pilot tests, Python heading/weight comparison, 34 icon labels × 3 sizes WPF fixture, physical QA matrix and maintained replacement audit wrappers. FullRow batch command semantics preserved. No Windows build/tests, SQL Pilot execution or real captures; no production DB, schema, finance or release changes. [Отчёт](DESIGN_PASS_20261128_ALL_REMAINING.md).
+
+
 Статус PARTIAL (блоки 1–9 внесены; Windows-приёмка открыта). Приоритет P1, отдельные проверки корректности P0. Владелец просит сначала подробный TODO, затем реализацию. Первый кодовый блок начат по указанию владельца.
 
 ## Доказательная база
