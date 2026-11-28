@@ -8,7 +8,7 @@
     Closing="Window_Closing" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
   <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
     <TextBlock DockPanel.Dock="Top" x:Name="ContextLabel" Margin="0,0,0,9"
-      Foreground="#64748B" TextWrapping="Wrap"/>
+      Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
     <WrapPanel x:Name="EditorActions" DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,10,0,0">
       <Button Style="{StaticResource PythonToolbarButton}" Content="Проверить комплект" ContentTemplate="{StaticResource IconLabelCheck}" Click="Verify_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
       <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр" ContentTemplate="{StaticResource IconLabelFile}" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
@@ -48,7 +48,7 @@
         <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
           <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8"
             Text="Выбор выполненных работ переносит исходные объёмы в текст акта. Объёмы не придумываются."
-            TextWrapping="Wrap" Foreground="#64748B"/>
+            TextWrapping="Wrap" Foreground="{StaticResource UiMutedTextBrush}"/>
           <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
             <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить выделенные работы в акт" Click="UseWorks_Click"
               Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
@@ -71,7 +71,7 @@
       </TabItem>
       <TabItem Header="5. Приложения">
         <DockPanel Margin="{StaticResource LayoutAuxTabPageMargin}">
-          <TextBlock DockPanel.Dock="Top" Foreground="#64748B"
+          <TextBlock DockPanel.Dock="Top" Foreground="{StaticResource UiMutedTextBrush}"
             Text="Порядок приложений используется в реестре и общем PDF. Исключённые файлы остаются в архиве."
             TextWrapping="Wrap" Margin="0,0,0,8"/>
           <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
