@@ -51,6 +51,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     };
     private bool _busy;
     private bool _closed;
+    private CancellationTokenSource? _previewCancellation;
     private readonly DataGrid _grid = new()
     {
         AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false,
@@ -221,20 +222,25 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             ResetPlan();
             SetBusy(true);
             _summary.Text = "Сравнение…";
+            using var cancellation = new CancellationTokenSource();
+            _previewCancellation = cancellation;
+            var token = cancellation.Token;
             try
             {
                 var result = await Task.Run(() =>
                 {
                     var plan = SqlServerExcelExistingUpdate.Prepare(
-                        _connectionString, contract.Id, _filePath, new[] { block.Block });
+                        _connectionString, contract.Id, _filePath, new[] { block.Block }, token);
                     if (!string.Equals(plan.FileSha256, _parsedFingerprint, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("Файл Excel изменён после первоначального разбора.");
                     var groups = plan.Differences.GroupBy(x => x.Kind)
                         .Select(g => g.Key + ": " + g.Count());
                     return (Plan: plan, Summary: string.Join("  |  ", groups),
                         HasSafe: plan.Differences.Any(x => x.SafeToApply));
-                });
-                if (_closed) return;
+                }, token);
+                if (_closed || token.IsCancellationRequested ||
+                    !ReferenceEquals(_contracts.SelectedItem, contract) ||
+                    !ReferenceEquals(_blocks.SelectedItem, block)) return;
                 PublishPlan(result.Plan, result.HasSafe);
                 _summary.Text = result.Summary +
                     ". Отсутствующие в Excel строки останутся на месте. " +
@@ -244,13 +250,14 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             }
             catch (Exception ex)
             {
-                if (_closed) return;
+                if (_closed || token.IsCancellationRequested) return;
                 MessageBox.Show(this, ex.Message, "Не удалось сравнить смету",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 _summary.Text = "Сравнение не выполнено. SQL не изменён.";
             }
             finally
             {
+                if (ReferenceEquals(_previewCancellation, cancellation)) _previewCancellation = null;
                 if (!_closed) SetBusy(false);
             }
         };
@@ -296,6 +303,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _previewCancellation?.Cancel();
         base.OnClosed(e);
     }
 

@@ -75,6 +75,7 @@ public partial class StagesDialog : Window
     private async Task ReloadAsync()
     {
         if (_closed) return;
+        if (_distributionCancellation is not null) return;
         using var cancellation = new CancellationTokenSource();
         _distributionCancellation = cancellation;
         var token = cancellation.Token;

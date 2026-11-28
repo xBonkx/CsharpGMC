@@ -1,5 +1,6 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.07 PARTIAL: один запрос глобального поиска, отмена предпросмотра Excel и защита чтения этапов. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, ручное сопоставление/полный аудит открыты, бронь снята.
 - 29.11.2026 — PERF-047.02 PARTIAL: пакетная публикация страницы справочника и импорт логотипа в фоне; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — CTX-046.02 PARTIAL: safe keyboard routes in Prompt/Help/SectionPicker, 3 source tests added (not run); remaining inventory and Windows checks open. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
