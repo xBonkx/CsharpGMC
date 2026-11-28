@@ -92,8 +92,8 @@ public sealed class SidebarAgreementSourceTests
         Assert.Equal("{Binding Document.NavigationDate}", (string?)date.Attribute("ToolTip"));
         var source = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));
         Assert.Contains("new(16 * Math.Max(0, depth), 7, 4, 7)", source);
-        Assert.Contains("FontWeight = FontWeights.SemiBold", source);
         var navigationTree = File.ReadAllText(Path.Combine(app, "MainWindow.NavigationTree.cs"));
+        Assert.Contains("FontWeight = FontWeights.SemiBold", navigationTree);
         Assert.Contains("FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal", navigationTree);
         var metrics = XDocument.Load(Path.Combine(app, "Theme", "LayoutMetrics.xaml"));
         var icon = Assert.Single(metrics.Descendants(w + "Style").Where(e => (string?)e.Attribute(x + "Key") == "LayoutNavigationIcon"));
