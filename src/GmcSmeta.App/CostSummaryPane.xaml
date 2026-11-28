@@ -278,9 +278,10 @@
                         </StackPanel>
                     </Border>
                 </UniformGrid>
-                <Border Grid.Row="1" Margin="0,12,0,0" Style="{StaticResource PythonTile}" Padding="1,1,1,6" MinHeight="0">
+                <local:SummaryTableFrame Grid.Row="1" Margin="{StaticResource LayoutDirectorSectionGap}" Background="White"
+                    BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="12" Padding="{StaticResource LayoutTotalsTablePadding}">
                     <DataGrid local:TableColumnMenu.Key="cost-totals" x:Name="TotalsGrid" CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsArticleRow}"
-                              ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="34" FontSize="{StaticResource UiTotalsTableSize}" ColumnHeaderHeight="36"
+                              ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="{StaticResource LayoutTotalsRowHeight}" FontSize="{StaticResource UiTotalsTableSize}"
                               EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderThickness="0"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                               CanUserReorderColumns="False" HeadersVisibility="Column" GridLinesVisibility="None" RowHeaderWidth="0"
@@ -295,7 +296,7 @@
                             <DataGridTextColumn Header="Маржа, %" Binding="{Binding MarginPct}" Width="100" IsReadOnly="True" ElementStyle="{StaticResource TotalsArticleMargin}"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                </Border>
+                </local:SummaryTableFrame>
             </Grid>
         </TabItem>
         </TabControl>
