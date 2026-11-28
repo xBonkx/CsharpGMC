@@ -600,6 +600,7 @@ public partial class MainWindow : Window
             if (_objectCardTransitionPending || !ReferenceEquals(PageHost.Content, ObjectPage) || _selectedObject?.Id != obj.Id ||
                 connection != _sqlConnectionString || mode != CurrentMode ||
                 fresh is null || fresh.Archived != obj.Archived || fresh.ArchivedOn != obj.ArchivedOn ||
+                !Equals(fresh, obj) ||
                 (writes && !SqlWritesEnabled))
             {
                 StatusText.Text = "Объект или режим изменились. Откройте меню заново.";
@@ -613,8 +614,9 @@ public partial class MainWindow : Window
         menu.Items.Add(import);
         if (mode != NavigationMode.Contracts)
         {
-            var passports = ContextMenuIcons.Create("Паспорта вентиляционных систем…", "File");
-            passports.Click += (s, args) => Run(_ => ObjectPassports_Click(s, args), writes: false);
+            var passports = ContextMenuIcons.Create("Паспорта вентиляционных систем…", "File", SqlWritesEnabled);
+            passports.Click += (_, _) => Run(current => OpenObjectTool(current, "Паспорта вентиляции",
+                (conn, target) => new PassportsWindow(conn, target.Id, target.Name, target.Address)));
             menu.Items.Add(passports);
         }
         menu.Items.Add(new Separator());
@@ -917,12 +919,14 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
         if (sender is not Button { Tag: int id } button ||
-            _docs.FirstOrDefault(doc => doc.Id == id) is not { } target) return;
+            _docs.FirstOrDefault(doc => doc.Id == id) is not { } target ||
+            !CardDocumentCurrent(target)) return;
         var menu = new ContextMenu { PlacementTarget = button,
             Placement = e.CursorLeft < 0 && e.CursorTop < 0
                 ? System.Windows.Controls.Primitives.PlacementMode.Bottom
                 : System.Windows.Controls.Primitives.PlacementMode.MousePoint };
-        AddDocumentFileMenu(menu, target);
+        var mode = CurrentMode;
+        AddDocumentFileMenu(menu, target, () => button.IsLoaded && mode == CurrentMode && CardDocumentCurrent(target));
         menu.IsOpen = true;
     }
 
@@ -996,15 +1000,26 @@ public partial class MainWindow : Window
         if (CardFileTarget(sender) is { } doc) OpenContractDocuments(doc, true);
     }
 
+    private bool CardDocumentCurrent(DocRow doc) =>
+        !_objectCardTransitionPending && ReferenceEquals(PageHost.Content, ObjectPage) &&
+        _selectedObject?.Id == doc.ObjectId &&
+        _objects.Any(row => Equals(row, _selectedObject)) &&
+        _docs.Any(current => Equals(current, doc));
+
     private DocRow? CardFileTarget(object sender) =>
-        sender is Button { Tag: int id } ? _docs.FirstOrDefault(doc => doc.Id == id && doc.Kind is "main" or "dop") : null;
+        sender is Button { Tag: int id, IsLoaded: true } ?
+            _docs.FirstOrDefault(doc => doc.Id == id && (doc.Kind is "main" or "dop") &&
+                CardDocumentCurrent(doc)) : null;
 
     private async void CardSignedPdf_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (CardFileTarget(sender) is { } doc && _sqlConnectionString is { } connection)
+        {
+            var mode = CurrentMode;
             await AttachmentWindow.OpenSignedAsync(this, connection, doc.Id, doc.Title, () =>
-                connection == _sqlConnectionString && _docs.Any(current => current.Id == doc.Id && current.Kind == doc.Kind));
+                connection == _sqlConnectionString && mode == CurrentMode && CardDocumentCurrent(doc));
+        }
     }
 
     private void CardSignedPdfMenu_Click(object sender, RoutedEventArgs e)
@@ -1014,10 +1029,12 @@ public partial class MainWindow : Window
             _sqlConnectionString is not { } connection) return;
         var menu = new ContextMenu { PlacementTarget = button,
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        var select = ContextMenuIcons.Create("Добавить / выбрать PDF документа…", "File");
+        var mode = CurrentMode;
+        // Python object_view.py: signed PDF split-button menu has no icon.
+        var select = new MenuItem { Header = "Добавить / выбрать подписанный PDF…" };
         select.Click += (_, _) =>
         {
-            if (connection == _sqlConnectionString && _docs.Any(current => current.Id == doc.Id && current.Kind == doc.Kind))
+            if (button.IsLoaded && connection == _sqlConnectionString && mode == CurrentMode && CardDocumentCurrent(doc))
                 new AttachmentWindow(connection, doc.Id, doc.Title, signedOnly: true) { Owner = this }.ShowDialog();
         };
         menu.Items.Add(select);

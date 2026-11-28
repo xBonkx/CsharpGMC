@@ -11,7 +11,8 @@ public partial class MainWindow
     /// No EstimateView or position editor methods are changed.
     /// </summary>
     private async Task UpdateExistingEstimateFromExcelAsync(
-        string filePath, ExcelImportResult imported, string parsedFingerprint, int? preferredObjectId)
+        string filePath, ExcelImportResult imported, string parsedFingerprint, int? preferredObjectId,
+        IReadOnlyList<DocRow> documents, Func<bool> contextCurrent)
     {
         if (_sqlConnectionString is null || _serverConn is null || !SqlWritesEnabled)
         {
@@ -19,9 +20,13 @@ public partial class MainWindow
                 "Excel safe-update", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var preview = new ExcelExistingUpdatePreviewWindow(this, imported, _docs,
-            preferredObjectId, _sqlConnectionString, filePath, parsedFingerprint);
-        if (preview.ShowDialog() != true || preview.Plan is not { } plan) return;
+        var connection = _sqlConnectionString;
+        if (!contextCurrent()) return;
+        var preview = new ExcelExistingUpdatePreviewWindow(this, imported, documents,
+            preferredObjectId, connection, filePath, parsedFingerprint);
+        if (preview.ShowDialog() != true || preview.Plan is not { } plan || !contextCurrent() ||
+            !documents.Any(doc => doc.Id == plan.ContractId &&
+                (preferredObjectId is null || doc.ObjectId == preferredObjectId))) return;
 
         using var cancel = new CancellationTokenSource();
         var progress = ImportProgressWindow("Безопасное обновление КП в одной SQL-транзакции…", cancel);
@@ -29,7 +34,7 @@ public partial class MainWindow
         try
         {
             var saved = await Task.Run(() =>
-                SqlServerExcelExistingUpdate.Apply(_sqlConnectionString, filePath, plan, cancel.Token));
+                SqlServerExcelExistingUpdate.Apply(connection, filePath, plan, cancel.Token));
             if (!saved.Saved)
                 throw new InvalidOperationException(saved.Error ?? "SQL Server не подтвердил обновление.");
             var objectId = _docs.FirstOrDefault(x => x.Id == plan.ContractId)?.ObjectId;
@@ -46,7 +51,7 @@ public partial class MainWindow
             {
                 // Observe the journal only; never run the SQL mutation a second time.
                 var committed = await Task.Run(() =>
-                    SqlServerExcelExistingUpdate.WasCommitted(_sqlConnectionString,
+                    SqlServerExcelExistingUpdate.WasCommitted(connection,
                         plan.ContractId, ex.OperationId));
                 if (committed)
                 {

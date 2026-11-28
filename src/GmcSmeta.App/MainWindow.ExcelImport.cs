@@ -16,18 +16,23 @@ public partial class MainWindow
     private async Task ImportExcelForObjectAsync(int? preferredObjectId, bool newDocumentsOnly = false)
     {
         if (_sqlConnectionString is null || _serverConn is null || !SqlWritesEnabled) return;
-        if (preferredObjectId is int id && !_objects.Any(obj => obj.Id == id && !obj.Archived))
+        var preferred = preferredObjectId is int id ? _objects.FirstOrDefault(obj => obj.Id == id && !obj.Archived) : null;
+        if (preferredObjectId is not null && preferred is null)
         {
             StatusText.Text = "Объект больше недоступен для импорта. Обновите список.";
             return;
         }
+        var modeAtStart = CurrentMode;
+        var connection = _sqlConnectionString;
+        bool ContextCurrent() => SqlWritesEnabled && connection == _sqlConnectionString &&
+            modeAtStart == CurrentMode && (preferred is null || _objects.Any(obj => Equals(obj, preferred)));
         var fileDialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "Импорт КП и смет из Excel",
             Filter = "Книги Excel (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls",
             CheckFileExists = true
         };
-        if (fileDialog.ShowDialog(this) != true) return;
+        if (fileDialog.ShowDialog(this) != true || !ContextCurrent()) return;
 
         // Capture exactly the bytes the reader is going to parse.
         string parsedFingerprint;
@@ -68,29 +73,18 @@ public partial class MainWindow
             return;
         }
 
-        if (SqlServerExcelExistingUpdate.FileFingerprint(fileDialog.FileName) != parsedFingerprint)
+        bool FileCurrent()
         {
-            MessageBox.Show(this, "Файл изменился во время разбора. Импорт отменён.",
-                "Excel", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        // The New KP dialog explicitly requests a new document, not an update.
-        if (!newDocumentsOnly)
-        {
-            // Separate opt-in path: the original new-document importer remains untouched.
-            var mode = MessageBox.Show(this,
-                "Обновить существующую смету из Excel?\n\n" +
-                "Да — предпросмотр безопасных изменений существующего КП.\n" +
-                "Нет — прежний импорт новых КП/смет.\nОтмена — ничего не делать.",
-                "Режим импорта Excel", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-            if (mode == MessageBoxResult.Yes)
+            try
             {
-                await UpdateExistingEstimateFromExcelAsync(fileDialog.FileName, result, parsedFingerprint, preferredObjectId);
-                return;
+                if (SqlServerExcelExistingUpdate.FileFingerprint(fileDialog.FileName) == parsedFingerprint)
+                    return true;
+                StatusText.Text = "Файл изменился. Импорт отменён.";
             }
-            if (mode != MessageBoxResult.No) return;
+            catch (Exception ex) { StatusText.Text = "Не удалось проверить Excel: " + ex.Message; }
+            return false;
         }
+        if (!ContextCurrent() || !FileCurrent()) return;
 
         // Read only metadata once, not one network query for each preview block.
         Dictionary<long, IReadOnlySet<string>> existing;
@@ -102,7 +96,7 @@ public partial class MainWindow
         {
             (existing, objects, documents, companies, revision) = await Task.Run(() =>
             {
-                using var conn = SqlServerDatabase.Open(_sqlConnectionString);
+                using var conn = SqlServerDatabase.Open(connection);
                 var before = SqlServerDatabase.Revision(conn);
                 var freshObjects = Workspace.Objects(conn);
                 var freshDocuments = Workspace.ReadAllDocumentMetadata(conn);
@@ -131,9 +125,35 @@ public partial class MainWindow
                 "Импорт Excel", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
+        if (!ContextCurrent() || (preferred is not null && !objects.Any(obj => Equals(obj, preferred))))
+        {
+            StatusText.Text = "Исходная карточка изменилась или недоступна. Импорт отменён; выберите объект заново.";
+            return;
+        }
+
+        // A missing preferred object must not silently become a new card.
+        // Both preview modes use the same confirmed metadata snapshot.
+        if (!newDocumentsOnly)
+        {
+            var mode = MessageBox.Show(this,
+                "Обновить существующую смету из Excel?\n\n" +
+                "Да — предпросмотр безопасных изменений существующего КП.\n" +
+                "Нет — прежний импорт новых КП/смет.\nОтмена — ничего не делать.",
+                "Режим импорта Excel", MessageBoxButton.YesNoCancel, MessageBoxImage.Question,
+                MessageBoxResult.Cancel);
+            if (!ContextCurrent() || !FileCurrent()) return;
+            if (mode == MessageBoxResult.Yes)
+            {
+                var activeIds = objects.Where(obj => !obj.Archived).Select(obj => obj.Id).ToHashSet();
+                await UpdateExistingEstimateFromExcelAsync(fileDialog.FileName, result, parsedFingerprint,
+                    preferredObjectId, documents.Where(doc => activeIds.Contains(doc.ObjectId)).ToArray(), ContextCurrent);
+                return;
+            }
+            if (mode != MessageBoxResult.No) return;
+        }
         var preview = new ExcelImportPreviewWindow(this, result, objects, documents,
             preferredObjectId, existing, companies);
-        if (preview.ShowDialog() != true) return;
+        if (preview.ShowDialog() != true || !ContextCurrent() || !FileCurrent()) return;
         var selections = preview.Choices;
         var target = preview.ObjectId;
         var name = preview.NewObjectName;
@@ -144,7 +164,7 @@ public partial class MainWindow
         try
         {
             var saved = await Task.Run(() => SqlServerExcelImport.Import(
-                _sqlConnectionString, target, name, fileDialog.FileName, selections,
+                connection, target, name, fileDialog.FileName, selections,
                 revision, writeCancellation.Token), writeCancellation.Token);
             ReloadAndSelect(checked((int)saved.ObjectId));
             StatusText.Text = $"Импортировано документов: {saved.ContractIds.Count}, строк: " +

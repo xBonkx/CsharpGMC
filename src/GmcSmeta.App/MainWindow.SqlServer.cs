@@ -27,7 +27,13 @@ public partial class MainWindow
         }
 
         // Read revision before opening the dialog to detect concurrent writes during editing.
-        var revision = SqlServerDatabase.Revision(_serverConn);
+        var mode = CurrentMode;
+        var connection = _sqlConnectionString;
+        var targetObject = id is int targetId ? _objects.FirstOrDefault(o => o.Id == targetId) : null;
+        var captured = targetObject is not null ? CaptureObjectMutation(targetObject) : null;
+        if (id is not null && (targetObject is null || targetObject.Archived || captured is null))
+            throw new InvalidOperationException("Карточка изменилась или недоступна.");
+        var revision = captured?.Revision ?? SqlServerDatabase.Revision(_serverConn);
         var previous = id is int objectId
             ? SqlServerWorkspace.ReadObject(_serverConn, objectId) : null;
         if (id is int existing && _objects.Any(o => o.Id == existing && o.Archived))
@@ -38,7 +44,11 @@ public partial class MainWindow
         var dialog = new ObjectDialog(
             SqlServerWorkspace.ObjectTags(_serverConn, previous?.Form ?? ""), previous, agreement, CurrentMode)
             { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Values is not { } values) return;
+        if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(_serverConn))
+            throw new InvalidOperationException("Данные изменились во время чтения свойств.");
+        if (dialog.ShowDialog() != true || dialog.Values is not { } values ||
+            !SqlWritesEnabled || connection != _sqlConnectionString || mode != CurrentMode ||
+            (targetObject is not null && !_objects.Any(o => Equals(o, targetObject)))) return;
 
         var saved = SaveSqlServerObjectProperties(values, id, revision);
         ReloadAndSelect(saved);
