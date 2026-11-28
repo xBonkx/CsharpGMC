@@ -1,7 +1,8 @@
 <Window x:Class="GmcSmeta.App.ArchiveYearDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Год в архиве" Width="470" SizeToContent="Height" MinWidth="460"
+        Title="Год в архиве" Width="470" SizeToContent="Height" MinWidth="320"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" UseLayoutRounding="True">
@@ -38,19 +39,21 @@
             </Setter.Value></Setter>
         </Style>
     </Window.Resources>
-    <Border Padding="{StaticResource LayoutFormDialogMargin}">
+    <DockPanel Margin="{StaticResource LayoutFormDialogMargin}">
+        <WrapPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource LayoutFormFooterGap}">
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" Margin="{StaticResource LayoutDialogActionGap}"/>
+            <Button x:Name="MoveButton" Content="Перенести" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Move_Click"/>
+        </WrapPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
-            <TextBlock Text="В какой год архива отнести карточку?" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-            <TextBlock x:Name="ObjectName" Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,0"/>
+            <TextBlock Text="В какой год архива отнести карточку?" FontSize="{StaticResource UiH2Size}" Style="{StaticResource UiHeadingText}"/>
+            <TextBlock x:Name="ObjectName" Style="{StaticResource UiSecondaryText}" Margin="0,10,0,0"/>
             <UniformGrid x:Name="YearGrid" Columns="4" Margin="0,10,0,0"/>
-            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <TextBlock Text="Другой год:" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <WrapPanel Orientation="Horizontal" Margin="{StaticResource LayoutFormFooterGap}">
+                <TextBlock Text="Другой год:" Style="{StaticResource UiSecondaryText}" VerticalAlignment="Center" Margin="{StaticResource LayoutDialogActionGap}"/>
                 <TextBox x:Name="YearBox" Style="{StaticResource PythonSearch}" Width="100" MaxLength="4" TextAlignment="Center" FontWeight="SemiBold" Padding="8,6" TextChanged="YearBox_TextChanged" KeyDown="YearBox_KeyDown"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0"/>
-                <Button x:Name="MoveButton" Content="Перенести" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Move_Click"/>
-            </StackPanel>
+            </WrapPanel>
         </StackPanel>
-    </Border>
+        </ScrollViewer>
+    </DockPanel>
 </Window>
