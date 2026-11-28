@@ -212,11 +212,11 @@ public static partial class SqlServerProcurement
         {
             token.ThrowIfCancellationRequested();
             systems.Add(new SystemChoice(
-                Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(reader, 0),
                 reader.IsDBNull(1) ? null :
-                    Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(reader, 1),
                 reader.IsDBNull(2) ? "" : reader.GetString(2),
-                reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3), CultureInfo.InvariantCulture)));
+                reader.IsDBNull(3) ? 0 : SqlInteger.ReadInt32(reader, 3)));
         }
         return systems;
     }
@@ -319,9 +319,9 @@ public static partial class SqlServerProcurement
         var dueDate = r.IsDBNull(13) ? (DateTime?)null :
             Convert.ToDateTime(r.GetValue(13), CultureInfo.InvariantCulture);
         var outOfKp = !r.IsDBNull(6) &&
-            Convert.ToBoolean(r.GetValue(6), CultureInfo.InvariantCulture);
+            SqlFlag.Read(r, 6);
         var directToSite = !r.IsDBNull(16) &&
-            Convert.ToBoolean(r.GetValue(16), CultureInfo.InvariantCulture);
+            SqlFlag.Read(r, 16);
         var supplier = r.IsDBNull(17) ? null : Text(17);
         var name = Text(2);
         var work = EstimateStatistics.IsWorkName(name) || (r.FieldCount > 26 && EstimateStatistics.IsWorkName(Text(26)));
@@ -330,7 +330,7 @@ public static partial class SqlServerProcurement
         var dueState = DueStateOf(status, dueDate, today);
 
         return new BuyRow(
-            Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt64(r, 0),
             Text(1), name, Text(3), qty, Qty(5),
             status, meta.Label, meta.Bg, meta.Fg,
             supplier, stage, Text(10), Text(11), Dec(12), dueDate,
@@ -338,15 +338,15 @@ public static partial class SqlServerProcurement
             received, issued, work, outOfKp,
             FlagsOf(qty, received, issued, replacement, dueDate, dueState, outOfKp),
             r.FieldCount > 18 ? Text(18) : "buy",
-            r.FieldCount > 19 ? Convert.ToInt64(r.GetValue(19), CultureInfo.InvariantCulture) : 0,
+            r.FieldCount > 19 ? SqlInteger.ReadInt64(r, 19) : 0,
             r.FieldCount > 20 && !r.IsDBNull(20)
-                ? Convert.ToInt64(r.GetValue(20), CultureInfo.InvariantCulture) : null,
+                ? SqlInteger.ReadInt64(r, 20) : null,
             r.FieldCount > 21 && !r.IsDBNull(21)
                 ? Convert.ToDateTime(r.GetValue(21), CultureInfo.InvariantCulture) : null,
             r.FieldCount > 22 ? Text(22) : "",
             r.FieldCount > 23 && !r.IsDBNull(23) ? Convert.ToDateTime(r.GetValue(23), CultureInfo.InvariantCulture) : null,
             r.FieldCount > 24 ? Text(24) : "",
-            r.FieldCount > 25 && !r.IsDBNull(25) ? Convert.ToInt64(r.GetValue(25), CultureInfo.InvariantCulture) : null);
+            r.FieldCount > 25 && !r.IsDBNull(25) ? SqlInteger.ReadInt64(r, 25) : null);
     }
 
     /// <summary>
@@ -435,7 +435,7 @@ public static partial class SqlServerProcurement
                         while (r.Read())
                             if (string.Equals(r.GetString(1), clean, StringComparison.OrdinalIgnoreCase))
                             {
-                                supplierId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                                supplierId = SqlInteger.ReadInt64(r, 0);
                                 break;
                             }
             if (supplierId is null)
@@ -460,8 +460,8 @@ public static partial class SqlServerProcurement
                 using var r = find.ExecuteReader();
                 if (r.Read())
                 {
-                    procurementId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-                    var same = (SupplierId: r.IsDBNull(1) ? (long?)null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+                    procurementId = SqlInteger.ReadInt64(r, 0);
+                    var same = (SupplierId: r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1),
                         Stage: r.IsDBNull(2) ? "" : r.GetString(2),
                         OrderRef: r.IsDBNull(3) ? "" : r.GetString(3),
                         InvoiceRef: r.IsDBNull(4) ? "" : r.GetString(4),
@@ -469,7 +469,7 @@ public static partial class SqlServerProcurement
                         DueDate: r.IsDBNull(6) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(6), CultureInfo.InvariantCulture),
                         Replacement: r.IsDBNull(7) ? "" : r.GetString(7),
                         Note: r.IsDBNull(8) ? "" : r.GetString(8),
-                        Direct: !r.IsDBNull(9) && Convert.ToBoolean(r.GetValue(9), CultureInfo.InvariantCulture),
+                        Direct: !r.IsDBNull(9) && SqlFlag.Read(r, 9),
                         Source: r.IsDBNull(10) ? "" : r.GetString(10),
                         PaidDate: r.IsDBNull(11) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(11), CultureInfo.InvariantCulture),
                         Responsible: r.IsDBNull(12) ? "" : r.GetString(12));
@@ -613,13 +613,13 @@ public static partial class SqlServerProcurement
             r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
         var kind = ReadText(2);
         return new MovementHistoryRow(
-            Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-            Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt64(r, 0),
+            SqlInteger.ReadInt64(r, 1),
             kind, MovementKindLabel(kind),
             Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture)),
             r.IsDBNull(4) ? null : Convert.ToDateTime(r.GetValue(4), CultureInfo.InvariantCulture),
             ReadText(5), ReadText(6), ReadText(7),
-            r.IsDBNull(8) ? null : Convert.ToInt64(r.GetValue(8), CultureInfo.InvariantCulture));
+            r.IsDBNull(8) ? null : SqlInteger.ReadInt64(r, 8));
     }
 
     public static IReadOnlyList<MovementHistoryRow> MovementsForPosition(

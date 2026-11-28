@@ -38,7 +38,7 @@ public static class SqlServerAgreements
             string S(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
             string D(int i) => r.IsDBNull(i) ? "" : Convert.ToDateTime(r.GetValue(i), CultureInfo.InvariantCulture).ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
             var print = new SqlServerKsRequisites.Values(objectId, S(11), S(10), S(12), S(13), S(14), S(15), S(16), S(17), S(18), S(19), S(20), D(21), "");
-            rows.Add(new(Convert.ToInt64(r.GetValue(0)), objectId, S(1), D(2), r.IsDBNull(3) ? null : Convert.ToInt64(r.GetValue(3)), S(4), D(5), S(6), S(7), S(8), S(9), print));
+            rows.Add(new(SqlInteger.ReadInt64(r, 0), objectId, S(1), D(2), r.IsDBNull(3) ? null : SqlInteger.ReadInt64(r, 3), S(4), D(5), S(6), S(7), S(8), S(9), print));
         }
         return rows;
     }
@@ -51,7 +51,7 @@ public static class SqlServerAgreements
         while (r.Read())
         {
             string S(int i) => r.IsDBNull(i) ? "" : Convert.ToString(r.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-            rows.Add(new(Convert.ToInt64(r.GetValue(0)), S(1), S(2), S(3), S(4)));
+            rows.Add(new(SqlInteger.ReadInt64(r, 0), S(1), S(2), S(3), S(4)));
         }
         return rows;
     }
@@ -148,8 +148,8 @@ public static class SqlServerAgreements
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
-            objectId = Convert.ToInt64(r.GetValue(0)); kind = r.GetString(1);
-            parent = r.IsDBNull(2) ? sourceId : Convert.ToInt64(r.GetValue(2));
+            objectId = SqlInteger.ReadInt64(r, 0); kind = r.GetString(1);
+            parent = r.IsDBNull(2) ? sourceId : SqlInteger.ReadInt64(r, 2);
         }
         if (kind == "kp") return;
         var inherited = parent.HasValue ? DocumentAgreementId(conn, parent.Value, tx) : null;
@@ -167,7 +167,7 @@ public static class SqlServerAgreements
                 if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
                 number=kind=="main" && !r.IsDBNull(0)?r.GetString(0):"";
                 date=kind=="main" && !r.IsDBNull(1)?Convert.ToString(r.GetValue(1),CultureInfo.InvariantCulture)??"":"";
-                companyId=r.IsDBNull(2)?null:Convert.ToInt64(r.GetValue(2));
+                companyId=r.IsDBNull(2)?null:SqlInteger.ReadInt64(r, 2);
             }
             var company=Companies(conn,tx).FirstOrDefault(c=>c.Id==companyId);
             var print=SqlServerKsRequisites.ReadShared(conn,objectId,tx);
@@ -197,7 +197,7 @@ public static class SqlServerAgreements
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
-            objectId = Convert.ToInt64(r.GetValue(0)); id = r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1));
+            objectId = SqlInteger.ReadInt64(r, 0); id = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1);
         }
         return id is long value ? Read(conn, objectId).SingleOrDefault(a => a.Id == value) : null;
     }

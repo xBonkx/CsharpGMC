@@ -99,4 +99,39 @@ public sealed class SqlIntegerTests
         Assert.DoesNotContain("Convert.ToInt32(reader.GetValue(", source);
     }
 
+
+    [Theory]
+    [InlineData("GmcSmeta.Core/Db/SqlServerActs.Extras.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerActs.ActList.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerActs.Grid.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerAgreements.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerProcurement.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerStages.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerTrash.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerShipments.cs")]
+    public void SqlServerProjectionUsesStrictIntegerAndFlagReads(string relative)
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", relative)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var source = File.ReadAllText(Path.Combine(root!.FullName, "src", relative));
+        Assert.Contains("SqlInteger.ReadInt", source);
+        Assert.DoesNotContain("Convert.ToInt64(r.GetValue(", source);
+        Assert.DoesNotContain("Convert.ToInt64(reader.GetValue(", source);
+        Assert.DoesNotContain("Convert.ToInt32(r.GetValue(", source);
+        Assert.DoesNotContain("Convert.ToBoolean(r.GetValue(", source);
+        Assert.DoesNotContain("Convert.ToBoolean(reader.GetValue(", source);
+    }
+
+    [Fact]
+    public void ShipmentBigIntCountCannotWrapToNegative()
+    {
+        using var table = new DataTable();
+        table.Columns.Add("count", typeof(long));
+        table.Rows.Add((long)int.MaxValue + 1);
+        using var reader = table.CreateDataReader();
+        Assert.True(reader.Read());
+        Assert.Throws<OverflowException>(() => SqlInteger.ReadInt32(reader, 0));
+    }
 }

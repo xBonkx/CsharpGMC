@@ -26,7 +26,7 @@ public partial class ActsEditorView
         using var reader = token.CanBeCanceled
             ? cmd.ExecuteReaderAsync(token).GetAwaiter().GetResult() : cmd.ExecuteReader();
         while (token.CanBeCanceled ? reader.ReadAsync(token).GetAwaiter().GetResult() : reader.Read())
-            ids.Add(Convert.ToInt64(reader.GetValue(0)));
+            ids.Add(SqlInteger.ReadInt64(reader, 0));
         token.ThrowIfCancellationRequested();
         return ids;
     }

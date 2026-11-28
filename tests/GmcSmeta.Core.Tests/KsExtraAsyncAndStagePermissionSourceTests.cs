@@ -51,4 +51,22 @@ public sealed class KsExtraAsyncAndStagePermissionSourceTests
         var policy = Read("GmcSmeta.Core/Domain/StageMutationPolicy.cs");
         Assert.Contains("if (stage.IsRest)", policy);
     }
+
+    [Fact]
+    public void ExtraWritesRejectArchivedObjectsAndComputedRestInsideTransaction()
+    {
+        var extra = Read("GmcSmeta.Core/Db/SqlServerActs.Extras.cs");
+        Assert.Contains("JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id", extra);
+        Assert.Contains("AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", extra);
+        Assert.Equal(3, extra.Split("var row=LoadExtra(conn,tx,actId,positionId)").Length - 1);
+        var acts = Read("GmcSmeta.Core/Db/SqlServerActs.cs");
+        var start = acts.IndexOf("public static long AddExtraLine(", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var end = acts.IndexOf("// ---------------------------------------------------------------- внутреннее", start, StringComparison.Ordinal);
+        Assert.True(end > start);
+        var add = acts[start..end];
+        Assert.Contains("BeginTransaction(IsolationLevel.Serializable)", add);
+        Assert.Contains("WHERE a.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", add);
+        Assert.Contains("JOIN dbo.objects o WITH (HOLDLOCK)", add);
+    }
 }

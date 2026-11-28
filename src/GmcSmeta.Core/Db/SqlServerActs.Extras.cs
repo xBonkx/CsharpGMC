@@ -23,11 +23,13 @@ public static partial class SqlServerActs
             "al.qty,al.price,a.signed,c.locked " +
             "FROM dbo.act_lines al WITH (UPDLOCK,HOLDLOCK) " +
             "JOIN dbo.acts a ON a.id=al.act_id " +
-            "JOIN dbo.contracts c ON c.id=a.contract_id " +
+            "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=a.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
             "JOIN dbo.positions p ON p.id=al.position_id " +
             "JOIN dbo.systems sy ON sy.id=p.system_id AND sy.contract_id=a.contract_id " +
             "WHERE al.act_id=@act AND al.position_id=@position " +
-            "AND p.parent_id IS NULL AND p.out_of_kp=1",conn,tx);
+            "AND p.parent_id IS NULL AND p.out_of_kp=1 " +
+            "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0",conn,tx);
         cmd.Parameters.Add("@act",SqlDbType.BigInt).Value=actId;
         cmd.Parameters.Add("@position",SqlDbType.BigInt).Value=positionId;
         using var r=cmd.ExecuteReader();
@@ -35,13 +37,13 @@ public static partial class SqlServerActs
         decimal D(int i) => r.IsDBNull(i) ? 0m :
             Money.FromDouble(Convert.ToDouble(r.GetValue(i),CultureInfo.InvariantCulture));
         return new ExtraContext(
-            Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),
-            Convert.ToInt64(r.GetValue(1),CultureInfo.InvariantCulture),
-            Convert.ToInt64(r.GetValue(2),CultureInfo.InvariantCulture),
-            Convert.ToInt32(r.GetValue(3),CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt64(r, 0),
+            SqlInteger.ReadInt64(r, 1),
+            SqlInteger.ReadInt64(r, 2),
+            SqlInteger.ReadInt32(r, 3),
             r.IsDBNull(4) ? "" : r.GetString(4),r.IsDBNull(5) ? "" : r.GetString(5),
-            D(6),D(7),Convert.ToBoolean(r.GetValue(8),CultureInfo.InvariantCulture),
-            Convert.ToBoolean(r.GetValue(9),CultureInfo.InvariantCulture));
+            D(6),D(7),SqlFlag.Read(r, 8),
+            SqlFlag.Read(r, 9));
     }
 
     private static bool SharedExtra(SqlConnection conn,SqlTransaction tx,long actId,long positionId)
@@ -159,7 +161,7 @@ public static partial class SqlServerActs
                 clone.Parameters.Add("@qty",SqlDbType.Float).Value=(double)row.Quantity;
                 clone.Parameters.Add("@price",SqlDbType.Float).Value=(double)price;
                 clone.Parameters.Add("@order",SqlDbType.Int).Value=row.Order+1;
-                targetId=Convert.ToInt64(clone.ExecuteScalar(),CultureInfo.InvariantCulture);
+                targetId=SqlInteger.RequireInt64(clone.ExecuteScalar());
             }
             using (var relink=new SqlCommand(
                 "UPDATE dbo.act_lines SET position_id=@new,price=@price " +
@@ -230,9 +232,9 @@ public static partial class SqlServerActs
             read.Parameters.Add("@system",SqlDbType.BigInt).Value=row.SystemId;
             using var r=read.ExecuteReader();
             while(r.Read()) roots.Add(new KsExtraOrdering.Row(
-                Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),
-                Convert.ToBoolean(r.GetValue(1),CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(2),CultureInfo.InvariantCulture)==1));
+                SqlInteger.ReadInt64(r, 0),
+                SqlFlag.Read(r, 1),
+                SqlInteger.ReadInt32(r, 2)==1));
         }
         IReadOnlyList<long> ordered;
         try { ordered=KsExtraOrdering.Plan(roots,positionId,direction,anchorId,before); }

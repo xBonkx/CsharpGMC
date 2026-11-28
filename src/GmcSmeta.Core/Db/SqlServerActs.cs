@@ -1038,17 +1038,18 @@ public static partial class SqlServerActs
         bool signed, contractLocked;
         using (var read = new SqlCommand(
             "SELECT a.contract_id, a.number, a.signed, o.name, c.locked " +
-            "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id " +
-            "JOIN dbo.objects o ON o.id=c.object_id WHERE a.id=@id", conn, tx))
+            "FROM dbo.acts a WITH (UPDLOCK,HOLDLOCK) JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=a.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE a.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             read.Parameters.AddWithValue("@id", actId);
             using var r = read.ExecuteReader();
-            if (!r.Read()) throw new InvalidOperationException("Акт не найден.");
-            contractId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+            if (!r.Read()) throw new InvalidOperationException("Акт не найден или относится к архиву/остатку.");
+            contractId = SqlInteger.ReadInt64(r, 0);
             actNumber = r.GetString(1);
-            signed = Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
+            signed = SqlFlag.Read(r, 2);
             objectName = r.IsDBNull(3) ? "" : r.GetString(3);
-            contractLocked = Convert.ToBoolean(r.GetValue(4),CultureInfo.InvariantCulture);
+            contractLocked = SqlFlag.Read(r, 4);
         }
         if (signed || contractLocked)
             throw new InvalidOperationException("Подписанный акт или заблокированный договор изменять нельзя.");

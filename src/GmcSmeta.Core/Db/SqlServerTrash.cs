@@ -207,8 +207,8 @@ public static partial class SqlServerTrash
         while (r.Read())
             rows.Add(new Dictionary<string, object?>
             {
-                ["id"] = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                [column] = r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+                ["id"] = SqlInteger.ReadInt64(r, 0),
+                [column] = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1),
             });
         return rows;
     }
@@ -222,7 +222,7 @@ public static partial class SqlServerTrash
         using var cmd = new SqlCommand(string.Format(CultureInfo.InvariantCulture, template, list), conn, tx);
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            result.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+            result.Add(SqlInteger.ReadInt64(r, 0));
         return result;
     }
 
@@ -233,7 +233,7 @@ public static partial class SqlServerTrash
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            result.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+            result.Add(SqlInteger.ReadInt64(r, 0));
         return result;
     }
 

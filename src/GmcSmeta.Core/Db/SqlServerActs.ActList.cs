@@ -65,22 +65,22 @@ public static partial class SqlServerActs
             {
                 token.ThrowIfCancellationRequested();
                 raw.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     r.IsDBNull(1) ? "" : Convert.ToString(r.GetValue(1), CultureInfo.InvariantCulture) ?? "",
                     r.IsDBNull(2) ? DateTime.Today : Convert.ToDateTime(r.GetValue(2), CultureInfo.InvariantCulture),
                     r.IsDBNull(3) ? null : Convert.ToDateTime(r.GetValue(3), CultureInfo.InvariantCulture),
                     r.IsDBNull(4) ? null : Convert.ToDateTime(r.GetValue(4), CultureInfo.InvariantCulture),
-                    !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture),
+                    !r.IsDBNull(5) && SqlFlag.Read(r, 5),
                     D(6), D(7), D(8),
-                    !r.IsDBNull(9) && Convert.ToBoolean(r.GetValue(9), CultureInfo.InvariantCulture),
-                    r.IsDBNull(10) ? 0L : Convert.ToInt64(r.GetValue(10), CultureInfo.InvariantCulture),
+                    !r.IsDBNull(9) && SqlFlag.Read(r, 9),
+                    r.IsDBNull(10) ? 0L : SqlInteger.ReadInt64(r, 10),
                     D(11), r.IsDBNull(12) ? "" : r.GetString(12),
                     r.IsDBNull(13) ? "" : r.GetString(13), r.IsDBNull(14) ? "" : r.GetString(14),
                     DiscountPolicy.ReadPercent(r,15),
-                    !r.IsDBNull(16)&&Convert.ToBoolean(r.GetValue(16)),
-                    !r.IsDBNull(17)?Convert.ToInt64(r.GetValue(17)):-1L,
+                    !r.IsDBNull(16)&&SqlFlag.Read(r, 16),
+                    !r.IsDBNull(17)?SqlInteger.ReadInt64(r, 17):-1L,
                     !r.IsDBNull(18)?r.GetString(18):"",
-                    !r.IsDBNull(19)&&Convert.ToBoolean(r.GetValue(19),CultureInfo.InvariantCulture),
+                    !r.IsDBNull(19)&&SqlFlag.Read(r, 19),
                     r.GetString(20)));
             }
         }
@@ -96,7 +96,7 @@ public static partial class SqlServerActs
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var id = SqlInteger.ReadInt64(r, 0);
                 var qty = r.IsDBNull(1) ? 0m : decimal.Parse(
                     Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture),
                     NumberStyles.Float, CultureInfo.InvariantCulture);

@@ -39,16 +39,16 @@ public static partial class SqlServerStages
         while (r.Read())
         {
             token.ThrowIfCancellationRequested();
-            var rowNo = r.IsDBNull(1) ? 0 : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
-            var isRest = !r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
+            var rowNo = r.IsDBNull(1) ? 0 : SqlInteger.ReadInt32(r, 1);
+            var isRest = !r.IsDBNull(2) && SqlFlag.Read(r, 2);
             var stageName = r.IsDBNull(3) ? "" : r.GetString(3);
             list.Add(new StageInfo(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
                 rowNo, isRest, stageName,
                 Documents.ContractTitleText("kp", "", "", stageName),
                 r.IsDBNull(4) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)))
                 {
-                    Locked = !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture)
+                    Locked = !r.IsDBNull(5) && SqlFlag.Read(r, 5)
                 });
         }
         token.ThrowIfCancellationRequested();
@@ -104,12 +104,12 @@ public static partial class SqlServerStages
             date = r.IsDBNull(2) ? "" : r.GetString(2);
             form = r.IsDBNull(3) ? "" : r.GetString(3);
             smrMode = r.IsDBNull(4) ? "" : r.GetString(4);
-            companyId = r.IsDBNull(6) ? null : Convert.ToInt64(r.GetValue(6), CultureInfo.InvariantCulture);
+            companyId = r.IsDBNull(6) ? null : SqlInteger.ReadInt64(r, 6);
             vatRate = r.IsDBNull(7) ? 22m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture));
-            if (!r.IsDBNull(9) && Convert.ToInt64(r.GetValue(9), CultureInfo.InvariantCulture) != fullId)
+            if (!r.IsDBNull(9) && SqlInteger.ReadInt64(r, 9) != fullId)
                 throw new ArgumentException("Это этап другого документа — этап создаётся у полного КП.");
             objectName = r.IsDBNull(10) ? "" : r.GetString(10);
-            var locked = !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture);
+            var locked = !r.IsDBNull(8) && SqlFlag.Read(r, 8);
             if (locked) throw new InvalidOperationException("Полное КП подписано — этапы создавать нельзя.");
             fullTitle = Documents.ContractTitleText("kp", number, date, fullName);
         }
@@ -206,10 +206,10 @@ public static partial class SqlServerStages
             using var r = stage.ExecuteReader();
             if (!r.Read() || r.IsDBNull(0))
                 return SqlServerDatabase.SaveResult.Fail("Выбранный документ не является этапом полного КП.", rev);
-            fullId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            if (fullId <= 0 || (!r.IsDBNull(1) && Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture)))
+            fullId = SqlInteger.ReadInt64(r, 0);
+            if (fullId <= 0 || (!r.IsDBNull(1) && SqlFlag.Read(r, 1)))
                 return SqlServerDatabase.SaveResult.Fail("Остаток рассчитывается автоматически и не редактируется.", rev);
-            if (!r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture))
+            if (!r.IsDBNull(2) && SqlFlag.Read(r, 2))
                 return SqlServerDatabase.SaveResult.Fail("Подписанный этап заблокирован.", rev);
         }
         if (StageGuardProblem(conn, tx, fullId, stageId, StageMutationPolicy.Operation.Quantity) is { } blocker)
@@ -229,7 +229,7 @@ public static partial class SqlServerStages
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Строка полного КП не найдена.", rev);
             srcName = r.IsDBNull(0) ? "" : r.GetString(0);
             srcQty = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
-            srcSystemId = Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture);
+            srcSystemId = SqlInteger.ReadInt64(r, 2);
             stageTitle = r.IsDBNull(3) ? "" : r.GetString(3);
         }
         srcSystemPath = SystemPath(conn, tx, srcSystemId);
@@ -380,7 +380,7 @@ public static partial class SqlServerStages
         using var r = cmd.ExecuteReader();
         if (!r.Read()) return "";
         var name = r.IsDBNull(0) ? "" : r.GetString(0);
-        var parent = r.IsDBNull(1) ? (long?)null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+        var parent = r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1);
         r.Close();
         return parent is null ? name : SystemPath(conn, tx, parent.Value) + " › " + name;
     }
@@ -405,7 +405,7 @@ public static partial class SqlServerStages
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = stageRowId;
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            ids.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+            ids.Add(SqlInteger.ReadInt64(r, 0));
         return ids;
     }
 
@@ -524,7 +524,7 @@ public static partial class SqlServerStages
         {
             read.Parameters.Add("@parent", SqlDbType.BigInt).Value = sourceParentId;
             using var r = read.ExecuteReader();
-            while (r.Read()) sourceChildren.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+            while (r.Read()) sourceChildren.Add(SqlInteger.ReadInt64(r, 0));
         }
 
         var existing = new Dictionary<long, long>();
@@ -535,8 +535,8 @@ public static partial class SqlServerStages
             read.Parameters.Add("@parent", SqlDbType.BigInt).Value = stageParentId;
             using var r = read.ExecuteReader();
             while (r.Read())
-                existing[Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture)] =
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                existing[SqlInteger.ReadInt64(r, 1)] =
+                    SqlInteger.ReadInt64(r, 0);
         }
 
         foreach (var childSrc in sourceChildren)
@@ -684,9 +684,9 @@ public static partial class SqlServerStages
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var stageId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var stageId = SqlInteger.ReadInt64(r, 0);
                 if (!byId.TryGetValue(stageId, out var map)) continue;
-                var srcId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                var srcId = SqlInteger.ReadInt64(r, 1);
                 var qty = r.IsDBNull(2) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(2), CultureInfo.InvariantCulture));
                 // Multiple physical rows for one stage/source are ambiguous.
                 // Do not publish a potentially different allocation from the write path.
@@ -710,7 +710,7 @@ public static partial class SqlServerStages
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var srcId = SqlInteger.ReadInt64(r, 0);
                 map[srcId] = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
                 var formula = EstimateCellFormula.Read(r.IsDBNull(2) ? "" : r.GetString(2), "qty");
                 if (formula.Length > 0) formulas[stage.Id][srcId] = formula;
@@ -729,7 +729,7 @@ public static partial class SqlServerStages
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var srcId = SqlInteger.ReadInt64(r, 0);
                 var qty = r.IsDBNull(3) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture));
                 var perStage = new decimal[stages.Count];
                 var stageFormulas = new string[stages.Count];
@@ -741,7 +741,7 @@ public static partial class SqlServerStages
                     stageFormulas[i] = formulas[stages[i].Id].GetValueOrDefault(srcId, "");
                 }
                 rows.Add(new StageTableRow(
-                    Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 5),
                     r.IsDBNull(6) ? "" : r.GetString(6),
                     srcId,
                     r.IsDBNull(1) ? "" : r.GetString(1),
@@ -1091,8 +1091,8 @@ public static partial class SqlServerStages
         cmd.Parameters.Add("@stage", SqlDbType.BigInt).Value = stageId;
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture)));
+            list.Add((SqlInteger.ReadInt64(r, 0),
+                SqlInteger.ReadInt64(r, 1)));
         return list;
     }
 

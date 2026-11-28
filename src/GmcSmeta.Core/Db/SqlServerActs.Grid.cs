@@ -60,9 +60,9 @@ public static partial class SqlServerActs
             {
                 token.ThrowIfCancellationRequested();
                 systemRows.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     r.IsDBNull(1) ? "" : r.GetString(1),
-                    Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture)));
+                    SqlInteger.ReadInt64(r, 2)));
             }
         }
         var nameById = systemRows.ToDictionary(s => s.Id, s => s.Name);
@@ -98,14 +98,14 @@ public static partial class SqlServerActs
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var positionId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var positionId = SqlInteger.ReadInt64(r, 0);
                 positions.Add(new ActSheetRow(
                     positionId,
-                    Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 1),
                     S(2), S(3), S(4), D(5), D(6), D(7),
-                    !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture),
+                    !r.IsDBNull(8) && SqlFlag.Read(r, 8),
                     S(9),
-                    r.IsDBNull(10) ? null : Convert.ToInt64(r.GetValue(10), CultureInfo.InvariantCulture),
+                    r.IsDBNull(10) ? null : SqlInteger.ReadInt64(r, 10),
                     D(11), S(12), D(13), D(14),
                     closedByOthers.GetValueOrDefault(positionId),
                     issued.GetValueOrDefault(positionId), tracked.Contains(positionId)));
@@ -136,7 +136,7 @@ public static partial class SqlServerActs
         while (r.Read())
         {
             token.ThrowIfCancellationRequested();
-            var pid = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+            var pid = SqlInteger.ReadInt64(r, 0);
             map[pid] = r.IsDBNull(1) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
         }
@@ -160,7 +160,7 @@ public static partial class SqlServerActs
         while (r.Read())
         {
             token.ThrowIfCancellationRequested();
-            set.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+            set.Add(SqlInteger.ReadInt64(r, 0));
         }
         return set;
     }

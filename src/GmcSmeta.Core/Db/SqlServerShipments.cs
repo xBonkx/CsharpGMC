@@ -88,7 +88,7 @@ public static class SqlServerShipments
             token.ThrowIfCancellationRequested();
             string Text(int i) => reader.IsDBNull(i) ? "" :
                 Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? "";
-            list.Add(new ShipmentDocument(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
+            list.Add(new ShipmentDocument(SqlInteger.ReadInt64(reader, 0),
                 Documents.ContractTitleText(Text(1), Text(2), Text(3), Text(4))));
         }
         token.ThrowIfCancellationRequested();
@@ -116,13 +116,13 @@ public static class SqlServerShipments
         {
             token.ThrowIfCancellationRequested();
             list.Add(new ShipmentInfo(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
                 r.GetString(1),
                 r.IsDBNull(2) ? DateTime.Today : Convert.ToDateTime(r.GetValue(2), CultureInfo.InvariantCulture),
                 r.IsDBNull(3) ? "" : r.GetString(3),
                 r.IsDBNull(4) ? "" : r.GetString(4),
-                !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture),
-                (int)Convert.ToInt64(r.GetValue(7), CultureInfo.InvariantCulture),
+                !r.IsDBNull(5) && SqlFlag.Read(r, 5),
+                SqlInteger.ReadInt32(r, 7),
                 r.IsDBNull(6) ? "" : r.GetString(6)));
         }
         token.ThrowIfCancellationRequested();
@@ -149,13 +149,13 @@ public static class SqlServerShipments
         while (r.Read())
         {
             token.ThrowIfCancellationRequested();
-            var positionId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+            var positionId = SqlInteger.ReadInt64(r, 1);
             var qtyByKp = r.IsDBNull(6) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(6), CultureInfo.InvariantCulture));
             var price = r.IsDBNull(7) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture));
             list.Add(new ShipmentLineRow(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
                 positionId,
-                Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 2),
                 r.IsDBNull(3) ? "" : r.GetString(3),
                 r.IsDBNull(4) ? "" : r.GetString(4),
                 Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
@@ -205,13 +205,13 @@ public static class SqlServerShipments
         while (r.Read())
         {
             token.ThrowIfCancellationRequested();
-            var outOfKp = !r.IsDBNull(8) && Convert.ToBoolean(r.GetValue(8), CultureInfo.InvariantCulture);
+            var outOfKp = !r.IsDBNull(8) && SqlFlag.Read(r, 8);
             var name = r.IsDBNull(4) ? "" : r.GetString(4);
             if (EstimateStatistics.IsWorkName(name)) continue;
             list.Add(new IssuableRow(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
+                SqlInteger.ReadInt64(r, 1),
+                SqlInteger.ReadInt64(r, 2),
                 r.IsDBNull(3) ? "" : r.GetString(3),
                 name,
                 r.IsDBNull(5) ? "" : r.GetString(5),
@@ -338,10 +338,10 @@ public static class SqlServerShipments
             read.Parameters.AddWithValue("@id", shipmentId);
             using var r = read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
-            fixedList = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
+            fixedList = SqlFlag.Read(r, 0);
             number = r.GetString(1);
             objectName = r.GetString(2);
-            objectId = Convert.ToInt64(r.GetValue(3), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 3);
         }
 
         if (expectedFixed.HasValue && fixedList != expectedFixed.Value)
@@ -439,8 +439,8 @@ public static class SqlServerShipments
             command.Parameters.AddWithValue("@id", shipmentId);
             using var reader = command.ExecuteReader();
             if (!reader.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
-            objectId = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
-            fixedList = Convert.ToBoolean(reader.GetValue(1), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(reader, 0);
+            fixedList = SqlFlag.Read(reader, 1);
             if (fixedList != expectedFixed)
                 return SqlServerDatabase.SaveResult.Fail("Состояние ведомости изменилось. Перечитайте данные.", rev);
         }
@@ -516,8 +516,8 @@ public static class SqlServerShipments
             read.Parameters.AddWithValue("@id", shipmentId);
             using var reader = read.ExecuteReader();
             if (!reader.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
-            objectId = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
-            fixedList = Convert.ToBoolean(reader.GetValue(1), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(reader, 0);
+            fixedList = SqlFlag.Read(reader, 1);
             if (fixedList != expectedFixed)
                 return SqlServerDatabase.SaveResult.Fail("Состояние ведомости изменилось. Перечитайте данные.", rev);
         }
@@ -587,12 +587,12 @@ public static class SqlServerShipments
             read.Parameters.AddWithValue("@id", shipmentId);
             using var r = read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
-            alreadyFixed = Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture);
+            alreadyFixed = SqlFlag.Read(r, 0);
             number = r.GetString(1);
             date = r.IsDBNull(2) ? DateTime.Today : Convert.ToDateTime(r.GetValue(2), CultureInfo.InvariantCulture);
             recipient = r.GetString(3);
             objectName = r.GetString(4);
-            objectId = Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 5);
         }
         if (alreadyFixed)
         {
@@ -615,7 +615,7 @@ public static class SqlServerShipments
             read.Parameters.AddWithValue("@id", shipmentId);
             using var r = read.ExecuteReader();
             while (r.Read())
-                lines.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                lines.Add((SqlInteger.ReadInt64(r, 0),
                     Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture))));
         }
         if (lines.Count == 0)
@@ -867,8 +867,8 @@ public static class SqlServerShipments
             read.Parameters.AddWithValue("@id", shipmentId);
             using var reader = read.ExecuteReader();
             if (!reader.Read()) return SqlServerDatabase.SaveResult.Fail("Ведомость не найдена.", rev);
-            objectId = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
-            if (Convert.ToBoolean(reader.GetValue(1), CultureInfo.InvariantCulture) != expectedFixed)
+            objectId = SqlInteger.ReadInt64(reader, 0);
+            if (SqlFlag.Read(reader, 1) != expectedFixed)
                 return SqlServerDatabase.SaveResult.Fail("Состояние ведомости изменилось.", rev);
         }
         using (var update = new SqlCommand(
