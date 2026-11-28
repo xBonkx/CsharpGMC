@@ -171,7 +171,7 @@ public static class SqlServerAttachments
         {
             using var existing = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.attachments WHERE contract_id=@c AND role=N'signed_contract' AND is_primary=1", conn, tx);
             existing.Parameters.Add("@c", SqlDbType.BigInt).Value = contractId;
-            primary = Convert.ToInt64(existing.ExecuteScalar()) == 0;
+            primary = SqlInteger.RequireInt64(existing.ExecuteScalar()) == 0;
         }
         if (primary)
         {

@@ -32,7 +32,7 @@ public static partial class SqlServerWorkspace
             "SELECT COUNT_BIG(*) FROM dbo.acts WHERE contract_id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            acts = (int)Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            acts = checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar()));
         }
         int movements;
         using (var cmd = new SqlCommand(
@@ -40,7 +40,7 @@ public static partial class SqlServerWorkspace
             "JOIN dbo.systems s ON s.id=p.system_id WHERE s.contract_id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            movements = (int)Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            movements = checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar()));
         }
         var details = WorkspaceDeletePresentation.ContractDetails(acts, movements);
         return new ContractDeleteInfo(title, objectName, acts, movements, details);
@@ -91,7 +91,7 @@ public static partial class SqlServerWorkspace
             "SELECT COUNT_BIG(*) FROM dbo.shipments WHERE object_id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            var count = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var count = SqlInteger.RequireInt64(cmd.ExecuteScalar());
             if (count > 0) details.Add("ведомости выдачи: " + count);
         }
         using (var cmd = new SqlCommand(
@@ -101,7 +101,7 @@ public static partial class SqlServerWorkspace
             "(SELECT id FROM dbo.contracts WHERE object_id=@id)))", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            var count = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var count = SqlInteger.RequireInt64(cmd.ExecuteScalar());
             if (count > 0) details.Add($"история закупок и выдачи: {count} записей");
         }
         return new(name, details);
@@ -154,7 +154,7 @@ public static partial class SqlServerWorkspace
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
             if (!wholeObject) cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = (object?)expectedObjectId ?? DBNull.Value;
-            if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Карточка архивная, документ заблокирован, является этапом или не принадлежит выбранной карточке.");
         }
 
@@ -174,7 +174,7 @@ public static partial class SqlServerWorkspace
         {
             using var cmd = new SqlCommand("SELECT CASE WHEN EXISTS(" + check + ") THEN 1 ELSE 0 END", conn, tx);
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            if (Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar())) != 0)
                 throw new InvalidOperationException("Есть ссылки из других документов. Удаление без потери связей невозможно.");
         }
     }

@@ -133,7 +133,7 @@ public static partial class SqlServerDatabase
             insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = cleanName;
             insert.Parameters.Add("@order", SqlDbType.Int).Value = original.Count;
             insert.Parameters.Add("@parent", SqlDbType.BigInt).Value = parentId is null ? DBNull.Value : (object)parentId.Value;
-            id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
 
         var created = new SectionEntry(id, parentId, original.Count, cleanName);

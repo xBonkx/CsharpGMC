@@ -45,7 +45,7 @@ public static partial class SqlServerDatabase
         {
             verify.Parameters.Add("@system", SqlDbType.BigInt).Value = systemId;
             verify.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            if (Convert.ToInt64(verify.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(verify.ExecuteScalar()) != 1)
                 throw new InvalidOperationException("Раздел не принадлежит этому документу.");
         }
         var rows = new List<OrderedPosition>();

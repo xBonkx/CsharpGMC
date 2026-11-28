@@ -151,7 +151,7 @@ public static partial class SqlServerDatabase
             add.Parameters.Add("@key", SqlDbType.NVarChar, 600).Value = key;
             add.Parameters.Add("@name", SqlDbType.NVarChar, -1).Value = name;
             add.Parameters.Add("@unit", SqlDbType.NVarChar, 32).Value = unit;
-            var created = Convert.ToInt64(add.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var created = SqlInteger.RequireInt64(add.ExecuteScalar());
             return catalogCache[key] = created;
         }
 

@@ -44,7 +44,7 @@ public sealed class SqlServerPassports
             "@Resource=@resource,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=15000; SELECT @result;",
             conn, tx);
         cmd.Parameters.Add("@resource", SqlDbType.NVarChar, 255).Value = resource;
-        if (Convert.ToInt32(cmd.ExecuteScalar()) < 0)
+        if (checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar())) < 0)
             throw new TimeoutException("Не удалось заблокировать редактирование паспортов.");
     }
 
@@ -119,7 +119,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
     {
         using var cmd = new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.objects WITH (HOLDLOCK) WHERE id=@id", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-        if (Convert.ToInt64(cmd.ExecuteScalar()) != 1)
+        if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != 1)
             throw new InvalidOperationException("Объект не найден в этой тестовой базе.");
     }
 
@@ -210,7 +210,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
                 // Explicitly detect ID collisions across object scopes, never re-home them.
                 using var collision = new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.gmc_passports WHERE id=@id", conn, tx);
                 collision.Parameters.Add("@id", SqlDbType.UniqueIdentifier).Value = p.Id;
-                if (Convert.ToInt64(collision.ExecuteScalar()) != 0 || p.Revision != 0)
+                if (SqlInteger.RequireInt64(collision.ExecuteScalar()) != 0 || p.Revision != 0)
                     throw new DBConcurrencyException("Паспорт удалён либо принадлежит другому объекту.");
             }
             else if (revision.Value != p.Revision)
@@ -334,7 +334,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
             check.Parameters.AddWithValue("@id", export.PassportId);
             check.Parameters.AddWithValue("@obj", objectId);
             check.Parameters.Add("@rev", SqlDbType.BigInt).Value = expectedRevision;
-            if (Convert.ToInt64(check.ExecuteScalar()) != 1)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 1)
                 throw new DBConcurrencyException("Паспорт изменён или удалён. Обновите данные перед экспортом.");
         }
         using (var cmd = new SqlCommand(
@@ -365,7 +365,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         using var conn = Open();
         using var cmd = new SqlCommand(
             "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.gmc_passport_exports) THEN 1 ELSE 0 END", conn);
-        return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+        return checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar())) == 1;
     }
 
     public IReadOnlyList<ExportInfo> Exports(long objectId, Guid passportId)

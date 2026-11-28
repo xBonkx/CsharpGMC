@@ -45,7 +45,7 @@ public static partial class SqlServerDatabase
             "JOIN #selected_delete_positions d ON d.id=p.id WHERE s.contract_id=@contract", conn, tx))
         {
             verify.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            if (Convert.ToInt64(verify.ExecuteScalar(), CultureInfo.InvariantCulture) != selectedIds.Length)
+            if (SqlInteger.RequireInt64(verify.ExecuteScalar()) != selectedIds.Length)
                 return SaveResult.Fail("Некоторые выделенные позиции отсутствуют в этом договоре. Обнови смету.", revision);
         }
 
@@ -131,7 +131,7 @@ public static partial class SqlServerDatabase
 
         long doomedCount;
         using (var count = new SqlCommand("SELECT COUNT_BIG(*) FROM #delete_positions", conn, tx))
-            doomedCount = Convert.ToInt64(count.ExecuteScalar(), CultureInfo.InvariantCulture);
+            doomedCount = SqlInteger.RequireInt64(count.ExecuteScalar());
 
         using var deleteChildren = new SqlCommand(
             "DELETE p FROM dbo.positions p JOIN #delete_positions d ON d.id=p.id " +

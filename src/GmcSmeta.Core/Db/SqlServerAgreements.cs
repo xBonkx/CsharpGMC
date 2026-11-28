@@ -84,7 +84,7 @@ public static class SqlServerAgreements
         {
             using var company = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.companies WITH(HOLDLOCK) WHERE id=@id", conn, tx);
             company.Parameters.Add("@id", SqlDbType.BigInt).Value = v.CompanyId.Value;
-            if (Convert.ToInt64(company.ExecuteScalar()) != 1) throw new ArgumentException("Подрядчик больше не существует.");
+            if (SqlInteger.RequireInt64(company.ExecuteScalar()) != 1) throw new ArgumentException("Подрядчик больше не существует.");
         }
         using var cmd = new SqlCommand(v.Id == 0
             ? "INSERT dbo.agreements(object_id,number,agreement_date,company_id,subject,works_start,works_end,customer_address," +
@@ -273,7 +273,7 @@ public static class SqlServerAgreements
         // legal context, and no existing agreement may be silently substituted.
         using var target=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.agreements WITH(UPDLOCK,HOLDLOCK) WHERE object_id=@id",conn,tx);
         target.Parameters.Add("@id",SqlDbType.BigInt).Value=targetObject;
-        var count=Convert.ToInt64(target.ExecuteScalar(),CultureInfo.InvariantCulture);
+        var count=SqlInteger.RequireInt64(target.ExecuteScalar());
         using var files=new SqlCommand("SELECT TOP(1) id FROM dbo.agreement_files WITH(UPDLOCK,HOLDLOCK) WHERE agreement_id=@id",conn,tx);
         files.Parameters.Add("@id",SqlDbType.BigInt).Value=source.Id;
         ValidateTransferDestination(count==0?0:1,files.ExecuteScalar() is not null);

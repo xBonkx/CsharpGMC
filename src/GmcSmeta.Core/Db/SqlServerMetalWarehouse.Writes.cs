@@ -81,13 +81,13 @@ WHERE e.material_id=@id ORDER BY e.id
         using (var check = new SqlCommand(
             "SELECT COUNT_BIG(*) FROM dbo.gmc_metal_opening WITH (UPDLOCK,HOLDLOCK)", conn, tx))
         {
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 0)
                 throw new InvalidOperationException("Начальные остатки уже перенесены.");
         }
         using (var check = new SqlCommand(
             "SELECT COUNT_BIG(*) FROM dbo.gmc_metal_movements WITH (UPDLOCK,HOLDLOCK)", conn, tx))
         {
-            if (Convert.ToInt64(check.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) != 0)
                 throw new InvalidOperationException("Склад содержит операции; повторный первоначальный импорт запрещён.");
         }
         // An existing Python metal warehouse must never be silently imported for a second time.
@@ -96,14 +96,14 @@ WHERE e.material_id=@id ORDER BY e.id
             "SELECT COUNT_BIG(*) FROM dbo.meta WITH (UPDLOCK,HOLDLOCK) " +
             "WHERE [key]=N'metal_warehouse_initialized'", conn, tx))
         {
-            if (Convert.ToInt64(previous.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(previous.ExecuteScalar()) != 0)
                 throw new InvalidOperationException(
                     "В Python уже выполнен первоначальный импорт. Требуется перенос истории, а не повторная загрузка Excel.");
         }
         using (var legacy = new SqlCommand(
             "SELECT COUNT_BIG(*) FROM dbo.metal_entries WITH (UPDLOCK,HOLDLOCK)", conn, tx))
         {
-            if (Convert.ToInt64(legacy.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            if (SqlInteger.RequireInt64(legacy.ExecuteScalar()) != 0)
                 throw new InvalidOperationException(
                     "В базе уже есть движения металла Python; повторный импорт начальных остатков запрещён.");
         }
@@ -179,7 +179,7 @@ OUTPUT INSERTED.id VALUES (@material,@supplier,@invoice,@area,@pieces)
         cmd.Parameters.Add("@area", SqlDbType.BigInt).Value = milli;
         cmd.Parameters.Add("@pieces", SqlDbType.Int).Value = count;
         // Unique SQL index prevents a second invoice for the same supplier/material.
-        var lotId = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        var lotId = SqlInteger.RequireInt64(cmd.ExecuteScalar());
         Append(conn, tx, materialId, "Партия", milli, count, lotId: lotId,
             supplier: supplier, invoice: invoice);
         Finish(conn, tx);
@@ -285,7 +285,7 @@ ELSE SELECT CONVERT(BIGINT,0);
 """, conn, tx);
             cmd.Parameters.Add("@bytes", SqlDbType.VarBinary, -1).Value = workbook;
             cmd.Parameters.Add("@user", SqlDbType.NVarChar, 64).Value = OperatorName();
-            newVersion = Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            newVersion = SqlInteger.RequireInt64(cmd.ExecuteScalar());
         }
         else
         {

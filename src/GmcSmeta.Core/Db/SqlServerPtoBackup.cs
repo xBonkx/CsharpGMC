@@ -77,7 +77,7 @@ public static class SqlServerPtoBackup
                      "gmc_pto_object_profiles","gmc_pto_releases"})
         {
             using var cmd=new SqlCommand($"SELECT COUNT_BIG(*) FROM dbo.[{table}] WITH (UPDLOCK,HOLDLOCK)",conn,tx);
-            if(Convert.ToInt64(cmd.ExecuteScalar())!=0)
+            if(SqlInteger.RequireInt64(cmd.ExecuteScalar())!=0)
                 throw new InvalidOperationException(
                     "SQL Server уже содержит данные ПТО. Восстановление допускается только в пустое пилотное хранилище.");
         }
@@ -109,7 +109,7 @@ public static class SqlServerPtoBackup
             "DECLARE @r int; EXEC @r=sys.sp_getapplock "+
             "@Resource=N'GMC.PTO.Restore',@LockMode='Exclusive',@LockOwner='Transaction',"+
             "@LockTimeout=15000; SELECT @r;",conn,tx))
-            if(Convert.ToInt32(lockCmd.ExecuteScalar())<0)
+            if(checked((int)SqlInteger.RequireInt64(lockCmd.ExecuteScalar()))<0)
                 throw new TimeoutException("Не удалось заблокировать восстановление.");
         CheckEmpty(conn,tx);
         var objects=snapshot.Packages.Select(p=>p.ObjectId)
@@ -118,7 +118,7 @@ public static class SqlServerPtoBackup
         {
             using var cmd=new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.objects WHERE id=@id",conn,tx);
             cmd.Parameters.AddWithValue("@id",obj);
-            if(Convert.ToInt64(cmd.ExecuteScalar())!=1)
+            if(SqlInteger.RequireInt64(cmd.ExecuteScalar())!=1)
                 throw new InvalidOperationException("Пилотная SQL-база не содержит объект ID="+obj+
                     ". Сначала восстановите объекты из проверенной копии SQL Server.");
         }

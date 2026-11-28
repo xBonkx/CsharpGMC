@@ -190,7 +190,7 @@ public static class SqlServerSystemCopy
         insert.Parameters.AddWithValue("@name", name);
         insert.Parameters.AddWithValue("@order", order);
         insert.Parameters.AddWithValue("@smr", smrAmount is null ? DBNull.Value : (object)(double)smrAmount.Value);
-        return Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return SqlInteger.RequireInt64(insert.ExecuteScalar());
     }
 
     /// <summary>Позиции и комплектующие источника → новый раздел (ссылки parent локальны).</summary>

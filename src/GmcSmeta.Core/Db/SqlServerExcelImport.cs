@@ -114,7 +114,7 @@ public static class SqlServerExcelImport
                   VALUES (@name,N'',N'',N'',N'',SYSDATETIME(),N'',N'',
                           N'',N'',N'',N'',N'',N'',N'',N'Монтаж системы вентиляции',0,N'',NULL,N'')", conn, tx);
             create.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = newObjectName.Trim();
-            objectId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.RequireInt64(create.ExecuteScalar());
             Log(conn, tx, "object", objectId, "create", newObjectName.Trim(), null, objectId);
         }
         // The legal schema uses explicit identities, never a match by number.
@@ -177,7 +177,7 @@ public static class SqlServerExcelImport
             "SELECT COALESCE(MAX([order]),0) FROM dbo.contracts WHERE object_id=@obj", conn, tx))
         {
             orderCommand.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-            nextOrder = Convert.ToInt32(orderCommand.ExecuteScalar(), CultureInfo.InvariantCulture) + 1;
+            nextOrder = checked((int)SqlInteger.RequireInt64(orderCommand.ExecuteScalar()) + 1);
         }
         for (var choiceIndex = 0; choiceIndex < choices.Count; choiceIndex++)
         {
@@ -218,7 +218,7 @@ public static class SqlServerExcelImport
             contract.Parameters.Add("@phase", SqlDbType.NVarChar, 24).Value = choice.Kind == "kp" ? "volumes" : "";
             contract.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = b.Form;
             contract.Parameters.Add("@pnr", SqlDbType.Float).Value = (double)(b.Pnr ?? 0m);
-            var contractId = Convert.ToInt64(contract.ExecuteScalar(), CultureInfo.InvariantCulture);
+            var contractId = SqlInteger.RequireInt64(contract.ExecuteScalar());
             SqlServerAgreements.AttachNewDocument(conn, tx, contractId, choice.AgreementId, validateNewAnnex: true);
             created.Add(contractId);
             var sections = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -237,7 +237,7 @@ public static class SqlServerExcelImport
                 insertSection.Parameters.Add("@smr", SqlDbType.Float).Value = section.Smr is decimal smr ? (double)smr : DBNull.Value;
                 insertSection.Parameters.Add("@heading", SqlDbType.NVarChar, 255).Value = section.Heading;
                 insertSection.Parameters.Add("@source", SqlDbType.NVarChar, 32).Value = section.SourceNumber;
-                var systemId = Convert.ToInt64(insertSection.ExecuteScalar(), CultureInfo.InvariantCulture);
+                var systemId = SqlInteger.RequireInt64(insertSection.ExecuteScalar());
                 if (section.Positions.Count == 0) sections[section.Name] = systemId;
                 var rowOrder = 0;
                 foreach (var p in section.Positions)

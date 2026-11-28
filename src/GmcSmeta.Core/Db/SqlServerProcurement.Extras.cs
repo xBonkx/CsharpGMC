@@ -73,7 +73,7 @@ public static partial class SqlServerProcurement
                     "(SELECT COALESCE(MAX([order]),-1)+1 FROM dbo.systems WHERE contract_id=@id)," +
                     "NULL,NULL,N'',N'',NULL)", conn, tx);
                 create.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-                systemId = Convert.ToInt64(create.ExecuteScalar(), CultureInfo.InvariantCulture);
+                systemId = SqlInteger.RequireInt64(create.ExecuteScalar());
             }
         }
         using (var scope = new SqlCommand(
@@ -81,7 +81,7 @@ public static partial class SqlServerProcurement
         {
             scope.Parameters.Add("@sys", SqlDbType.BigInt).Value = systemId;
             scope.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            if (Convert.ToInt64(scope.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
+            if (SqlInteger.RequireInt64(scope.ExecuteScalar()) != 1)
                 return ExtraResult.Fail("Выбранная система не принадлежит договору.", rev);
         }
         long id;
@@ -97,7 +97,7 @@ public static partial class SqlServerProcurement
             insert.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = name.Trim();
             insert.Parameters.Add("@unit", SqlDbType.NVarChar, 32).Value = unit.Trim();
             insert.Parameters.Add("@qty", SqlDbType.Float).Value = (double)qty;
-            id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            id = SqlInteger.RequireInt64(insert.ExecuteScalar());
         }
         if (purchaseCost is not null)
         {
@@ -282,7 +282,7 @@ public static partial class SqlServerProcurement
                 companyId is null ? DBNull.Value : companyId.Value;
             insert.Parameters.Add("@base", SqlDbType.BigInt).Value = sourceContractId;
             insert.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = form;
-            dopId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            dopId = SqlInteger.RequireInt64(insert.ExecuteScalar());
             SqlServerAgreements.AttachNewDocument(conn, tx, dopId);
         }
         var destinations = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -299,7 +299,7 @@ public static partial class SqlServerProcurement
                 add.Parameters.Add("@contract", SqlDbType.BigInt).Value = dopId;
                 add.Parameters.Add("@name", SqlDbType.NVarChar, 255).Value = name;
                 add.Parameters.Add("@ord", SqlDbType.Int).Value = destinations.Count;
-                destination = Convert.ToInt64(add.ExecuteScalar(), CultureInfo.InvariantCulture);
+                destination = SqlInteger.RequireInt64(add.ExecuteScalar());
                 destinations.Add(name, destination);
                 order.Add(destination, 0);
             }

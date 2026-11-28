@@ -68,7 +68,7 @@ public static class SqlServerWorkspaceReferenceWrites
             cmd.Parameters.Add("@logo", SqlDbType.VarBinary, -1).Value =
                 company.Logo is null ? DBNull.Value : company.Logo;
             if (company.Id == 0)
-                id = Convert.ToInt64(cmd.ExecuteScalar());
+                id = SqlInteger.RequireInt64(cmd.ExecuteScalar());
             else
             {
                 cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = company.Id;
@@ -101,7 +101,7 @@ public static class SqlServerWorkspaceReferenceWrites
             "SELECT COUNT_BIG(*) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE company_id=@id", conn, tx))
         {
             check.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
-            if (Convert.ToInt64(check.ExecuteScalar()) > 0)
+            if (SqlInteger.RequireInt64(check.ExecuteScalar()) > 0)
                 throw new InvalidOperationException("Организация используется документами. Сначала переназначьте их вручную.");
         }
         // Legal agreements can exist without any annex and still own the
@@ -145,7 +145,7 @@ public static class SqlServerWorkspaceReferenceWrites
                 using var check = new SqlCommand(
                     "SELECT COUNT_BIG(*) FROM dbo.tags WITH (UPDLOCK,HOLDLOCK) WHERE [key]=@key", conn, tx);
                 check.Parameters.Add("@key", SqlDbType.NVarChar, 32).Value = key;
-                if (Convert.ToInt64(check.ExecuteScalar()) == 0) break;
+                if (SqlInteger.RequireInt64(check.ExecuteScalar()) == 0) break;
                 var suffix = "_" + n;
                 key = basis[..Math.Min(basis.Length, 32 - suffix.Length)] + suffix;
             }
@@ -155,7 +155,7 @@ public static class SqlServerWorkspaceReferenceWrites
             cmd.Parameters.Add("@name", SqlDbType.NVarChar, 120).Value = tag.Name.Trim();
             cmd.Parameters.Add("@rules", SqlDbType.NVarChar, -1).Value = rules;
             cmd.Parameters.Add("@note", SqlDbType.NVarChar, -1).Value = tag.Note;
-            id = Convert.ToInt64(cmd.ExecuteScalar());
+            id = SqlInteger.RequireInt64(cmd.ExecuteScalar());
         }
         else
         {
@@ -176,7 +176,7 @@ public static class SqlServerWorkspaceReferenceWrites
                         "SELECT COUNT_BIG(*) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) " +
                         "WHERE form=@key AND locked=1", conn, tx);
                     check.Parameters.Add("@key", SqlDbType.NVarChar, 32).Value = key;
-                    if (Convert.ToInt64(check.ExecuteScalar()) > 0)
+                    if (SqlInteger.RequireInt64(check.ExecuteScalar()) > 0)
                         throw new InvalidOperationException(
                             "Правила тега используются подписанными документами. Нельзя менять расчёты подписанного КП.");
                 }
@@ -217,7 +217,7 @@ public static class SqlServerWorkspaceReferenceWrites
             "SELECT COUNT_BIG(*) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE form=@key", conn, tx))
         {
             cmd.Parameters.Add("@key", SqlDbType.NVarChar, 32).Value = key;
-            if (Convert.ToInt64(cmd.ExecuteScalar()) != 0)
+            if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != 0)
                 throw new InvalidOperationException("Тег используется документами. Сначала измените свойства этих документов.");
         }
         using (var cmd = new SqlCommand("UPDATE dbo.objects SET form=N'' WHERE form=@key", conn, tx))

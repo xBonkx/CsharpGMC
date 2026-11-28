@@ -40,7 +40,7 @@ public sealed class SqlServerPto
             "DECLARE @v int; EXEC @v=sys.sp_getapplock @Resource=@res,@LockMode='Exclusive',"+
             "@LockOwner='Transaction',@LockTimeout=15000; SELECT @v;",conn,tx);
         cmd.Parameters.Add("@res",SqlDbType.NVarChar,255).Value=resource;
-        if(Convert.ToInt32(cmd.ExecuteScalar())<0)
+        if(checked((int)SqlInteger.RequireInt64(cmd.ExecuteScalar()))<0)
             throw new TimeoutException("ПТО: не удалось получить блокировку SQL Server.");
     }
 
@@ -133,7 +133,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
     {
         using var cmd=new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.objects WITH (HOLDLOCK) WHERE id=@id",conn,tx);
         cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=objectId;
-        if(Convert.ToInt64(cmd.ExecuteScalar())!=1)
+        if(SqlInteger.RequireInt64(cmd.ExecuteScalar())!=1)
             throw new ArgumentException("Объект удалён или отсутствует в SQL Server.");
     }
 
@@ -222,7 +222,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
             if(p.Revision!=0)throw new DBConcurrencyException("Комплект ПТО был удалён.");
             using var collision=new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.gmc_pto_packages WHERE id=@id",conn,tx);
             collision.Parameters.Add("@id",SqlDbType.UniqueIdentifier).Value=p.Id;
-            if(Convert.ToInt64(collision.ExecuteScalar())!=0)
+            if(SqlInteger.RequireInt64(collision.ExecuteScalar())!=0)
                 throw new InvalidOperationException("Комплект с таким ID принадлежит другому объекту.");
         }
         else if(oldRev!=p.Revision)
@@ -235,7 +235,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
             duplicate.Parameters.Add("@obj",SqlDbType.BigInt).Value=p.ObjectId;
             duplicate.Parameters.Add("@number",SqlDbType.NVarChar,256).Value=number;
             duplicate.Parameters.Add("@id",SqlDbType.UniqueIdentifier).Value=p.Id;
-            if(Convert.ToInt64(duplicate.ExecuteScalar())>0)
+            if(SqlInteger.RequireInt64(duplicate.ExecuteScalar())>0)
                 throw new ArgumentException("Номер акта уже используется на этом объекте.");
         }
         var rev=(oldRev??0)+1;
@@ -440,7 +440,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
             verify.Parameters.AddWithValue("@pid",release.PackageId);
             verify.Parameters.AddWithValue("@obj",release.ObjectId);
             verify.Parameters.Add("@rev",SqlDbType.BigInt).Value=expectedRevision is long rev?rev:DBNull.Value;
-            if(Convert.ToInt64(verify.ExecuteScalar())!=1)
+            if(SqlInteger.RequireInt64(verify.ExecuteScalar())!=1)
                 throw new InvalidOperationException("Комплект изменён, удалён или принадлежит другому объекту.");
         }
         using(var cmd=new SqlCommand(

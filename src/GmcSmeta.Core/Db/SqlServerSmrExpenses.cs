@@ -90,7 +90,7 @@ public static class SqlServerSmrExpenses
             conn, tx))
         {
             add.Parameters.Add("@c", SqlDbType.BigInt).Value = contractId;
-            id = Convert.ToInt64(add.ExecuteScalar(), CultureInfo.InvariantCulture);
+            id = SqlInteger.RequireInt64(add.ExecuteScalar());
         }
         Log(conn, tx, contractId, id, "create", "Добавлена затрата на монтаж");
         var next = SqlServerDatabase.BumpPositionRevision(conn, tx);
@@ -213,7 +213,7 @@ public static class SqlServerSmrExpenses
                 "WHERE sy.contract_id=@contract AND o.archived=0 AND p.parent_id IS NULL " +
                 "AND ISNULL(p.out_of_kp,0)=0 AND p.id IN (" + string.Join(",", names) + ")";
             cmd.CommandText = "SELECT COUNT_BIG(*)" + scope;
-            if (Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) != chunk.Length)
+            if (SqlInteger.RequireInt64(cmd.ExecuteScalar()) != chunk.Length)
                 throw new DBConcurrencyException("Выделение содержит чужие, отсутствующие или архивные позиции. Изменение отменено.");
             // Internal work costs and selling prices remain editable according
             // to the existing cost-accounting rules, including signed estimates.
