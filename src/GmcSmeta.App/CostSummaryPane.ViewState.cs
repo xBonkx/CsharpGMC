@@ -58,13 +58,21 @@ public partial class CostSummaryPane
         var selected = grid.SelectionUnit != DataGridSelectionUnit.Cell
             ? grid.SelectedItems.Cast<object>().Select(CostViewKey).OfType<string>().ToHashSet(StringComparer.Ordinal)
             : new HashSet<string>(StringComparer.Ordinal);
+        var selectedCells = grid.SelectionUnit == DataGridSelectionUnit.Cell
+            ? grid.SelectedCells.Where(cell => cell.IsValid && cell.Column.Visibility == Visibility.Visible)
+                .Select(cell => (Key: CostViewKey(cell.Item), Column: cell.Column))
+                .Where(cell => cell.Key is not null).ToArray()
+            : [];
+        var selectedCellKeys = selectedCells.Select(cell => cell.Key!).ToHashSet(StringComparer.Ordinal);
         var current = grid.CurrentCell;
         var currentKey = CostViewKey(current.Item);
         var scroll = CostScroll(grid);
         var vertical = scroll?.VerticalOffset ?? 0;
         var horizontal = scroll?.HorizontalOffset ?? 0;
         SummaryViewportAnchor.Row? top = null, active = null;
-        if (CostViewport(scroll) is { } viewport)
+        if (scroll is not null && (!scroll.CanContentScroll ||
+            VirtualizingPanel.GetScrollUnit(grid) == ScrollUnit.Pixel) &&
+            CostViewport(scroll) is { } viewport)
         {
             foreach (var row in RealizedCostRows(viewport))
             {
@@ -90,25 +98,32 @@ public partial class CostSummaryPane
         var anchorToRestore = SummaryViewportAnchor.Choose(active, top,
             anchorCandidates.Keys.ToHashSet(StringComparer.Ordinal));
 
-        if (selected.Count > 0 || currentKey is not null)
+        if (selected.Count > 0 || selectedCells.Length > 0 || currentKey is not null)
         {
             var candidates = new Dictionary<string, object>(StringComparer.Ordinal);
             var duplicates = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in grid.Items)
             {
                 var key = CostViewKey(item);
-                if (key is null || key != currentKey && !selected.Contains(key)) continue;
+                if (key is null || key != currentKey && !selected.Contains(key) && !selectedCellKeys.Contains(key)) continue;
                 if (!candidates.TryAdd(key, item)) duplicates.Add(key);
             }
             foreach (var key in duplicates) candidates.Remove(key);
             foreach (var (key, item) in candidates)
                 if (selected.Contains(key) && !grid.SelectedItems.Contains(item)) grid.SelectedItems.Add(item);
+            foreach (var (key, selectedColumn) in selectedCells)
+            {
+                if (key is null || !candidates.TryGetValue(key, out var item) ||
+                    selectedColumn.Visibility != Visibility.Visible || !grid.Columns.Contains(selectedColumn)) continue;
+                var cell = new DataGridCellInfo(item, selectedColumn);
+                if (!grid.SelectedCells.Contains(cell)) grid.SelectedCells.Add(cell);
+            }
             if (currentKey is not null && candidates.TryGetValue(currentKey, out var restored) &&
                 current.Column is { Visibility: Visibility.Visible } column && grid.Columns.Contains(column))
             {
                 var cell = new DataGridCellInfo(restored, column);
                 grid.CurrentCell = cell;
-                if (grid.SelectionUnit == DataGridSelectionUnit.Cell && !grid.SelectedCells.Contains(cell))
+                if (grid.SelectionUnit == DataGridSelectionUnit.Cell && selectedCells.Length == 0 && !grid.SelectedCells.Contains(cell))
                     grid.SelectedCells.Add(cell);
             }
         }
