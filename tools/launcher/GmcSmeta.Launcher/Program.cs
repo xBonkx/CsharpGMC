@@ -85,6 +85,20 @@ try
     var repository = Environment.GetEnvironmentVariable("GMC_SMETA_RELEASES");
     if (office || string.IsNullOrWhiteSpace(repository)) repository = GitHubReleases.DefaultRepository;
 
+    // Cache only successful processing of an exact installed state. No credentials or asset URLs are stored.
+    var cachePath = Path.Combine(paths.Root, "release-check.json");
+    var preferredFlavor = RuntimeProbe.HasDesktopRuntime10() ? "fx" : "sc";
+    ReleaseCheckKey Key(InstalledApp app) => new(repository!, app.Version, app.Flavor, app.Exe,
+        app.InstalledUtc, AppVersion.CurrentLauncher(), preferredFlavor,
+        Environment.GetEnvironmentVariable("GMC_SMETA_NO_SELF_UPDATE") == "1");
+    var cached = options.BackgroundUpdate && installed is not null
+        ? ReleaseCheckCache.Load(cachePath, Key(installed)) : null;
+    if (cached?.IsFresh(DateTimeOffset.UtcNow) == true)
+    {
+        StartupTrace.Mark("launcher_release_check_ttl_hit");
+        return;
+    }
+
     StartupTrace.Mark("launcher_auth_begin");
     var tokenSource = "";
     var token = office ? null : GitHubAuth.Resolve(out tokenSource);
@@ -92,17 +106,24 @@ try
     if (token is not null)
         ui.Info("Доступ к GitHub: " + tokenSource);
 
-    var releases = new GitHubReleases(repository, token, ui);
+    using var releases = new GitHubReleases(repository, token, ui);
     ReleaseInfo? release = null;
     string? updateError = null;
+    string? responseEtag = null;
     if (!options.NoUpdate)
     {
         if (installed is null)
             ui.ShowUpdate("Проверяем доступность программы", "Получаем сведения о выпуске.");
         ui.Step($"1/3  Проверяю обновления на GitHub ({repository})…");
         StartupTrace.Mark("launcher_release_check_begin");
-        release = releases.TryGetLatest(out updateError);
+        release = releases.TryGetLatest(cached?.ETag, out responseEtag, out var notModified, out updateError);
         StartupTrace.Mark("launcher_release_check_end");
+        if (notModified && cached is not null && installed is not null)
+        {
+            ReleaseCheckCache.Save(cachePath, Key(installed), responseEtag, DateTimeOffset.UtcNow);
+            StartupTrace.Mark("launcher_release_check_not_modified");
+            return;
+        }
     }
 
     if (release is not null && !AppVersion.CanOfferRelease(installed?.Version, release.Version))
@@ -145,8 +166,10 @@ try
         }
 
         StartupTrace.Mark("launcher_self_update_begin");
-        LauncherSelfUpdate.TryUpdate(releases, release, ui);
+        var launcherReady = LauncherSelfUpdate.TryUpdate(releases, release, ui);
         StartupTrace.Mark("launcher_self_update_end");
+        if (launcherReady && installed is not null)
+            ReleaseCheckCache.Save(cachePath, Key(installed), responseEtag, DateTimeOffset.UtcNow);
         if (options.BackgroundUpdate && appUpdated)
             ui.FinishUpdate($"Версия {release.Version} готова", "Программа с поддержкой автоперезапуска откроет новую версию автоматически после завершения операций.");
     }

@@ -226,19 +226,19 @@ internal sealed class AppInstaller
 /// <summary>Обновление самого запускающего EXE проверенным файлом.</summary>
 internal static class LauncherSelfUpdate
 {
-    public static void TryUpdate(GitHubReleases releases, ReleaseInfo release, ConsoleUi ui)
+    public static bool TryUpdate(GitHubReleases releases, ReleaseInfo release, ConsoleUi ui)
     {
-        if (Environment.GetEnvironmentVariable("GMC_SMETA_NO_SELF_UPDATE") == "1") return;
+        if (Environment.GetEnvironmentVariable("GMC_SMETA_NO_SELF_UPDATE") == "1") return true;
 
         var asset = release.Assets.FirstOrDefault(a =>
             string.Equals(a.Name, AppInstaller.AssetLauncher, StringComparison.OrdinalIgnoreCase));
-        if (asset is null) return;
+        if (asset is null) return true;
 
         var self = Process.GetCurrentProcess().MainModule?.FileName;
-        if (string.IsNullOrWhiteSpace(self) || !File.Exists(self)) return;
+        if (string.IsNullOrWhiteSpace(self) || !File.Exists(self)) return true;
         self = Path.GetFullPath(self);
-        if (!string.Equals(Path.GetExtension(self), ".exe", StringComparison.OrdinalIgnoreCase)) return;
-        if (!AppVersion.IsOlder(AppVersion.CurrentLauncher(), release.Version)) return;
+        if (!string.Equals(Path.GetExtension(self), ".exe", StringComparison.OrdinalIgnoreCase)) return true;
+        if (!AppVersion.IsOlder(AppVersion.CurrentLauncher(), release.Version)) return true;
 
         try
         {
@@ -263,12 +263,14 @@ internal static class LauncherSelfUpdate
                 catch (UnauthorizedAccessException) { }
             }
             ui.Info("Запускающий EXE обновлён — новый файл вступит в силу сразу, повторно скачивать не нужно.");
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
                                        or System.Net.Http.HttpRequestException or OperationCanceledException)
         {
             ui.Warn("Не удалось обновить запускающий EXE: " + ex.Message);
             ui.Warn("Программа всё равно запустится; EXE можно обновить позже вручную.");
+            return false;
         }
     }
 

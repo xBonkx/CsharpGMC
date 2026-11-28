@@ -101,7 +101,7 @@ internal static class GitHubAuth
 }
 
 /// <summary>Чтение GitHub Releases через REST API и скачивание вложений.</summary>
-internal sealed class GitHubReleases
+internal sealed class GitHubReleases : IDisposable
 {
     public const string DefaultRepository = "xBonkx/CsharpGMC";
     public const string ChecksumAsset = "SHA256SUMS.txt";
@@ -124,12 +124,17 @@ internal sealed class GitHubReleases
 
     public bool HasToken => !string.IsNullOrWhiteSpace(_token);
 
-    public ReleaseInfo? TryGetLatest(out string? error)
+    public ReleaseInfo? TryGetLatest(string? etag, out string? responseEtag, out bool notModified, out string? error)
     {
         error = null;
+        responseEtag = null;
+        notModified = false;
         try
         {
-            using var document = GetJson($"https://api.github.com/repos/{_repository}/releases/latest", TimeSpan.FromSeconds(30));
+            using var document = GetJson($"https://api.github.com/repos/{_repository}/releases/latest", TimeSpan.FromSeconds(30),
+                etag, out responseEtag, out notModified);
+            if (notModified) return null;
+            if (document is null) throw new InvalidOperationException("GitHub не вернул сведения о выпуске.");
             var root = document.RootElement;
             var tag = root.TryGetProperty("tag_name", out var tagElement) ? tagElement.GetString() ?? "" : "";
             if (tag.Length == 0)
@@ -167,7 +172,7 @@ internal sealed class GitHubReleases
             error = Describe(ex);
             return null;
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
             error = "истекло время ожидания ответа GitHub";
             return null;
@@ -223,7 +228,10 @@ internal sealed class GitHubReleases
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(60));
         using var request = CreateRequest(HttpMethod.Get, asset.ApiUrl, "application/octet-stream");
-        using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        using var headerTimeout = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+        headerTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var response = _http.Send(request, HttpCompletionOption.ResponseHeadersRead, headerTimeout.Token);
+        headerTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new InvalidOperationException(
                 "вложение не найдено или нет доступа. Для закрытого репозитория нужен токен GitHub.");
@@ -271,7 +279,11 @@ internal sealed class GitHubReleases
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string url, string accept)
     {
-        var request = new HttpRequestMessage(method, url);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
+            !string.Equals(uri.Host, "api.github.com", StringComparison.OrdinalIgnoreCase) ||
+            !uri.IsDefaultPort || uri.UserInfo.Length != 0)
+            throw new HttpRequestException("Недопустимый адрес GitHub API.");
+        var request = new HttpRequestMessage(method, uri);
         request.Headers.Accept.Clear();
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
         if (!string.IsNullOrWhiteSpace(_token))
@@ -279,11 +291,23 @@ internal sealed class GitHubReleases
         return request;
     }
 
-    private JsonDocument GetJson(string url, TimeSpan timeout)
+    private JsonDocument? GetJson(string url, TimeSpan timeout, string? etag,
+        out string? responseEtag, out bool notModified)
     {
+        responseEtag = null;
+        notModified = false;
         using var cts = new CancellationTokenSource(timeout);
         using var request = CreateRequest(HttpMethod.Get, url, "application/vnd.github+json");
+        var conditional = ReleaseCheckCache.ParseETag(etag);
+        if (conditional is not null) request.Headers.IfNoneMatch.Add(conditional);
         using var response = _http.Send(request, HttpCompletionOption.ResponseContentRead, cts.Token);
+        if (response.StatusCode == HttpStatusCode.NotModified)
+        {
+            if (conditional is null) throw new HttpRequestException("GitHub вернул 304 без условного запроса.");
+            notModified = true;
+            responseEtag = response.Headers.ETag?.ToString() ?? conditional.ToString();
+            return null;
+        }
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new HttpRequestException("GitHub отклонил токен (401). Проверьте срок действия токена.");
         if (response.StatusCode == HttpStatusCode.Forbidden)
@@ -292,9 +316,12 @@ internal sealed class GitHubReleases
             throw new HttpRequestException(
                 "репозиторий или релиз не найден (404). Репозиторий закрытый — нужен токен GitHub с доступом к нему.");
         response.EnsureSuccessStatusCode();
+        responseEtag = response.Headers.ETag?.ToString();
         using var stream = response.Content.ReadAsStream(cts.Token);
         return JsonDocument.Parse(stream);
     }
+
+    public void Dispose() => _http.Dispose();
 
     private static string Describe(HttpRequestException ex)
     {
