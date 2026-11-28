@@ -107,7 +107,9 @@ internal static class VisualAuditChecks
                 Doc(5, 1, "main", "Этап один", 4, 1),
                 Doc(6, 1, "main", "Глубокая вложенность", 5, 2),
                 Doc(7, 1, "main", "Остаток", 4, 3, true),
-                Doc(8, 3, "main", "Архивный документ")
+                Doc(8, 3, "main", "Архивный документ"),
+                Doc(9, 1, "main", "Этап два с длинным именем", 4, 4),
+                Doc(10, 1, "main", "Этап три", 4, 5)
             });
             var refresh = typeof(MainWindow).GetMethod("RefreshNavigation", flags)!;
             IEnumerable<TreeViewItem> Expand(ItemCollection items)
@@ -124,7 +126,7 @@ internal static class VisualAuditChecks
             root.IsEnabled = true;
             foreach (var (mode, expected) in new[]
             {
-                ("ContractsMode", new[] { 2, 3, 4, 5, 6, 7 }),
+                ("ContractsMode", new[] { 2, 3, 4, 5, 6, 7, 9, 10 }),
                 ("KpMode", new[] { 1 }),
                 ("ArchiveMode", new[] { 8 })
             })
@@ -163,7 +165,9 @@ internal static class VisualAuditChecks
                     var parent = docNodes[4];
                     var stage = docNodes[5];
                     var rest = docNodes[7];
-                    Require(parent.Items.Contains(stage) && parent.Items.Contains(rest) && stage.Items.Contains(docNodes[6]),
+                    Require(parent.Items.Contains(stage) && parent.Items.Contains(rest) &&
+                        parent.Items.Contains(docNodes[9]) && parent.Items.Contains(docNodes[10]) &&
+                        stage.Items.Contains(docNodes[6]),
                         "Production navigation must retain deep stage hierarchy");
                     parent.IsExpanded = false;
                     Layout(root, 1366, 1000);
@@ -277,7 +281,23 @@ internal static class VisualAuditChecks
             Require(view.Child is Canvas canvas && canvas.Width == 24 && canvas.Height == 24,
                 key + ": canvas size");
             if (key.StartsWith("IconLabel", StringComparison.Ordinal))
+            {
                 Require(view.Margin == new Thickness(0, 0, 6, 0), key + ": caption gap");
+                var caption = ((Panel)content).Children.OfType<TextBlock>().Single();
+                Require(view.VerticalAlignment == VerticalAlignment.Center &&
+                    caption.VerticalAlignment == VerticalAlignment.Center, key + ": common vertical alignment");
+                caption.Text = "Длинная подпись";
+                foreach (var size in new[] { 13.3333333333, 16d, 20d })
+                {
+                    caption.FontSize = size;
+                    content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    Layout(content, content.DesiredSize.Width, Math.Max(40, content.DesiredSize.Height));
+                    var a = view.TransformToAncestor(content).TransformBounds(new Rect(view.RenderSize));
+                    var b = caption.TransformToAncestor(content).TransformBounds(new Rect(caption.RenderSize));
+                    Require(Math.Abs(a.Top + a.Height / 2 - b.Top - b.Height / 2) <= 1,
+                        key + ": glyph and caption vertical center differ at font " + size);
+                }
+            }
         }
         Console.WriteLine("Shared glyph geometry and all icon template metrics checked (no SQL).");
     }
