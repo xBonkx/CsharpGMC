@@ -301,14 +301,15 @@ public partial class EstimateView
     private void SetSmrControls(EstimateDocument est)
     {
         var mode = string.IsNullOrWhiteSpace(est.SmrMode) ? "sum" : est.SmrMode;
-        foreach (var item in SmrModeCombo.Items.Cast<ComboBoxItem>())
-            if ((string)item.Tag == mode)
-            {
-                _smrComboSilent = true;
-                SmrModeCombo.SelectedItem = item;
-                _smrComboSilent = false;
-                break;
-            }
+        // Restore the stored mode without executing a mutation, including
+        // unsupported legacy values: never leave a stale choice from another snapshot.
+        _smrComboSilent = true;
+        try
+        {
+            SmrModeCombo.SelectedItem = SmrModeCombo.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => (string?)item.Tag == mode);
+        }
+        finally { _smrComboSilent = false; }
         var byPos = mode == "pos";
         var bySys = mode == "systems";
         var pct = mode == "percent";
