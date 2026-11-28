@@ -71,6 +71,10 @@
                                 <Setter Property="Foreground" Value="#0F172A"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/></Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions><Condition Property="IsEnabled" Value="False"/><Condition Property="IsSelected" Value="True"/></MultiTrigger.Conditions>
+                                <Setter TargetName="ListChrome" Property="Background" Value="#E8F0FE"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
