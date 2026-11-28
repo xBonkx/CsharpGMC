@@ -175,6 +175,7 @@
         </Grid.RowDefinitions>
         <!-- Python proc_view.py: chips and filters, then an action row. -->
         <Grid x:Name="ProcurementFilterLayout" SizeChanged="ProcurementFilterLayout_SizeChanged">
+            <!-- Row 1 is populated by the width-dependent handler; Auto reserves zero height when wide. -->
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <WrapPanel x:Name="ProcurementChips" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
