@@ -15,8 +15,8 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock x:Name="CaptionText" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold" Text="Документ" TextWrapping="Wrap"/>
-            <TextBlock x:Name="ObjectText" Foreground="#64748B" Margin="0,3,0,0" TextWrapping="Wrap"/>
+            <TextBlock x:Name="CaptionText" FontSize="{StaticResource UiH2Size}" Style="{StaticResource UiHeadingText}" Text="Документ"/>
+            <TextBlock x:Name="ObjectText" Style="{StaticResource UiSecondaryText}" Margin="{StaticResource LayoutFormLabelFieldGap}"/>
             <StackPanel x:Name="LegalAgreementPanel" Visibility="Collapsed" Margin="0,8,0,0">
                 <TextBlock Text="Юридический договор" TextWrapping="Wrap"/>
                 <ComboBox x:Name="LegalAgreementCombo" DisplayMemberPath="Caption" SelectedValuePath="Id" MinHeight="32"/>
@@ -66,10 +66,10 @@
             <ComboBox x:Name="CompanyCombo" Grid.Row="4" Grid.Column="1" Margin="0"
                       SelectionChanged="Company_SelectionChanged"/>
 
-            <TextBlock x:Name="VatHint" Grid.Row="5" Grid.Column="1" Foreground="#64748B"
+            <TextBlock x:Name="VatHint" Grid.Row="5" Grid.Column="1"
                        FontSize="{StaticResource UiCaptionSize}" Margin="0,3,0,9" TextWrapping="Wrap">
                 <TextBlock.Style>
-                    <Style TargetType="TextBlock">
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource UiSecondaryText}">
                         <Style.Triggers>
                             <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
                         </Style.Triggers>
@@ -104,7 +104,7 @@
                 </Grid>
             </StackPanel>
 
-            <TextBlock x:Name="TagNote" Grid.Row="11" Grid.Column="1" Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
+            <TextBlock x:Name="TagNote" Grid.Row="11" Grid.Column="1" Style="{StaticResource UiSecondaryText}" FontSize="{StaticResource UiCaptionSize}"
                        TextWrapping="Wrap" Margin="0,0,0,4"
                        Text="Тег — правила заказчика: НДС сверху, нумерация, форма КС."/>
         </Grid>
@@ -115,11 +115,11 @@
                     Style="{StaticResource PythonToolbarButton}" MinWidth="110" Visibility="Collapsed"
                     ContentTemplate="{StaticResource IconLabelExcel}" Click="ImportExcel_Click"
                     ToolTip="Открыть импорт нового КП из файла Excel. Реквизиты указываются в окне импорта."/>
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" MinWidth="90" Margin="0,0,8,0"/>
+            <WrapPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" MinWidth="90" Margin="{StaticResource LayoutDialogActionGap}"/>
             <Button x:Name="OkButton" Content="Сохранить" IsDefault="True" MinWidth="110"
                     Click="Ok_Click" Style="{StaticResource PrimaryButton}"/>
-            </StackPanel>
+            </WrapPanel>
         </DockPanel>
     </Grid>
 </Window>
