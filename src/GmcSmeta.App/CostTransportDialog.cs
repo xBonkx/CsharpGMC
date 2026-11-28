@@ -40,48 +40,51 @@ public sealed class CostTransportDialog : Window
     {
         Title = "Транспорт — клиенту и нам";
         Width = 660;
-        Height = Math.Min(750, 330 + 37 * suppliers.Count);
-        MinWidth = 550;
+        SizeToContent = SizeToContent.Height;
+        MinWidth = 360;
+        ResizeMode = ResizeMode.CanResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         DynamicFormLayout.Apply(this);
         var root = new StackPanel();
-        root.Children.Add(new TextBlock {
-            Text = "Транспорт учитывается в итогах документа только один раз",
-            FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10)
-        });
-        var customerRow = new DockPanel { Margin = new Thickness(0, 2, 0, 8) };
-        customerRow.Children.Add(new TextBlock {
-            Text = "Клиенту (в смете), ₽:", Width = 210, VerticalAlignment = VerticalAlignment.Center
-        });
+        var intro = WorkspaceWindowUi.Heading("Транспорт учитывается в итогах документа только один раз");
+        intro.TextWrapping = TextWrapping.Wrap;
+        intro.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
+        root.Children.Add(intro);
+        void AddField(string caption, TextBox input)
+        {
+            var row = new Grid();
+            row.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
+            var label = new TextBlock { Text = caption, TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center };
+            label.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormColumnGap");
+            DynamicFormLayout.Field(input);
+            System.Windows.Automation.AutomationProperties.SetName(input, caption);
+            Grid.SetColumn(input, 1);
+            row.Children.Add(label);
+            row.Children.Add(input);
+            root.Children.Add(row);
+        }
         _customer = new TextBox {
-            Text = Number(current.Customer), MinWidth = 150,
-            IsReadOnly = locked, HorizontalContentAlignment = HorizontalAlignment.Right
+            Text = Number(current.Customer), IsReadOnly = locked,
+            HorizontalContentAlignment = HorizontalAlignment.Right
         };
-        customerRow.Children.Add(_customer);
-        root.Children.Add(customerRow);
-        var costRow = new DockPanel { Margin = new Thickness(0, 2, 0, 8) };
-        costRow.Children.Add(new TextBlock {
-            Text = "Нам (закуп), ₽:", Width = 210, VerticalAlignment = VerticalAlignment.Center
-        });
+        AddField("Клиенту (в смете), ₽:", _customer);
         _cost = new TextBox {
             Text = current.Cost is null ? "" : Number(current.Cost.Value),
-            MinWidth = 150, HorizontalContentAlignment = HorizontalAlignment.Right
+            HorizontalContentAlignment = HorizontalAlignment.Right
         };
-        costRow.Children.Add(_cost);
-        root.Children.Add(costRow);
-        root.Children.Add(new TextBlock {
-            Text = locked
-                ? "Смета подписана: сумму клиенту менять нельзя, наш расход разрешено уточнить."
-                : "Сумма «Клиенту» совпадает с транспортом в итогах договора.",
-            Foreground = System.Windows.Media.Brushes.DimGray,
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14)
-        });
-        root.Children.Add(new TextBlock {
-            Text = "ПОСЧИТАТЬ ОТ ЗАКУПА У ПОСТАВЩИКА",
-            FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6)
-        });
+        AddField("Нам (закуп), ₽:", _cost);
+        root.Children.Add(DynamicFormLayout.Secondary(locked
+            ? "Смета подписана: сумму клиенту менять нельзя, наш расход разрешено уточнить."
+            : "Сумма «Клиенту» совпадает с транспортом в итогах договора.", "LayoutDialogIntroGap"));
+        var supplierHeading = WorkspaceWindowUi.Heading("Посчитать от закупа у поставщика");
+        supplierHeading.TextWrapping = TextWrapping.Wrap;
+        supplierHeading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
+        root.Children.Add(supplierHeading);
         if (suppliers.Count == 0)
-            root.Children.Add(new TextBlock { Text = "В смете нет строк с закупом." });
+            root.Children.Add(DynamicFormLayout.Secondary("В смете нет строк с закупом."));
 
         HashSet<string> oldNames = new(StringComparer.Ordinal);
         decimal oldPct = 0m;
@@ -108,34 +111,27 @@ public sealed class CostTransportDialog : Window
                     " ₽ (" + supplier.Rows + " поз." +
                     (supplier.Missing > 0 ? ", без закупа " + supplier.Missing : "") + ")",
                 IsChecked = oldNames.Contains(supplier.Name),
-                Margin = new Thickness(0, 2, 0, 4),
             };
+            check.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogListItemGap");
             DynamicFormLayout.WrapCaption(check);
             check.Checked += (_, _) => Recalculate();
             check.Unchecked += (_, _) => Recalculate();
             _suppliers.Add((supplier, check));
             root.Children.Add(check);
         }
-        var bottom = new DockPanel { Margin = new Thickness(0, 8, 0, 5) };
-        bottom.Children.Add(new TextBlock {
-            Text = "× процент:", Width = 100, VerticalAlignment = VerticalAlignment.Center
-        });
         _percent = new TextBox {
-            Text = oldPct == 0m ? "" : Number(oldPct), Width = 85,
+            Text = oldPct == 0m ? "" : Number(oldPct),
             HorizontalContentAlignment = HorizontalAlignment.Right
         };
-        bottom.Children.Add(_percent);
+        AddField("× процент:", _percent);
         _percent.TextChanged += (_, _) => Recalculate();
-        _calculation = new TextBlock {
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 8, 0),
-            TextWrapping = TextWrapping.Wrap
-        };
-        bottom.Children.Add(_calculation);
-        root.Children.Add(bottom);
+        _calculation = DynamicFormLayout.Secondary("", "LayoutDialogIntroGap");
+        root.Children.Add(_calculation);
         var put = new Button {
-            Content = "Вписать расчёт в «Нам»", Margin = new Thickness(0, 6, 0, 12),
-            Padding = new Thickness(12, 6, 12, 6), HorizontalAlignment = HorizontalAlignment.Left
+            Content = "Вписать расчёт в «Нам»", HorizontalAlignment = HorizontalAlignment.Left
         };
+        WorkspaceWindowUi.StyleButton(put);
+        put.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         put.Click += (_, _) =>
         {
             var checkedSuppliers = _suppliers.Where(x => x.Check.IsChecked == true).ToArray();
@@ -154,14 +150,13 @@ public sealed class CostTransportDialog : Window
             _cost.Text = Number(_putValue.Value);
         };
         root.Children.Add(put);
-        var buttons = new StackPanel {
+        var buttons = new WrapPanel {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
-        var cancel = new Button { Content = "Отмена", MinWidth = 100,
-            Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(12, 6, 12, 6) };
+        var cancel = new Button { Content = "Отмена" };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         cancel.Click += (_, _) => DialogResult = false;
-        var save = new Button { Content = "Сохранить", MinWidth = 120,
-            Padding = new Thickness(12, 6, 12, 6), FontWeight = FontWeights.SemiBold };
+        var save = new Button { Content = "Сохранить" };
         save.Click += (_, _) =>
         {
             var sell = Parse(_customer.Text);
