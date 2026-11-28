@@ -63,9 +63,10 @@ internal static class ReferenceWindowUi
             StrokeDashArray=new DoubleCollection{4,3},IsHitTestVisible=false});
         image.Width=250;image.Height=82;
         grid.Children.Add(image);
-        var empty=new TextBlock{Text="нет логотипа",Foreground=Brushes.SlateGray,
+        var empty=new TextBlock{Text="нет логотипа",
             HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,
             IsHitTestVisible=false};
+        empty.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
         var style=new Style(typeof(TextBlock));
         style.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
         var missing=new DataTrigger{Binding=new Binding(nameof(Image.Source)){Source=image},Value=null};
