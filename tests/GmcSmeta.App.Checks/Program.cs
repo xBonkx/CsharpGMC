@@ -373,6 +373,21 @@ internal static class Program
             automatic.SaveToPath(path);
             if (EstimateUiSettings.LoadFromPath(path).PurchaseVisible != true)
                 throw new Exception("Latest purchase choice did not survive cached-view settings save.");
+            var firstLayout = EstimateUiSettings.LoadFromPath(path);
+            var staleLayout = EstimateUiSettings.LoadFromPath(path);
+            firstLayout.ColumnWidths["Цена"] = 147;
+            firstLayout.ColumnOrder = ["№", "Цена", "Наименование"];
+            firstLayout.HiddenColumns = ["Примечание"];
+            firstLayout.AreaUnitVisible = true;
+            firstLayout.ResetPurchaseVisibility();
+            firstLayout.SaveToPath(path);
+            staleLayout.EstimateHintHidden = true;
+            staleLayout.SaveToPath(path);
+            var persisted = EstimateUiSettings.LoadFromPath(path);
+            if (persisted.PurchaseVisible is not null || !persisted.EstimateHintHidden ||
+                persisted.ColumnWidths["Цена"] != 147 || !persisted.ColumnOrder.SequenceEqual(firstLayout.ColumnOrder) ||
+                !persisted.HiddenColumns.SequenceEqual(firstLayout.HiddenColumns) || !persisted.AreaUnitVisible)
+                throw new Exception("Stale settings instance overwrote column choices or automatic purchase mode.");
             File.WriteAllText(path, "{invalid-json");
             var fallback = EstimateUiSettings.LoadFromPath(path);
             if (fallback.FontScale != 1.0 || File.Exists(path) ||

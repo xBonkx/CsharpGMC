@@ -31,6 +31,8 @@ public partial class EstimateView
             if (_applyingEstimateOrder) return;
             ApplyEstimateOrder(_defaultEstimateColumns.OrderBy(c => c.DisplayIndex)
                 .Select(ColumnPreferenceKey).ToArray());
+            _uiSettings.ColumnOrder = _defaultEstimateColumns.OrderBy(c => c.DisplayIndex)
+                .Select(ColumnPreferenceKey).ToList();
             SaveEstimateUiSettings();
         };
         EstimateGrid.Loaded += (_, _) => RequestEstimateColumnFit();

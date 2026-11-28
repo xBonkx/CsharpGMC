@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace GmcSmeta.App;
 
@@ -21,6 +22,8 @@ internal sealed class EstimateUiSettings
     // null = automatic; older true/false JSON values retain the explicit choice.
     public bool? PurchaseVisible { get; set; }
     private bool _purchaseChoiceChanged;
+    private JsonObject? _localBaseline;
+    private static readonly object SaveGate = new();
 
     internal void ChoosePurchaseVisibility(bool visible)
     {
@@ -65,10 +68,12 @@ internal sealed class EstimateUiSettings
     {
         try
         {
-            return File.Exists(path)
+            var settings = File.Exists(path)
                 ? Normalize(JsonSerializer.Deserialize<EstimateUiSettings>(File.ReadAllText(path))
                     ?? new EstimateUiSettings())
                 : new EstimateUiSettings();
+            settings._localBaseline = Snapshot(settings);
+            return settings;
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
@@ -105,28 +110,74 @@ internal sealed class EstimateUiSettings
         return settings;
     }
 
+    private static JsonObject Snapshot(EstimateUiSettings settings) =>
+        JsonSerializer.SerializeToNode(settings)!.AsObject();
+
+    // Cached pages have separate settings instances. On reattach apply the
+    // latest layout, without treating it as a new user modification.
+    internal void RefreshColumnPreferences()
+    {
+        if (!File.Exists(FilePath)) return;
+        var latest = LoadFromPath(FilePath);
+        ColumnWidths = latest.ColumnWidths;
+        ColumnOrder = latest.ColumnOrder;
+        HiddenColumns = latest.HiddenColumns;
+        AreaUnitVisible = latest.AreaUnitVisible;
+        AreaTotalVisible = latest.AreaTotalVisible;
+        BasisVisible = latest.BasisVisible;
+        TableZoom = latest.TableZoom;
+        RefreshPurchasePreference();
+        if (_localBaseline is not null)
+        {
+            var refreshed = Snapshot(this);
+            foreach (var name in new[] { nameof(ColumnWidths), nameof(ColumnOrder), nameof(HiddenColumns),
+                nameof(AreaUnitVisible), nameof(AreaTotalVisible), nameof(BasisVisible), nameof(TableZoom) })
+                _localBaseline[name] = refreshed[name]?.DeepClone();
+        }
+    }
+
     public void Save() => SaveToPath(FilePath);
 
     internal void SaveToPath(string path)
     {
-        try
+        lock (SaveGate)
         {
-            Normalize(this);
-            var directory = Path.GetDirectoryName(path)!;
-            Directory.CreateDirectory(directory);
-            // Cached views and the main window have distinct settings instances.
-            // Saving an unrelated preference must not undo the latest purchase choice.
-            if (!_purchaseChoiceChanged && File.Exists(path))
-                PurchaseVisible = LoadFromPath(path).PurchaseVisible;
-            var temporary = path + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(this,
-                new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporary, path, overwrite: true);
-            _purchaseChoiceChanged = false;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Personal UI settings are best-effort; never fail editing or SQL saves.
+            string? temporary = null;
+            try
+            {
+                Normalize(this);
+                var directory = Path.GetDirectoryName(path)!;
+                Directory.CreateDirectory(directory);
+                var latest = File.Exists(path) ? LoadFromPath(path) : new EstimateUiSettings();
+                // Only fields explicitly changed by this instance since its
+                // last local snapshot may replace values from another page.
+                if (!_purchaseChoiceChanged) PurchaseVisible = latest.PurchaseVisible;
+                var local = Snapshot(this);
+                var merged = Snapshot(latest);
+                foreach (var (name, value) in local)
+                {
+                    if (name == nameof(PurchaseVisible) && _purchaseChoiceChanged ||
+                        _localBaseline is null || !JsonNode.DeepEquals(_localBaseline[name], value))
+                        merged[name] = value?.DeepClone();
+                }
+                temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                File.WriteAllText(temporary, merged.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                File.Move(temporary, path, overwrite: true);
+                // Keep the local baseline, not the merged snapshot: a hidden
+                // cached page still has its old controls until reattached.
+                _localBaseline = local;
+                _purchaseChoiceChanged = false;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Personal UI settings are best-effort; never fail editing or SQL saves.
+            }
+            finally
+            {
+                if (temporary is not null)
+                    try { File.Delete(temporary); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
         }
     }
 }

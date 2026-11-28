@@ -1181,6 +1181,7 @@ public partial class EstimateView : UserControl
                 if (ReferenceEquals(column, BasisColumn) && _estimate?.Form != "r4")
                     _uiSettings.BasisVisible = checkItem.IsChecked;
                 RefreshAreaColumnValues();
+                CaptureEstimateVisibilityPreferences();
                 SaveEstimateUiSettings();
             };
             items.Add((checkItem, column));
@@ -1207,6 +1208,7 @@ public partial class EstimateView : UserControl
                 if (column == BasisColumn && _estimate?.Form != "r4") _uiSettings.BasisVisible = true;
             }
             RefreshAreaColumnValues();
+            CaptureEstimateVisibilityPreferences();
             SaveEstimateUiSettings();
         };
         menu.Items.Add(showAll);
@@ -1232,6 +1234,7 @@ public partial class EstimateView : UserControl
                     if (column == PurchaseColumn) item.IsChecked = column.Visibility == Visibility.Visible;
             }
             RefreshAreaColumnValues();
+            CaptureEstimateVisibilityPreferences();
             SaveEstimateUiSettings();
         };
         menu.Items.Add(resetVisibility);
@@ -1346,28 +1349,26 @@ public partial class EstimateView : UserControl
             column.Visibility = hidden.Contains(column.Header?.ToString() ?? "")
                 ? Visibility.Collapsed : Visibility.Visible;
         }
-        ApplyPurchaseVisibility(null);
-        SetTotalsHidden(_uiSettings.TotalsHidden);
+    }
+
+    private void CaptureEstimateVisibilityPreferences()
+    {
+        _uiSettings.HiddenColumns = _defaultEstimateColumns.Where(c => c != PurchaseColumn &&
+            c != WorkColumn && c != WorkTotalColumn && c != BasisColumn &&
+            c != AreaUnitColumn && c != AreaTotalColumn && c != NumberColumn && c != NameColumn &&
+            c.Visibility != Visibility.Visible).Select(ColumnPreferenceKey).ToList();
+        _uiSettings.AreaUnitVisible = AreaUnitColumn.Visibility == Visibility.Visible;
+        _uiSettings.AreaTotalVisible = AreaTotalColumn.Visibility == Visibility.Visible;
+        if (_estimate is { Form: not "r4", BasisAllowed: true })
+            _uiSettings.BasisVisible = BasisColumn.Visibility == Visibility.Visible;
     }
 
     private void SaveEstimateUiSettings()
     {
         if (!_uiSettingsReady || EstimateGrid is null || TotalsCards is null) return;
-        var columns = EstimateGrid.Columns.Where(c => !_inlineStageColumns.Contains(c)).ToList();
-        // ColumnWidths contains preferred user widths, not the transient auto-fit
-        // pixels. Header resize completion records preferences separately.
+        // Column choices are captured only by their actual user commands, not
+        // by unload or unrelated hint/footer updates from cached pages.
         RequestEstimateColumnFit();
-        _uiSettings.ColumnOrder = columns.OrderBy(c => c.DisplayIndex)
-            .Select(ColumnPreferenceKey).ToList();
-        _uiSettings.HiddenColumns = columns.Where(c => c != PurchaseColumn &&
-                c != WorkColumn && c != WorkTotalColumn && c != BasisColumn &&
-                c.Visibility != Visibility.Visible)
-            .Select(c => c.Header?.ToString() ?? "").ToList();
-        // Preserve null (automatic) until the user actually chooses a purchase visibility.
-        _uiSettings.AreaUnitVisible = AreaUnitColumn.Visibility == Visibility.Visible;
-        _uiSettings.AreaTotalVisible = AreaTotalColumn.Visibility == Visibility.Visible;
-        if (_estimate?.Form != "r4") _uiSettings.BasisVisible = BasisColumn.Visibility == Visibility.Visible;
-        _uiSettings.TotalsHidden = TotalsCards.Visibility != Visibility.Visible;
         _uiSettings.Save();
     }
 
