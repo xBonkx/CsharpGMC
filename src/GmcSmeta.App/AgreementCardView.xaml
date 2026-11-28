@@ -43,7 +43,9 @@
       <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
        <StackPanel Margin="0,8,0,0">
         <TextBlock Text="У ДС собственные номер и дата. Изменить можно только неподписанные документы, не являющиеся этапами." Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
-        <DataGrid local:TableColumnMenu.Key="agreement.sources" local:TableColumnMenu.Protect="Документ" local:TableColumnMenu.Exclude="Действия" x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column">
+        <DataGrid local:TableColumnMenu.Key="agreement.sources" local:TableColumnMenu.Protect="Документ" local:TableColumnMenu.Exclude="Действия" x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column"
+                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                   VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True">
          <DataGrid.Columns>
           <DataGridTextColumn Header="Документ" Binding="{Binding Name}" Width="2*"/>
           <DataGridTextColumn Header="№" Binding="{Binding Number}" Width="*"/>

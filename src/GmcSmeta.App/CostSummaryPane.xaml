@@ -100,6 +100,7 @@
                           AutoGenerateColumns="False" SelectionUnit="FullRow" SelectionMode="Extended"
                           CanUserAddRows="False" CanUserDeleteRows="False"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True"
                           BeginningEdit="SummaryGrid_BeginningEdit" CellEditEnding="SummaryGrid_CellEditEnding">
                     <DataGrid.Resources>
                         <Style TargetType="TextBox" BasedOn="{StaticResource PythonGridEditor}"/>
@@ -154,6 +155,7 @@
                           AutoGenerateColumns="False" SelectionUnit="FullRow" SelectionMode="Extended"
                           CanUserAddRows="False" CanUserDeleteRows="False"
                           EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizing="True" ScrollViewer.CanContentScroll="True"
                           PreviewKeyDown="SmrWorkGrid_PreviewKeyDown"
                           BeginningEdit="SummaryGrid_BeginningEdit" CellEditEnding="SummaryGrid_CellEditEnding">
                     <DataGrid.Resources>
