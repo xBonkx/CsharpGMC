@@ -20,6 +20,14 @@ internal static class PilotCases
         p.RunCase("2500-rows-bulk-fixture-read", () => SeedAndRead(p, p.SmallSystem, 2500));
         p.RunCase("10000-rows-bulk-fixture-read", () => SeedAndRead(p, p.LargeSystem, 10000));
         p.RunCase("two-real-sql-clients-revision-conflict", () => Concurrency(p));
+        p.RunCase("three-client-cross-document-revision-and-readback",
+            () => PilotConcurrencyReadCases.ThreeClients(p));
+        p.RunCase("global-revision-invalidates-unrelated-buy-snapshot",
+            () => PilotConcurrencyReadCases.GlobalRevision(p));
+        p.RunCase("cancel-blocked-sql-revision-and-reopen",
+            () => PilotConcurrencyReadCases.CancelBlockedRevision(p));
+        p.RunCase("public-read-apis-pre-cancellation",
+            () => PilotConcurrencyReadCases.PreCancelledReads(p));
         p.RunCase("signed-acts-prices-and-linked-lines", () => SignedActs(p));
         p.RunCase("2500-atomic-numeric-paste-and-rollback",
             () => PilotAtomicNumericPasteCases.Run(p));
@@ -68,8 +76,8 @@ internal static class PilotCases
             "Real receipt, supplier, shipment and Core reader tested; monetary exports " +
             "and supplier requests are owned by other agents");
         p.Skip("public-api-cancellation-mid-flight",
-            "The covered synchronous Core methods expose no cancellation token; " +
-            "SQL client cancellation is not an application-level cancellation test");
+            "Revision cancellation under a held lock and pre-cancelled read APIs are exercised separately; " +
+            "mid-result cancellation of every projection and WPF navigation remain unverified");
         p.Skip("physical-disconnect-during-commit",
             "Lost acknowledgement is simulated AFTER real COMMIT; no TCP drop tested");
         p.Skip("actual-wpf-client-relaunch",
