@@ -108,15 +108,10 @@ public partial class PeopleView : UserControl
                 token.ThrowIfCancellationRequested();
                 var db = new SqlServerPeopleAccess(connectionString, token);
                 token.ThrowIfCancellationRequested();
-                var site = _objectId is long objectId ? db.Site(objectId, token) : null;
+                var data = db.ReadInitialSnapshot(_objectId, showInactive, token);
                 token.ThrowIfCancellationRequested();
-                var companies = site is null ? new List<AccessCompany>() : db.Companies(token).ToList();
-                token.ThrowIfCancellationRequested();
-                var history = _objectId is long id ? db.History(id, "list", token) : Array.Empty<AccessHistory>();
-                token.ThrowIfCancellationRequested();
-                var directory = db.Load(showInactive, token);
-                token.ThrowIfCancellationRequested();
-                return (Db: db, Site: site, Companies: companies, History: history, Directory: directory);
+                return (Db: db, Site: data.Site, Companies: data.Companies.ToList(),
+                    History: data.History, Directory: data.Directory);
             }, token);
             if (_closed || token.IsCancellationRequested) return;
             HintText.Text = "Двойной щелчок или F2 — редактировать ячейку; Enter — сохранить, Esc — отменить.";

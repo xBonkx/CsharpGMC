@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.02 PARTIAL: единый согласованный снимок допуска, отказ без ревизии, ограниченные повторы; source/unit tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — CTX-046.02 PARTIAL: integrated saved archive year, estimate discount, transport and signed PDF keyboard patch; 4 source tests added (not run). [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — PERF-044.02 PARTIAL: integrated prepared summary header geometry and width invalidation patch; 12 prior static checks, 3 source test cases (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
