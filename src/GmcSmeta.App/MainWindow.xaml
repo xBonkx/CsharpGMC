@@ -605,6 +605,7 @@
                 <Button x:Name="ShowSidebarButton" Grid.Row="0" Style="{StaticResource PythonToolbarButton}" Content="Показать объекты" ContentTemplate="{StaticResource IconLabelMenu}" Visibility="Collapsed" HorizontalAlignment="Left"
                         MinWidth="148" MinHeight="30" Margin="{StaticResource LayoutShowSidebarMargin}" Click="ToggleSidebar_Click" ToolTip="Показать панель (Ctrl+B)"/>
                 <Grid x:Name="EmptyPage" Grid.Row="1" Visibility="Collapsed" Margin="16,0">
+                    <!-- Intentional 2:3 elastic whitespace positions the empty-state prompt above center. -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="2*"/>
                         <RowDefinition Height="Auto"/>
