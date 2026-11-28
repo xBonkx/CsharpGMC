@@ -14,12 +14,15 @@ namespace GmcSmeta.App;
 /// </summary>
 public partial class EstimateView
 {
+    private bool InlineStageParentEditable(InlineStagesSnapshot snapshot) =>
+        snapshot.FullMutationProblem is null && _estimate is { Locked: false } && !_doc.StageRest &&
+        new SqlConnectionStringBuilder(_sqlConnectionString).InitialCatalog
+            .StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase);
+
     private bool BulkStageAllowed =>
         !_detached && _inlineStagesOn && _inlineStagesData is { } snapshot && !_inlineStagesLoading && !_inlineStageCommandBusy &&
         !string.IsNullOrWhiteSpace(snapshot.Revision) && snapshot.Revision == _serverRevision &&
-        !_serverConflict && System.Threading.Volatile.Read(ref _pendingWrites) == 0 &&
-        new SqlConnectionStringBuilder(_sqlConnectionString).InitialCatalog
-            .StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase);
+        !_serverConflict && !HasUnsettledCacheWrites && InlineStageParentEditable(snapshot);
 
     private InlineStagesSnapshot? _selectionButtonsSnapshot;
 
@@ -106,7 +109,7 @@ public partial class EstimateView
         for (var i = 0; i < data.Stages.Count; i++)
         {
             var stage = data.Stages[i];
-            if (stage.Locked) continue;
+            if (stage.Locked || stage.Rest || stage.StageSum is not null) continue;
             var sourceId = stage.Id;
             var btn = new Button
             {
@@ -188,7 +191,8 @@ public partial class EstimateView
                 : "Выделенные строки не распределены по этапам.", false);
             return;
         }
-        if (preview.Any(x => data.Stages[x.StageIndex].Locked))
+        if (preview.Any(x => data.Stages[x.StageIndex] is { } stage &&
+            (stage.Locked || stage.Rest || stage.StageSum is not null)))
         {
             SetStatus("Выделенные позиции используются в подписанном этапе. Операция отменена.", true);
             return;

@@ -60,7 +60,8 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("Visibility = Visibility.Visible", code);
         Assert.Contains("EstimateGrid.Columns.Add(column);", code);
         Assert.Contains("column.DisplayIndex = EstimateGrid.Columns.Count - 1;", code);
-        Assert.Contains("IsReadOnly = rest || data.Stages[i].Locked", code);
+        Assert.Contains("IsReadOnly = rest || keys[i].Locked", code);
+        Assert.Contains("!InlineStageParentEditable(data) || s.Rest || s.Locked || s.StageSum is not null", code);
         Assert.Contains("new DataGridTemplateColumn", code);
         Assert.Contains("CellEditingTemplate = new DataTemplate", code);
         Assert.DoesNotContain("new DataGridTextColumn", code);
@@ -104,7 +105,7 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("column.HeaderStyle = CreateInlineStageHeaderStyle(stageIndex", zoom);
         var batch = Source("GmcSmeta.App/EstimateView.InlineStages.Batch.cs");
         Assert.Contains("if (ids.Count == 0)", batch);
-        Assert.Contains("if (stage.Locked) continue;", batch);
+        Assert.Contains("if (stage.Locked || stage.Rest || stage.StageSum is not null) continue;", batch);
         var xaml = Source("GmcSmeta.App/EstimateView.xaml");
         Assert.Contains("MaxHeight=\"144\"", xaml);
         Assert.Contains("x:Name=\"InlineStagesSelectionButtons\"", xaml);

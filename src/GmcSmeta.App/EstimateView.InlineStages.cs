@@ -21,7 +21,8 @@ public partial class EstimateView
         Dictionary<int, SqlServerStages.StageTableRow> Rows,
         SqlServerStages.StageInfo? Rest,
         Dictionary<long, decimal> DocumentTotals, string Revision,
-        ILookup<long, long> SourcesBySystem, StageAllocationPresentation.Metrics Metrics);
+        ILookup<long, long> SourcesBySystem, StageAllocationPresentation.Metrics Metrics,
+        string? FullMutationProblem);
 
     private bool _inlineStagesOn;
     private bool _requestInlineStages;
@@ -160,6 +161,7 @@ public partial class EstimateView
                         throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
                     token.ThrowIfCancellationRequested();
                     var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full, token);
+                    var fullMutationProblem = SqlServerStages.ReadFullStageMutationProblem(conn, full, token);
                     token.ThrowIfCancellationRequested();
 
                     // Scope the shared totals calculation to this KP's stage documents.
@@ -184,7 +186,7 @@ public partial class EstimateView
                     token.ThrowIfCancellationRequested();
                     return new InlineStagesSnapshot(stages,
                         rows.ToDictionary(r => checked((int)r.SrcId)),
-                        rest, totals, revisionBefore, index, metrics);
+                        rest, totals, revisionBefore, index, metrics, fullMutationProblem);
                 }
                 finally { _inlineStagesReadGate.Release(); }
             }, token);
@@ -253,7 +255,8 @@ public partial class EstimateView
     {
         var data = _inlineStagesData;
         if (data is null) return;
-        var keys = data.Stages.Select(s => new StageColumnKey(s.Id, ShortStageName(s.Name), s.Locked)).ToArray();
+        var keys = data.Stages.Select(s => new StageColumnKey(s.Id, ShortStageName(s.Name),
+            !InlineStageParentEditable(data) || s.Rest || s.Locked || s.StageSum is not null)).ToArray();
         if (_inlineStageColumnKeys.SequenceEqual(keys) &&
             _inlineStageColumns.Count == keys.Length + 1 &&
             _inlineStageColumns.All(EstimateGrid.Columns.Contains))
@@ -313,7 +316,7 @@ public partial class EstimateView
                 CellTemplate = new DataTemplate { VisualTree = display },
                 CellEditingTemplate = new DataTemplate { VisualTree = editor },
                 Width = new DataGridLength(Math.Clamp(90 + title.Length * 5, 90, 170)),
-                IsReadOnly = rest || data.Stages[i].Locked,
+                IsReadOnly = rest || keys[i].Locked,
                 CanUserSort = false,
                 CanUserReorder = false,
                 HeaderStyle = CreateInlineStageHeaderStyle(i, rest),
@@ -392,9 +395,11 @@ public partial class EstimateView
     {
         if (sender is not DataGridColumnHeader header || _inlineStagesData is not { } data) return;
         var index = _inlineStageColumns.IndexOf(header.Column);
-        if (index < 0 || index >= data.Stages.Count) return;
+        if (index < 0 || index > data.Stages.Count) return;
+        var stage = index == data.Stages.Count ? data.Rest : data.Stages[index];
+        if (stage is null) return;
         e.Handled = true;
-        ShowInlineStageMenu(header, data.Stages[index], data);
+        ShowInlineStageMenu(header, stage, data);
     }
 
     private void ShowInlineStageMenu(FrameworkElement anchor, SqlServerStages.StageInfo stage,
@@ -405,10 +410,13 @@ public partial class EstimateView
         var name = stage.Rest ? "Остаток" : ShortStageName(stage.Name);
         bool Writable() => BulkStageAllowed && ReferenceEquals(snapshot, _inlineStagesData) &&
             !stage.Rest && !stage.Locked && stage.StageSum is null;
-        var open = ContextMenuIcons.Create($"Открыть КП «{name}»", "File");
+        bool CanOpen() => !_detached && !_inlineStagesLoading && !_inlineStageCommandBusy &&
+            ReferenceEquals(snapshot, _inlineStagesData) && snapshot.Revision == _serverRevision &&
+            !HasUnsettledCacheWrites && !HasActiveEstimateEdit() && stage.Id is > 0 and <= int.MaxValue;
+        var open = ContextMenuIcons.Create($"Открыть КП «{name}»", "File", CanOpen());
         open.Click += (_, _) =>
         {
-            if (ReferenceEquals(snapshot, _inlineStagesData) && Window.GetWindow(this) is MainWindow main)
+            if (CanOpen() && Window.GetWindow(this) is MainWindow main)
                 main.NavigateToStageEstimate(checked((int)stage.Id), _objectId);
         };
         menu.Items.Add(open);
@@ -447,13 +455,11 @@ public partial class EstimateView
     {
         stageIndex = _inlineStageColumns.IndexOf(column);
         var data = _inlineStagesData;
-        return !_detached && _inlineStagesOn && !_inlineStagesLoading && !_inlineStageCommandBusy && data is not null &&
-            !string.IsNullOrWhiteSpace(data.Revision) && data.Revision == _serverRevision &&
+        return BulkStageAllowed && data is not null &&
             stageIndex >= 0 && stageIndex < data.Stages.Count &&
-            !data.Stages[stageIndex].Locked &&
-            !row.IsSystem && !row.IsSub && !row.IsVirtual &&
-            data.Rows.ContainsKey(row.Id) && !_serverConflict &&
-            System.Threading.Volatile.Read(ref _pendingWrites) == 0;
+            !data.Stages[stageIndex].Rest && !data.Stages[stageIndex].Locked &&
+            data.Stages[stageIndex].StageSum is null &&
+            !row.IsSystem && !row.IsSub && !row.IsVirtual && data.Rows.ContainsKey(row.Id);
     }
 
     /// <summary>

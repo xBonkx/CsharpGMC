@@ -866,7 +866,7 @@ public partial class StagesDialog : Window
             return;
         }
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
-        if (stage is null || stage.Locked || stage.StageSum is not null)
+        if (stage is null || stage.Rest || stage.Locked || stage.StageSum is not null)
         {
             SetStatus("Этап недоступен для изменения.");
             return;
@@ -884,9 +884,15 @@ public partial class StagesDialog : Window
 
     private void OpenStage(long stageId)
     {
-        if (_building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
+        if (stageId is <= 0 or > int.MaxValue ||
+            (!_cachedStages.Any(stage => stage.Id == stageId) && _restDocument?.Id != stageId))
+        {
+            SetStatus("Документ этапа не входит в текущий снимок или его идентификатор не поддерживается.");
+            return;
+        }
         // Открытие КП этапа — через главное окно (оно перечитает список и откроет смету).
-        OpenStageRequested?.Invoke((int)stageId);
+        OpenStageRequested?.Invoke(checked((int)stageId));
         Close();
     }
 

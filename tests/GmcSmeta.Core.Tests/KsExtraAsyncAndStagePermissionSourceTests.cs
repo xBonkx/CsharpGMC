@@ -50,6 +50,15 @@ public sealed class KsExtraAsyncAndStagePermissionSourceTests
         Assert.Contains("stage is null || stage.Rest || stage.Locked", commands);
         var policy = Read("GmcSmeta.Core/Domain/StageMutationPolicy.cs");
         Assert.Contains("if (stage.IsRest)", policy);
+        Assert.Contains("ReadFullStageMutationProblem(conn, full, token)", menu);
+        Assert.Contains("data.Stages[stageIndex].StageSum is null", menu);
+        Assert.Contains("var stage = index == data.Stages.Count ? data.Rest", menu);
+        var batch = Read("GmcSmeta.App/EstimateView.InlineStages.Batch.cs");
+        Assert.Contains("snapshot.FullMutationProblem is null", batch);
+        Assert.Contains("stage.Locked || stage.Rest || stage.StageSum is not null", batch);
+        var dialog = Read("GmcSmeta.App/StagesDialog.xaml.cs");
+        Assert.Contains("OpenStageRequested?.Invoke(checked((int)stageId))", dialog);
+        Assert.Contains("_restDocument?.Id != stageId", dialog);
     }
 
     [Fact]
