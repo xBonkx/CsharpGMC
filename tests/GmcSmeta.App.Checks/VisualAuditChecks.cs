@@ -16,6 +16,8 @@ internal static class VisualAuditChecks
     internal static void RunLayoutChecks()
     {
         RunNavigationGlyphChecks();
+        RunNavigationTreeLayoutChecks();
+        RunReportTextSelectionChecks();
         RunSharedGlyphCatalogChecks();
         RunEqualGapAndRenderingChecks();
         RunDirectorTextLayoutChecks();
@@ -67,6 +69,106 @@ internal static class VisualAuditChecks
             }
         }
         finally { window.Close(); }
+    }
+
+    // Exercise the compiled shell templates without opening the real workspace.
+    private static void RunNavigationTreeLayoutChecks()
+    {
+        var window = new MainWindow();
+        try
+        {
+            var root = (FrameworkElement)window.FindName("RootLayout");
+            var tree = (TreeView)window.FindName("NavigationTree");
+            var sidebar = (ColumnDefinition)window.FindName("SidebarColumn");
+            TreeViewItem Node(object value, string template, int depth)
+                => new() { Header = value, HeaderTemplate = (DataTemplate)window.FindResource(template),
+                    Padding = new Thickness(16 * depth, 7, 4, 7), IsExpanded = true };
+            TreeViewItem Doc(int id, string kind, string title, int depth, bool nested = false,
+                bool children = false, bool remainder = false)
+            {
+                var document = new GmcSmeta.Core.Domain.DocRow(id, 1, kind, "", title, "", "", "", false, 0, 0, 0, 0)
+                    with { StageRest = remainder };
+                var header = new GmcSmeta.Core.Domain.NavigationDocumentHeader(document, nested, children);
+                var node = Node(header, "DocumentNavigationTemplate", depth);
+                node.FontStyle = header.IsItalic ? FontStyles.Italic : FontStyles.Normal;
+                return node;
+            }
+            var year = Node("2026", "YearNavigationTemplate", 0);
+            var obj = Node("Договор — объект с очень длинным названием", "ObjectNavigationTemplate", 1);
+            var folder = Node("Папка документов", "ObjectNavigationTemplate", 1);
+            var archive = Node("Архив 2025", "ObjectNavigationTemplate", 1);
+            var kp = Doc(1, "kp", "Коммерческое предложение", 2);
+            var contract = Doc(2, "main", "Договор", 2);
+            var dop = Doc(3, "dop", "Дополнительное соглашение", 2);
+            var parent = Doc(4, "main", "Родитель с этапами", 2, children: true);
+            var stage = Doc(5, "main", "Этап один", 3, nested: true, children: true);
+            var deep = Doc(6, "main", "Глубокая вложенность", 4, nested: true);
+            var rest = Doc(7, "main", "Остаток", 3, nested: true, remainder: true);
+            stage.Items.Add(deep); parent.Items.Add(stage); parent.Items.Add(rest);
+            foreach (var child in new[] { kp, contract, dop, parent }) obj.Items.Add(child);
+            year.Items.Add(obj); year.Items.Add(folder); year.Items.Add(archive);
+            tree.Items.Add(year);
+            foreach (var width in new[] { 270d, 300d, 420d })
+            {
+                sidebar.Width = new GridLength(width);
+                Layout(root, 1366, 1000);
+                foreach (var item in new[] { year, obj, folder, archive, kp, contract, dop, parent, stage, deep, rest })
+                {
+                    item.ApplyTemplate();
+                    var chrome = (Border)item.Template.FindName("HeaderBorder", item);
+                    var content = (ContentPresenter)item.Template.FindName("PART_Header", item);
+                    var mark = (Border)item.Template.FindName("SelectionMark", item);
+                    Require(chrome.ActualHeight >= 31 && content.ActualWidth > 0,
+                        "Navigation header must have a visible content area");
+                    Require(content.TransformToAncestor(chrome).TransformBounds(new Rect(content.RenderSize)).Right
+                        <= chrome.ActualWidth + 1, "Navigation content extends outside row");
+                    item.IsSelected = true;
+                    Layout(root, 1366, 1000);
+                    Require(mark.Visibility == Visibility.Visible, "Selection marker not visible");
+                    item.IsSelected = false;
+                    Layout(root, 1366, 1000);
+                    Require(mark.Visibility == Visibility.Collapsed, "Normal row must not retain selection marker");
+                }
+                parent.IsExpanded = false;
+                Layout(root, 1366, 1000);
+                Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Collapsed,
+                    "Collapsed stage group must hide descendants");
+                parent.IsExpanded = true;
+                Layout(root, 1366, 1000);
+                Require(((FrameworkElement)parent.Template.FindName("ItemsHost", parent)).Visibility == Visibility.Visible,
+                    "Expanded stage group must show descendants");
+                Require(rest.FontStyle == FontStyles.Italic && stage.FontStyle == FontStyles.Normal,
+                    "Only remainder uses italic presentation");
+            }
+        }
+        finally { window.Close(); }
+    }
+
+    private static void RunReportTextSelectionChecks()
+    {
+        var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false,
+            SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended,
+            ItemsSource = new[] { new { Text = "Очень длинное значение отчета", NeedsReview = true, ResultText = "Не найдено" } } };
+        foreach (var key in new[] { "ReportGridReviewText", "ReportGridMuted", "CompactCostReview", "CompactCostMuted" })
+            grid.Columns.Add(new DataGridTextColumn { Header = key, Binding = new Binding("Text"), Width = 160,
+                ElementStyle = (Style)Application.Current.FindResource(key) });
+        Layout(grid, 720, 180);
+        var row = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
+        Require(row is not null, "Report row was not realized");
+        var expected = (SolidColorBrush)Application.Current.FindResource("GridSelectionTextBrush");
+        foreach (var column in grid.Columns)
+        {
+            var text = (TextBlock)column.GetCellContent(row);
+            Require(text.ToolTip is string full && full == text.Text, "Full report value must remain accessible");
+            var normal = ((SolidColorBrush)text.Foreground).Color;
+            var cell = new DataGridCellInfo(grid.Items[0], column);
+            grid.SelectedCells.Add(cell);
+            Layout(grid, 720, 180);
+            Require(((SolidColorBrush)text.Foreground).Color == expected.Color, "Selected report value must use grid selection foreground");
+            grid.SelectedCells.Remove(cell);
+            Layout(grid, 720, 180);
+            Require(((SolidColorBrush)text.Foreground).Color == normal, "Deselection must restore semantic foreground");
+        }
     }
 
     private static void RunNavigationGlyphChecks()
