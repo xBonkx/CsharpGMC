@@ -75,6 +75,16 @@
     <Thickness x:Key="LayoutAuxTabPaneOverlap">0,-1,0,0</Thickness>
     <Thickness x:Key="LayoutAuxTabPageMargin">12</Thickness>
     <Thickness x:Key="LayoutAuxActionGap">0,0,6,6</Thickness>
+    <!-- Embedded tab body owns vertical spacing only; its page owns horizontal edges. -->
+    <Thickness x:Key="LayoutCostTabBodyMargin">0,8,0,6</Thickness>
+    <Thickness x:Key="LayoutCostTabStripGap">0,10,0,0</Thickness>
+    <Thickness x:Key="LayoutCostToolbarItemGap">0,0,6,4</Thickness>
+    <Thickness x:Key="LayoutFormScrollInset">12</Thickness>
+    <Thickness x:Key="LayoutFormStackedFieldGap">0,4,0,9</Thickness>
+    <Thickness x:Key="LayoutFormLabelFieldGap">0,4,0,0</Thickness>
+    <Thickness x:Key="LayoutFormGroupHeadingGap">0,0,0,7</Thickness>
+    <Thickness x:Key="LayoutFormGroupSeparatorGap">0,0,0,10</Thickness>
+    <Thickness x:Key="LayoutFormColumnGap">0,0,8,0</Thickness>
     <!-- Qt final field inset and drop-down arrow width; explicit compact controls can override. -->
     <Thickness x:Key="LayoutFieldPadding">10,6</Thickness>
     <sys:Double x:Key="LayoutFieldMinHeight">32</sys:Double>

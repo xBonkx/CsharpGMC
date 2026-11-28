@@ -623,7 +623,7 @@
                         </StackPanel>
                     </StackPanel>
                 </Grid>
-                <ContentControl x:Name="PageHost" Grid.Row="1">
+                <ContentControl x:Name="PageHost" Grid.Row="1" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
                     <ContentControl.Style>
                         <Style TargetType="ContentControl">
                             <Style.Triggers>

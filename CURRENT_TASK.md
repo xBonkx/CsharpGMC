@@ -1,5 +1,7 @@
 ## 27.11.2026 — самостоятельные договоры, схема 32 применена; релиз не опубликован
 
+28.11.2026 ChatGPT/main (base d208ac9) — SPACE-03/SPACE-04/SPACE-09/SPACE-10/SPACE-12/SPACE-13 CODE READY implementation. Explicit zero-padding/stretch PageHost; documented major page host/edge ownership; cost tabs shared zero-padding template and vertical body gap without duplicate horizontal edges; trailing-only cost toolbar gaps; KS requisites one form inset, shared field/group gaps, multiline minima and independent footer. Eight source cases added, not run; handler sets unchanged. Chosen 8/6 vertical tab gap, 6/4 toolbar wrap gap and retained 12 form content inset are WPF adaptations. Whole-app physical layout/paired Python checks and Windows build/xUnit not run. SQL/data/calculation/release untouched. Design 197/253 CODE READY, 56 PARTIAL; +6.
+
 28.11.2026 — DEMO-01…05 PARTIAL: C# ожидает реальную загрузку штатной сметы в demo smoke, изолированы прямые APPDATA/LOCALAPPDATA пути и локальный startup-error, [единая сборка и 2 ярлыка](https://github.com/xBonkx/gmcsmeta/blob/main/docs/DEMO_BUILD.md). DEMO-06/07 NOT STARTED; .NET/Windows/SQL не запускались, рабочая БД 28 и релиз не изменены.
 
 28.11.2026 — DEMO-01…05 PARTIAL, DEMO-06/07 NOT STARTED, 0 CODE READY/DONE. По уточнению владельца вместо имитатора — две реальные синтетические базы локального SQLEXPRESS. C# штатный MainWindow через --demo, строгое имя, локальная идентичность, маркер и схема 32; отдельный профиль. Генератор в gmcsmeta. Windows/SQL/тесты не запущены. [DEMO TODO](docs/DEMO_MODE_TODO_20261128.md).

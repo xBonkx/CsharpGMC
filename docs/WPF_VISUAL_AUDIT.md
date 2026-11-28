@@ -75,3 +75,19 @@ METADATA_MATCH_NOT_VISUAL_ACCEPTANCE не является PASS или DONE.
 ## Разностные изображения с масками
 
 `--visual-diff before.png after.png output [masks.json]` принимает одинаковые пиксельные размеры. Необязательный JSON — массив прямоугольников с X, Y, Width, Height в пикселях, внутри изображения. Маски исключаются из числителя и знаменателя; полностью замаскированный снимок отклоняется. `difference.png` показывает изменённые пиксели, `overlay.png` — немаскированный 50/50 overlay для ручной проверки, `difference.json` — координаты изменённой области и количество сравниваемых/замаскированных пикселей. Маски указываются вручную только для согласованных динамических сумм/курсора. Результат не является визуальной приёмкой.
+
+## Владелец внешних отступов основных страниц
+
+| Путь host → root | Владелец внешнего края | Внутренние исключения |
+|---|---|---|
+| MainWindow.PageHost → ObjectPage | LayoutPageMargin на ObjectPage | Карточки/легенды — собственные смысловые интервалы |
+| PageHost → DirectorView | LayoutPageMargin на странице | Рамки и тени — не второй page margin |
+| PageHost → EstimateView → EstimateTablePanel | Отступы header/toolbar/table/footer на секциях | Строки имеют только cell padding |
+| EstimateView.MaterialsPanel → EstimateMaterialsPanel | LayoutEmbeddedPageMargin на host | Дочерний Grid без внешнего margin |
+| EstimateView.SummaryPanel → EstimateSummaryPanel | LayoutSummaryPageMargin на host | Намеренно составной Python 24/6/24/14 + 12/8/20/16 |
+| EstimateView.TotalsPanel → EstimateTotalsPanel | LayoutEmbeddedPageMargin на TotalsScroll | Статьи и плитки имеют отдельные локальные интервалы |
+| ContractCostsPanel/ProcurementPanel/ShipmentsPanel → соответствующий pane | LayoutCostPaneMargin / LayoutProcurementPaneMargin / LayoutShipmentsPaneMargin на pane | Standalone Window.Resources переопределяет только свой ключ; CostTabs имеет вертикальный inset, горизонтальный 0 |
+| ContractActsPanel → ContractActsWorkspace | LayoutEmbeddedPageMargin на дочернем Grid | Внутренние список актов и редактор |
+| KsRequisitesWindow → Grid → ScrollViewer → RequisitesFields | LayoutDialogMargin на Grid; LayoutFormScrollInset только на fields | ScrollViewer.Padding=0, TextBox padding только внутри поля, кнопки вне scroll |
+
+Не удалять намеренные смысловые отступы; физические координаты проверять по TSV ancestry. Таблица описывает основные страницы, вспомогательные локальные переопределения продолжают проверяться сканером.
