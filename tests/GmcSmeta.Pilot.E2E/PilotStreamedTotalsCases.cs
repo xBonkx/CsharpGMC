@@ -58,6 +58,43 @@ internal static class PilotStreamedTotalsCases
                 "Totals read changed SQL revision");
         }
 
+        // Saving an unrelated totals field must not switch SMR mode or
+        // rewrite position formulas/values. Only the isolated Pilot fixture is touched.
+        foreach (var mode in new[] { "sum", "pos", "percent", "systems" })
+        {
+            PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=@mode WHERE id=@id",
+                ("@mode", mode), ("@id", id));
+            var before = EstimateReader.Load(conn, contractId);
+            var transport = before.Totals.Transport + 1.25m;
+            var saved = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+                "transport_amount", transport, p.Revision());
+            var after = EstimateReader.Load(conn, contractId);
+            PilotRunner.Check(saved.Saved && after.SmrMode == mode &&
+                after.SmrPercent == before.SmrPercent && after.Totals.Smr == before.Totals.Smr &&
+                after.Totals.Transport == transport &&
+                after.PositionsInOrder.SequenceEqual(before.PositionsInOrder),
+                "Transport edit changed SMR mode or unrelated position data: " + mode);
+            if (mode == "sum")
+            {
+                var amount = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+                    "smr_amount", 123456789.01m, p.Revision());
+                var readback = EstimateReader.Load(conn, contractId);
+                PilotRunner.Check(amount.Saved && readback.SmrMode == "sum" &&
+                    readback.Totals.Smr == 123456789.01m && readback.Totals.Transport == transport &&
+                    readback.SmrPercent == before.SmrPercent, "Large SMR sum readback changed mode or transport");
+            }
+            else
+            {
+                var revision = p.Revision();
+                var rejected = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+                    "smr_amount", 111m, revision);
+                var readback = EstimateReader.Load(conn, contractId);
+                PilotRunner.Check(!rejected.Saved && revision == p.Revision() &&
+                    readback.SmrMode == mode && readback.Totals == after.Totals,
+                    "Non-sum SMR accepted a sum edit: " + mode);
+            }
+        }
+
         PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'percent' WHERE id=@id", ("@id", id));
         var percentRevision = p.Revision();
         var beforePercent = EstimateReader.Load(conn, contractId);
@@ -89,8 +126,20 @@ internal static class PilotStreamedTotalsCases
         PilotRunner.Execute(conn, "UPDATE dbo.contracts SET stage_of=@id,stage_sum=100,stage_rest=0 WHERE id=@child",
             ("@id", id), ("@child", child));
         stable = p.Revision();
-        PilotRunner.Check(EstimateReader.Load(conn, contractId).MoneyFromStages, "Stage money flag missing");
+        var stageBefore = EstimateReader.Load(conn, contractId);
+        PilotRunner.Check(stageBefore.MoneyFromStages, "Stage money flag missing");
         RejectPercent(50m, stable);
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'sum' WHERE id=@id", ("@id", id));
+        var stageSumBefore = EstimateReader.Load(conn, contractId);
+        var stageSumRevision = p.Revision();
+        var rejectedStageSum = SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
+            "smr_amount", 111m, stageSumRevision);
+        var stageSumAfter = EstimateReader.Load(conn, contractId);
+        PilotRunner.Check(!rejectedStageSum.Saved && stageSumRevision == p.Revision() &&
+            stageSumAfter.MoneyFromStages && stageSumAfter.SmrMode == "sum" &&
+            stageSumAfter.Totals == stageSumBefore.Totals,
+            "Stage-derived SMR accepted a manual sum or changed transport");
+        PilotRunner.Execute(conn, "UPDATE dbo.contracts SET smr_mode=N'percent' WHERE id=@id", ("@id", id));
         PilotRunner.Execute(conn, "UPDATE dbo.contracts SET stage_of=NULL,stage_sum=NULL WHERE id=@child", ("@child", child));
         PilotRunner.Check(!EstimateReader.Load(conn, contractId).MoneyFromStages, "Stage money flag not cleared");
         PilotRunner.Check(SqlServerCostTotals.SaveTotalsField(p.PilotConnection, contractId,
