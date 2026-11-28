@@ -33,9 +33,14 @@ public static class WorkspaceInputPolicy
             throw new ArgumentException("Слишком длинные реквизиты документа.");
         if (!Documents.IsValidDocumentDate(v.Date))
             throw new ArgumentException("Дата должна быть в формате дд.мм.гггг.");
-        if (v.Kind == "dop" && v.BaseContractId is null)
+        if (v.Kind == "dop" && v.BaseContractId is not > 0)
             throw new ArgumentException("Для допсоглашения выбери исходный договор.");
-        return v with { BaseContractId = v.Kind == "dop" ? v.BaseContractId : null };
+        if (v.AgreementId is <= 0 || v.Kind != "main" && v.AgreementId.HasValue)
+            throw new ArgumentException("Юридический договор выбирается только для приложения.");
+        var annexNumber = (v.AnnexNumber ?? "").Trim();
+        if (annexNumber.Length > 200 || v.Kind != "main" && annexNumber.Length != 0)
+            throw new ArgumentException("Номер приложения допустим только для приложения (до 200 символов).");
+        return v with { BaseContractId = v.Kind == "dop" ? v.BaseContractId : null, AnnexNumber = annexNumber };
     }
 
 }

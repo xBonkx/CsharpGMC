@@ -232,7 +232,7 @@ public static partial class SqlServerWorkspace
         insert.Parameters.Add("@phase", SqlDbType.NVarChar, 24).Value = v.Kind == "kp" ? "volumes" : "";
         insert.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = form;
         var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
-        SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId);
+        SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, validateNewAnnex: true);
         SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
         Log(conn, tx, "contract", id, "create",
             objName + ": " + Documents.ContractTitleText(v.Kind, v.Number, v.Date, v.Name), id, objectId);
@@ -265,7 +265,9 @@ public static partial class SqlServerWorkspace
             EnsureBaseContract(conn, tx, parentId, src.ObjectId);
 
         // Организация из диалога, НДС — по организации; без неё остаются реквизиты источника.
-        var company = v.CompanyId ?? src.CompanyId;
+        // A selected legal card may explicitly have no company; copying
+        // positions must not restore the source's unrelated organization.
+        var company = v.Kind == "main" && v.AgreementId.HasValue ? v.CompanyId : v.CompanyId ?? src.CompanyId;
         var vat = v.CompanyId is long dialogCompany && CompanyVat(conn, tx, dialogCompany) is double rate
             ? rate : src.VatRate;
 
@@ -304,7 +306,7 @@ public static partial class SqlServerWorkspace
                 src.TransportCost is double cost ? cost : DBNull.Value;
             var id = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
 
-            SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, sourceId);
+            SqlServerAgreements.AttachNewDocument(conn, tx, id, v.AgreementId, sourceId, validateNewAnnex: true);
             SqlServerAgreements.SetAnnexNumber(conn, tx, id, v.AnnexNumber);
             Log(conn, tx, "contract", id, "create",
                 objName + ": " + Documents.ContractTitleText(v.Kind, v.Number, v.Date, v.Name), id, src.ObjectId);
@@ -651,7 +653,7 @@ public static partial class SqlServerWorkspace
                     ? SqlServerAgreements.DocumentAgreementId(conn, legalBase, tx) : null)
             : null;
         var legalChanged = legalEnabled && previousLegal != requestedLegal;
-        if (legalChanged && previousLegal.HasValue)
+        if (legalChanged || legalEnabled && old.Kind == "kp" && value.Kind == "main")
         {
             using var children = new SqlCommand(
                 "SELECT TOP(1) id FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) " +

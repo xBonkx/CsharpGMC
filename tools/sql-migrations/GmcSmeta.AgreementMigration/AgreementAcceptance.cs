@@ -133,6 +133,23 @@ internal static class AgreementAcceptance
             directorAfter.Earned!=directorBefore.Earned||Revision()!=afterDirectorRevision)
             throw new Exception("Director legal annotation changed object totals or lost contributing identity.");
         Console.WriteLine("PASS director scope: independent agreements, empty-card exclusion, preserved object totals and revision.");
+        var invalidAnnexRevision=Revision();
+        var invalidAnnexRejected=false;
+        try
+        {
+            SqlServerWorkspace.CreateEmptyContract(connection,obj,
+                new("main","WRONG","01.01.2026","Wrong legal metadata",null,null){AgreementId=id},invalidAnnexRevision);
+        }
+        catch(InvalidOperationException) { invalidAnnexRejected=true; }
+        if(!invalidAnnexRejected||Revision()!=invalidAnnexRevision)
+            throw new Exception("Mismatched new annex metadata was accepted or changed revision.");
+        var copied=SqlServerWorkspace.CopyContract(connection,document,
+            new("main",secondLegal.Number,secondLegal.Date,"Copy positions across legal cards",secondLegal.CompanyId,null)
+            {AgreementId=secondLegal.Id},Revision(),withPositions:false);
+        if(SqlServerAgreements.DocumentAgreementId(read,copied)!=secondLegal.Id ||
+            SqlServerAgreements.DocumentAgreementId(read,document)!=id)
+            throw new Exception("Copy source incorrectly overrode explicit target legal identity.");
+        Console.WriteLine("PASS new-annex legal metadata rollback and explicit cross-card copy.");
         Console.WriteLine("PASS agreement CRUD and transfer: before annex, own fields, two agreements, annex/DS inheritance, stale revision, cross-object protection, existing-context rejection and empty-target transfer.");
     }
 }

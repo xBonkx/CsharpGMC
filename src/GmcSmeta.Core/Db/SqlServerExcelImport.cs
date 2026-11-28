@@ -219,7 +219,7 @@ public static class SqlServerExcelImport
             contract.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = b.Form;
             contract.Parameters.Add("@pnr", SqlDbType.Float).Value = (double)(b.Pnr ?? 0m);
             var contractId = Convert.ToInt64(contract.ExecuteScalar(), CultureInfo.InvariantCulture);
-            SqlServerAgreements.AttachNewDocument(conn, tx, contractId, choice.AgreementId);
+            SqlServerAgreements.AttachNewDocument(conn, tx, contractId, choice.AgreementId, validateNewAnnex: true);
             created.Add(contractId);
             var sections = new Dictionary<string, long>(StringComparer.Ordinal);
             for (var sIndex = 0; sIndex < b.Sections.Count; sIndex++)

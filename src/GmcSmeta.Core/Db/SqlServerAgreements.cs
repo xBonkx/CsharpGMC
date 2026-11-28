@@ -145,9 +145,13 @@ public static class SqlServerAgreements
         cmd.ExecuteNonQuery();
     }
 
-    internal static void AttachNewDocument(SqlConnection conn, SqlTransaction tx, long documentId, long? preferred = null, long? sourceId = null)
+    internal static void AttachNewDocument(SqlConnection conn, SqlTransaction tx, long documentId, long? preferred = null, long? sourceId = null, bool validateNewAnnex = false)
     {
-        if (!Enabled(conn, tx)) return;
+        if (!Enabled(conn, tx))
+        {
+            if (preferred.HasValue) throw new InvalidOperationException("Схема базы не поддерживает юридические договоры.");
+            return;
+        }
         long objectId; string kind; long? parent;
         using (var cmd = new SqlCommand("SELECT object_id,kind,COALESCE(stage_of,base_contract_id) FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
         {
@@ -155,7 +159,9 @@ public static class SqlServerAgreements
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
             objectId = SqlInteger.ReadInt64(r, 0); kind = r.GetString(1);
-            parent = r.IsDBNull(2) ? sourceId : SqlInteger.ReadInt64(r, 2);
+            // A copy source is not a legal parent. An explicit target for a
+            // new annex can differ from the document supplying its positions.
+            parent = r.IsDBNull(2) ? (preferred.HasValue ? null : sourceId) : SqlInteger.ReadInt64(r, 2);
         }
         if (kind == "kp") return;
         var inherited = parent.HasValue ? DocumentAgreementId(conn, parent.Value, tx) : null;
@@ -186,7 +192,21 @@ public static class SqlServerAgreements
             if (cards.Count != 1) throw new InvalidOperationException("Выберите юридический договор в реквизитах документа. Для нового объекта сначала сохраните реквизиты договора.");
             id = cards[0].Id;
         }
-        if (cards.All(a => a.Id != id)) throw new ArgumentException("Выбранный договор относится к другому объекту или архивирован.");
+        var selected = cards.SingleOrDefault(a => a.Id == id)
+            ?? throw new ArgumentException("Выбранный договор относится к другому объекту или архивирован.");
+        if (validateNewAnnex && kind == "main")
+        {
+            using var check = new SqlCommand("SELECT number,[date],company_id FROM dbo.contracts WHERE id=@id", conn, tx);
+            check.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
+            using var r = check.ExecuteReader();
+            if (!r.Read()) throw new DBConcurrencyException("Документ изменился.");
+            var number = r.IsDBNull(0) ? "" : r.GetString(0);
+            var date = r.IsDBNull(1) ? "" : Convert.ToString(r.GetValue(1), CultureInfo.InvariantCulture) ?? "";
+            var company = r.IsDBNull(2) ? (long?)null : SqlInteger.ReadInt64(r, 2);
+            if (!string.Equals(number, selected.Number, StringComparison.Ordinal) ||
+                Date(date) != Date(selected.Date) || company != selected.CompanyId)
+                throw new InvalidOperationException("Реквизиты нового приложения не совпадают с юридическим договором.");
+        }
         using var update = new SqlCommand("UPDATE dbo.contracts SET agreement_id=@agreement WHERE id=@id AND object_id=@object", conn, tx);
         update.Parameters.Add("@agreement", SqlDbType.BigInt).Value = id.Value;
         update.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;

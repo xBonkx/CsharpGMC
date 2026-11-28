@@ -25,7 +25,9 @@ public partial class ContractDialog
             _legalFieldsApplied = true;
             NumberBox.Text = selected.Number;
             DateBox.Text = selected.Date;
+            var priorVat = VatBox.Text;
             CompanyCombo.SelectedValue = selected.CompanyId;
+            if (_preserveLegacyLegalMetadata) VatBox.Text = priorVat;
             NumberBox.IsReadOnly = DateBox.IsReadOnly = true;
             CompanyCombo.IsEnabled = false;
         }
