@@ -1,5 +1,7 @@
 # SUM-VIS-01 — Сводная стоимость: визуальный и UX-паритет Python → C# (25.11.2026)
 
+**Канонический статус 28.11.2026 — CODE READY (реализация); приёмка E01–E06 и C12 не выполнена.** Активная вкладка КП/договора единая; неиспользуемый отдельный обработчик удалён, compatibility host сохранён. Исторические чекбоксы остаются открыты до DONE. [Отчёт](DESIGN_PASS_20261128_WIDTHS_SUMMARY_CLOSURE.md).
+
 28.11.2026 ChatGPT/main — проход 12 remaining visual IDs: FONT-08 and QA-08 (maintained replacement implementation) CODE READY; 10 PARTIAL. Three detached procurement previews now support validated rectangular TSV paste; four forms use adaptive shared layout; live summary header sizing; Qt semantic weights and shared H1; nested-frame/override inventory, hash-bound physical capture raster diff/crop. Main structural grids retain FullRow. No build, xUnit, App.Checks, Python unittest, PowerShell audit, actual Windows/Pilot evidence; no DB, finance, schema or release changes. [Отчёт](DESIGN_PASS_20261128_REMAINING_12.md).
 
 

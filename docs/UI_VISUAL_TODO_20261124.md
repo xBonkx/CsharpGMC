@@ -1,3 +1,5 @@
+28.11.2026 ChatGPT/main — GRID-19 and SUM-VIS-01 CODE READY (+2), QA-09/QA-19 BLOCKED on actual Windows captures. Width coverage now includes common scalar roles and 108 explicit display annotations across 17 XAML files, dynamic stage and KS matrices, approved metal/KS converters, inline stage manual/default reset, weak source/font/collection invalidation; active summary route and pixel-safe anchor. No original checkboxes closed, no actual build/xUnit/WPF/Pilot/capture; no finance, DB, SQL or release changes by this design pass. Design 246/253 CODE READY, 5 PARTIAL, 2 BLOCKED. Remaining implementation IDs GRID-28, HOME-03, SPACE-15/18/19. [Отчёт](DESIGN_PASS_20261128_WIDTHS_SUMMARY_CLOSURE.md).
+
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
 28.11.2026 ChatGPT/main — проход 12 remaining visual IDs: FONT-08 and QA-08 (maintained replacement implementation) CODE READY; 10 PARTIAL. Three detached procurement previews now support validated rectangular TSV paste; four forms use adaptive shared layout; live summary header sizing; Qt semantic weights and shared H1; nested-frame/override inventory, hash-bound physical capture raster diff/crop. Main structural grids retain FullRow. No build, xUnit, App.Checks, Python unittest, PowerShell audit, actual Windows/Pilot evidence; no DB, finance, schema or release changes. [Отчёт](DESIGN_PASS_20261128_REMAINING_12.md).
@@ -516,7 +518,7 @@ Live scrolling вместо deferred; подробности в [CHANGELOG](CHAN
   - **Реализация и критерий приёмки:** Считать ширины по kp_columns.py/настройкам Python; сохранить возможность пользовательского resize; на сброшенных настройках ширины совпадают.
 - [ ] **GRID-18 · P1** — Растягивание Примечания.
   - **Реализация и критерий приёмки:** Примечание получает остаточную ширину, если это предусмотрено эталоном; длинные примечания не заставляют другие колонки разъезжаться.
-- [ ] **GRID-19 · P0** — Устранить обрезание данных при доступном месте.
+- [ ] **GRID-19 · P0** — Устранить обрезание данных при доступном месте. **CODE READY; Windows/DPI-приёмка не выполнена.**
   - **Реализация и критерий приёмки:** Включить числа 123 456 789,00, длинные имена и заголовки; устранить скрытый clipping в штатных размерах, обеспечить корректную прокрутку при необходимости.
 - [ ] **GRID-20 · P1** — Горизонтальный скролл только при необходимости.
   - **Реализация и критерий приёмки:** ScrollbarVisibility Auto и корректный расчёт звёздочных/фиксированных ширин; при помещающихся колонках горизонтальная полоса отсутствует.
@@ -858,7 +860,7 @@ Live scrolling вместо deferred; подробности в [CHANGELOG](CHAN
   - **Реализация и критерий приёмки:** Для выбранного элемента выводить ancestry, локальные/стилевые/template значения и фактическую позицию; отличать последовательные блоки от вложенных.
 - [ ] **QA-08 · P1** — Использовать существующие audit_snap и audit_parity.
   - **Реализация и критерий приёмки:** Запускать _tools/audit_snap.ps1 и _tools/audit_parity.ps1 на Windows; проверить их реальные параметры и сохранять артефакты рядом с отчётом.
-- [ ] **QA-09 · P1** — Эталонные снимки Python всех основных страниц.
+- [ ] **QA-09 · P1** — Эталонные снимки Python всех основных страниц. **BLOCKED: требуются реальные снимки на Windows.**
   - **Реализация и критерий приёмки:** Снимки главной, объекта, КП 4 вкладки, договор 5 вкладок и специализированных модулей с одинаковыми состояниями.
 - [ ] **QA-10 · P1** — Одинаковые договор, права, СМР, настройки колонок, масштаб, DPI и состояния.
   - **Реализация и критерий приёмки:** Протокол снимка содержит договор/объект ID тестовой БД, права, signed, СМР, столбцы, zoom, DPI, размер окна; сравнение разных сумм запрещено.
@@ -878,7 +880,7 @@ Live scrolling вместо deferred; подробности в [CHANGELOG](CHAN
   - **Реализация и критерий приёмки:** На смете 2500+ строк измерить открытие, прокрутку, редактирование и переключение вкладок; не отключать виртуализацию ради оформления, сравнить до/после.
 - [ ] **QA-18 · P0** — Сборка и регрессионные тесты перед публикацией.
   - **Реализация и критерий приёмки:** Запустить dotnet build/test, CI и Windows UI-приёмку; фиксировать реальный результат, не заявлять запуск без него.
-- [ ] **QA-19 · P1** — Снимки логотипа и дерева с родителем, несколькими этапами, остатком и глубокой вложенностью; отсутствие обрезания и смещения контуров.
+- [ ] **QA-19 · P1** — Снимки логотипа и дерева с родителем, несколькими этапами, остатком и глубокой вложенностью; отсутствие обрезания и смещения контуров. **BLOCKED: требуются реальные снимки на Windows.**
   - **Реализация и критерий приёмки:** Приложить увеличенные снимки логотипа и дерева: обычный документ, родитель с этапами, 3+ детей, остаток, вложенность и выбранный узел при нескольких DPI. Все glyph целые.
 
 
