@@ -43,32 +43,27 @@ public sealed class ProcurementOrderDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ProcurementDialogChrome.Apply(this);
         Background = System.Windows.Media.Brushes.White;
-        var root = new StackPanel { Margin = ProcurementDialogChrome.Outer };
-        var dock = new DockPanel { Margin = ProcurementDialogChrome.Outer };
-        root.Margin = new Thickness(0);
-        Content = dock;
+        var root = new StackPanel();
         var title = ProcurementDialogChrome.Heading($"Заказ / оплата — позиций: {rows.Count}");
-        title.Margin = new Thickness(0, 0, 0, 8);
+        title.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupHeadingGap");
         root.Children.Add(title);
-        root.Children.Add(new TextBlock
-        {
-            Text = "При массовом изменении пустые поля не изменяются. Цена закупки редактируется в таблице.",
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
-        });
+        root.Children.Add(DynamicFormLayout.Secondary(
+            "При массовом изменении пустые поля не изменяются. Цена закупки редактируется в таблице.", "LayoutDialogIntroGap"));
 
         var form = new Grid();
-        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(145) });
-        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 145 });
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
         for (var i = 0; i < 6; i++)
-            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 38 });
+            form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         static void Place(Grid panel, string title, FrameworkElement editor, int index)
         {
-            var label = new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center };
+            var label = DynamicFormLayout.Secondary(title, "LayoutFormLabelMargin");
+            label.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetRow(label, index);
             panel.Children.Add(label);
-            editor.MinHeight = 32;
-            editor.Margin = new Thickness(0, 4, 0, 4);
+            if (editor is Control input) DynamicFormLayout.Field(input);
+            editor.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+            System.Windows.Automation.AutomationProperties.SetName(editor, title);
             editor.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetRow(editor, index);
             Grid.SetColumn(editor, 1);
@@ -171,13 +166,13 @@ public sealed class ProcurementOrderDialog : Window
             Margin = new Thickness(0, 10, 0, 14)
         });
 
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right
         };
-        var save = new Button { Content = "Сохранить", MinWidth = 110, Height = 32,
-            Margin = new Thickness(0, 0, 8, 0) };
+        var save = new Button { Content = "Сохранить", MinWidth = 110 };
+        save.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         save.Click += (_, _) =>
         {
             if (_setPayment.IsChecked == true && _payment.SelectedDate is null)
@@ -187,15 +182,10 @@ public sealed class ProcurementOrderDialog : Window
             }
             DialogResult = true;
         };
-        var cancel = new Button { Content = "Отмена", MinWidth = 90, Height = 32 };
-        cancel.Click += (_, _) => DialogResult = false;
+        var cancel = new Button { Content = "Отмена", MinWidth = 90 };
         ProcurementDialogChrome.Buttons(save, cancel);
         buttons.Children.Add(save);
         buttons.Children.Add(cancel);
-        buttons.Margin = ProcurementDialogChrome.FooterGap;
-        DockPanel.SetDock(buttons, Dock.Bottom);
-        dock.Children.Add(buttons);
-        dock.Children.Add(new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        Content = DynamicFormLayout.WithFooter(root, buttons);
     }
 }
