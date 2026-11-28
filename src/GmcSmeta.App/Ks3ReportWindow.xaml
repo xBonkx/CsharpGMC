@@ -21,7 +21,7 @@
             <StackPanel>
                 <TextBlock Text="Расчёт КС-3" TextWrapping="Wrap" Foreground="#0F172A" FontWeight="Bold"
                            FontSize="{StaticResource UiH1Size}"/>
-                <TextBlock x:Name="ActInfoText" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                <TextBlock x:Name="ActInfoText" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="ExportButton" Content="Сохранить Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click"
