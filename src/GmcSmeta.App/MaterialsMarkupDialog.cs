@@ -26,6 +26,7 @@ public sealed class MaterialsMarkupDialog : Window
     {
         Title = "Наценка";
         Width = 560;
+        MinWidth = 340;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
@@ -38,13 +39,14 @@ public sealed class MaterialsMarkupDialog : Window
         _toPrice = new RadioButton
         {
             Content = "Посчитать цену клиенту из закупа:  цена = закуп × коэффициент",
-            IsChecked = true, Margin = new Thickness(0, 0, 0, 6),
+            IsChecked = true,
         };
         _toCost = new RadioButton
         {
             Content = "Посчитать закуп из цены клиенту:  закуп = цена ÷ коэффициент",
-            Margin = new Thickness(0, 0, 0, 10),
         };
+        _toPrice.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormChoiceGap");
+        _toCost.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupSeparatorGap");
         DynamicFormLayout.WrapCaption(_toPrice);
         DynamicFormLayout.WrapCaption(_toCost);
         root.Children.Add(_toPrice);
@@ -74,9 +76,10 @@ public sealed class MaterialsMarkupDialog : Window
         AddField("или наценка, %", _percent);
         _onlyEmpty = new CheckBox
         {
-            Content = "Только там, где цена (или закуп) ещё не указана", Margin = new Thickness(0, 0, 0, 6),
+            Content = "Только там, где цена (или закуп) ещё не указана",
         };
         _round = new CheckBox { Content = "Округлить цену до целых рублей", IsChecked = true };
+        _onlyEmpty.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormChoiceGap");
         DynamicFormLayout.WrapCaption(_onlyEmpty);
         DynamicFormLayout.WrapCaption(_round);
         root.Children.Add(_onlyEmpty);

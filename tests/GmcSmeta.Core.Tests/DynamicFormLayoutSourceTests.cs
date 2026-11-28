@@ -89,7 +89,8 @@ public sealed class DynamicFormLayoutSourceTests
         var source = Source("DynamicFormLayout.cs");
         Assert.Contains("MonitorFromWindow(handle, MonitorDefaultToNearest)", source);
         Assert.Contains("GetMonitorInfo(monitor, ref info)", source);
-        Assert.Contains("VisualTreeHelper.GetDpi(window)", source);
+        Assert.Contains("VisualTreeHelper.GetDpi(visual)", source);
+        Assert.Contains("WorkAreaFor(window)", source);
         Assert.Contains("window.SourceInitialized +=", source);
         Assert.Contains("window.LocationChanged +=", source);
         Assert.Contains("window.DpiChanged +=", source);

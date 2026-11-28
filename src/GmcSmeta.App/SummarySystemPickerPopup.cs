@@ -29,34 +29,45 @@ internal sealed class SummarySystemPickerPopup
         _changed = changed;
         _popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom,
             VerticalOffset = 4, StaysOpen = false, AllowsTransparency = true };
-        var root = new DockPanel { Width = Math.Min(440, Math.Max(240, SystemParameters.WorkArea.Width - 40)),
-            MaxHeight = Math.Min(560, Math.Max(240, SystemParameters.WorkArea.Height - 80)), LastChildFill = true };
+        var root = new DockPanel { LastChildFill = true };
+        void FitPopup()
+        {
+            var work = DynamicFormLayout.WorkAreaFor(anchor);
+            root.Width = Math.Min(440, Math.Max(1, work.Width - 40));
+            root.MaxHeight = Math.Min(560, Math.Max(1, work.Height - 80));
+        }
+        FitPopup();
+        _popup.Opened += (_, _) => FitPopup();
         var frame = new Border { Background = Brushes.White, BorderBrush = Brush("#DAE3EF"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10), Child = root };
+            Child = root };
+        frame.SetResourceReference(Border.PaddingProperty, "LayoutPickerPadding");
         _popup.Child = frame;
         frame.PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) { e.Handled = true; Close(); }
         };
 
-        var searchBar = new DockPanel { Margin = new Thickness(0, 0, 0, 8), LastChildFill = true };
+        var searchBar = new DockPanel { LastChildFill = true };
+        searchBar.SetResourceReference(FrameworkElement.MarginProperty, "LayoutPickerSearchGap");
         DockPanel.SetDock(searchBar, Dock.Top);
-        var clear = new Button { Content = "Очистить", Width = 30, MinHeight = 34, Margin = new Thickness(6, 0, 0, 0),
-            ToolTip = "Очистить поиск" };
+        var clear = new Button { Content = "Очистить", Width = 30, ToolTip = "Очистить поиск" };
+        clear.SetResourceReference(FrameworkElement.MarginProperty, "LayoutPickerClearGap");
         StyleFor(clear, "PythonToolbarButton");
         clear.SetResourceReference(ContentControl.ContentTemplateProperty, "IconOnlyX");
         System.Windows.Automation.AutomationProperties.SetName(clear, "Очистить поиск");
         DockPanel.SetDock(clear, Dock.Right);
         searchBar.Children.Add(clear);
-        _search = new TextBox { MinHeight = 34, VerticalContentAlignment = VerticalAlignment.Center,
+        _search = new TextBox { VerticalContentAlignment = VerticalAlignment.Center,
             ToolTip = "Найти систему: В1, ВЕ, ДП…" };
         StyleFor(_search, "PythonSearch");
+        DynamicFormLayout.Field(_search);
         var searchGrid = new Grid();
         searchGrid.Children.Add(_search);
         var hint = new TextBlock { Text = "Найти систему: В1, ВЕ, ДП…", TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             IsHitTestVisible = false };
+        hint.SetResourceReference(FrameworkElement.MarginProperty, "LayoutPickerHintInset");
         hint.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
         System.Windows.Automation.AutomationProperties.SetName(_search, "Найти систему");
         searchGrid.Children.Add(hint);
@@ -68,10 +79,10 @@ internal sealed class SummarySystemPickerPopup
         footer.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
         DockPanel.SetDock(footer, Dock.Bottom);
         var actions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var all = new Button { Content = "Все системы", MinHeight = 34,
-            Margin = new Thickness(0, 0, 6, 0), ToolTip = "Снять все отметки — показать все системы" };
+        var all = new Button { Content = "Все системы", ToolTip = "Снять все отметки — показать все системы" };
+        all.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         StyleFor(all, "PythonToolbarButton");
-        var done = new Button { Content = "Готово", MinHeight = 34 };
+        var done = new Button { Content = "Готово" };
         StyleFor(done, "PythonToolbarPrimary");
         actions.Children.Add(all);
         actions.Children.Add(done);
@@ -88,7 +99,8 @@ internal sealed class SummarySystemPickerPopup
         {
             var ids = family.Select(o => o.Id).ToArray();
             var chip = new CheckBox { Content = $"{family.Key} · {ids.Length}",
-                Margin = new Thickness(0, 0, 6, 6), ToolTip = $"Отметить / снять все системы {family.Key}" };
+                ToolTip = $"Отметить / снять все системы {family.Key}" };
+            chip.SetResourceReference(FrameworkElement.MarginProperty, "LayoutAuxActionGap");
             StyleFor(chip, "PythonFilterChip");
             _families.Add((ids, chip));
             familyPanel.Children.Add(chip);
@@ -111,9 +123,11 @@ internal sealed class SummarySystemPickerPopup
         var list = new StackPanel();
         foreach (var (id, label) in options)
         {
-            var choice = new CheckBox { Content = label, MinHeight = 28,
-                Margin = new Thickness(parents.ContainsKey(id) ? 20 : 4, 0, 4, 0),
+            var choice = new CheckBox { Content = label,
                 ToolTip = label, VerticalContentAlignment = VerticalAlignment.Center };
+            choice.SetResourceReference(FrameworkElement.MinHeightProperty, "LayoutDocumentRowMinHeight");
+            choice.SetResourceReference(FrameworkElement.MarginProperty,
+                parents.ContainsKey(id) ? "LayoutPickerChildChoiceInset" : "LayoutPickerRootChoiceInset");
             DynamicFormLayout.WrapCaption(choice);
             _choices.Add((id, label, choice));
             list.Children.Add(choice);

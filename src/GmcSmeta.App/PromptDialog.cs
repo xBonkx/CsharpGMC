@@ -17,7 +17,8 @@ public sealed class PromptDialog : Window
         Title = title;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
+        MinWidth = 300;
         SizeToContent = SizeToContent.Height;
         Width = 460;
         Background = Brushes.White;
@@ -33,20 +34,21 @@ public sealed class PromptDialog : Window
         var footer = new Border
         {
             Background = Brush("#F8FAFC"), BorderBrush = Brush("#E4E8EF"),
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(20, 12, 20, 12)
+            BorderThickness = new Thickness(0, 1, 0, 0)
         };
+        footer.SetResourceReference(Border.PaddingProperty, "LayoutPromptFooterPadding");
         DockPanel.SetDock(footer, Dock.Bottom);
-        var actions = new StackPanel
+        var actions = new WrapPanel
         {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
-        var cancel = new Button { Content = "Отмена", MinWidth = 94, IsCancel = true };
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         cancel.SetResourceReference(StyleProperty, "PythonToolbarButton");
         cancel.Click += (_, _) => DialogResult = false;
         var ok = new Button
         {
-            Content = "Сохранить", MinWidth = 108, Margin = new Thickness(8, 0, 0, 0), IsDefault = true
+            Content = "Сохранить", IsDefault = true
         };
         ok.SetResourceReference(StyleProperty, "PythonToolbarPrimary");
         ok.Click += (_, _) => DialogResult = true;

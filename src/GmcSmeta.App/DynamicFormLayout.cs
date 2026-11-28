@@ -24,23 +24,7 @@ internal static class DynamicFormLayout
             // Callers may set an intentional local cap after Apply.
             if (window.MaxHeight != lastAppliedHeight) requestedMaxHeight = window.MaxHeight;
             if (window.MaxWidth != lastAppliedWidth) requestedMaxWidth = window.MaxWidth;
-            var workArea = SystemParameters.WorkArea.Size;
-            // SystemParameters.WorkArea refers to the primary display. Once a
-            // HWND exists, constrain the form to the actual monitor instead.
-            var handle = new WindowInteropHelper(window).Handle;
-            var monitor = handle == IntPtr.Zero ? IntPtr.Zero : MonitorFromWindow(handle, MonitorDefaultToNearest);
-            if (monitor != IntPtr.Zero)
-            {
-                var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-                if (GetMonitorInfo(monitor, ref info))
-                {
-                    var dpi = VisualTreeHelper.GetDpi(window);
-                    var width = (info.Work.Right - info.Work.Left) / dpi.DpiScaleX;
-                    var height = (info.Work.Bottom - info.Work.Top) / dpi.DpiScaleY;
-                    if (double.IsFinite(width) && width > 0 && double.IsFinite(height) && height > 0)
-                        workArea = new Size(width, height);
-                }
-            }
+            var workArea = WorkAreaFor(window);
             var maxHeight = Math.Max(window.MinHeight, Math.Min(requestedMaxHeight, workArea.Height));
             var maxWidth = Math.Max(window.MinWidth, Math.Min(requestedMaxWidth, workArea.Width));
             fitting = true;
@@ -58,6 +42,23 @@ internal static class DynamicFormLayout
         window.Loaded += (_, _) => FitWorkArea();
         window.LocationChanged += (_, _) => FitWorkArea();
         window.DpiChanged += (_, _) => FitWorkArea();
+    }
+
+    /// <summary>Monitor containing the supplied visual, in its effective DIPs.
+    /// Fallback is the primary work area only before a presentation source exists.</summary>
+    internal static Size WorkAreaFor(Visual visual)
+    {
+        var workArea = SystemParameters.WorkArea.Size;
+        var handle = (PresentationSource.FromVisual(visual) as HwndSource)?.Handle ?? IntPtr.Zero;
+        var monitor = handle == IntPtr.Zero ? IntPtr.Zero : MonitorFromWindow(handle, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return workArea;
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref info)) return workArea;
+        var dpi = VisualTreeHelper.GetDpi(visual);
+        var width = (info.Work.Right - info.Work.Left) / dpi.DpiScaleX;
+        var height = (info.Work.Bottom - info.Work.Top) / dpi.DpiScaleY;
+        return double.IsFinite(width) && width > 0 && double.IsFinite(height) && height > 0
+            ? new Size(width, height) : workArea;
     }
 
     private const uint MonitorDefaultToNearest = 2;

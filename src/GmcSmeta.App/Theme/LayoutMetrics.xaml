@@ -89,6 +89,14 @@
     <Thickness x:Key="LayoutCostToolbarItemGap">0,0,6,4</Thickness>
     <Thickness x:Key="LayoutFormScrollInset">12</Thickness>
     <Thickness x:Key="LayoutDialogActionGap">0,0,8,0</Thickness>
+    <Thickness x:Key="LayoutPromptFooterPadding">20,12,20,12</Thickness>
+    <Thickness x:Key="LayoutFormChoiceGap">0,0,0,6</Thickness>
+    <Thickness x:Key="LayoutPickerPadding">10</Thickness>
+    <Thickness x:Key="LayoutPickerSearchGap">0,0,0,8</Thickness>
+    <Thickness x:Key="LayoutPickerClearGap">6,0,0,0</Thickness>
+    <Thickness x:Key="LayoutPickerHintInset">12,0,0,0</Thickness>
+    <Thickness x:Key="LayoutPickerRootChoiceInset">4,0,4,0</Thickness>
+    <Thickness x:Key="LayoutPickerChildChoiceInset">20,0,4,0</Thickness>
     <Thickness x:Key="LayoutDialogIntroGap">0,0,0,12</Thickness>
     <Thickness x:Key="LayoutDialogListGap">0,12,0,12</Thickness>
     <Thickness x:Key="LayoutDialogListItemGap">0,0,0,4</Thickness>
