@@ -109,7 +109,7 @@ public sealed class EstimateTotalsVisualSourceTests
         var table = Named(doc, "TotalsGrid");
         Assert.Equal("False", (string?)table.Attribute("CanUserResizeRows"));
         Assert.Equal("True", (string?)table.Attribute("CanUserResizeColumns"));
-        Assert.Equal("14", (string?)table.Attribute("FontSize"));
+        Assert.Equal("{StaticResource UiTotalsTableSize}", (string?)table.Attribute("FontSize"));
         var columns = table.Element(W + "DataGrid.Columns")!.Elements().ToArray();
         Assert.Equal(new[] { "name", "cost", "sell", "margin", "pct" },
             columns.Select(e => (string?)e.Attribute("SortMemberPath")).ToArray());
