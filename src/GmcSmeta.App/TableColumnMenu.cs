@@ -102,8 +102,7 @@ public static class TableColumnMenu
         menu.Items.Add(columns);
     }
 
-    private static bool ValidKey(string key) => !string.IsNullOrWhiteSpace(key) &&
-        key.All(ch => char.IsAsciiLetterOrDigit(ch) || ch == '-' || ch == '_');
+    private static bool ValidKey(string key) => ColumnLayoutKeyPolicy.IsValid(key);
 
     private static void KeyChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
     {
@@ -121,7 +120,7 @@ public static class TableColumnMenu
     {
         var layout = new Layout(grid, key);
         Layouts.Add(grid, layout);
-        grid.Loaded += (_, _) => layout.Initialize();
+        grid.Loaded += (_, _) => layout.OnLoaded();
         if (ownHeaderMenu) InstallHeaderMenu(grid, anchor => layout.Show(anchor));
         grid.ColumnReordered += (_, _) => layout.SaveOrder();
         grid.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler(layout.ResizeStarted), true);
@@ -259,10 +258,9 @@ public static class TableColumnMenu
                 {
                     foreach (var entry in _entries.Where(x => !x.Excluded))
                     {
-                        if (!entry.Protected && GetDefaultHidden(entry.Column))
-                            entry.Column.Visibility = Visibility.Collapsed;
-                        else if (!entry.Protected && _prefs.Hidden.Contains(entry.Id))
-                            entry.Column.Visibility = Visibility.Visible;
+                        if (!entry.Protected)
+                            entry.Column.Visibility = GetDefaultHidden(entry.Column)
+                                ? Visibility.Collapsed : Visibility.Visible;
                         entry.Column.Width = entry.Width;
                     }
                     if (grid.CanUserReorderColumns)
@@ -281,6 +279,7 @@ public static class TableColumnMenu
             Initialize(retained);
         }
         private bool _initialized, _applying;
+        private long _profileGeneration;
         private Preferences _prefs = new();
         private Dictionary<DataGridColumn, DataGridLength>? _resizeStart;
         private string PathName => Path.Combine(ProfileDirectory, key + ".json");
@@ -355,32 +354,7 @@ public static class TableColumnMenu
                     index == 0 || index < grid.FrozenColumnCount || excluded || !column.CanUserReorder);
             }).ToArray();
             _initialized = true;
-            _prefs = Read();
-            _applying = true;
-            try
-            {
-                foreach (var entry in _entries.Where(x => !x.Excluded))
-                {
-                    if (!entry.Protected)
-                    {
-                        var hide = _prefs.Hidden.Contains(entry.Id) ||
-                            GetDefaultHidden(entry.Column) && !_prefs.Shown.Contains(entry.Id);
-                        if (hide && CanHide(entry.Column)) entry.Column.Visibility = Visibility.Collapsed;
-                        else if (GetDefaultHidden(entry.Column)) entry.Column.Visibility = Visibility.Visible;
-                    }
-                    if (_prefs.Widths.TryGetValue(entry.Id, out var width) &&
-                        double.IsFinite(width) && width is >= 36 and <= 2000)
-                        entry.Column.Width = new DataGridLength(Math.Clamp(width, entry.Column.MinWidth,
-                            Math.Max(entry.Column.MinWidth, entry.Column.MaxWidth)));
-                }
-                if (grid.CanUserReorderColumns)
-                {
-                    foreach (var entry in _entries.Where(x => x.FixedOrder))
-                        entry.Column.CanUserReorder = false;
-                    ApplyOrder(_prefs.Order);
-                }
-            }
-            finally { _applying = false; }
+            ApplyProfile(Read(), restoreDefaults: false);
             if (key == "estimate-summary")
             {
                 _summaryFit ??= new SummaryColumnFit(grid, SummaryPreferred, () => _prefs.Widths.Count > 0);
@@ -399,6 +373,58 @@ public static class TableColumnMenu
                 _documentFit ??= new DocumentColumnFit(grid, DocumentPreferred);
                 _documentFit.Invalidate();
             }
+        }
+
+        // Cached grids keep their original entries, not the current manual widths
+        // or hidden columns as new defaults. Reload the persisted profile when
+        // reattached; another window may have independently reset any field.
+        internal void OnLoaded()
+        {
+            if (!_initialized)
+            {
+                Initialize();
+                return;
+            }
+            if (!Ready() || _resizeStart is not null) return;
+            ApplyProfile(Read(), restoreDefaults: true);
+            _legacyCostFit?.Invalidate();
+            _documentFit?.Invalidate();
+            RequestSummaryFit();
+        }
+
+        private void ApplyProfile(Preferences latest, bool restoreDefaults)
+        {
+            ++_profileGeneration;
+            _prefs = latest;
+            _applying = true;
+            try
+            {
+                // Show desired columns first so the last-visible-column guard
+                // cannot strand an old hidden state during a profile reset.
+                var entries = _entries.Where(x => !x.Excluded).ToArray();
+                bool Hidden(Entry entry) => latest.Hidden.Contains(entry.Id) ||
+                    GetDefaultHidden(entry.Column) && !latest.Shown.Contains(entry.Id);
+                foreach (var entry in entries.Where(x => !x.Protected && !Hidden(x)))
+                    entry.Column.Visibility = Visibility.Visible;
+                foreach (var entry in entries.Where(x => !x.Protected && Hidden(x)))
+                    if (CanHide(entry.Column)) entry.Column.Visibility = Visibility.Collapsed;
+                foreach (var entry in entries)
+                {
+                    if (latest.Widths.TryGetValue(entry.Id, out var width) &&
+                        double.IsFinite(width) && width is >= 36 and <= 2000)
+                        entry.Column.Width = new DataGridLength(Math.Clamp(width, entry.Column.MinWidth,
+                            Math.Max(entry.Column.MinWidth, entry.Column.MaxWidth)));
+                    else if (restoreDefaults)
+                        entry.Column.Width = entry.Width;
+                }
+                if (grid.CanUserReorderColumns)
+                {
+                    foreach (var entry in _entries.Where(x => x.FixedOrder))
+                        entry.Column.CanUserReorder = false;
+                    ApplyOrder(latest.Order);
+                }
+            }
+            finally { _applying = false; }
         }
 
         private bool CanHide(DataGridColumn column) => column.Visibility != Visibility.Visible ||
@@ -432,7 +458,8 @@ public static class TableColumnMenu
         {
             if (!Ready()) return false;
             var snapshot = _entries;
-            bool Current() => ReferenceEquals(snapshot, _entries) && Ready();
+            var generation = _profileGeneration;
+            bool Current() => ReferenceEquals(snapshot, _entries) && generation == _profileGeneration && Ready();
             menu.Items.Add(new MenuItem { Header = "Показывать столбцы", IsEnabled = false });
             var items = new List<(Entry Entry, MenuItem Item)>();
             foreach (var entry in _entries.Where(x => !x.Excluded).OrderBy(x => x.Column.DisplayIndex))
@@ -446,7 +473,7 @@ public static class TableColumnMenu
                 };
                 item.Click += (_, _) =>
                 {
-                    if (!Current() || !item.IsChecked && !CanHide(entry.Column))
+                    if (!Current() || entry.Protected || !item.IsChecked && !CanHide(entry.Column))
                     { item.IsChecked = entry.Column.Visibility == Visibility.Visible; return; }
                     entry.Column.Visibility = item.IsChecked ? Visibility.Visible : Visibility.Collapsed;
                     SaveVisibility(new[] { entry });
@@ -470,13 +497,16 @@ public static class TableColumnMenu
                 if (!Current()) return;
                 // Restore only the visibility profile. Do not expose mode columns
                 // or touch widths/order; protected columns stay visible.
-                foreach (var (entry, item) in items)
+                foreach (var (entry, item) in items.Where(x => !x.Entry.Protected && !GetDefaultHidden(x.Entry.Column)))
                 {
-                    if (entry.Protected) continue;
-                    var visible = !GetDefaultHidden(entry.Column);
-                    if (!visible && !CanHide(entry.Column)) continue;
-                    entry.Column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-                    item.IsChecked = visible;
+                    entry.Column.Visibility = Visibility.Visible;
+                    item.IsChecked = true;
+                }
+                foreach (var (entry, item) in items.Where(x => !x.Entry.Protected && GetDefaultHidden(x.Entry.Column)))
+                {
+                    if (!CanHide(entry.Column)) continue;
+                    entry.Column.Visibility = Visibility.Collapsed;
+                    item.IsChecked = false;
                 }
                 Save(prefs => { prefs.Hidden.Clear(); prefs.Shown.Clear(); });
                 RequestSummaryFit();
