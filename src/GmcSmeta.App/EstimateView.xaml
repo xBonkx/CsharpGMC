@@ -761,12 +761,12 @@
                     <Style TargetType="TextBox" BasedOn="{StaticResource EstimateGridEditor}"/>
                 </DataGrid.Resources>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn x:Name="NumberColumn" Header="№" SortMemberPath="number" HeaderStyle="{StaticResource EstimateCenteredHeader}" Width="64" IsReadOnly="True" CanUserReorder="False">
+                    <DataGridTemplateColumn x:Name="NumberColumn" Header="№" SortMemberPath="number" HeaderStyle="{StaticResource EstimateCenteredHeader}" Width="64" MinWidth="48" IsReadOnly="True" CanUserReorder="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Grid>
+                                <Grid ClipToBounds="True">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Button Grid.Column="0" Click="ToggleSection_Click"

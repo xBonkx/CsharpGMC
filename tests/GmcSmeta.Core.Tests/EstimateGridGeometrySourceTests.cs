@@ -95,4 +95,40 @@ public sealed class EstimateGridGeometrySourceTests
             Assert.Equal("Right", (string?)editor.Attribute("TextAlignment"));
         }
     }
+
+    [Fact]
+    public void NumberColumnReservesExpanderSpaceOnlyForExpandableRows()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var view = XDocument.Load(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "EstimateView.xaml"));
+        var number = Assert.Single(view.Descendants(p + "DataGridTemplateColumn")
+            .Where(e => (string?)e.Attribute("SortMemberPath") == "number"));
+        Assert.Equal("64", (string?)number.Attribute("Width"));
+        Assert.Equal("48", (string?)number.Attribute("MinWidth"));
+        Assert.Equal("True", (string?)number.Attribute("IsReadOnly"));
+        var grid = number.Element(p + "DataGridTemplateColumn.CellTemplate")!
+            .Element(p + "DataTemplate")!.Element(p + "Grid")!;
+        Assert.Equal("True", (string?)grid.Attribute("ClipToBounds"));
+        var widths = grid.Element(p + "Grid.ColumnDefinitions")!.Elements(p + "ColumnDefinition")
+            .Select(e => (string?)e.Attribute("Width")).ToArray();
+        Assert.Equal(new[] { "Auto", "*" }, widths);
+        var button = Assert.Single(grid.Elements(p + "Button"));
+        Assert.Equal("0", (string?)button.Attribute("Grid.Column"));
+        Assert.Equal("16", (string?)button.Attribute("Width"));
+        Assert.Equal("{Binding IsExpandable, Converter={StaticResource OnlySystems}}", (string?)button.Attribute("Visibility"));
+        Assert.Equal("ToggleSection_Click", (string?)button.Attribute("Click"));
+        var label = Assert.Single(grid.Elements(p + "TextBlock"));
+        Assert.Equal("1", (string?)label.Attribute("Grid.Column"));
+        Assert.Equal("{Binding DisplayNum}", (string?)label.Attribute("Text"));
+        Assert.Equal("Center", (string?)label.Attribute("TextAlignment"));
+        Assert.Equal("CharacterEllipsis", (string?)label.Attribute("TextTrimming"));
+        Assert.Equal("False", (string?)label.Attribute("IsHitTestVisible"));
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        Assert.Single(view.Descendants(p + "BooleanToVisibilityConverter")
+            .Where(e => (string?)e.Attribute(xaml + "Key") == "OnlySystems"));
+    }
 }

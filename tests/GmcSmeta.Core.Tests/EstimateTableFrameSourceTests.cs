@@ -20,6 +20,7 @@ public sealed class EstimateTableFrameSourceTests
         Assert.Equal(local + "SummaryTableFrame", frame.Name);
         Assert.Equal("12", (string?)frame.Attribute("CornerRadius"));
         Assert.Equal("1", (string?)frame.Attribute("BorderThickness"));
+        Assert.Equal("White", (string?)frame.Attribute("Background"));
 
         var grid = Assert.Single(frame.Descendants(presentation + "DataGrid")
             .Where(e => (string?)e.Attribute(xaml + "Name") == "EstimateGrid"));
@@ -28,5 +29,11 @@ public sealed class EstimateTableFrameSourceTests
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
         Assert.Equal("True", (string?)grid.Attribute("EnableColumnVirtualization"));
         Assert.Equal("0", (string?)grid.Attribute("BorderThickness"));
+        Assert.Equal("White", (string?)grid.Attribute("Background"));
+        var clip = File.ReadAllText(Path.Combine(app, "SummaryTableFrame.cs"));
+        Assert.Contains("SizeChanged += (_, _) => UpdateRoundedClip()", clip);
+        Assert.Contains("Loaded += (_, _) => UpdateRoundedClip()", clip);
+        Assert.Contains("Math.Min(CornerRadius.TopLeft, Math.Min(ActualWidth, ActualHeight) / 2)", clip);
+        Assert.Contains("Clip = geometry;", clip);
     }
 }
