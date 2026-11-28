@@ -17,9 +17,9 @@ public sealed class StagesDialogLifecycleTests
         var code = Source("GmcSmeta.App/StagesDialog.xaml.cs");
         Assert.Contains("Loaded += InitialLoadAsync;", code);
         Assert.Contains("var data = await Task.Run", code);
-        Assert.Contains("revision != SqlServerDatabase.Revision(conn)", code);
+        Assert.Contains("revision != await SqlServerDatabase.RevisionAsync(conn, token)", code);
         Assert.Contains("if (_closed) return;", code);
-        Assert.Contains("Table: BuildTable(stages, rows)", code);
+        Assert.Contains("Table: BuildTable(stages, rows, token)", code);
         Assert.Contains("PublishSnapshot(data.Stages, data.Remaining, data.Table, data.Revision)", code);
         Assert.Contains("if (_quantityWriteBusy) e.Cancel = true;", code);
         Assert.Contains("await ReloadAsync();", code);
@@ -136,7 +136,7 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("CollectionViewSource.GetDefaultView(StagesGrid.ItemsSource)", code);
         Assert.Contains("IEditableCollectionView { IsEditingItem: true }", code);
         Assert.Contains("record[\"__QtyExact\"] = row.Qty;", code);
-        Assert.Contains("record[$\"__S{i}\"] = row.PerStage[i];", code);
+        Assert.Contains("record[exactColumns[i]] = quantity;", code);
         Assert.Contains("record[\"__RestExact\"] = row.Rest;", code);
     }
 
@@ -145,7 +145,7 @@ public sealed class StagesDialogLifecycleTests
     {
         var sql = Source("GmcSmeta.Core/Db/SqlServerStages.cs");
         Assert.Contains("ReadStageTableRows(conn, fullId, stages, tx, batchRead: false)", sql);
-        Assert.Contains("ReadStageTableRows(conn, fullId, stages, null, batchRead: true)", sql);
+        Assert.Contains("ReadStageTableRows(conn, fullId, stages, null, batchRead: true, token: token)", sql);
         Assert.Contains("WHERE c.stage_of=@full AND ISNULL(c.stage_rest,0)=0", sql);
         Assert.Contains("!map.TryAdd(srcId, qty)", sql);
         Assert.Contains("p.parent_id IS NULL AND p.out_of_kp=0", sql);
@@ -158,7 +158,7 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("Totals.ReadSelected(conn, stageIds, token)", code);
         Assert.Contains("stageIds.Append(checked((int)rest.Id))", code);
         Assert.DoesNotContain("Totals.ReadAll(conn)", code);
-        Assert.Contains("revisionBefore != SqlServerDatabase.Revision(conn)", code);
+        Assert.Contains("revisionBefore != await SqlServerDatabase.RevisionAsync(conn, token)", code);
         var sql = Source("GmcSmeta.Core/Domain/Totals.cs");
         Assert.Contains("ids.Chunk(ContractReadScope.BatchSize)", sql);
         Assert.Contains("ReadSqlBatch(conn, new ContractReadScope(batch), out _, token: token)", sql);
@@ -216,5 +216,27 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("var selected = SelectedStageSourceIds();", code);
         Assert.Contains("!SelectedStageSourceIds().SequenceEqual(selected)", code);
         Assert.Contains("_selectionButtonsSnapshot = null;", code);
+    }
+
+    [Fact]
+    public void DistributionCancellationReachesSqlCommandsAndDialogProjection()
+    {
+        var sql = Source("GmcSmeta.Core/Db/SqlServerStages.cs");
+        Assert.Contains("ReadStagesOf(conn, fullId, true, null, token)", sql);
+        Assert.Contains("SqlReadCancellation.Register(cmd, token)", sql);
+        Assert.Contains("SqlReadCancellation.ExecuteReader(cmd, token)", sql);
+        Assert.Contains("SqlReadCancellation.Register(read, token)", sql);
+        Assert.Contains("SqlReadCancellation.ExecuteReader(read, token)", sql);
+        Assert.Contains("await cmd.ExecuteScalarAsync(token)", sql);
+        var inline = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
+        Assert.Contains("SqlServerDatabase.OpenAsync(_sqlConnectionString, token)", inline);
+        Assert.Contains("SqlServerStages.FullOfAsync(conn, _contractId, token)", inline);
+        Assert.Contains("ReadStageDistribution(conn, full, token)", inline);
+        var dialog = Source("GmcSmeta.App/StagesDialog.xaml.cs");
+        Assert.Contains("ReadStageDistribution(conn, _fullId, token)", dialog);
+        Assert.Contains("_distributionCancellation?.Cancel();", dialog);
+        Assert.Contains("record[displayColumns[i]]", dialog);
+        Assert.Contains("record[exactColumns[i]]", dialog);
+        Assert.Contains("if (_closed || token.IsCancellationRequested) return;", dialog);
     }
 }

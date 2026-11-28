@@ -28,6 +28,7 @@ public partial class StagesDialog : Window
     private List<SqlServerStages.StageInfo> _cachedStages = new();
     private DataTable? _table;
     private bool _closed;
+    private CancellationTokenSource? _distributionCancellation;
     private readonly DispatcherTimer _searchTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     internal event Action? InitialSnapshotReady;
 
@@ -70,6 +71,9 @@ public partial class StagesDialog : Window
     private async Task ReloadAsync()
     {
         if (_closed) return;
+        using var cancellation = new CancellationTokenSource();
+        _distributionCancellation = cancellation;
+        var token = cancellation.Token;
         _revision = "";
         _restDocument = null;
         _searchTimer.Stop();
@@ -77,20 +81,23 @@ public partial class StagesDialog : Window
         SetReadControls(false);
         try
         {
-            var data = await Task.Run(() =>
+            var data = await Task.Run(async () =>
             {
-                using var conn = SqlServerDatabase.Open(_connectionString);
-                var revision = SqlServerDatabase.Revision(conn);
-                var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, _fullId);
-                if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
+                using var conn = await SqlServerDatabase.OpenAsync(_connectionString, token).ConfigureAwait(false);
+                var revision = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, _fullId, token);
+                if (string.IsNullOrWhiteSpace(revision) ||
+                    revision != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились при загрузке этапов. Откройте окно снова.");
-                return (Stages: stages, Remaining: rest, Revision: revision, Table: BuildTable(stages, rows));
-            });
-            if (_closed) return;
+                return (Stages: stages, Remaining: rest, Revision: revision, Table: BuildTable(stages, rows, token));
+            }, token);
+            if (_closed || token.IsCancellationRequested) return;
             PublishSnapshot(data.Stages, data.Remaining, data.Table, data.Revision);
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         finally
         {
+            if (ReferenceEquals(_distributionCancellation, cancellation)) _distributionCancellation = null;
             _building = false;
             if (!_closed) SetReadControls(!string.IsNullOrWhiteSpace(_revision));
         }
@@ -132,8 +139,9 @@ public partial class StagesDialog : Window
 
     // Build the detached table on the worker; publish once on the dispatcher.
     private static DataTable BuildTable(IReadOnlyList<SqlServerStages.StageInfo> stages,
-        IReadOnlyList<SqlServerStages.StageTableRow> rows)
+        IReadOnlyList<SqlServerStages.StageTableRow> rows, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var table = new DataTable { Locale = CultureInfo.InvariantCulture, CaseSensitive = true };
         table.Columns.Add("SrcId", typeof(long));
         table.Columns.Add("SystemName", typeof(string));
@@ -141,10 +149,12 @@ public partial class StagesDialog : Window
         table.Columns.Add("Unit", typeof(string));
         table.Columns.Add("Qty", typeof(string));
         table.Columns.Add("__QtyExact", typeof(decimal));
+        var displayColumns = new DataColumn[stages.Count];
+        var exactColumns = new DataColumn[stages.Count];
         for (var i = 0; i < stages.Count; i++)
         {
-            table.Columns.Add($"S{i}", typeof(string));
-            table.Columns.Add($"__S{i}", typeof(decimal));
+            displayColumns[i] = table.Columns.Add($"S{i}", typeof(string));
+            exactColumns[i] = table.Columns.Add($"__S{i}", typeof(decimal));
         }
         table.Columns.Add("Rest", typeof(string));
         table.Columns.Add("__RestExact", typeof(decimal));
@@ -152,6 +162,7 @@ public partial class StagesDialog : Window
         table.BeginLoadData();
         foreach (var row in rows)
         {
+            token.ThrowIfCancellationRequested();
             var record = table.NewRow();
             record[StageTableSearch.Column] = $"{row.SystemName} · {row.Name} · {row.Unit}".ToLowerInvariant();
             record["SrcId"] = row.SrcId;
@@ -162,14 +173,17 @@ public partial class StagesDialog : Window
             record["__QtyExact"] = row.Qty;
             for (var i = 0; i < stages.Count; i++)
             {
-                record[$"S{i}"] = row.PerStage[i] == 0m ? "" : QtyText(row.PerStage[i]);
-                record[$"__S{i}"] = row.PerStage[i];
+                var quantity = row.PerStage[i];
+                record[displayColumns[i]] = quantity == 0m ? "" : QtyText(quantity);
+                record[exactColumns[i]] = quantity;
             }
             record["Rest"] = row.Rest == 0m ? "" : QtyText(row.Rest);
             record["__RestExact"] = row.Rest;
             table.Rows.Add(record);
         }
+        token.ThrowIfCancellationRequested();
         table.EndLoadData();
+        token.ThrowIfCancellationRequested();
         return table;
     }
 
@@ -240,6 +254,7 @@ public partial class StagesDialog : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _distributionCancellation?.Cancel();
         _searchTimer.Stop();
         _searchTimer.Tick -= SearchTimer_Tick;
         InitialSnapshotReady = null;

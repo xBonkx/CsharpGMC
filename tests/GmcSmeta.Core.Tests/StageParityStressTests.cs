@@ -70,4 +70,22 @@ public sealed class StageParityStressTests
         Assert.Equal(expected, actual.OrderBy(id => id));
         Assert.Empty(index[999]);
     }
+
+    [Fact]
+    public void CancelledDistributionDoesNotAccessConnection()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            SqlServerStages.ReadStageDistribution(null!, 1, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task CancelledFullDocumentLookupDoesNotAccessConnection()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            SqlServerStages.FullOfAsync(null!, 1, cancellation.Token));
+    }
 }

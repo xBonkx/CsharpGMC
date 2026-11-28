@@ -152,14 +152,14 @@ public partial class EstimateView
                 try
                 {
                     token.ThrowIfCancellationRequested();
-                    using var conn = SqlServerDatabase.Open(_sqlConnectionString);
+                    using var conn = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
-                    var revisionBefore = SqlServerDatabase.Revision(conn);
-                    var full = SqlServerStages.FullOf(conn, _contractId);
+                    var revisionBefore = await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false);
+                    var full = await SqlServerStages.FullOfAsync(conn, _contractId, token).ConfigureAwait(false);
                     if (full != _contractId)
                         throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
                     token.ThrowIfCancellationRequested();
-                    var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full);
+                    var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full, token);
                     token.ThrowIfCancellationRequested();
 
                     // Scope the shared totals calculation to this KP's stage documents.
@@ -174,7 +174,7 @@ public partial class EstimateView
                     if (rest is not null)
                         totals[rest.Id] = allTotals.GetValueOrDefault(rest.Id);
 
-                    if (string.IsNullOrWhiteSpace(revisionBefore) || revisionBefore != SqlServerDatabase.Revision(conn))
+                    if (string.IsNullOrWhiteSpace(revisionBefore) || revisionBefore != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                         throw new InvalidOperationException(
                             "Распределение изменилось во время чтения. Обнови смету.");
                     token.ThrowIfCancellationRequested();

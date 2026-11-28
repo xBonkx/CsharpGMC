@@ -22,17 +22,23 @@ public static partial class SqlServerStages
 
     /// <summary>Этапы полного КП; «Остаток» последним (stages.stages_of).</summary>
     public static List<StageInfo> StagesOf(SqlConnection conn, long fullId, bool rest = true,
-        SqlTransaction? tx = null)
+        SqlTransaction? tx = null) =>
+        ReadStagesOf(conn, fullId, rest, tx, CancellationToken.None);
+
+    private static List<StageInfo> ReadStagesOf(SqlConnection conn, long fullId, bool rest,
+        SqlTransaction? tx, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         var list = new List<StageInfo>();
         using var cmd = new SqlCommand(
             "SELECT id,stage_no,stage_rest,name,stage_sum,locked FROM dbo.contracts " +
             "WHERE stage_of=@id ORDER BY stage_no,id", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = fullId;
-        using var r = cmd.ExecuteReader();
-        string Name(long stageNo, bool isRest, string name) => name;
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var rowNo = r.IsDBNull(1) ? 0 : Convert.ToInt32(r.GetValue(1), CultureInfo.InvariantCulture);
             var isRest = !r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
             var stageName = r.IsDBNull(3) ? "" : r.GetString(3);
@@ -45,6 +51,7 @@ public static partial class SqlServerStages
                     Locked = !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture)
                 });
         }
+        token.ThrowIfCancellationRequested();
         var ordered = list.OrderBy(x => x.Rest).ToList();
         return rest ? ordered : ordered.Where(x => !x.Rest).ToList();
     }
@@ -56,6 +63,17 @@ public static partial class SqlServerStages
             "SELECT COALESCE(stage_of, id) FROM dbo.contracts WHERE id=@id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         return Convert.ToInt64(cmd.ExecuteScalar() ?? contractId, CultureInfo.InvariantCulture);
+    }
+
+    public static async Task<long> FullOfAsync(SqlConnection conn, long contractId, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var cmd = new SqlCommand(
+            "SELECT COALESCE(stage_of, id) FROM dbo.contracts WHERE id=@id", conn);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+        var result = await cmd.ExecuteScalarAsync(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        return Convert.ToInt64(result ?? contractId, CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -631,17 +649,23 @@ public static partial class SqlServerStages
 
     /// <summary>Read-only distribution; caller verifies the revision before/after.</summary>
     public static (List<StageInfo> Stages, List<StageTableRow> Rows, StageInfo? Remaining) ReadStageDistribution(
-        SqlConnection conn, long fullId)
+        SqlConnection conn, long fullId) =>
+        ReadStageDistribution(conn, fullId, CancellationToken.None);
+
+    public static (List<StageInfo> Stages, List<StageTableRow> Rows, StageInfo? Remaining) ReadStageDistribution(
+        SqlConnection conn, long fullId, CancellationToken token)
     {
-        var all = StagesOf(conn, fullId);
+        token.ThrowIfCancellationRequested();
+        var all = ReadStagesOf(conn, fullId, true, null, token);
         var stages = all.Where(stage => !stage.Rest).ToList();
-        return (stages, ReadStageTableRows(conn, fullId, stages, null, batchRead: true),
+        return (stages, ReadStageTableRows(conn, fullId, stages, null, batchRead: true, token: token),
             all.FirstOrDefault(stage => stage.Rest));
     }
 
     private static List<StageTableRow> ReadStageTableRows(SqlConnection conn, long fullId,
-        List<StageInfo> stages, SqlTransaction? tx, bool batchRead)
+        List<StageInfo> stages, SqlTransaction? tx, bool batchRead, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var maps = stages.Select(_ => new Dictionary<long, decimal>()).ToList();
         var formulas = stages.ToDictionary(s => s.Id, _ => new Dictionary<long, string>());
         if (batchRead && stages.Count > 0)
@@ -655,9 +679,11 @@ public static partial class SqlServerStages
                 "AND p.stage_src IS NOT NULL AND p.parent_id IS NULL AND p.out_of_kp=0 " +
                 "ORDER BY sy.contract_id,p.id", conn);
             read.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var stageId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 if (!byId.TryGetValue(stageId, out var map)) continue;
                 var srcId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
@@ -679,9 +705,11 @@ public static partial class SqlServerStages
                 "JOIN dbo.systems sy ON sy.id=p.system_id " +
                 "WHERE sy.contract_id=@stage AND p.stage_src IS NOT NULL AND p.parent_id IS NULL AND p.out_of_kp=0", conn, tx);
             read.Parameters.Add("@stage", SqlDbType.BigInt).Value = stage.Id;
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 map[srcId] = r.IsDBNull(1) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(1), CultureInfo.InvariantCulture));
                 var formula = EstimateCellFormula.Read(r.IsDBNull(2) ? "" : r.GetString(2), "qty");
@@ -696,9 +724,11 @@ public static partial class SqlServerStages
             "ORDER BY sy.[order], sy.id, p.[order], p.id", conn, tx))
         {
             read.Parameters.Add("@full", SqlDbType.BigInt).Value = fullId;
-            using var r = read.ExecuteReader();
+            using var cancellation = SqlReadCancellation.Register(read, token);
+            using var r = SqlReadCancellation.ExecuteReader(read, token);
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 var qty = r.IsDBNull(3) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture));
                 var perStage = new decimal[stages.Count];
@@ -724,6 +754,7 @@ public static partial class SqlServerStages
                 });
             }
         }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 
