@@ -72,7 +72,7 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("{Binding QtyHint}", Style("ShipmentNowText").ToString());
         var leftStyle = Style("ShipmentLeftText").ToString();
         Assert.Contains("всё", leftStyle);
-        Assert.Contains("#94A3B8", leftStyle);
+        Assert.Contains("{StaticResource UiMutedTextBrush}", leftStyle);
         Assert.Contains("GridSelectionTextBrush", leftStyle);
 
         var group = Assert.Single(grid.Descendants(p + "Expander"));
