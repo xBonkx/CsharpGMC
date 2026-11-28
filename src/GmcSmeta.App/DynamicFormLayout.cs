@@ -15,15 +15,19 @@ internal static class DynamicFormLayout
         WorkspaceWindowUi.ApplyChrome(window);
         var requestedMaxHeight = window.MaxHeight;
         var requestedMaxWidth = window.MaxWidth;
+        var lastAppliedHeight = requestedMaxHeight;
+        var lastAppliedWidth = requestedMaxWidth;
         void FitWorkArea()
         {
+            // Callers may set an intentional local cap after Apply.
+            if (window.MaxHeight != lastAppliedHeight) requestedMaxHeight = window.MaxHeight;
+            if (window.MaxWidth != lastAppliedWidth) requestedMaxWidth = window.MaxWidth;
             var workArea = SystemParameters.WorkArea.Size;
             // SystemParameters.WorkArea refers to the primary display. Once a
             // HWND exists, constrain the form to the actual monitor instead.
             var handle = new WindowInteropHelper(window).Handle;
-            if (handle != IntPtr.Zero &&
-                MonitorFromWindow(handle, MonitorDefaultToNearest) is var monitor &&
-                monitor != IntPtr.Zero)
+            var monitor = handle == IntPtr.Zero ? IntPtr.Zero : MonitorFromWindow(handle, MonitorDefaultToNearest);
+            if (monitor != IntPtr.Zero)
             {
                 var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
                 if (GetMonitorInfo(monitor, ref info))
@@ -37,6 +41,8 @@ internal static class DynamicFormLayout
             }
             var maxHeight = Math.Max(window.MinHeight, Math.Min(requestedMaxHeight, workArea.Height));
             var maxWidth = Math.Max(window.MinWidth, Math.Min(requestedMaxWidth, workArea.Width));
+            lastAppliedHeight = maxHeight;
+            lastAppliedWidth = maxWidth;
             if (window.MaxHeight != maxHeight) window.MaxHeight = maxHeight;
             if (window.MaxWidth != maxWidth) window.MaxWidth = maxWidth;
         }
