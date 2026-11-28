@@ -21,8 +21,8 @@ public sealed class PriceLikeMenuSourceTests
         Assert.Contains("preview.ClientCount > 0", source);
         Assert.Contains("preview.PurchaseCount > 0", source);
         Assert.Contains("revision != _serverRevision", source);
-        Assert.Contains("SavePriceLikeAsync(selected.Id, \"price\")", source);
-        Assert.Contains("SavePriceLikeAsync(selected.Id, \"purchase_price\")", source);
+        Assert.Contains("SavePriceLikeAsync(selected.Id, \"price\", preview.ExpectedPlan(\"price\"), SelectionCurrent)", source);
+        Assert.Contains("SavePriceLikeAsync(selected.Id, \"purchase_price\", preview.ExpectedPlan(\"purchase_price\"), SelectionCurrent)", source);
         Assert.DoesNotContain("PriceLike_Click", source);
         Assert.DoesNotContain("SqlServerPriceLike.SamePriceCount", source);
         Assert.Contains("SqlServerPriceLike.SetPriceLike", Source("EstimateView.Cells.cs"));

@@ -87,6 +87,8 @@ public sealed class PriceLikeBatchPlanTests
         Assert.Equal(50m, preview.PurchasePrice);
         Assert.Equal(1, preview.ClientCount);
         Assert.Equal(1, preview.PurchaseCount);
+        Assert.Equal(new long[] { 2 }, preview.ClientIds);
+        Assert.Equal(new long[] { 3 }, preview.PurchaseIds);
         var persisted = rows.Where(r => !r.IsSystem).Select(r =>
             new PriceLikeBatchPlan.Position(r.Id, r.Name, r.Unit, r.ParentPositionId is null,
                 r.OutOfKp, r.Price, r.PurchasePrice, r.Formulas)).ToArray();
@@ -108,8 +110,8 @@ public sealed class PriceLikeBatchPlanTests
     [Fact]
     public void MenuPreviewRejectsMissingSourceComponentOrBlankName()
     {
-        var rows = new[] { E(1, 10m, sub: true), E(2, 10m, name: " "), E(3, 20m) };
-        foreach (var id in new[] { 1, 2, 99 })
+        var rows = new[] { E(1, 10m, sub: true), E(2, 10m, name: " "), E(3, 20m), E(4, 10m, outside: true) };
+        foreach (var id in new[] { 1, 2, 4, 99 })
             Assert.Equal(0, PriceLikeBatchPlan.Preview(rows, id).ClientCount);
     }
 
@@ -121,6 +123,28 @@ public sealed class PriceLikeBatchPlanTests
         var preview = PriceLikeBatchPlan.Preview(rows, 1);
         Assert.Equal(2501, preview.ClientCount);
         Assert.Equal(0, preview.PurchaseCount);
+    }
+
+    [Fact]
+    public void CapturedPlanChecksPriceAndExactIdsNotOnlyCount()
+    {
+        var preview = PriceLikeBatchPlan.Preview(new[] { E(1, 10m), E(2, 5m), E(3, 7m) }, 1);
+        var expected = preview.ExpectedPlan("price");
+        Assert.True(PriceLikeBatchPlan.Matches(expected, new(10m, new long[] { 3, 2 })));
+        Assert.False(PriceLikeBatchPlan.Matches(expected, new(10m, new long[] { 3, 4 })));
+        Assert.False(PriceLikeBatchPlan.Matches(expected, new(11m, new long[] { 2, 3 })));
+        Assert.False(PriceLikeBatchPlan.Matches(expected, new(10m, new long[] { 2, 2 })));
+    }
+
+    [Fact]
+    public void OutsideSourceIsNotAnEstimatePriceSource()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            PriceLikeBatchPlan.Build(new[] { P(1, 10m, outside: true), P(2, 5m) }, 1, "price"));
+        Assert.False(PriceLikeBatchPlan.PositivePrice(null));
+        Assert.False(PriceLikeBatchPlan.PositivePrice(0m));
+        Assert.False(PriceLikeBatchPlan.PositivePrice(-1m));
+        Assert.True(PriceLikeBatchPlan.PositivePrice(1m));
     }
 
     [Fact]

@@ -19,32 +19,53 @@ public static class PriceLikeBatchPlan
     public sealed record Plan(decimal? Price, IReadOnlyList<long> TargetIds);
 
     public sealed record MenuPreview(decimal ClientPrice, int ClientCount,
-        decimal? PurchasePrice, int PurchaseCount);
+        decimal? PurchasePrice, int PurchaseCount)
+    {
+        public IReadOnlyList<long> ClientIds { get; init; } = Array.Empty<long>();
+        public IReadOnlyList<long> PurchaseIds { get; init; } = Array.Empty<long>();
+        public Plan ExpectedPlan(string field) => field switch
+        {
+            "price" => new(ClientPrice, ClientIds),
+            "purchase_price" => new(PurchasePrice, PurchaseIds),
+            _ => throw new ArgumentException("Некорректное поле цены.", nameof(field))
+        };
+    }
+
+    public static bool PositivePrice(decimal? price) => price is > 0m && price <= NumberText.MaxNumber;
+
+    public static bool Matches(Plan expected, Plan actual) =>
+        expected.Price == actual.Price &&
+        expected.TargetIds.Count == actual.TargetIds.Count &&
+        expected.TargetIds.OrderBy(id => id).SequenceEqual(actual.TargetIds.OrderBy(id => id));
 
     // Use the full displayed revision, not the filtered grid. The SQL writer
     // still independently validates revision, targets and formulas in its transaction.
     public static MenuPreview Preview(IReadOnlyList<EstimateRow> positions, long sourceId)
     {
         var source = positions.FirstOrDefault(p => p.Id == sourceId && !p.IsSystem);
-        if (source is null || source.IsSub || source.ParentPositionId is not null ||
-            string.IsNullOrWhiteSpace(source.Name))
+        if (source is null || source.Id <= 0 || source.IsSub || source.OutOfKp ||
+            source.ParentPositionId is not null || string.IsNullOrWhiteSpace(source.Name))
             return new(0m, 0, null, 0);
 
-        var client = source.Price > 0m && source.Price <= NumberText.MaxNumber;
-        var purchase = source.PurchasePrice is decimal value && value > 0m &&
-            value <= NumberText.MaxNumber;
+        var client = PositivePrice(source.Price);
+        var purchase = PositivePrice(source.PurchasePrice);
         var key = Catalog.Key(source.Name, source.Unit);
-        int clientCount = 0, purchaseCount = 0;
+        var clientIds = new List<long>();
+        var purchaseIds = new List<long>();
         foreach (var row in positions)
         {
-            if (row.Id == source.Id || row.IsSystem || row.IsSub ||
+            if (row.Id <= 0 || row.Id == source.Id || row.IsSystem || row.IsSub ||
                 row.ParentPositionId is not null || row.OutOfKp ||
                 Catalog.Key(row.Name, row.Unit) != key)
                 continue;
-            if (client && row.Price != source.Price) clientCount++;
-            if (purchase && row.PurchasePrice != source.PurchasePrice) purchaseCount++;
+            if (client && row.Price != source.Price) clientIds.Add(row.Id);
+            if (purchase && row.PurchasePrice != source.PurchasePrice) purchaseIds.Add(row.Id);
         }
-        return new(source.Price, clientCount, source.PurchasePrice, purchaseCount);
+        return new(source.Price, clientIds.Count, source.PurchasePrice, purchaseIds.Count)
+        {
+            ClientIds = clientIds.ToArray(),
+            PurchaseIds = purchaseIds.ToArray()
+        };
     }
 
     public static Plan Build(IReadOnlyList<Position> rows, long sourceId, string field)
@@ -54,7 +75,7 @@ public static class PriceLikeBatchPlan
             throw new InvalidOperationException("Некорректный источник или поле цены.");
 
         var source = rows.FirstOrDefault(p => p.Id == sourceId);
-        if (source is null || !source.IsRoot ||
+        if (source is null || !source.IsRoot || source.Outside ||
             string.IsNullOrWhiteSpace(source.Name))
             throw new InvalidOperationException(
                 "Исходная строка удалена либо не является верхней позицией.");

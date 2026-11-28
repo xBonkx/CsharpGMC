@@ -441,7 +441,17 @@ internal static class PilotCases
         PilotRunner.Check(SqlServerDatabase.SaveCell(cs, first, "price", "120", p.Revision()).Saved,
             "Editor price save failed");
         AssertPrices(120m, 80m);
-        var copied = SqlServerPriceLike.SetPriceLike(cs, full, first, "price", p.Revision());
+        var beforePreviewMismatch = p.Revision();
+        var wrongPlan = new GmcSmeta.Core.Domain.PriceLikeBatchPlan.Plan(120m, new long[] { long.MaxValue });
+        var mismatched = SqlServerPriceLike.SetPriceLike(cs, full, first, "price", beforePreviewMismatch, wrongPlan);
+        PilotRunner.Check(!mismatched.Saved && p.Revision() == beforePreviewMismatch,
+            "Mismatched menu preview must not change price or revision");
+        AssertPrices(120m, 80m);
+        var blankPurchase = SqlServerPriceLike.SetPriceLike(cs, full, first, "purchase_price", beforePreviewMismatch);
+        PilotRunner.Check(!blankPurchase.Saved && p.Revision() == beforePreviewMismatch,
+            "Blank purchase price must not clear other prices");
+        var expected = new GmcSmeta.Core.Domain.PriceLikeBatchPlan.Plan(120m, new long[] { second });
+        var copied = SqlServerPriceLike.SetPriceLike(cs, full, first, "price", p.Revision(), expected);
         PilotRunner.Check(copied.Saved && copied.Changed == 1, "Copy same price failed");
         AssertPrices(120m, 120m);
         PilotRunner.Check(SqlServerCostSummary.SaveSummaryCells(cs, checked((int)full),

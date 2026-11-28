@@ -37,13 +37,17 @@ public sealed class ContextPriceAndSelectionReadinessTests
         Assert.Contains("var revision = _serverRevision;", command);
         Assert.Contains("AttachSaveCloseGuard();", command);
         Assert.Contains("revision != _serverRevision || !ReferenceEquals(snapshot, _estimate)", command);
-        Assert.Contains("sourceId, field, revision));", command);
+        Assert.Contains("sourceId, field, revision, expectedPlan));", command);
+        Assert.Contains("!selectionCurrent() || HasActiveEstimateEdit()", command);
         Assert.Contains("_saveAwaitingReadback = true;", command);
         var sql = Source("GmcSmeta.Core", "Db/SqlServerPriceLike.cs");
         Assert.Contains("if (locked)", sql);
         Assert.Contains("SqlSchemaCompatibility.IsWritablePilot", sql);
         Assert.Contains("IsolationLevel.Serializable", sql);
         Assert.Contains("string.Equals(revision, expectedRevision", sql);
+        Assert.Contains("!PriceLikeBatchPlan.PositivePrice(plan.Price)", sql);
+        Assert.Contains("!PriceLikeBatchPlan.Matches(expectedPlan, plan)", sql);
+        Assert.Contains("o.archived", sql);
     }
 
     [Fact]

@@ -368,13 +368,17 @@ public partial class EstimateView
     private bool CanStartPriceLike() => PriceLikeBatchPlan.CanStart(
         _estimate?.Locked, _serverConflict, HasUnsettledCacheWrites, _detached, _serverRevision);
 
-    private async Task SavePriceLikeAsync(long sourceId, string field)
+    private async Task SavePriceLikeAsync(long sourceId, string field,
+        PriceLikeBatchPlan.Plan expectedPlan, Func<bool> selectionCurrent)
     {
         // Preserve the exact revision and source the user saw, not a later queue revision.
-        if (!CanStartPriceLike() || sourceId <= 0 || field is not ("price" or "purchase_price")) return;
+        if (!CanStartPriceLike() || sourceId <= 0 || field is not ("price" or "purchase_price") ||
+            !selectionCurrent() || HasActiveEstimateEdit() || !PriceLikeBatchPlan.PositivePrice(expectedPlan.Price)) return;
         var revision = _serverRevision;
         var snapshot = _estimate;
         if (snapshot is null || !snapshot.PositionsInOrder.Any(row => row.Id == sourceId && !row.IsSystem)) return;
+        var connection = _sqlConnectionString;
+        var contractId = _contractId;
         // One operation on the same queue as ordinary cell writes: no stale
         // revision and no interleaving of a bulk edit with single-cell edits.
         _reloadTimer.Stop();
@@ -386,13 +390,15 @@ public partial class EstimateView
         {
             if (_serverConflict || _detached || _estimate?.Locked != false ||
                 revision != _serverRevision || !ReferenceEquals(snapshot, _estimate) ||
-                _cellSaveQueue.Blocked || _saveAwaitingReadback || _saveError is not null)
+                _cellSaveQueue.Blocked || _saveAwaitingReadback || _saveError is not null ||
+                connection != _sqlConnectionString || contractId != _contractId ||
+                !selectionCurrent() || HasActiveEstimateEdit())
             {
-                _saveError ??= "Смета изменилась во время ожидания. Повторите перенос цены после обновления.";
+                _saveError ??= "Смета или выбор изменились во время ожидания. Повторите перенос цены после обновления.";
                 return;
             }
             var result = await Task.Run(() => SqlServerPriceLike.SetPriceLike(
-                _sqlConnectionString, _contractId, sourceId, field, revision));
+                connection, contractId, sourceId, field, revision, expectedPlan));
             if (!result.Saved)
             {
                 _saveError = result.Error ?? "Не удалось перенести цену.";

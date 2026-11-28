@@ -176,13 +176,13 @@ public partial class EstimateView
                 var culture = CultureInfo.GetCultureInfo("ru-RU");
                 if (preview.ClientCount > 0)
                     Add($"Цену {preview.ClientPrice.ToString("N2", culture)} ₽ — всем таким же строкам ({preview.ClientCount})",
-                        () => _ = SavePriceLikeAsync(selected.Id, "price"),
+                        () => _ = SavePriceLikeAsync(selected.Id, "price", preview.ExpectedPlan("price"), SelectionCurrent),
                         preview.ClientCount <= PriceLikeBatchPlan.MaxChanges, glyph: "Check");
                 // C# extension: only a positive purchase price, never silently
                 // clear other rows with an empty/zero source.
                 if (preview.PurchaseCount > 0 && preview.PurchasePrice is decimal purchase)
                     Add($"Закупочную цену {purchase.ToString("N2", culture)} ₽ — всем таким же строкам ({preview.PurchaseCount})",
-                        () => _ = SavePriceLikeAsync(selected.Id, "purchase_price"),
+                        () => _ = SavePriceLikeAsync(selected.Id, "purchase_price", preview.ExpectedPlan("purchase_price"), SelectionCurrent),
                         preview.PurchaseCount <= PriceLikeBatchPlan.MaxChanges);
             }
         }

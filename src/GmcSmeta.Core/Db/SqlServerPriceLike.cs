@@ -56,7 +56,8 @@ public static class SqlServerPriceLike
         using var conn = SqlServerDatabase.Open(connectionString);
         var rows = RowsOf(conn, contractId);
         var source = rows.FirstOrDefault(r => r.Id == positionId);
-        if (source is null || !source.IsRoot || string.IsNullOrWhiteSpace(source.Name))
+        if (source is null || !source.IsRoot || source.Outside ||
+            !PriceLikeBatchPlan.PositivePrice(source.Price) || string.IsNullOrWhiteSpace(source.Name))
             return 0;
         var key = Catalog.Key(source.Name, source.Unit);
         return rows.Count(r => r.Id != source.Id && r.IsRoot && !r.Outside &&
@@ -64,12 +65,19 @@ public static class SqlServerPriceLike
     }
 
     public static PriceLikeResult SetPriceLike(string connectionString,
-        long contractId, long positionId, string field, string expectedRevision)
+        long contractId, long positionId, string field, string expectedRevision,
+        PriceLikeBatchPlan.Plan? expectedPlan = null)
     {
         if (contractId <= 0 || positionId <= 0 || string.IsNullOrWhiteSpace(expectedRevision) ||
             field is not ("price" or "purchase_price"))
             return PriceLikeResult.Fail("Некорректный документ, позиция или колонка цены.",
                 expectedRevision);
+
+        if (expectedPlan is not null && (!PriceLikeBatchPlan.PositivePrice(expectedPlan.Price) ||
+            expectedPlan.TargetIds.Count == 0 || expectedPlan.TargetIds.Count > PriceLikeBatchPlan.MaxChanges ||
+            expectedPlan.TargetIds.Any(id => id <= 0 || id == positionId) ||
+            expectedPlan.TargetIds.Distinct().Count() != expectedPlan.TargetIds.Count))
+            return PriceLikeResult.Fail("Некорректный снимок переноса цены.", expectedRevision);
 
         // This new set-based writer must be verified on the pilot SQL Server
         // before enabling it for other databases.
@@ -100,8 +108,8 @@ public static class SqlServerPriceLike
         string contractName;
         bool locked;
         using (var cmd = new SqlCommand(
-            "SELECT object_id,name,locked FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) " +
-            "WHERE id=@id", conn, tx))
+            "SELECT c.object_id,c.name,c.locked,o.archived FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id WHERE c.id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var reader = cmd.ExecuteReader();
@@ -111,6 +119,8 @@ public static class SqlServerPriceLike
             contractName = reader.IsDBNull(1) ? "" : reader.GetString(1);
             locked = !reader.IsDBNull(2) &&
                 Convert.ToBoolean(reader.GetValue(2), CultureInfo.InvariantCulture);
+            if (reader.IsDBNull(3) || Convert.ToBoolean(reader.GetValue(3), CultureInfo.InvariantCulture))
+                return PriceLikeResult.Fail("Архивный объект нельзя изменять.", revision);
         }
         // This bulk command is disabled for signed estimates in the editor.
         // Ordinary individual procurement price editing uses a separate writer.
@@ -129,6 +139,11 @@ public static class SqlServerPriceLike
         {
             return PriceLikeResult.Fail(ex.Message, revision);
         }
+
+        if (!PriceLikeBatchPlan.PositivePrice(plan.Price))
+            return PriceLikeResult.Fail("Перенос пустой, нулевой или отрицательной цены запрещён.", revision);
+        if (expectedPlan is not null && !PriceLikeBatchPlan.Matches(expectedPlan, plan))
+            return PriceLikeResult.Fail("Состав или цена одинаковых позиций изменились. Откройте меню заново.", revision);
 
         if (plan.TargetIds.Count == 0)
         {
