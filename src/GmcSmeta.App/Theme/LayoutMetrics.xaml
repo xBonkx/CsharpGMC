@@ -37,8 +37,7 @@
     <Thickness x:Key="LayoutTilePadding">16,11,16,11</Thickness>
     <!-- director_view.py root spacing12; tile gap10; object_view.py legend gap14. -->
     <Thickness x:Key="LayoutDirectorSectionGap">0,12,0,0</Thickness>
-    <Thickness x:Key="LayoutDirectorTileInset">5,5</Thickness>
-    <Thickness x:Key="LayoutDirectorTilesInset">-5,7,-5,-5</Thickness>
+    <Thickness x:Key="LayoutDirectorTilesInset">0,12,0,0</Thickness>
     <Thickness x:Key="LayoutCardLegendGap">0,0,14,0</Thickness>
     <!-- Small affordances, navigation icons and primary toolbar icons are different roles. -->
     <Style x:Key="LayoutSmallAffordanceIcon" TargetType="Viewbox">

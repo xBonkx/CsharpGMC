@@ -98,12 +98,6 @@ internal static class ContextMenuIcons
         disabled.Setters.Add(new Setter(Shape.StrokeProperty,
             new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8))));
         style.Triggers.Add(disabled);
-        var canvas = new Canvas { Width = 24, Height = 24, IsHitTestVisible = false };
-        canvas.Children.Add(new System.Windows.Shapes.Path { Data = geometry, Style = style });
-        item.Icon = new Viewbox
-        {
-            Width = 18, Height = 18, Child = canvas,
-            IsHitTestVisible = false, Stretch = Stretch.Uniform
-        };
+        item.Icon = VectorGlyph.Create(geometry, style);
     }
 }

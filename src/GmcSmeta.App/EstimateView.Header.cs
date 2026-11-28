@@ -39,7 +39,7 @@ public partial class EstimateView
         PhaseButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible) return;
         var (phase, number) = PhaseInfo(_estimate!.KpPhase);
-        PhaseButtonText.Text = $"{number} · {phase.Split(" · ")[0]} ▾";
+        PhaseButtonText.Text = $"{number} · {phase.Split(" · ")[0]}";
         PhaseButton.ToolTip = $"Подготовка КП: {phase}\nНажмите, чтобы выбрать этап подготовки";
         PhaseButton.IsEnabled = !_estimate.Locked && !_doc.StageRest;
     }

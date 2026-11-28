@@ -16,6 +16,11 @@
     <!-- WPF status/transport roles: original geometry, not a Python SVG claim. -->
     <PathGeometry x:Key="GlyphLock" Figures="M6 11H18V21H6Z M8 11V7a4 4 0 0 1 8 0v4 M12 15v2"/>
     <PathGeometry x:Key="GlyphTruck" Figures="M3 5H15V17H3Z M15 9H19l3 4v4H15 M7 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4 M18 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4"/>
+    <!-- Exact Python theme.py wrench and clip paths; SVG relative initial M normalized. -->
+    <PathGeometry x:Key="GlyphWrench" Figures="M14 6a5 5 0 0 0-6 6L2 18a2.8 2.8 0 0 0 4 4l6-6a5 5 0 0 0 6-6l-3 3-4-4 3-3z"/>
+    <PathGeometry x:Key="GlyphClip" Figures="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/>
+    <!-- Three Python circles, represented by equivalent pairs of circular arcs. -->
+    <PathGeometry x:Key="GlyphMore" Figures="M6.2 12A1.2 1.2 0 1 0 3.8 12A1.2 1.2 0 1 0 6.2 12 M13.2 12A1.2 1.2 0 1 0 10.8 12A1.2 1.2 0 1 0 13.2 12 M20.2 12A1.2 1.2 0 1 0 17.8 12A1.2 1.2 0 1 0 20.2 12"/>
     <PathGeometry x:Key="GlyphPlus" Figures="M12 5v14M5 12h14"/>
     <!-- Exact Python theme.py row-plus geometry (aa6b34d). -->
     <PathGeometry x:Key="GlyphRowPlus" Figures="M4 6h16M4 12h9M4 18h9 M18 14v6M15 17h6"/>
@@ -54,6 +59,16 @@
     <!-- Python theme.py: exact open path and excel rect (rx=2) converted to equivalent arcs. -->
     <PathGeometry x:Key="GlyphExcel" Figures="M6 3H18A2 2 0 0 1 20 5V19A2 2 0 0 1 18 21H6A2 2 0 0 1 4 19V5A2 2 0 0 1 6 3Z M8.5 8.5l7 7M15.5 8.5l-7 7"/>
     <PathGeometry x:Key="GlyphOpen" Figures="M14 4h6v6M20 4l-9 9 M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>
+    <!-- All caption and icon-only templates share one viewbox presentation role. -->
+    <Style x:Key="SvgGlyphViewbox" TargetType="Viewbox">
+        <Setter Property="Width" Value="18"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Focusable" Value="False"/>
+    </Style>
     <Style x:Key="SvgGlyphPath" TargetType="Path">
         <Setter Property="Stretch" Value="None"/>
         <Setter Property="StrokeThickness" Value="1.9"/>
@@ -64,7 +79,7 @@
     </Style>
     <DataTemplate x:Key="IconLabelMaterials">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphMaterials}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -72,9 +87,19 @@
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
         </StackPanel>
     </DataTemplate>
+    <DataTemplate x:Key="IconLabelClip">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+                <Canvas Width="24" Height="24">
+                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphClip}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
+                </Canvas>
+            </Viewbox>
+            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+        </StackPanel>
+    </DataTemplate>
     <DataTemplate x:Key="IconLabelWrench">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphWrench}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -84,7 +109,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelTruck">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphTruck}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -94,7 +119,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelPlus">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -104,13 +129,13 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelCalculator">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" Stretch="Uniform" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphCalculator}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" Stretch="Uniform" VerticalAlignment="Center" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphCalculator}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
         </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="IconLabelBuilding">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBuilding}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -120,7 +145,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelList">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphList}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -130,7 +155,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelFile">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphFile}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -140,11 +165,9 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelMore">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
-                    <Ellipse Canvas.Left="3.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/>
-                    <Ellipse Canvas.Left="10.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/>
-                    <Ellipse Canvas.Left="17.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/>
+                    <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphMore}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
             </Viewbox>
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
@@ -152,7 +175,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelDownload">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphDownload}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                     
@@ -163,7 +186,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelUpload">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphUpload}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -173,7 +196,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelUndo">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphUndo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -183,7 +206,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelRedo">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphRedo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -193,7 +216,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelEdit">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                     
@@ -204,7 +227,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelLayers">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphLayers}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -214,7 +237,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelSort">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSort}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -224,7 +247,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelX">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphX}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -234,7 +257,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelCheck">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphCheck}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -244,7 +267,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelSearch">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -254,7 +277,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelTrash">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphTrash}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -264,7 +287,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelRefresh">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphRefresh}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -274,7 +297,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelCopy">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphCopy}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -284,7 +307,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelRowPlus">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphRowPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -294,7 +317,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelMenu">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="20" Height="20" Margin="0,0,6,0" Stretch="Uniform" VerticalAlignment="Center" IsHitTestVisible="False">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="20" Height="20" Margin="0,0,6,0" Stretch="Uniform" VerticalAlignment="Center" IsHitTestVisible="False">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphMenu}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -304,37 +327,37 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelBook">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBook}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphBook}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
         </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="IconLabelAlert">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphAlert}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
         </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="IconLabelHistory">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
             <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
         </StackPanel>
     </DataTemplate>
-    <DataTemplate x:Key="IconOnlyArrowUp"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowUp}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconLabelArrowUp"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowUp}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
-    <DataTemplate x:Key="IconOnlyArrowDown"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconLabelArrowDown"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
-    <DataTemplate x:Key="IconOnlyArrowBack"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowBack}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconLabelArrowBack"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowBack}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
-    <DataTemplate x:Key="IconOnlyArrowForward"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconLabelArrowForward"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
-    <DataTemplate x:Key="IconOnlyEdit"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconOnlyX"><Viewbox Width="14" Height="14" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphX}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconOnlyMore"><Viewbox Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Ellipse Canvas.Left="3.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/><Ellipse Canvas.Left="10.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/><Ellipse Canvas.Left="17.8" Canvas.Top="10.8" Width="2.4" Height="2.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}" StrokeThickness="1.9"/></Canvas></Viewbox></DataTemplate>
-    <DataTemplate x:Key="IconOnlyChevronDown"><Viewbox Width="12" Height="12" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconOnlyArrowUp"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowUp}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconLabelArrowUp"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowUp}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
+    <DataTemplate x:Key="IconOnlyArrowDown"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconLabelArrowDown"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
+    <DataTemplate x:Key="IconOnlyArrowBack"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowBack}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconLabelArrowBack"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowBack}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
+    <DataTemplate x:Key="IconOnlyArrowForward"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconLabelArrowForward"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Margin="0,0,6,0" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphArrowForward}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox><TextBlock Text="{Binding}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
+    <DataTemplate x:Key="IconOnlyEdit"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphEdit}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconOnlyX"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="14" Height="14" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphX}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconOnlyMore"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphMore}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
+    <DataTemplate x:Key="IconOnlyChevronDown"><Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="12" Height="12" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox></DataTemplate>
     <DataTemplate x:Key="IconLabelExcel">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphExcel}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>
@@ -344,7 +367,7 @@
     </DataTemplate>
     <DataTemplate x:Key="IconLabelOpen">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Viewbox Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
+            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Margin="0,0,6,0" VerticalAlignment="Center" IsHitTestVisible="False" Stretch="Uniform">
                 <Canvas Width="24" Height="24">
                     <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphOpen}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/>
                 </Canvas>

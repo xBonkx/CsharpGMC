@@ -618,8 +618,8 @@
                         <TextBlock x:Name="EmptyNavigationHint" Text="или создайте новый: соберите КП в конструкторе или загрузите готовое из Excel."
                                    Foreground="#64748B" TextAlignment="Center" TextWrapping="Wrap" Margin="0,5,0,14"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}">
-                            <Button Content="Загрузить КП из Excel" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
-                            <Button x:Name="EmptyNewObjectButton" Content="Новый договор" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
+                            <Button Content="Загрузить КП из Excel" ContentTemplate="{StaticResource IconLabelExcel}" Style="{StaticResource PythonToolbarButton}" Click="ImportExcelFromObject_Click" Margin="0,0,6,0"/>
+                            <Button x:Name="EmptyNewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Style="{StaticResource PrimaryButton}" Click="NewObject_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -648,7 +648,7 @@
                                         <Button x:Name="ObjectNewKpButton" Content="Новое КП" ContentTemplate="{StaticResource IconLabelPlus}" Click="ObjectNewContract_Click"
                                                 Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="0,0,8,0"
                                                 ToolTip="Создать КП: пустое или копию существующего"/>
-                                        <Button x:Name="ObjectPropertiesButton" Style="{StaticResource PythonToolbarButton}" Content="Свойства" Click="ObjectProperties_Click" Visibility="Collapsed" Margin="0,0,8,0"/>
+                                        <Button x:Name="ObjectPropertiesButton" Style="{StaticResource PythonToolbarButton}" Content="Свойства" ContentTemplate="{StaticResource IconLabelEdit}" Click="ObjectProperties_Click" Visibility="Collapsed" Margin="0,0,8,0"/>
                                         <Button x:Name="ObjectMoreButton" Style="{StaticResource PythonToolbarButton}" Content="Ещё" ContentTemplate="{StaticResource IconOnlyMore}" Padding="7,4" MinWidth="32" ToolTip="Ещё"
                                                 AutomationProperties.Name="Ещё" Click="ObjectMore_Click" Visibility="Collapsed"/>
                                     </StackPanel>

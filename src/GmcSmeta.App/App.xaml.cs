@@ -86,6 +86,7 @@ public partial class App : Application
         InstallWindowBranding(demo ? ShellAppId + ".Demo" : ShellAppId);
         StartupTrace.Mark("app_branding_end");
         StartupTrace.Mark("app_interaction_setup_begin");
+        VisualRenderingPolicy.Install();
         ContextMenuIcons.InstallSeparatorNormalization();
         GridEditInteraction.Install();
         GridSortInteraction.Install();

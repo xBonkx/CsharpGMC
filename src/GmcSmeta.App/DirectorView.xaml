@@ -151,32 +151,32 @@
             <ComboBoxItem Content="Договоры — в работе" Tag="contracts" IsSelected="True"/>
             <ComboBoxItem Content="КП — просчёты (последнее КП по карточке)" Tag="kp"/>
         </ComboBox>
-        <UniformGrid x:Name="DirectorTiles" Grid.Row="2" Columns="4" Margin="{StaticResource LayoutDirectorTilesInset}" SizeChanged="DirectorTiles_SizeChanged">
-            <Border Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}" MinWidth="0">
+        <local:EqualGapTilePanel Gap="{StaticResource LayoutTotalsTileGap}" x:Name="DirectorTiles" Grid.Row="2" Columns="4" Margin="{StaticResource LayoutDirectorTilesInset}" SizeChanged="DirectorTiles_SizeChanged">
+            <Border Style="{StaticResource PythonTile}" MinWidth="0">
                 <StackPanel>
                     <TextBlock x:Name="TileTotalCaption" Text="Договоры всего, с НДС" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileTotalValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border x:Name="TileClosed" Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}" MinWidth="0">
+            <Border x:Name="TileClosed" Style="{StaticResource PythonTile}" MinWidth="0">
                 <StackPanel>
                     <TextBlock Text="Сдано по КС" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileClosedValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border x:Name="TileExtra" Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTile}" MinWidth="0">
+            <Border x:Name="TileExtra" Style="{StaticResource PythonTile}" MinWidth="0">
                 <StackPanel>
                     <TextBlock Text="Докуплено вне сметы" Style="{StaticResource PythonTileLabel}"/>
                     <TextBlock x:Name="TileExtraValue" Style="{StaticResource PythonTileValue}"/>
                 </StackPanel>
             </Border>
-            <Border Margin="{StaticResource LayoutDirectorTileInset}" Style="{StaticResource PythonTileAccent}" MinWidth="0">
+            <Border Style="{StaticResource PythonTileAccent}" MinWidth="0">
                 <StackPanel>
                     <TextBlock x:Name="TileEarnedCaption" Text="Заработано (материалы + монтаж)" Style="{StaticResource PythonTileLabel}" Foreground="#DBEAFE"/>
                     <TextBlock x:Name="TileEarnedValue" Style="{StaticResource PythonTileValue}" Foreground="White"/>
                 </StackPanel>
             </Border>
-        </UniformGrid>
+        </local:EqualGapTilePanel>
         <Border Grid.Row="3" Margin="{StaticResource LayoutDirectorSectionGap}" Style="{StaticResource DirectorTableFrame}">
             <!-- Outer border owns shadow and stroke; the inner clip keeps scrolling content inside the rounded corners. -->
             <local:SummaryTableFrame Background="White" CornerRadius="11" BorderThickness="0">
@@ -239,7 +239,7 @@
         </Border>
         <StackPanel Grid.Row="4" Margin="{StaticResource LayoutDirectorSectionGap}">
             <DockPanel x:Name="LoadStatusPanel" Visibility="Collapsed" Margin="0,0,0,6">
-                <Button x:Name="RetryButton" DockPanel.Dock="Right" Content="Повторить загрузку"
+                <Button x:Name="RetryButton" DockPanel.Dock="Right" Content="Повторить загрузку" ContentTemplate="{StaticResource IconLabelRefresh}"
                         Visibility="Collapsed" Style="{StaticResource PythonToolbarButton}" Click="Retry_Click"/>
                 <TextBlock x:Name="LoadStatus" Foreground="#64748B" TextWrapping="Wrap"/>
             </DockPanel>

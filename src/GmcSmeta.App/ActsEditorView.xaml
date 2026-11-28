@@ -266,9 +266,9 @@
             </Grid>
 
             <!-- плитки итогов акта (SizePolicy.Ignored в Python: сжимаются, не уводят окно) -->
-            <UniformGrid Grid.Row="5" x:Name="TilesPanel" Columns="4" Margin="0,5,-10,0"
+            <local:EqualGapTilePanel Gap="{StaticResource LayoutTotalsTileGap}" Grid.Row="5" x:Name="TilesPanel" Columns="4" Margin="0,5,0,8"
                          SizeChanged="TilesPanel_SizeChanged">
-                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8">
+                <Border Style="{StaticResource PythonTile}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource PythonTileLabel}" Text="Материалы в акте"
                                    TextWrapping="Wrap" ToolTip="Материалы в акте"/>
@@ -277,7 +277,7 @@
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="SmrTile">
+                <Border Style="{StaticResource PythonTile}" x:Name="SmrTile">
                     <StackPanel>
                         <TextBlock Style="{StaticResource PythonTileLabel}" Text="СМР в акте, ₽" TextWrapping="Wrap"/>
                         <TextBox x:Name="SmrInput" Style="{StaticResource KsTileInput}" Margin="0,3,0,0"
@@ -290,7 +290,7 @@
                                   ToolTip="В КС-2 строка «СМР:» под каждой системой (как в актах по Анне)"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="TrTile"
+                <Border Style="{StaticResource PythonTile}" x:Name="TrTile"
                         Visibility="Collapsed">
                     <StackPanel>
                         <TextBlock Style="{StaticResource PythonTileLabel}" Text="Транспорт в акте, ₽" TextWrapping="Wrap"/>
@@ -301,7 +301,7 @@
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8" x:Name="PnrTile"
+                <Border Style="{StaticResource PythonTile}" x:Name="PnrTile"
                         Visibility="Collapsed">
                     <StackPanel>
                         <TextBlock Style="{StaticResource PythonTileLabel}" Text="Пусконаладка в акте, ₽" TextWrapping="Wrap"/>
@@ -312,7 +312,7 @@
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource PythonTileAccent}" Margin="0,0,10,8">
+                <Border Style="{StaticResource PythonTileAccent}">
                     <StackPanel>
                         <TextBlock x:Name="TotalCaption" Style="{StaticResource PythonTileLabel}"
                                    Foreground="#DDE7FF" Text="ИТОГО по акту с НДС"
@@ -323,7 +323,7 @@
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource PythonTile}" Margin="0,0,10,8">
+                <Border Style="{StaticResource PythonTile}">
                     <StackPanel>
                         <TextBlock x:Name="DoneCaption" Style="{StaticResource PythonTileLabel}"
                                    Text="Сдано по договору (подписано)" TextWrapping="Wrap"
@@ -333,7 +333,7 @@
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                     </StackPanel>
                 </Border>
-            </UniformGrid>
+            </local:EqualGapTilePanel>
         </Grid>
 
         <!-- Cold opening has a real first frame; on act switches this becomes
@@ -357,7 +357,7 @@
                 <TextBlock x:Name="EmptyDescription" Text="Нажмите «Новый акт», отметьте, что сдаёте, впишите СМР — и сохраните КС-2 и КС-3."
                            Foreground="#64748B" TextWrapping="Wrap" HorizontalAlignment="Center"
                            Margin="0,10,0,0" TextAlignment="Center"/>
-                <Button x:Name="RetryActButton" Content="Повторить загрузку" Visibility="Collapsed"
+                <Button x:Name="RetryActButton" Content="Повторить загрузку" ContentTemplate="{StaticResource IconLabelRefresh}" Visibility="Collapsed"
                         Style="{StaticResource PythonToolbarButton}" Click="RetryAct_Click"
                         HorizontalAlignment="Center" Margin="0,12,0,0"/>
             </StackPanel>

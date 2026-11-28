@@ -19,14 +19,12 @@ internal static class ReferenceWindowUi
         AutomationProperties.SetName(input,placeholder);
         var root=new Grid();
         root.Children.Add(input);
-        var icon=new System.Windows.Shapes.Path{Data=(Geometry)Application.Current.FindResource("GlyphSearch"),
-            Stroke=new SolidColorBrush(Color.FromRgb(0x64,0x74,0x8B))};
-        icon.SetResourceReference(FrameworkElement.StyleProperty,"SvgGlyphPath");
-        var canvas=new Canvas{Width=24,Height=24};
-        canvas.Children.Add(icon);
-        root.Children.Add(new Viewbox{Width=18,Height=18,Child=canvas,
-            HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,
-            Margin=new Thickness(8,0,0,0),IsHitTestVisible=false});
+        var icon=VectorGlyph.Create((Geometry)Application.Current.FindResource("GlyphSearch"),
+            (Style)Application.Current.FindResource("SvgGlyphPath"),
+            new SolidColorBrush(Color.FromRgb(0x64,0x74,0x8B)));
+        icon.HorizontalAlignment=HorizontalAlignment.Left;
+        icon.Margin=new Thickness(8,0,0,0);
+        root.Children.Add(icon);
         var hint=new TextBlock{Text=placeholder,TextTrimming=TextTrimming.CharacterEllipsis,
             Foreground=new SolidColorBrush(Color.FromRgb(0x94,0xA3,0xB8)),
             Margin=new Thickness(32,0,32,0),VerticalAlignment=VerticalAlignment.Center,

@@ -41,11 +41,11 @@ public sealed class DirectorAndCardVisualSourceTests
     public void DirectorTilesAdaptToWidthAndKeepEqualGaps()
     {
         var doc = XDocument.Parse(Source("DirectorView.xaml"));
-        var tiles = Assert.Single(doc.Descendants(W + "UniformGrid").Where(e => (string?)e.Attribute(X + "Name") == "DirectorTiles"));
+        var tiles = Assert.Single(doc.Descendants().Where(e => e.Name.LocalName == "EqualGapTilePanel" && (string?)e.Attribute(X + "Name") == "DirectorTiles"));
         Assert.Equal("DirectorTiles_SizeChanged", (string?)tiles.Attribute("SizeChanged"));
         Assert.Equal(4, tiles.Elements(W + "Border").Count());
-        Assert.All(tiles.Elements(W + "Border"), b =>
-            Assert.Equal("{StaticResource LayoutDirectorTileInset}", (string?)b.Attribute("Margin")));
+        Assert.Equal("{StaticResource LayoutTotalsTileGap}", (string?)tiles.Attribute("Gap"));
+        Assert.All(tiles.Elements(W + "Border"), b => Assert.Null(b.Attribute("Margin")));
         var cs = Source("DirectorView.xaml.cs");
         Assert.Contains("width < 920 ? 2 : count", cs);
         Assert.Contains("UpdateDirectorTileColumns();", cs);
@@ -175,8 +175,8 @@ public sealed class DirectorAndCardVisualSourceTests
         string Metric(string key) => metrics.Descendants().Single(e => (string?)e.Attribute(X + "Key") == key).Value;
         Assert.Equal("24,18,24,14", Metric("LayoutPageMargin"));
         Assert.Equal("0,12,0,0", Metric("LayoutDirectorSectionGap"));
-        Assert.Equal("5,5", Metric("LayoutDirectorTileInset"));
-        Assert.Equal("-5,7,-5,-5", Metric("LayoutDirectorTilesInset"));
+        Assert.Equal("0,12,0,0", Metric("LayoutDirectorTilesInset"));
+        Assert.Equal("10", Metric("LayoutTotalsTileGap"));
         var footer = Named(doc, "LoadStatusPanel").Parent!;
         Assert.Equal("{StaticResource LayoutDirectorSectionGap}", (string?)footer.Attribute("Margin"));
         Assert.Contains(footer.Elements(W + "TextBlock"), e => ((string?)e.Attribute("Text"))?.Contains("Суммы с НДС.") == true);

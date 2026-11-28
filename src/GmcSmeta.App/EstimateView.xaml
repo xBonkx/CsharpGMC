@@ -520,7 +520,10 @@
                             ToolTip="Подготовка КП. Нажмите, чтобы передать на следующий этап">
                         <StackPanel Orientation="Horizontal">
                             <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
-                             <TextBlock x:Name="PhaseButtonText" Text="Этап ▾" VerticalAlignment="Center"/>
+                             <TextBlock x:Name="PhaseButtonText" Text="Этап" VerticalAlignment="Center"/>
+                             <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="12" Height="12" Margin="4,0,0,0">
+                                 <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Canvas>
+                             </Viewbox>
                         </StackPanel>
                     </Button>
                     <Button x:Name="TransferRatesButton" Style="{StaticResource DocumentPhaseTool}"
@@ -677,7 +680,7 @@
         <local:SummaryTableFrame x:Name="EstimateTablePanel" Grid.Row="4" Background="White" BorderBrush="#E4E8EF" BorderThickness="1"
                 CornerRadius="12" Margin="24,8,24,0">
             <DockPanel>
-                <Button x:Name="BottomAddRowButton" DockPanel.Dock="Bottom" Content="Добавить строку"
+                <Button x:Name="BottomAddRowButton" DockPanel.Dock="Bottom" Content="Добавить строку" ContentTemplate="{StaticResource IconLabelRowPlus}"
                         Click="AddRow_Click" IsEnabled="{Binding IsEnabled, ElementName=AddRowButton}"
                         Foreground="#2563EB" BorderThickness="0" Background="Transparent"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" FontWeight="SemiBold"
@@ -790,7 +793,7 @@
                                     <Button Grid.Column="0" Click="ToggleSection_Click"
                                             ToolTip="Свернуть или развернуть раздел"
                                             AutomationProperties.Name="Свернуть или развернуть раздел"
-                                            Width="16" Height="18" MinHeight="0" MinWidth="0" Padding="0"
+                                            Width="22" MinHeight="24" MinWidth="22" Padding="0"
                                             BorderThickness="0" Background="Transparent"
                                             Visibility="{Binding IsExpandable, Converter={StaticResource OnlySystems}}">
                                         <Button.Template>
@@ -812,7 +815,7 @@
                                                             <Setter Property="Data" Value="{StaticResource GlyphChevronDown}"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsCollapsed}" Value="True">
-                                                                    <Setter Property="Data" Value="M9 6l6 6-6 6"/>
+                                                                    <Setter Property="Data" Value="{StaticResource GlyphChevronRight}"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>

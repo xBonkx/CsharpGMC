@@ -17,6 +17,7 @@ internal static class VisualAuditChecks
     {
         RunNavigationGlyphChecks();
         RunSharedGlyphCatalogChecks();
+        RunEqualGapAndRenderingChecks();
         RunDirectorTextLayoutChecks();
         RunSharedTypographyChecks();
         RunEstimateHeaderToolbarParityChecks();
@@ -114,6 +115,40 @@ internal static class VisualAuditChecks
                 Require(view.Margin == new Thickness(0, 0, 6, 0), key + ": caption gap");
         }
         Console.WriteLine("Shared glyph geometry and all icon template metrics checked (no SQL).");
+    }
+
+    private static void RunEqualGapAndRenderingChecks()
+    {
+        var panel = new EqualGapTilePanel { Columns = 3, Gap = 10 };
+        var first = new Border { MinHeight = 70 };
+        var hidden = new Border { MinHeight = 140, Visibility = Visibility.Collapsed };
+        var second = new Border { MinHeight = 70, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18 } };
+        var third = new Border { MinHeight = 70 };
+        panel.Children.Add(first); panel.Children.Add(hidden);
+        panel.Children.Add(second); panel.Children.Add(third);
+        Layout(panel, 320, 70);
+        Require(Math.Abs(LayoutInformation.GetLayoutSlot(first).Width - 100) < .1 &&
+            Math.Abs(LayoutInformation.GetLayoutSlot(second).Left - 110) < .1 &&
+            Math.Abs(LayoutInformation.GetLayoutSlot(third).Right - 320) < .1,
+            "Visible cards must align at both edges with gaps independent of shadows");
+        Require(panel.DesiredSize.Height <= 70.1, "Collapsed card must not reserve height");
+        panel.Columns = 2;
+        Layout(panel, 320, 150);
+        Require(Math.Abs(LayoutInformation.GetLayoutSlot(third).Top - 80) < .1,
+            "Card grid must wrap with equal vertical gap");
+        var root = new Grid();
+        VisualRenderingPolicy.Apply(root);
+        Require(root.UseLayoutRounding && root.SnapsToDevicePixels &&
+            TextOptions.GetTextFormattingMode(root) == TextFormattingMode.Display &&
+            TextOptions.GetTextRenderingMode(root) == TextRenderingMode.ClearType,
+            "Shared window rendering defaults");
+        var exception = new Grid();
+        TextOptions.SetTextFormattingMode(exception, TextFormattingMode.Ideal);
+        TextOptions.SetTextRenderingMode(exception, TextRenderingMode.Grayscale);
+        VisualRenderingPolicy.Apply(exception);
+        Require(TextOptions.GetTextFormattingMode(exception) == TextFormattingMode.Ideal &&
+            TextOptions.GetTextRenderingMode(exception) == TextRenderingMode.Grayscale,
+            "Explicit popup rendering exception must survive");
     }
 
     private static void RunSharedTypographyChecks()
