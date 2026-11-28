@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Windows.Media;
+using GmcSmeta.Core.Domain;
 
 namespace GmcSmeta.App;
 
@@ -25,6 +27,28 @@ public partial class CostSummaryPane
     private static ScrollViewer? CostScroll(DataGrid grid) =>
         grid.Template?.FindName("DG_ScrollViewer", grid) as ScrollViewer;
 
+    // Inspect only realized visual rows; never walk the entire data source to
+    // obtain containers or disable recycling virtualization.
+    private static IEnumerable<DataGridRow> RealizedCostRows(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is DataGridRow row) yield return row;
+            else foreach (var nested in RealizedCostRows(child)) yield return nested;
+        }
+    }
+
+    private static ScrollContentPresenter? CostViewport(ScrollViewer? scroll) =>
+        scroll?.Template?.FindName("PART_ScrollContentPresenter", scroll) as ScrollContentPresenter;
+
+    private static double? VisibleCostRowY(DataGridRow row, ScrollContentPresenter viewport)
+    {
+        if (!row.IsVisible || row.ActualHeight <= 0 || !viewport.IsAncestorOf(row)) return null;
+        var y = row.TranslatePoint(new Point(0, 0), viewport).Y;
+        return double.IsFinite(y) && y < viewport.ActualHeight && y + row.ActualHeight > 0 ? y : null;
+    }
+
     // Preserve identities rather than indices. Never reselect an unrelated row
     // after deletion, filtering or group rebuild. Offscreen rows stay virtual.
     private void ReplaceCostRows(DataGrid grid, IEnumerable source)
@@ -39,8 +63,32 @@ public partial class CostSummaryPane
         var scroll = CostScroll(grid);
         var vertical = scroll?.VerticalOffset ?? 0;
         var horizontal = scroll?.HorizontalOffset ?? 0;
+        SummaryViewportAnchor.Row? top = null, active = null;
+        if (CostViewport(scroll) is { } viewport)
+        {
+            foreach (var row in RealizedCostRows(viewport))
+            {
+                if (CostViewKey(row.Item) is not { } key || VisibleCostRowY(row, viewport) is not { } y) continue;
+                var anchor = new SummaryViewportAnchor.Row(key, y);
+                if (top is null || y < top.Value.Y) top = anchor;
+                if (ReferenceEquals(row.Item, current.Item)) active = anchor;
+            }
+        }
+        var anchorCandidates = new Dictionary<string, object>(StringComparer.Ordinal);
+        var duplicateAnchors = new HashSet<string>(StringComparer.Ordinal);
         grid.ItemsSource = source;
         if (!hadSource) return;
+        if (top is not null || active is not null)
+        {
+            foreach (var item in grid.Items)
+            {
+                if (CostViewKey(item) is not { } key || key != top?.Key && key != active?.Key) continue;
+                if (!anchorCandidates.TryAdd(key, item)) duplicateAnchors.Add(key);
+            }
+            foreach (var key in duplicateAnchors) anchorCandidates.Remove(key);
+        }
+        var anchorToRestore = SummaryViewportAnchor.Choose(active, top,
+            anchorCandidates.Keys.ToHashSet(StringComparer.Ordinal));
 
         if (selected.Count > 0 || currentKey is not null)
         {
@@ -75,6 +123,23 @@ public partial class CostSummaryPane
                     CostScroll(grid) is not { } target) return;
                 target.ScrollToHorizontalOffset(horizontal);
                 target.ScrollToVerticalOffset(vertical);
+                if (anchorToRestore is not { } anchor ||
+                    !anchorCandidates.TryGetValue(anchor.Key, out var item)) return;
+                // ScrollIntoView realizes just the anchor, then correct its pixel
+                // position. Recheck the source/generation after the layout pass.
+                grid.ScrollIntoView(item);
+                grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    if (!_attached || generation != _loadGeneration || !grid.IsVisible ||
+                        !ReferenceEquals(grid.ItemsSource, source) || CostScroll(grid) is not { } updated ||
+                        CostViewport(updated) is not { } updatedViewport ||
+                        grid.ItemContainerGenerator.ContainerFromItem(item) is not DataGridRow row ||
+                        !ReferenceEquals(row.Item, item) || VisibleCostRowY(row, updatedViewport) is not { } actualY)
+                        return;
+                    updated.ScrollToVerticalOffset(SummaryViewportAnchor.Offset(
+                        updated.VerticalOffset, actualY, anchor.Y, updated.ScrollableHeight));
+                    updated.ScrollToHorizontalOffset(horizontal);
+                }));
             }));
     }
 }
