@@ -570,6 +570,7 @@
 ## Тестовый режим — текущий остаток
 
 - DEMO-05.02 CODE READY: seed совместим с установщиком двух TEST-ярлыков. DEMO-01.01/05.01/08.01 PARTIAL: guard обоих Open, изоляция профиля/наследуемых путей, проверка metadata до smoke, fallback; прямой EXE, полный инвентарь и исходный сбой v1.11.0 открыты. [Профильный TODO](DEMO_MODE_TODO_20261128.md).
+- DEMO-06.01–03 PARTIAL: CLI totals/estimate/check переведены на guarded SQL Server; оставшиеся legacy fixtures и зависимости требуют замены. [Профильный TODO](DEMO_MODE_TODO_20261128.md).
 
 ## Активный перенос и миграция (отдельно от исторических 400 ID)
 

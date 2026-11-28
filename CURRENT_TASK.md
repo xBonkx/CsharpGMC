@@ -43,6 +43,8 @@
 
 - 29.11.2026 — chat-demo-next-1449: DEMO-01.01/05.01/08.01 PARTIAL; усилены guard ошибочных параметров, запрет failover, изоляция локального профиля и окружения child. 6 xUnit случаев добавлены, не запускались; новые CODE READY/DONE отсутствуют. [Доказательства](docs/DEMO_MODE_TODO_20261128.md).
 
+- 29.11.2026 — chat-legacy-1455: DEMO-06.01–03 PARTIAL, CLI totals/estimate/check теперь SQL-only, явная тестовая база и revision fence. Legacy fixture/dependency не удалены до полной замены. 3 source-теста добавлены, не запускались. [Доказательства](docs/DEMO_MODE_TODO_20261128.md).
+
 ## История до реорганизации
 
 [Полный CURRENT_TASK до сокращения](https://github.com/xBonkx/CsharpGMC/blob/c00f4c32d3faea3e9db33a31ca07c0207df3a376/CURRENT_TASK.md) — неизменённый снимок со всеми отчётами, результатами и доказательствами. Локально: `git show c00f4c32d3faea3e9db33a31ca07c0207df3a376:CURRENT_TASK.md`. Старые заголовки ниже сохранены для совместимости ссылок. Новые записи — краткий итог со ссылкой на единственный подробный отчёт; не копировать содержимое профильных TODO.
