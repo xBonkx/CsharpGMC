@@ -1137,80 +1137,9 @@ public partial class ActsEditorView : UserControl
                 .Sum(p => ActQuantityPolicy.Remaining(p.QtyByKp, p.ClosedByOthers) * p.Price);
         }
 
-        var dialog = new Window
-        {
-            Title = "Закрыть разделы",
-            Width = 560, Height = 560,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = Window.GetWindow(this),
-        };
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"Отмеченные разделы попадут в КС-2 №{current.Number} всем остатком (100 %). " +
-                   "Снимите галочки с тех, что не закрываем.",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)),
-        });
-        var checks = new Dictionary<long, CheckBox>();
-        var list = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
-        foreach (var top in tops)
-        {
-            var rest = restByTop.GetValueOrDefault(top.SystemId);
-            var text = rest > 0.005m
-                ? $"{top.Label}   —   остаток {Money.Format(rest)} ₽"
-                : $"{top.Label}   —   уже сдан";
-            var check = new CheckBox { Content = text, IsChecked = rest > 0.005m, Margin = new Thickness(0, 0, 0, 4) };
-            checks[top.SystemId] = check;
-            list.Children.Add(check);
-        }
-        panel.Children.Add(new ScrollViewer
-        {
-            Content = list,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MaxHeight = 320,
-        });
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 12) };
-        Button MarkAll(string caption, bool value)
-        {
-            var button = new Button
-            {
-                Content = caption,
-                Style = (Style)FindResource("PythonToolbarButton"),
-                Margin = new Thickness(0, 0, 8, 0),
-            };
-            button.Click += (_, _) =>
-            {
-                foreach (var c in checks.Values) c.IsChecked = value;
-            };
-            return button;
-        }
-        row.Children.Add(MarkAll("Отметить все", true));
-        row.Children.Add(MarkAll("Снять все", false));
-        panel.Children.Add(row);
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-        };
-        var ok = new Button
-        {
-            Content = "Сохранить",
-            Style = (Style)FindResource("PythonToolbarPrimary"),
-            Padding = new Thickness(14, 5, 14, 5),
-        };
-        var cancel = new Button { Content = "Отмена", Style = (Style)FindResource("PythonToolbarButton") };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
-        panel.Children.Add(buttons);
-        dialog.Content = panel;
-        bool? accepted = null;
-        ok.Click += (_, _) => { accepted = true; dialog.DialogResult = true; };
-        cancel.Click += (_, _) => { accepted = false; dialog.DialogResult = false; };
-        dialog.ShowDialog();
-        if (accepted != true)
-            return;
-        var chosenTops = checks.Where(kv => kv.Value.IsChecked == true).Select(kv => kv.Key).ToHashSet();
+        var chosenTops = KsCloseSectionsDialog.Show(this, current.Number,
+            tops.Select(top => (top.SystemId, top.Label, restByTop.GetValueOrDefault(top.SystemId))));
+        if (chosenTops is null) return;
         if (chosenTops.Count == 0)
             return;
         var ids = chosenTops.SelectMany(t => positionsByTop.GetValueOrDefault(t) ?? new List<long>()).ToHashSet();

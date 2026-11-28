@@ -411,41 +411,16 @@ public partial class EstimateView
     private List<MaterialsRow> MaterialsMergedRows(List<CostMaterialsPosition> top, Dictionary<long, string> labels)
     {
         var rows = new List<MaterialsRow>();
-        foreach (var g in top.GroupBy(p => (Name: p.Name.Trim().ToLowerInvariant(), Unit: (p.Unit ?? "").Trim().ToLowerInvariant())))
+        foreach (var ps in GmcSmeta.Core.Domain.MaterialsMerge.Groups(top))
         {
-            var ps = g.ToList();
             if (ps.Count == 1)
             {
                 rows.Add(MaterialsPositionRow(ps[0], "", labels.GetValueOrDefault(ps[0].SystemId)));
                 continue;
             }
             var p0 = ps[0];
-            decimal qty = 0m, sum = 0m, costSum = 0m, cov = 0m;
-            var prices = new HashSet<decimal>();
-            var costs = new HashSet<decimal?>();
-            var suppliers = new HashSet<string>();
-            var notes = new HashSet<string>();
-            decimal? oneMarkup = null;
-            var markupValues = new HashSet<decimal?>();
-            foreach (var p in ps)
-            {
-                qty += p.Qty;
-                var amount = Money.Round2(p.Qty * p.Price);
-                sum += amount;
-                prices.Add(Money.Round2(p.Price));
-                var cu = p.UnitCost;
-                costs.Add(cu is decimal unit ? Money.Round2(unit) : null);
-                if (cu is decimal u)
-                {
-                    costSum += u * p.Qty;
-                    if (p.Price != 0m) cov += amount;
-                }
-                suppliers.Add(p.Supplier);
-                notes.Add(p.CostNote);
-                markupValues.Add(cu is decimal uu && p.Price != 0m && uu != 0m
-                    ? Money.Round2((p.Price / uu - 1m) * 100m) : null);
-            }
-            oneMarkup = markupValues.Count == 1 ? markupValues.First() : null;
+            var merged = GmcSmeta.Core.Domain.MaterialsMerge.Summarize(ps);
+            var (qty, sum, costSum, cov, prices, costs, suppliers, notes, oneMarkup, markupValues) = merged;
             string Same(decimal? v) => v is decimal value ? MatMoney(value) : "";
             rows.Add(new MaterialsRow
             {
