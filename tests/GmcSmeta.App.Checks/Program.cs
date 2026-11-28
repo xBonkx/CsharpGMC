@@ -52,6 +52,13 @@ internal static class Program
                 VisualDifferenceChecks.CompareFiles(args[1], args[2], args[3], args.Length == 5 ? args[4] : null);
                 return 0;
             }
+            if (args.Length == 1 && args[0] == "--icon-catalog")
+            {
+                var iconApp = CreateApplication();
+                try { VisualAuditChecks.ShowInteractiveIconCatalog(); }
+                finally { iconApp.Shutdown(); }
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--visual-audit")
             {
                 var auditApp = CreateApplication();

@@ -13,14 +13,14 @@
         <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" ContentTemplate="{StaticResource IconLabelOpen}" Click="Edit_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать акт" ContentTemplate="{StaticResource IconLabelCopy}" Click="Copy_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить" ContentTemplate="{StaticResource IconLabelTrash}" Click="Delete_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Карточка объекта" Click="ObjectCard_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Сертификаты…" Click="Certificates_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Шаблоны Excel…" Click="Templates_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Карточка объекта" ContentTemplate="{StaticResource IconLabelBuilding}" Click="ObjectCard_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Сертификаты…" ContentTemplate="{StaticResource IconLabelFile}" Click="Certificates_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Шаблоны Excel…" ContentTemplate="{StaticResource IconLabelExcel}" Click="Templates_Click" Padding="14,6" Margin="0,0,6,6"/>
       </WrapPanel>
       <WrapPanel Margin="0,0,0,10">
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Резервная копия…" Click="Backup_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Восстановить…" Click="Restore_Click" Padding="14,6" Margin="0,0,6,6"/>
-        <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" Click="Root_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Резервная копия…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Backup_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Восстановить…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Restore_Click" Padding="14,6" Margin="0,0,6,6"/>
+        <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" ContentTemplate="{StaticResource IconLabelFolder}" Click="Root_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Обновить" ContentTemplate="{StaticResource IconLabelRefresh}" Click="Refresh_Click" Padding="14,6" Margin="0,0,6,6"/>
       </WrapPanel>
       <Grid Margin="0,0,0,10">
@@ -28,7 +28,7 @@
           <ColumnDefinition Width="*"/><ColumnDefinition Width="185"/>
         </Grid.ColumnDefinitions>
         <Grid Margin="0,0,8,0">
-          <TextBox x:Name="Search" Style="{StaticResource PythonSearch}" Height="32"
+          <TextBox x:Name="Search" Style="{StaticResource PythonSearch}"
             Background="White" BorderBrush="#D0D7E2" Padding="32,5,10,5" VerticalContentAlignment="Center"
             AutomationProperties.Name="Поиск комплектов"
             ToolTip="Поиск объекта, договора, акта или замечаний" TextChanged="Filter_Changed"/>
@@ -48,7 +48,7 @@
             </TextBlock.Style>
           </TextBlock>
         </Grid>
-        <ComboBox x:Name="StatusFilter" Grid.Column="1" Height="32" SelectionChanged="Filter_Changed">
+        <ComboBox x:Name="StatusFilter" Grid.Column="1" MinHeight="{StaticResource LayoutFieldMinHeight}" SelectionChanged="Filter_Changed">
           <ComboBoxItem Content="Все статусы" IsSelected="True"/>
           <ComboBoxItem Content="Черновик"/>
           <ComboBoxItem Content="На проверке"/>

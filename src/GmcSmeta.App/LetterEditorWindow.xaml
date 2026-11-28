@@ -12,7 +12,7 @@
             <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр PDF" ContentTemplate="{StaticResource IconLabelFile}" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" x:Name="BuildButton" Content="Собрать выдачу…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Build_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SendButton" Content="Отметить отправленным…" Click="Sent_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SendButton" Content="Отметить отправленным…" ContentTemplate="{StaticResource IconLabelCheck}" Click="Sent_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="История…" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
         </WrapPanel>
@@ -74,7 +74,7 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                         <Button Style="{StaticResource PythonToolbarButton}" FontWeight="Bold" Content="Жирный" Click="Bold_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
                         <Button Style="{StaticResource PythonToolbarButton}" FontStyle="Italic" Content="Курсив" Click="Italic_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Список" Click="List_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Список" ContentTemplate="{StaticResource IconLabelList}" Click="List_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="По левому краю" Click="AlignLeft_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="По центру" Click="AlignCenter_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
                         <Button Style="{StaticResource PythonToolbarButton}" Content="По ширине" Click="AlignJustify_Click" Padding="12,6" Margin="{StaticResource LayoutAuxActionGap}"/>
@@ -95,12 +95,12 @@
                                 <ComboBoxItem Content="Скан письма"/>
                                 <ComboBoxItem Content="Подтверждение отправки"/>
                             </ComboBox>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить PDF / фото…" Click="FileAdd_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" Click="FileOpen_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Название…" Click="FileRename_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить PDF / фото…" ContentTemplate="{StaticResource IconLabelClip}" Click="FileAdd_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" ContentTemplate="{StaticResource IconLabelOpen}" Click="FileOpen_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Название…" ContentTemplate="{StaticResource IconLabelEdit}" Click="FileRename_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Включить / исключить" Click="FileToggle_Click" Padding="10,5" Margin="{StaticResource LayoutAuxActionGap}"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="↑" AutomationProperties.Name="Выше" ToolTip="Выше" Click="FileUp_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="↓" AutomationProperties.Name="Ниже" ToolTip="Ниже" Click="FileDown_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Выше" ContentTemplate="{StaticResource IconOnlyArrowUp}" AutomationProperties.Name="Выше" ToolTip="Выше" Click="FileUp_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Ниже" ContentTemplate="{StaticResource IconOnlyArrowDown}" AutomationProperties.Name="Ниже" ToolTip="Ниже" Click="FileDown_Click" Margin="{StaticResource LayoutAuxActionGap}" Width="32" MinWidth="32" Padding="4" />
                         </WrapPanel>
                         <CheckBox x:Name="CombineBox" Margin="0,4,0,10" Content="Дополнительно собрать письмо и приложения в один PDF"/>
                         <TextBlock Text="Выпуски (двойной щелчок — открыть папку):" Margin="0,0,0,4"/>

@@ -12,11 +12,11 @@
             <TextBlock x:Name="ArchiveLabel" Margin="0,4,0,8" Foreground="#64748B" TextWrapping="Wrap"/>
             <StackPanel x:Name="HeaderActions" IsEnabled="False">
             <WrapPanel Margin="0,0,0,4">
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" Padding="11,6" Margin="0,0,7,5" Click="Root_Click"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" ContentTemplate="{StaticResource IconLabelFolder}" Padding="11,6" Margin="0,0,7,5" Click="Root_Click"/>
             </WrapPanel>
             <WrapPanel>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelPlus}" Click="Add_Click"/>
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Список систем…" Padding="11,6" Margin="0,0,7,5" Click="Batch_Click"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Список систем…" ContentTemplate="{StaticResource IconLabelList}" Padding="11,6" Margin="0,0,7,5" Click="Batch_Click"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Копировать" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelCopy}" Click="Duplicate_Click"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelTrash}" Click="Delete_Click"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Ранее созданные PDF…" Padding="11,6" Margin="0,0,7,5" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click"/>
@@ -24,7 +24,7 @@
             </StackPanel>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SaveButton" IsEnabled="False" Content="Сохранить" Padding="14,8" Margin="0,0,8,0" Click="Save_Click"/>
+            <Button Style="{StaticResource PythonToolbarButton}" x:Name="SaveButton" IsEnabled="False" Content="Сохранить" ContentTemplate="{StaticResource IconLabelCheck}" Padding="14,8" Margin="0,0,8,0" Click="Save_Click"/>
             <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportSelectedButton" IsEnabled="False" Content="PDF выбранных" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportSelected_Click"/>
             <Button Style="{StaticResource PythonToolbarButton}" x:Name="ExportAllButton" IsEnabled="False" Content="PDF всех" Padding="14,8" Margin="0,0,8,0" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportAll_Click"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Padding="14,8" Click="Close_Click"/>
@@ -110,7 +110,7 @@
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Top">
                             <DockPanel Margin="0,0,0,8">
-                                <Button Style="{StaticResource PythonToolbarButton}" Content="Подставить" DockPanel.Dock="Right" Click="Catalogue_Click"
+                                <Button Style="{StaticResource PythonToolbarButton}" Content="Подставить" ContentTemplate="{StaticResource IconLabelBook}" DockPanel.Dock="Right" Click="Catalogue_Click"
                                         Margin="8,0,0,0" Padding="12,5"/>
                                 <ComboBox x:Name="CatalogueBox" MinWidth="130" MinHeight="{StaticResource LayoutFieldMinHeight}"/>
                             </DockPanel>
@@ -133,8 +133,8 @@
                         <TextBlock DockPanel.Dock="Bottom" x:Name="TotalsLabel"
                                    Margin="0,8,0,0" Foreground="#334155" FontWeight="SemiBold"/>
                         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить точку" Padding="12,6" Margin="0,0,8,0" Click="AddPoint_Click"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить точку" Padding="12,6" Margin="0,0,8,0" Click="DeletePoint_Click"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить точку" ContentTemplate="{StaticResource IconLabelPlus}" Padding="12,6" Margin="0,0,8,0" Click="AddPoint_Click"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить точку" ContentTemplate="{StaticResource IconLabelTrash}" Padding="12,6" Margin="0,0,8,0" Click="DeletePoint_Click"/>
                             <TextBlock Text="Вставка Excel: Ctrl+V с выбранной ячейки" Foreground="#64748B" VerticalAlignment="Center"/>
                         </WrapPanel>
                         <DataGrid local:TableColumnMenu.Key="passport-points" x:Name="PointsGrid" AutoGenerateColumns="False" CanUserAddRows="False"

@@ -12,8 +12,8 @@
     <WrapPanel x:Name="EditorActions" DockPanel.Dock="Bottom" HorizontalAlignment="Right" Margin="0,10,0,0">
       <Button Style="{StaticResource PythonToolbarButton}" Content="Проверить комплект" ContentTemplate="{StaticResource IconLabelCheck}" Click="Verify_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
       <Button Style="{StaticResource PythonToolbarButton}" Content="Предпросмотр" ContentTemplate="{StaticResource IconLabelFile}" Click="Preview_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-      <Button Style="{StaticResource PythonToolbarButton}" Content="Собрать комплект для сдачи…" Click="Release_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-      <Button Style="{StaticResource PythonToolbarButton}" Content="История версий" Click="History_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+      <Button Style="{StaticResource PythonToolbarButton}" Content="Собрать комплект для сдачи…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Release_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+      <Button Style="{StaticResource PythonToolbarButton}" Content="История версий" ContentTemplate="{StaticResource IconLabelHistory}" Click="History_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
       <Button Style="{StaticResource PythonToolbarButton}" Content="История выпусков" ContentTemplate="{StaticResource IconLabelHistory}" Click="ReleaseHistory_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
       <Button Style="{StaticResource PythonToolbarButton}" Content="Сохранить" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click" Padding="12,7" Margin="{StaticResource LayoutAuxActionGap}"/>
       <Button x:Name="CloseButton" Style="{StaticResource PythonToolbarButton}" Content="Закрыть" Click="Close_Click" Padding="12,7" Margin="0,0,0,5"/>
@@ -50,11 +50,11 @@
             Text="Выбор выполненных работ переносит исходные объёмы в текст акта. Объёмы не придумываются."
             TextWrapping="Wrap" Foreground="#64748B"/>
           <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить выделенные работы в акт" Click="UseWorks_Click"
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить выделенные работы в акт" ContentTemplate="{StaticResource IconLabelPlus}" Click="UseWorks_Click"
               Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="ВОР из КС этого договора…" Click="KsVor_Click"
+            <Button Style="{StaticResource PythonToolbarButton}" Content="ВОР из КС этого договора…" ContentTemplate="{StaticResource IconLabelFile}" Click="KsVor_Click"
               Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Внешняя ВОР из Excel…" Click="ExternalVor_Click"
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Внешняя ВОР из Excel…" ContentTemplate="{StaticResource IconLabelExcel}" Click="ExternalVor_Click"
               Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
           </WrapPanel>
           <DataGrid local:TableColumnMenu.Key="pto-works" local:TableColumnMenu.Protect="Работа" x:Name="WorksGrid" AutoGenerateColumns="False" IsReadOnly="True"
@@ -79,9 +79,9 @@
             <Button Style="{StaticResource PythonToolbarButton}" Content="Ниже" ContentTemplate="{StaticResource IconLabelArrowDown}" ToolTip="Ниже" Click="Down_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить PDF / Excel…" ContentTemplate="{StaticResource IconLabelPlus}" Click="AddFile_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Включить / исключить" Click="ToggleFile_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Реквизиты / системы схемы…" Click="FileProperties_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть файл" Click="OpenFile_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
-            <Button Style="{StaticResource PythonToolbarButton}" Content="Из архива сертификатов…" Click="FromLibrary_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Реквизиты / системы схемы…" ContentTemplate="{StaticResource IconLabelSettings}" Click="FileProperties_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть файл" ContentTemplate="{StaticResource IconLabelOpen}" Click="OpenFile_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
+            <Button Style="{StaticResource PythonToolbarButton}" Content="Из архива сертификатов…" ContentTemplate="{StaticResource IconLabelFolder}" Click="FromLibrary_Click" Padding="10,7" Margin="{StaticResource LayoutAuxActionGap}"/>
           </WrapPanel>
           <DataGrid local:TableColumnMenu.Key="pto-files" local:TableColumnMenu.Protect="Документ" x:Name="FilesGrid" AutoGenerateColumns="False" IsReadOnly="True"
             Background="White" MinRowHeight="27" AlternationCount="0" RowStyle="{StaticResource PythonTableRow}" SelectionMode="Single" SelectionUnit="FullRow" Style="{StaticResource DocumentTable}">

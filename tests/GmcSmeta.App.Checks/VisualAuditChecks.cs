@@ -327,7 +327,42 @@ internal static class VisualAuditChecks
     private static EstimateView.TotalsRow Row(string name, string cost, string sell, bool editable = false) =>
         new() { Name = name, CostText = cost, SellText = sell, CostEditable = editable, SellEditable = editable && sell != "—" };
 
-    private static StackPanel CreateIconCatalog()
+    // Real WPF input states; this is deliberately separate from offscreen PNG evidence.
+    // No application window or database is created.
+    internal static void ShowInteractiveIconCatalog()
+    {
+        RunSharedGlyphCatalogChecks();
+        var body = new DockPanel { Background = Brushes.White };
+        var hint = new TextBlock
+        {
+            Text = "Tab / Shift+Tab — фокус; мышь — наведение и нажатие; Space — переключение. " +
+                "Сравните обычное, недоступное, отмеченное и снятое состояния. Esc — закрыть.",
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12)
+        };
+        DockPanel.SetDock(hint, Dock.Top);
+        body.Children.Add(hint);
+        body.Children.Add(new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = CreateIconCatalog(interactive: true)
+        });
+        var window = new Window
+        {
+            Title = "GMC — каталог иконок (без SQL)", Content = body,
+            Width = 1040, Height = 700, MinWidth = 480, MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen
+        };
+        window.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+            e.Handled = true;
+            window.Close();
+        };
+        window.ShowDialog();
+    }
+
+    private static StackPanel CreateIconCatalog(bool interactive = false)
     {
         var keys = ResourceKeys(Application.Current.Resources)
             .OfType<string>()
@@ -349,7 +384,7 @@ internal static class VisualAuditChecks
                 });
             row.Children.Add(new ToggleButton
             {
-                Content = "Активная", ContentTemplate = template, IsChecked = true,
+                Content = interactive ? "Переключатель" : "Активная", ContentTemplate = template, IsChecked = true,
                 Style = (Style)Application.Current.FindResource("PythonToolToggle"),
                 Width = 210, Margin = new Thickness(4)
             });
