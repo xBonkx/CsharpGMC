@@ -1474,6 +1474,7 @@
             <Setter Property="BorderBrush" Value="#A7F3D0"/>
         </Style>
         <Style x:Key="ReportGridReviewText" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -1483,9 +1484,11 @@
             <Style.Triggers>
                 <DataTrigger Binding="{Binding NeedsReview}" Value="True"><Setter Property="Foreground" Value="#B45309"/></DataTrigger>
                 <DataTrigger Binding="{Binding ResultText}" Value="Не найдено"><Setter Property="Foreground" Value="#B91C1C"/></DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="ReportGridStrongRight" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -1494,13 +1497,16 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
         <Style x:Key="ReportGridMuted" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Style.Triggers><DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True"><Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/></DataTrigger></Style.Triggers>
         </Style>
         <Style x:Key="ReportGridCenter" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="TextAlignment" Value="Center"/>
@@ -1508,6 +1514,7 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="ReportGridRight" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
