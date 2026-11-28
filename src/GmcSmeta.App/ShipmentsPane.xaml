@@ -198,7 +198,7 @@
         <Style x:Key="ShipmentLeftText" TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding LeftText}" Value="всё">
-                    <Setter Property="Foreground" Value="#94A3B8"/>
+                    <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
                     <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
@@ -253,7 +253,7 @@
                 </MultiTrigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Foreground" Value="#94A3B8"/>
+                    <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                     <Setter Property="BorderBrush" Value="#E4E8EF"/>
                 </Trigger>
             </Style.Triggers>
