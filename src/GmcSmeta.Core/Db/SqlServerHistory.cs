@@ -18,6 +18,50 @@ public static class SqlServerHistory
         long? EntityId, string Action, string Details, long? ContractId, long? ObjectId);
 
     public sealed record HistoryScope(string Title, string ObjectName);
+    public sealed record HistorySnapshot(HistoryScope? Scope, IReadOnlyList<HistoryEntry> Entries);
+
+    /// <summary>
+    /// Read a document heading and history through one connection. Reject a mixed
+    /// revision (including a document moved or removed between the two SELECTs).
+    /// Global history has no separate heading query.
+    /// </summary>
+    public static HistorySnapshot ReadSnapshot(string connectionString, long? contractId = null,
+        int limit = Limit, CancellationToken token = default)
+    {
+        ValidateLimit(limit);
+        token.ThrowIfCancellationRequested();
+        using var conn = OpenRead(connectionString, token);
+        if (contractId is not long id)
+            return new HistorySnapshot(null, List(conn, null, limit, token));
+
+        string Revision() => token.CanBeCanceled
+            ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Revision(conn);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            token.ThrowIfCancellationRequested();
+            var before = Revision();
+            var scope = ContractScope(conn, id, token);
+            var entries = scope is null
+                ? Array.Empty<HistoryEntry>()
+                : List(conn, id, limit, token);
+            var after = Revision();
+            token.ThrowIfCancellationRequested();
+            if (!string.IsNullOrWhiteSpace(before) && before == after)
+                return new HistorySnapshot(scope, entries);
+        }
+        throw new InvalidOperationException("Документ изменился при чтении истории. Откройте её повторно.");
+    }
+
+    private static SqlConnection OpenRead(string connectionString, CancellationToken token) =>
+        token.CanBeCanceled
+            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
+            : SqlServerDatabase.Open(connectionString);
+
+    private static void ValidateLimit(int limit)
+    {
+        if (limit is < 1 or > Limit) throw new ArgumentOutOfRangeException(nameof(limit));
+    }
 
     /// <summary>
     /// Заголовок и объект документа для окна истории. null — документ не найден
@@ -27,12 +71,16 @@ public static class SqlServerHistory
         CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
-        using var conn = token.CanBeCanceled
-            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
-            : SqlServerDatabase.Open(connectionString);
+        using var conn = OpenRead(connectionString, token);
+        return ContractScope(conn, contractId, token);
+    }
+
+    private static HistoryScope? ContractScope(SqlConnection conn, long contractId, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT c.kind,c.number,c.[date],c.name,o.name FROM dbo.contracts c " +
-            "JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id", conn);
+            "JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id", conn) { CommandTimeout = 20 };
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         using var registration = SqlReadCancellation.Register(cmd, token);
         using var r = SqlReadCancellation.ExecuteReader(cmd, token);
@@ -52,11 +100,16 @@ public static class SqlServerHistory
     public static IReadOnlyList<HistoryEntry> List(string connectionString,
         long? contractId = null, int limit = Limit, CancellationToken token = default)
     {
-        if (limit is < 1 or > Limit) throw new ArgumentOutOfRangeException(nameof(limit));
+        ValidateLimit(limit);
         token.ThrowIfCancellationRequested();
-        using var conn = token.CanBeCanceled
-            ? SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult()
-            : SqlServerDatabase.Open(connectionString);
+        using var conn = OpenRead(connectionString, token);
+        return List(conn, contractId, limit, token);
+    }
+
+    private static IReadOnlyList<HistoryEntry> List(SqlConnection conn, long? contractId,
+        int limit, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT TOP (@limit) id,ts,[user],entity,entity_id,action,details,contract_id,object_id " +
             "FROM dbo.change_log " +

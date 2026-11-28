@@ -47,9 +47,8 @@ public partial class HistoryWindow : Window
         {
             var snapshot = await Task.Run(() =>
             {
-                var scope = contractId is long id
-                    ? SqlServerHistory.ContractScope(connectionString, id, token)
-                    : null;
+                var data = SqlServerHistory.ReadSnapshot(connectionString, contractId, token: token);
+                var scope = data.Scope;
                 if (contractId.HasValue && scope is null)
                     return (Scope: scope, Rows: Array.Empty<Row>());
                 var prefixes = scope is null ? Array.Empty<string>() : new[]
@@ -58,7 +57,7 @@ public partial class HistoryWindow : Window
                     $"{scope.Title}: ",
                     $"{scope.ObjectName} / {scope.Title} / ",
                 };
-                var entries = SqlServerHistory.List(connectionString, contractId, token: token);
+                var entries = data.Entries;
                 var rows = new Row[entries.Count];
                 for (var i = 0; i < entries.Count; i++)
                 {
