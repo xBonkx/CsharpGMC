@@ -17,6 +17,7 @@ internal static class GridEditingChecks
     {
         GridEditInteraction.Install();
         RunSelectionAndSort();
+        RunPreviewRangePaste();
         var row = new Row();
         var font = GmcSmeta.Core.Domain.EstimateVisualPolicy.TableFont(
             (double)Application.Current.FindResource("UiBodySize"), .95, 1.2);
@@ -89,6 +90,53 @@ internal static class GridEditingChecks
             Require(grid.CommitEdit(DataGridEditingUnit.Row, true) && row.Value == "Сохранено",
                 "Native commit lost the entered text.");
             Console.WriteLine("Grid routed double-click, adjacent/repeated cells, cancel, commit and edit guards passed (no SQL).");
+        }
+        finally { host.Close(); }
+    }
+
+    public sealed class PreviewRow
+    {
+        public string Name { get; set; } = "";
+        public decimal Quantity { get; set; }
+        public string Locked { get; set; } = "";
+    }
+
+    private static void RunPreviewRangePaste()
+    {
+        Require(PreviewGridPaste.TryParse("\"А\tБ\"\t\"строка\r\n2\"\r\n\"цитата \"\"да\"\"\"\t\"\"\r\n", out var parsed) &&
+            parsed.Count == 2 && parsed[0][0] == "А\tБ" && parsed[0][1] == "строка\r\n2" &&
+            parsed[1][0] == "цитата \"да\"" && parsed[1][1] == "", "Excel quoted TSV parsing");
+        Require(!PreviewGridPaste.TryParse("a\tb\r\nc", out _) &&
+            !PreviewGridPaste.TryParse("\"unterminated", out _), "Invalid TSV must be rejected");
+        var rows = new[] { new PreviewRow { Name = "A", Quantity = 1 }, new PreviewRow { Name = "B", Quantity = 2 } };
+        var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false,
+            SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended };
+        var name = new DataGridTextColumn { Binding = new Binding(nameof(PreviewRow.Name)) { Mode = BindingMode.TwoWay }, Width = 120 };
+        var qty = new DataGridTextColumn { Binding = new Binding(nameof(PreviewRow.Quantity)) { Mode = BindingMode.TwoWay }, Width = 120 };
+        var locked = new DataGridTextColumn { Binding = new Binding(nameof(PreviewRow.Locked)), IsReadOnly = true, Width = 120 };
+        grid.Columns.Add(name); grid.Columns.Add(qty); grid.Columns.Add(locked); grid.ItemsSource = rows;
+        var host = new Window { Content = grid, Width = 400, Height = 260, ShowInTaskbar = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            grid.CurrentCell = new DataGridCellInfo(rows[0], name);
+            string[] allow = [nameof(PreviewRow.Name), nameof(PreviewRow.Quantity)];
+            Require(!PreviewGridPaste.TryApply<PreviewRow>(grid, "X\t3\r\nY\tbad", allow, out _) &&
+                rows[0].Name == "A" && rows[0].Quantity == 1, "Invalid last cell must not change earlier fields");
+            Require(!PreviewGridPaste.TryApply<PreviewRow>(grid, "X\t3\tlocked", allow, out _) &&
+                rows[0].Name == "A", "Locked target must refuse whole rectangle");
+            Require(PreviewGridPaste.TryApply<PreviewRow>(grid, "Z\t3,25\r\nY\t4", allow, out var error),
+                "Valid preview paste: " + error);
+            Require(rows[0].Name == "Z" && rows[0].Quantity == 3.25m && rows[1].Name == "Y" &&
+                rows[1].Quantity == 4 && grid.SelectedCells.Count == 4, "Range content and selected cells");
+            CollectionViewSource.GetDefaultView(rows).SortDescriptions.Add(new SortDescription(nameof(PreviewRow.Name), ListSortDirection.Ascending));
+            Pump();
+            grid.CurrentCell = new DataGridCellInfo(rows[1], name);
+            Require(PreviewGridPaste.TryApply<PreviewRow>(grid, "ZZ\t5", allow, out error) &&
+                rows[1].Name == "ZZ" && rows[1].Quantity == 5 && rows[0].Name == "Z" &&
+                grid.SelectedCells.Contains(new DataGridCellInfo(rows[1], name)),
+                "Paste must select affected identity after resort: " + error);
         }
         finally { host.Close(); }
     }
