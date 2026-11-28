@@ -52,8 +52,20 @@ public static class SqlServerShipments
         var candidates = IssuableRows(conn, objectId, positionIds);
         var lines = LinesOf(conn, shipmentId, positionIds);
         if (SqlServerDatabase.Revision(conn) != committedRevision ||
-            candidates.Count != positionIds.Count) return null;
+            !CanPublishChangedRows(positionIds, candidates.Select(x => x.PositionId),
+                lines.Select(x => x.PositionId))) return null;
         return new ShipmentChanges(shipment, candidates, lines, committedRevision);
+    }
+
+    public static bool CanPublishChangedRows(IReadOnlyList<long> requested,
+        IEnumerable<long> candidates, IEnumerable<long> lines)
+    {
+        var ids = requested.ToHashSet();
+        if (ids.Count == 0 || ids.Count != requested.Count || ids.Any(id => id <= 0)) return false;
+        var actual = candidates.ToArray();
+        var linked = lines.ToArray();
+        return actual.Length == ids.Count && ids.SetEquals(actual) &&
+            linked.Distinct().Count() == linked.Length && linked.All(ids.Contains);
     }
 
     private static string PositionFilter(IReadOnlyList<long>? ids)
@@ -135,15 +147,7 @@ public static class SqlServerShipments
     {
         token.ThrowIfCancellationRequested();
         var list = new List<ShipmentLineRow>();
-        using var cmd = new SqlCommand(
-            "SELECT sl.id, sl.position_id, sl.shipment_id, p.name, p.unit, sl.qty, " +
-            "p.qty, p.price, " +
-            "ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'out'),0) " +
-            "- ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back'),0) AS issued " +
-            "FROM dbo.shipment_lines sl JOIN dbo.positions p ON p.id=sl.position_id " +
-            "WHERE sl.shipment_id=@id" + PositionFilter(positionIds) + " ORDER BY sl.id", conn);
-        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
-        AddPositionParameters(cmd, positionIds);
+        using var cmd = CreateLinesReadCommand(conn, shipmentId, positionIds);
         using var registration = SqlReadCancellation.Register(cmd, token);
         using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
@@ -184,22 +188,7 @@ public static class SqlServerShipments
     {
         token.ThrowIfCancellationRequested();
         var list = new List<IssuableRow>();
-        using var cmd = new SqlCommand(
-            "SELECT sy.contract_id, p.id, p.system_id, sy.name, p.name, p.unit, p.qty, p.price, " +
-            "p.out_of_kp, " +
-            "ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'in'),0)" +
-            " - ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back_supplier'),0) AS received, " +
-            "ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'out'),0)" +
-            " - ISNULL((SELECT SUM(m.qty) FROM dbo.movements m WHERE m.position_id=p.id AND m.kind=N'back'),0) AS issued, p.parent_id, sy.parent_id " +
-            "FROM dbo.positions p " +
-            "JOIN dbo.systems sy ON sy.id=p.system_id " +
-            "JOIN dbo.contracts c ON c.id=sy.contract_id " +
-            "LEFT JOIN dbo.positions parent ON parent.id=p.parent_id AND parent.system_id=p.system_id " +
-            "WHERE c.object_id=@obj AND c.kind IN (N'main',N'dop') AND " + IssuableHierarchy + PositionFilter(positionIds) + " " +
-            "ORDER BY c.id,sy.[order],sy.id,COALESCE(parent.[order],p.[order]),COALESCE(parent.id,p.id)," +
-            "CASE WHEN p.parent_id IS NULL THEN 0 ELSE 1 END,p.[order],p.id", conn);
-        cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
-        AddPositionParameters(cmd, positionIds);
+        using var cmd = CreateIssuableReadCommand(conn, objectId, positionIds);
         using var registration = SqlReadCancellation.Register(cmd, token);
         using var r = SqlReadCancellation.ExecuteReader(cmd, token);
         while (r.Read())
@@ -223,6 +212,53 @@ public static class SqlServerShipments
         }
         token.ThrowIfCancellationRequested();
         return list;
+    }
+
+    // These factories are shared by production reads and opt-in actual-plan diagnostics.
+    public static SqlCommand CreateLinesReadCommand(SqlConnection conn, long shipmentId,
+        IReadOnlyList<long>? positionIds = null)
+    {
+        var cmd = new SqlCommand(
+            "WITH selected_lines AS (SELECT sl.id,sl.position_id,sl.shipment_id,p.name,p.unit,sl.qty AS line_qty," +
+            "p.qty,p.price FROM dbo.shipment_lines sl JOIN dbo.positions p ON p.id=sl.position_id " +
+            "WHERE sl.shipment_id=@id" + PositionFilter(positionIds) + "), movement_totals AS (" +
+            "SELECT m.position_id,SUM(CASE WHEN m.kind=N'out' THEN m.qty END) AS qty_out," +
+            "SUM(CASE WHEN m.kind=N'back' THEN m.qty END) AS qty_back FROM dbo.movements m " +
+            "WHERE m.kind IN (N'out',N'back') AND EXISTS (SELECT 1 FROM selected_lines sl WHERE sl.position_id=m.position_id) " +
+            "GROUP BY m.position_id) " +
+            "SELECT sl.id,sl.position_id,sl.shipment_id,sl.name,sl.unit,sl.line_qty,sl.qty,sl.price," +
+            "ISNULL(m.qty_out,0)-ISNULL(m.qty_back,0) FROM selected_lines sl " +
+            "LEFT JOIN movement_totals m ON m.position_id=sl.position_id ORDER BY sl.id", conn);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
+        AddPositionParameters(cmd, positionIds);
+        return cmd;
+    }
+
+    public static SqlCommand CreateIssuableReadCommand(SqlConnection conn, long objectId,
+        IReadOnlyList<long>? positionIds = null)
+    {
+        var cmd = new SqlCommand(
+            "WITH selected_positions AS (SELECT sy.contract_id,p.id,p.system_id,sy.name AS system_name,p.name,p.unit,p.qty,p.price," +
+            "p.out_of_kp,p.parent_id,sy.parent_id AS system_parent_id,sy.[order] AS system_order,p.[order] AS position_order," +
+            "COALESCE(parent.[order],p.[order]) AS root_order,COALESCE(parent.id,p.id) AS root_id " +
+            "FROM dbo.positions p JOIN dbo.systems sy ON sy.id=p.system_id JOIN dbo.contracts c ON c.id=sy.contract_id " +
+            "LEFT JOIN dbo.positions parent ON parent.id=p.parent_id AND parent.system_id=p.system_id " +
+            "WHERE c.object_id=@obj AND c.kind IN (N'main',N'dop') AND " + IssuableHierarchy + PositionFilter(positionIds) +
+            "), movement_totals AS (SELECT m.position_id," +
+            "SUM(CASE WHEN m.kind=N'in' THEN m.qty END) AS qty_in," +
+            "SUM(CASE WHEN m.kind=N'back_supplier' THEN m.qty END) AS qty_back_supplier," +
+            "SUM(CASE WHEN m.kind=N'out' THEN m.qty END) AS qty_out," +
+            "SUM(CASE WHEN m.kind=N'back' THEN m.qty END) AS qty_back FROM dbo.movements m " +
+            "WHERE m.kind IN (N'in',N'back_supplier',N'out',N'back') " +
+            "AND EXISTS (SELECT 1 FROM selected_positions p WHERE p.id=m.position_id) GROUP BY m.position_id) " +
+            "SELECT p.contract_id,p.id,p.system_id,p.system_name,p.name,p.unit,p.qty,p.price,p.out_of_kp," +
+            "ISNULL(m.qty_in,0)-ISNULL(m.qty_back_supplier,0),ISNULL(m.qty_out,0)-ISNULL(m.qty_back,0)," +
+            "p.parent_id,p.system_parent_id FROM selected_positions p LEFT JOIN movement_totals m ON m.position_id=p.id " +
+            "ORDER BY p.contract_id,p.system_order,p.system_id,p.root_order,p.root_id," +
+            "CASE WHEN p.parent_id IS NULL THEN 0 ELSE 1 END,p.position_order,p.id", conn);
+        cmd.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
+        AddPositionParameters(cmd, positionIds);
+        return cmd;
     }
 
     // builder.ordered_positions: a top-level row followed by its immediate children.

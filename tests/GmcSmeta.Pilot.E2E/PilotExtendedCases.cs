@@ -213,6 +213,29 @@ internal static class PilotExtendedCases
             "SELECT purchase_price FROM dbo.positions WHERE id=@id", ("@id", ids[0]))
             == beforeManualPrice, "Supplier edit overwrote manual purchase price");
 
+        // Compare grouped shipment reads with the independent correlated ledger.
+        var candidates = SqlServerShipments.IssuableRows(verify, p.ObjectId);
+        var shipmentLines = SqlServerShipments.LinesOf(verify, issue.ShipmentId);
+        decimal Net(long id, string plus, string minus) => Money.FromDouble(PilotRunner.Double(verify,
+            "SELECT ISNULL((SELECT SUM(qty) FROM dbo.movements WHERE position_id=@id AND kind=@plus),0)" +
+            "-ISNULL((SELECT SUM(qty) FROM dbo.movements WHERE position_id=@id AND kind=@minus),0)",
+            ("@id", id), ("@plus", plus), ("@minus", minus)));
+        foreach (var id in ids)
+        {
+            var candidate = candidates.Single(x => x.PositionId == id);
+            var line = shipmentLines.Single(x => x.PositionId == id);
+            PilotRunner.Check(candidate.Received == Net(id, "in", "back_supplier") &&
+                candidate.Issued == Net(id, "out", "back") && line.Issued == candidate.Issued,
+                "Grouped shipment read disagrees with ledger");
+        }
+        var delta = SqlServerShipments.ReadChangedRows(cs, p.ObjectId, issue.ShipmentId, ids, p.Revision());
+        PilotRunner.Check(delta is not null &&
+            delta.Candidates.SequenceEqual(candidates.Where(x => ids.Contains(x.PositionId))) &&
+            delta.Lines.SequenceEqual(shipmentLines.Where(x => ids.Contains(x.PositionId))),
+            "Shipment targeted read differs from full snapshot");
+        PilotRunner.Check(SqlServerShipments.ReadChangedRows(cs, p.ObjectId, issue.ShipmentId, ids, beforeIssue) is null,
+            "Stale shipment revision accepted");
+
         // A mixed-contract batch must be rejected wholly, including its valid row.
         var rev = p.Revision();
         var countBefore = PilotRunner.Long(verify,

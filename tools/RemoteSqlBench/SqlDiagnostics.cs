@@ -137,6 +137,25 @@ internal static class SqlDiagnostics
             (conn, path) => ReadIoTime(conn, contractId, path));
         Run("procurement_actual_plan", "procurement-actual-plan.sqlplan",
             (conn, path) => ReadActualPlan(conn, contractId, path));
+        foreach (var lines in new[] { false, true })
+        {
+            var kind = lines ? "lines" : "candidates";
+            Run("shipment_" + kind + "_io", "shipment-" + kind + "-io-time.txt", (conn, path) =>
+            {
+                var ids = ShipmentScope(conn, contractId);
+                if (ids.ObjectId <= 0 || lines && ids.ShipmentId <= 0) return (false, "No shipment fixture.");
+                return ReadIoTime(conn, () => ShipmentCommand(conn, ids, lines), path);
+            });
+            Run("shipment_" + kind + "_plan", "shipment-" + kind + "-plan.sqlplan", (conn, path) =>
+            {
+                var ids = ShipmentScope(conn, contractId);
+                if (ids.ObjectId <= 0 || lines && ids.ShipmentId <= 0) return (false, "No shipment fixture.");
+                var plans = ReadActualPlans(conn, () => ShipmentCommand(conn, ids, lines));
+                if (plans.Count != 1) return (false, $"Expected one plan; got {plans.Count}.");
+                File.WriteAllText(path, plans[0]);
+                return (true, "Actual production plan collected.");
+            });
+        }
         // Each profile is independent, guarded, and outside timed iterations.
         foreach (var countLate in new[] { false, true })
         {
@@ -169,6 +188,22 @@ internal static class SqlDiagnostics
             }
         }
         return results;
+    }
+
+    private static (long ObjectId, long ShipmentId) ShipmentScope(SqlConnection conn, int contractId)
+    {
+        using var cmd = new SqlCommand("SELECT c.object_id,(SELECT MAX(id) FROM dbo.shipments WHERE object_id=c.object_id) FROM dbo.contracts c WHERE c.id=@id", conn);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? (Convert.ToInt64(reader.GetValue(0)), reader.IsDBNull(1) ? 0L : Convert.ToInt64(reader.GetValue(1))) : (0L,0L);
+    }
+
+    private static SqlCommand ShipmentCommand(SqlConnection conn, (long ObjectId, long ShipmentId) ids, bool lines)
+    {
+        var cmd = lines ? SqlServerShipments.CreateLinesReadCommand(conn, ids.ShipmentId)
+            : SqlServerShipments.CreateIssuableReadCommand(conn, ids.ObjectId);
+        cmd.CommandTimeout = 120;
+        return cmd;
     }
 
     private static SqlCommand DirectorCommand(SqlConnection conn, IReadOnlyList<long> ids, bool countLate)
