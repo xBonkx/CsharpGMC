@@ -16,6 +16,20 @@ public sealed class AgreementEditPolicyTests
         long? preferred,bool changed,long? inherited,long? expected)
         => Assert.Equal(expected, AgreementEditPolicy.ResolveRequested(kind,oldKind,previous,preferred,changed,inherited));
 
+    [Theory]
+    [InlineData(null,null,null)]
+    [InlineData(null,10L,10L)]
+    [InlineData(10L,10L,10L)]
+    public void StageAndDsInheritExactParentIncludingNull(long? preferred,long? parent,long? expected)
+        => Assert.Equal(expected, AgreementEditPolicy.InheritParent(preferred,parent));
+
+    [Fact]
+    public void CannotAssignUnlinkedOrDifferentParentByGuess()
+    {
+        Assert.Throws<ArgumentException>(()=>AgreementEditPolicy.InheritParent(10,null));
+        Assert.Throws<ArgumentException>(()=>AgreementEditPolicy.InheritParent(10,20));
+    }
+
     [Fact]
     public void RejectsMismatchedOrUnlinkedNewBase()
     {

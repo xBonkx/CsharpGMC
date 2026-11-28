@@ -152,21 +152,41 @@ public static class SqlServerAgreements
             if (preferred.HasValue) throw new InvalidOperationException("Схема базы не поддерживает юридические договоры.");
             return;
         }
-        long objectId; string kind; long? parent;
-        using (var cmd = new SqlCommand("SELECT object_id,kind,COALESCE(stage_of,base_contract_id) FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
+        long objectId; string kind; long? stageOf, baseId;
+        using (var cmd = new SqlCommand("SELECT object_id,kind,stage_of,base_contract_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Документ не найден.");
             objectId = SqlInteger.ReadInt64(r, 0); kind = r.GetString(1);
-            // A copy source is not a legal parent. An explicit target for a
-            // new annex can differ from the document supplying its positions.
-            parent = r.IsDBNull(2) ? (preferred.HasValue ? null : sourceId) : SqlInteger.ReadInt64(r, 2);
+            stageOf = r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2);
+            baseId = r.IsDBNull(3) ? null : SqlInteger.ReadInt64(r, 3);
+        }
+        var actualParent = stageOf ?? (kind == "dop" ? baseId : null);
+        if (actualParent is long parentId)
+        {
+            // Stages use kind=kp in storage. Their parent relation, not kind,
+            // controls legal identity. A truly unlinked base stays unlinked.
+            long? parentLegal;
+            using (var parent = new SqlCommand(
+                "SELECT agreement_id FROM dbo.contracts WITH(UPDLOCK,HOLDLOCK) WHERE id=@parent AND object_id=@object AND stage_of IS NULL", conn, tx))
+            {
+                parent.Parameters.Add("@parent", SqlDbType.BigInt).Value = parentId;
+                parent.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
+                var raw = parent.ExecuteScalar();
+                if (raw is null) throw new InvalidOperationException("Основание или полное КП не найдено в этом объекте.");
+                parentLegal = raw is DBNull ? null : SqlInteger.RequireInt64(raw);
+            }
+            var inheritedId = AgreementEditPolicy.InheritParent(preferred, parentLegal);
+            if (inheritedId.HasValue && Read(conn, objectId, tx).All(a => a.Id != inheritedId.Value))
+                throw new InvalidOperationException("Юридический договор основания архивирован или недоступен.");
+            WriteDocumentAgreement(conn, tx, documentId, objectId, inheritedId);
+            return;
         }
         if (kind == "kp") return;
-        var inherited = parent.HasValue ? DocumentAgreementId(conn, parent.Value, tx) : null;
-        if (preferred.HasValue && inherited.HasValue && preferred != inherited)
-            throw new ArgumentException("Договор ДС или этапа должен совпадать с договором основания.");
+        // A copy source is not a legal parent. An explicit target can differ
+        // from the document supplying its positions.
+        var inherited = !preferred.HasValue && sourceId.HasValue ? DocumentAgreementId(conn, sourceId.Value, tx) : null;
         var cards = Read(conn, objectId, tx);
         var id = inherited ?? preferred;
         if (id is null && cards.Count == 0)
@@ -207,8 +227,13 @@ public static class SqlServerAgreements
                 Date(date) != Date(selected.Date) || company != selected.CompanyId)
                 throw new InvalidOperationException("Реквизиты нового приложения не совпадают с юридическим договором.");
         }
+        WriteDocumentAgreement(conn, tx, documentId, objectId, selected.Id);
+    }
+
+    private static void WriteDocumentAgreement(SqlConnection conn, SqlTransaction tx, long documentId, long objectId, long? legalId)
+    {
         using var update = new SqlCommand("UPDATE dbo.contracts SET agreement_id=@agreement WHERE id=@id AND object_id=@object", conn, tx);
-        update.Parameters.Add("@agreement", SqlDbType.BigInt).Value = id.Value;
+        update.Parameters.Add("@agreement", SqlDbType.BigInt).Value = legalId is long id ? id : DBNull.Value;
         update.Parameters.Add("@id", SqlDbType.BigInt).Value = documentId;
         update.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
         if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Документ изменился.");
