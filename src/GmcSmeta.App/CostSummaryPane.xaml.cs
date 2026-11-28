@@ -585,28 +585,22 @@ public partial class CostSummaryPane : UserControl
     private void Export_Click(object sender, RoutedEventArgs e)
     {
         if (!CanUseSnapshot) return;
+        // Freeze the displayed strings before the modal save dialog pumps the UI.
+        var snapshot = SummaryGrid.Items.OfType<CostSummaryPreviewRow>().Select(r => new[]
+        {
+            r.Name, r.Unit, r.Qty, r.Supplier, r.MCost, r.MSell, r.MatMargin,
+            r.WCost, r.WSell, r.WorkMargin, r.TotalCost, r.TotalSell, r.TotalMargin, r.MarkupPct
+        }).ToArray();
         XlsxExport.Save(Window.GetWindow(this), $"Сводная — {_contractId}", sheet =>
         {
             XlsxExport.Header(sheet, 1, new[] { "Наименование", "Ед.", "Кол-во", "Поставщик",
                 "Мат: закуп", "Мат: розница", "Мат: маржа", "Работы: закуп", "Работы: розница",
                 "Работы: маржа", "Итого: закуп", "Итого: розница", "Итого: маржа", "СМР: наценка" });
             var row = 2;
-            foreach (var rowItem in SummaryGrid.Items.OfType<CostSummaryPreviewRow>())
+            foreach (var values in snapshot)
             {
-                sheet.Cell(row, 1).Value = rowItem.Name;
-                sheet.Cell(row, 2).Value = rowItem.Unit;
-                sheet.Cell(row, 3).Value = rowItem.Qty;
-                sheet.Cell(row, 4).Value = rowItem.Supplier;
-                sheet.Cell(row, 5).Value = rowItem.MCost;
-                sheet.Cell(row, 6).Value = rowItem.MSell;
-                sheet.Cell(row, 7).Value = rowItem.MatMargin;
-                sheet.Cell(row, 8).Value = rowItem.WCost;
-                sheet.Cell(row, 9).Value = rowItem.WSell;
-                sheet.Cell(row, 10).Value = rowItem.WorkMargin;
-                sheet.Cell(row, 11).Value = rowItem.TotalCost;
-                sheet.Cell(row, 12).Value = rowItem.TotalSell;
-                sheet.Cell(row, 13).Value = rowItem.TotalMargin;
-                sheet.Cell(row, 14).Value = rowItem.MarkupPct;
+                for (var column = 0; column < values.Length; column++)
+                    sheet.Cell(row, column + 1).Value = values[column];
                 row++;
             }
             sheet.SheetView.FreezeRows(1);
@@ -615,24 +609,36 @@ public partial class CostSummaryPane : UserControl
     /// <summary>Наценка на СМР: выделенные строки или все (cost_summary_view._apply_markup).</summary>
     private async void Markup_Click(object sender, RoutedEventArgs e)
     {
-        using var operation = BeginCostOperation();
-        if (operation is null) return;
-        var selected = SummaryGrid.SelectedItems.OfType<CostSummaryPreviewRow>()
-            .Where(r => !r.IsTransport && r.Id > 0).Select(r => (long)r.Id).ToList();
-        var ids = selected.Count > 0 ? selected
-            : (SummaryGrid.ItemsSource as ObservableCollection<CostSummaryPreviewRow> ?? new())
-                .Where(r => !r.IsTransport && r.Id > 0).Select(r => (long)r.Id).ToList();
-        var scope = selected.Count > 0 ? "Выбранные позиции" : "Все позиции сметы";
-        var dialog = new PromptDialog("Наценка на СМР",
-            $"{scope} ({ids.Count}). Цена клиенту за ед. будет пересчитана от закупа СМР.\nНаценка, %",
-            "50") { Owner = Window.GetWindow(this) };
-        if (dialog.ShowDialog() != true) return;
-        if (!decimal.TryParse(dialog.Value.Trim().Replace(',', '.'), NumberStyles.Any,
-                CultureInfo.InvariantCulture, out var percent))
+        if (_readOnly || !CanUseSnapshot || CostTabs.SelectedIndex != 2) return;
+        var revision = _revision;
+        var attachment = Interlocked.Read(ref _attachmentGeneration);
+        var selected = SummaryGrid.SelectedItems.OfType<CostSummaryPreviewRow>().ToArray();
+        // An explicit selection containing only transport/extra/group rows is
+        // not permission to change every position in the estimate.
+        var allRows = SummaryGrid.SelectedItems.Count == 0;
+        var ids = MarkupIds(allRows ? _allRows : selected);
+        if (ids.Count == 0)
         {
-            SetStatus("Недопустимое число: " + dialog.Value);
+            SetStatus("Нет позиций сметы для наценки.");
             return;
         }
+        var scope = allRows ? "Все позиции сметы, включая скрытые фильтром" : "Выбранные позиции";
+        var dialog = new SummaryMarkupDialog(
+            $"{scope} ({ids.Count}). Цена клиенту за ед. будет пересчитана от закупа СМР.")
+            { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() != true) return;
+        if (_readOnly || !CanUseSnapshot || CostTabs.SelectedIndex != 2 ||
+            revision != _revision || attachment != Interlocked.Read(ref _attachmentGeneration) ||
+            allRows != (SummaryGrid.SelectedItems.Count == 0) ||
+            !new HashSet<long>(ids).SetEquals(MarkupIds(allRows ? _allRows :
+                SummaryGrid.SelectedItems.OfType<CostSummaryPreviewRow>())))
+        {
+            SetStatus("Выбор или данные изменились. Откройте диалог снова.");
+            return;
+        }
+        using var operation = BeginCostOperation();
+        if (operation is null) return;
+        var percent = dialog.Percent;
         SetStatus("Пересчёт…");
         try
         {
@@ -652,6 +658,10 @@ public partial class CostSummaryPane : UserControl
         {
             SetStatus("Ошибка: " + ex.Message);
         }
-        await ReloadAsync();
+        // CostOperation.Dispose requests the guarded readback, including unknown COMMIT.
     }
+
+    private static List<long> MarkupIds(IEnumerable<CostSummaryPreviewRow> rows) =>
+        rows.Where(r => !r.IsTransport && !r.IsGroup && r.Id > 0)
+            .Select(r => r.Id).Distinct().ToList();
 }
