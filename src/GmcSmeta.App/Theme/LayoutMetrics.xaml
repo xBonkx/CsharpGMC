@@ -94,6 +94,8 @@
     <Thickness x:Key="LayoutDialogActionRowGap">0,8,0,12</Thickness>
     <Thickness x:Key="LayoutDialogDetailInset">16,0,0,1</Thickness>
     <Thickness x:Key="LayoutStageCardValueGap">0,2,0,1</Thickness>
+    <Thickness x:Key="LayoutReferenceGroupHeadingGap">0,12,0,6</Thickness>
+    <Thickness x:Key="LayoutReferenceNoteHeadingGap">0,8,0,4</Thickness>
     <Thickness x:Key="LayoutFormStackedFieldGap">0,4,0,9</Thickness>
     <Thickness x:Key="LayoutFormLabelFieldGap">0,4,0,0</Thickness>
     <Thickness x:Key="LayoutFormGroupHeadingGap">0,0,0,7</Thickness>
