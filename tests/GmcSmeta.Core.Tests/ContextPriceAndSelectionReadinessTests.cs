@@ -61,8 +61,8 @@ public sealed class ContextPriceAndSelectionReadinessTests
         Assert.Contains("ids.Contains(row.PositionId)", code);
         Assert.Contains("_historyRevision != _revision", code);
         var movement = Source("GmcSmeta.App", "ProcurementPane.MovementFlows.cs");
-        Assert.Contains("if (!valid.Contains(clicked))", movement);
-        Assert.Contains(".Where(valid.Contains)", movement);
+        Assert.Contains("if (!valid.Contains(clicked) || !CurrentBuyingRow(clicked))", movement);
+        Assert.Contains("!CurrentBuyingSelection(chosen) || !chosen.Contains(clicked)", movement);
         Assert.Contains("operation.BeginWrite()", movement);
     }
 

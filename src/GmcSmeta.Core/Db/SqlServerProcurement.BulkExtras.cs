@@ -56,7 +56,8 @@ public static partial class SqlServerProcurement
             FROM dbo.positions p WITH(UPDLOCK,HOLDLOCK)
             JOIN dbo.systems sy ON sy.id=p.system_id
             JOIN dbo.contracts c WITH(UPDLOCK,HOLDLOCK) ON c.id=sy.contract_id
-            WHERE p.id=@id AND sy.contract_id=@contract";
+            JOIN dbo.objects o WITH(HOLDLOCK) ON o.id=c.object_id
+            WHERE p.id=@id AND sy.contract_id=@contract AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0";
         using var cmd = new SqlCommand(sql, conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = positionId;
         cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;

@@ -18,7 +18,7 @@ public sealed class ProcurementToolbarMenuSourceTests
         Assert.Contains("Movement(\"Возврат с объекта…\", \"back\");", code);
         Assert.Contains("Movement(\"Возврат поставщику…\", \"back_supplier\");", code);
         Assert.Contains("Movement(\"Изготовлено → на склад…\", \"in\", document: \"из цеха\");", code);
-        Assert.Contains("ProcurementToShop_Click, \"Settings\"", code);
+        Assert.Contains("Guard(ProcurementToShop_Click), \"Settings\"", code);
         var grid = File.ReadAllText(Path.Combine(app, "ProcurementPane.xaml.cs"));
         Assert.Contains("ProcurementBulkSupplier_Click, \"Building\");", grid);
         Assert.Contains("ProcurementToShop_Click, \"Settings\");", grid);

@@ -122,6 +122,8 @@ public partial class ProcurementPane
                 UpdateCategoryCounts();
                 ApplyProcurementFilters();
                 _snapshotDay = accepted.Day;
+                _snapshotCanWrite = accepted.CanWrite;
+                BuyGrid.IsReadOnly = !_snapshotCanWrite;
                 _revision = accepted.Revision;
                 _buySnapshotMayReuse = true;
                 _needsReloadAfterAttach = false;

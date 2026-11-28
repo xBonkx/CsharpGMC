@@ -64,7 +64,7 @@ public partial class ProcurementPane
 
     private async void ProcurementShopOrder_Click(object sender, RoutedEventArgs e)
     {
-        using var operation = TryBeginOperation();
+        using var operation = TryBeginOperation(readOnly: true);
         if (operation is null) return;
         var selectedIds = SelectedBuyingIds().ToHashSet();
 

@@ -164,8 +164,9 @@ public static partial class SqlServerProcurement
     {
         bool locked;
         using (var contract = new SqlCommand(
-            "SELECT locked FROM dbo.contracts" + (tx is null ? "" : " WITH (UPDLOCK,HOLDLOCK)") +
-            " WHERE id=@id", conn, tx))
+            "SELECT c.locked FROM dbo.contracts c" + (tx is null ? "" : " WITH (UPDLOCK,HOLDLOCK)") +
+            " JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id " +
+            "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             contract.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             var flag = contract.ExecuteScalar();

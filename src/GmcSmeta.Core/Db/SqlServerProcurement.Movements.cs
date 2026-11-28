@@ -58,8 +58,10 @@ public static partial class SqlServerProcurement
             using (var find = new SqlCommand(
                 "SELECT p.name FROM dbo.positions p WITH (UPDLOCK,HOLDLOCK) " +
                 "JOIN dbo.systems s ON s.id=p.system_id " +
-                "JOIN dbo.contracts c ON c.id=s.contract_id " +
-                "WHERE p.id=@position AND s.contract_id=@contract AND c.locked=0", conn, tx))
+                "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=s.contract_id " +
+                "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+                "WHERE p.id=@position AND s.contract_id=@contract AND c.locked=0 " +
+                "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
             {
                 find.Parameters.Add("@position", SqlDbType.BigInt).Value = row.PositionId;
                 find.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
@@ -123,8 +125,10 @@ public static partial class SqlServerProcurement
             "FROM dbo.movements m WITH (UPDLOCK,HOLDLOCK) " +
             "JOIN dbo.positions p ON p.id=m.position_id " +
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
-            "JOIN dbo.contracts c ON c.id=sy.contract_id " +
+            "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=sy.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
             "WHERE m.id=@id AND m.position_id=@position AND sy.contract_id=@contract AND c.locked=0 " +
+            "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0 " +
             "AND m.shipment_id IS NULL", conn, tx))
         {
             update.Parameters.Add("@qty", SqlDbType.Float).Value = (double)qty;
@@ -190,7 +194,9 @@ public static partial class SqlServerProcurement
             using var scope = new SqlCommand(
                 "SELECT p.name FROM dbo.positions p WITH (UPDLOCK,HOLDLOCK) " +
                 "JOIN dbo.systems sy ON sy.id=p.system_id " +
-                "JOIN dbo.contracts c ON c.id=sy.contract_id " +
+                "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=sy.contract_id " +
+                "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id AND ISNULL(o.archived,0)=0 " +
+                "AND ISNULL(c.stage_rest,0)=0 " +
                 "LEFT JOIN dbo.positions parent ON parent.id=p.parent_id AND parent.system_id=p.system_id " +
                 "WHERE p.id=@id AND sy.contract_id=@contract AND c.locked=0 " +
                 "AND (p.parent_id IS NULL OR (parent.id IS NOT NULL AND parent.parent_id IS NULL))", conn, tx);

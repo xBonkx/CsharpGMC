@@ -67,7 +67,7 @@ public partial class ProcurementPane
             if (MessageBox.Show(Window.GetWindow(this),
                     summary + "\n\nПрименить подтверждённые изменения одной SQL-транзакцией?",
                     "Импорт: предпросмотр / dry-run",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
             {
                 SetStatus("Dry-run завершён без записи.");
                 return;
@@ -79,6 +79,7 @@ public partial class ProcurementPane
             if (!saved.Saved)
             {
                 SetStatus("Импорт не выполнен: " + saved.Error);
+                await TryReloadAsync(preserveStatus: true);
                 return;
             }
 

@@ -222,7 +222,10 @@ public static partial class SqlServerProcurement
     }
 
     public sealed record BuySnapshot(IReadOnlyList<BuyRow> Rows,
-        IReadOnlyList<SystemChoice> Systems, string Revision, DateTime Day);
+        IReadOnlyList<SystemChoice> Systems, string Revision, DateTime Day)
+    {
+        public bool CanWrite { get; init; }
+    }
 
     /// <summary>
     /// Read rows and all systems (including empty parents) in one batch on
@@ -265,7 +268,11 @@ public static partial class SqlServerProcurement
 
         IReadOnlyList<BuyRow> rows;
         IReadOnlyList<SystemChoice> systems;
-        using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery, conn))
+        bool editable;
+        const string writeScope = "SELECT CASE WHEN c.locked=0 AND ISNULL(c.stage_rest,0)=0 " +
+            "AND ISNULL(o.archived,0)=0 THEN 1 ELSE 0 END " +
+            "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id";
+        using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery + ";\n" + writeScope, conn))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var registration = SqlReadCancellation.Register(cmd, token);
@@ -275,12 +282,19 @@ public static partial class SqlServerProcurement
             if (!reader.NextResult())
                 throw new InvalidOperationException("Не получен список систем закупок.");
             systems = ReadSystemChoices(reader, token);
+            if (!reader.NextResult() || !reader.Read())
+                throw new InvalidOperationException("Документ закупок не найден.");
+            editable = SqlFlag.Read(reader, 0);
         }
         token.ThrowIfCancellationRequested();
         if (Revision() != revision)
             throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
         token.ThrowIfCancellationRequested();
-        return new BuySnapshot(rows, systems, revision, day);
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        return new BuySnapshot(rows, systems, revision, day)
+        {
+            CanWrite = editable && SqlSchemaCompatibility.IsWritablePilot(builder.InitialCatalog, builder.DataSource)
+        };
     }
 
     /// <summary>
@@ -392,8 +406,10 @@ public static partial class SqlServerProcurement
             using var scope = new SqlCommand(
                 "SELECT COUNT_BIG(*) FROM dbo.positions p WITH (UPDLOCK,HOLDLOCK) " +
                 "JOIN dbo.systems sy ON sy.id=p.system_id " +
-                "JOIN dbo.contracts c ON c.id=sy.contract_id " +
-                "WHERE p.id=@position AND sy.contract_id=@contract AND c.locked=0", conn, tx);
+                "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=sy.contract_id " +
+                "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+                "WHERE p.id=@position AND sy.contract_id=@contract AND c.locked=0 " +
+                "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx);
             scope.Parameters.Add("@position", SqlDbType.BigInt).Value = positionId;
             scope.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             if (Convert.ToInt64(scope.ExecuteScalar(), CultureInfo.InvariantCulture) != 1)
@@ -675,8 +691,10 @@ public static partial class SqlServerProcurement
             "FROM dbo.movements m WITH (UPDLOCK,HOLDLOCK) " +
             "JOIN dbo.positions p ON p.id=m.position_id " +
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
-            "JOIN dbo.contracts c ON c.id=sy.contract_id " +
-            "WHERE m.id=@mid AND m.position_id=@position AND sy.contract_id=@contract AND c.locked=0", conn, tx))
+            "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=sy.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE m.id=@mid AND m.position_id=@position AND sy.contract_id=@contract AND c.locked=0 " +
+            "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             read.Parameters.Add("@mid", SqlDbType.BigInt).Value = movementId;
             read.Parameters.Add("@position", SqlDbType.BigInt).Value = positionId;
@@ -729,10 +747,7 @@ public static partial class SqlServerProcurement
 
     private static void RequirePilotWrite(string connectionString)
     {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        if (!builder.InitialCatalog.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                "Запись C# разрешена только в отдельную тестовую базу GmcSmetaPilot_*. Рабочая база не изменена.");
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
     }
     /// <summary>Строка контрольной таблицы для импорта (procurement.RowPlan, упрощённо:
     /// колонки распознаются по заголовкам файла).</summary>

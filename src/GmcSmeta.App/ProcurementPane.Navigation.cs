@@ -81,10 +81,13 @@ public partial class ProcurementPane
         if (!CanStartOperation || SelectedBuyingIds().Count == 0) return;
         var revision = _revision;
         var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
+        var selection = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds().OrderBy(id => id).ToArray();
         bool CurrentSelection()
         {
             if (CanStartOperation && _attachmentGeneration == attachment && _revision == revision &&
+                _reloadGeneration == generation && CurrentBuyingSelection(selection) &&
                 SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids)) return true;
             SetStatus("Данные или выбор изменились. Откройте меню заново.");
             return false;
@@ -126,11 +129,16 @@ public partial class ProcurementPane
     {
         if (!CanStartOperation || SelectedBuyingIds().Count == 0) return;
         var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
+        var selection = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds().ToArray();
         var prompt = new PromptDialog("Ожидаем поставку", "Дата: 25.11, 25.11.2026 или +7 (пусто — очистить)", "")
         { Owner = Window.GetWindow(this) };
         if (prompt.ShowDialog() != true) return;
-        if (_revision != revision || !SelectedBuyingIds().SequenceEqual(ids))
+        if (!CanStartOperation || _revision != revision || attachment != _attachmentGeneration ||
+            generation != _reloadGeneration || !CurrentBuyingSelection(selection) ||
+            !SelectedBuyingIds().SequenceEqual(ids))
         { SetStatus("Данные или выбор изменились. Повторите назначение срока."); return; }
         if (!ProcurementDisplay.TryParseDue(prompt.Value, DateTime.Today, out var due))
         {
@@ -170,19 +178,34 @@ public partial class ProcurementPane
         var canWrite = CanStartOperation;
         var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds();
-        var extraSelected = selected.Any(row => row.OutOfKp && ids.Contains(row.PositionId));
+        var extraSelected = ids.Count > 0 && selected.All(row => row.OutOfKp && !row.IsSub);
         var singleExtra = selected.Length == 1 && extraSelected;
-        MenuAction(menu, "Докупили (нет в смете)…", ProcurementAddExtra_Click, "Plus", enabled: canWrite);
-        MenuAction(menu, "Изменить докупленное…", ProcurementEditExtra_Click, "Edit", enabled: canWrite && singleExtra);
-        MenuAction(menu, "Удалить докупленное…", ProcurementDeleteExtra_Click, "Trash", danger: true,
+        var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
+        var primary = BuyGrid.SelectedItem;
+        var rows = _allRows;
+        RoutedEventHandler Guard(RoutedEventHandler action) => (s, args) =>
+        {
+            if (CanStartOperation && _revision == revision && attachment == _attachmentGeneration &&
+                generation == _reloadGeneration && ReferenceEquals(rows, _allRows) &&
+                ReferenceEquals(primary, BuyGrid.SelectedItem) &&
+                (selected.Length == 0 ? BuyGrid.SelectedItems.Count == 0 : CurrentBuyingSelection(selected)))
+                action(s, args);
+            else SetStatus("Данные или выбор изменились. Откройте меню заново.");
+        };
+        MenuAction(menu, "Докупили (нет в смете)…", Guard(ProcurementAddExtra_Click), "Plus",
+            enabled: canWrite && (selected.Length == 0 || ids.Count == 1));
+        MenuAction(menu, "Изменить докупленное…", Guard(ProcurementEditExtra_Click), "Edit", enabled: canWrite && singleExtra);
+        MenuAction(menu, "Удалить докупленное…", Guard(ProcurementDeleteExtra_Click), "Trash", danger: true,
             enabled: canWrite && extraSelected);
-        MenuAction(menu, "Допсоглашение из докупленного…", ProcurementExtraDop_Click, "FilePlus",
-            enabled: canWrite && _allRows.Any(row => row.OutOfKp));
-        MenuAction(menu, "Отдать в цех…", ProcurementToShop_Click, "Settings", enabled: canWrite && ids.Count > 0);
+        MenuAction(menu, "Допсоглашение из докупленного…", Guard(ProcurementExtraDop_Click), "FilePlus",
+            enabled: canWrite && _allRows.Any(row => row.OutOfKp && !row.IsSub));
+        MenuAction(menu, "Отдать в цех…", Guard(ProcurementToShop_Click), "Settings", enabled: canWrite && ids.Count > 0);
         MenuAction(menu, "Заявка в цех (печать)…", ProcurementShopOrder_Click, "File");
         menu.Items.Add(new Separator());
-        MenuAction(menu, "Заказ / оплата…", ProcurementOrder_Click, "File", shortcut: "F4", enabled: canWrite && ids.Count > 0);
-        MenuAction(menu, "Загрузить контроль оборудования из Excel…", ImportPlan_Click, "Upload", enabled: canWrite);
+        MenuAction(menu, "Заказ / оплата…", Guard(ProcurementOrder_Click), "File", shortcut: "F4", enabled: canWrite && ids.Count > 0);
+        MenuAction(menu, "Загрузить контроль оборудования из Excel…", Guard(ImportPlan_Click), "Upload", enabled: canWrite);
         MenuAction(menu, "Сохранить в Excel / PDF…", ProcurementExport_Click, "Download");
         MenuAction(menu, "Обновить", ProcurementRefresh_Click, "Refresh");
         menu.Items.Add(new Separator());
@@ -204,7 +227,7 @@ public partial class ProcurementPane
 
     private async void ProcurementSaveDetails_Click(object sender, RoutedEventArgs e)
     {
-        if (SelectedHistoryRow() is not ProcurementPreviewRow row) return;
+        if (SelectedHistoryRow() is not ProcurementPreviewRow row || !CurrentBuyingRow(row)) return;
         using var operation = TryBeginOperation();
         if (operation is null) return;
         var replacement = ReplacementDetail.Text.Trim();
@@ -224,7 +247,7 @@ public partial class ProcurementPane
                 _connectionString, _contractId, new[] { row.PositionId }, null, null, null,
                 null, null, null, replacement, null, direct, revision, responsible: responsible));
 
-            if (!result.Saved) { SetStatus("Не сохранено: " + result.Error); return; }
+            if (!result.Saved) { SetStatus("Не сохранено: " + result.Error); await TryReloadAsync(preserveStatus: true); return; }
             await RefreshCommittedBuyRowsAsync(new[] { row.PositionId }, result.Revision);
             SetStatus("Данные позиции сохранены.");
         }

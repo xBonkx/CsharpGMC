@@ -340,7 +340,11 @@ CREATE TABLE dbo.price_history (
             "Malformed hierarchy created a partial agreement or moved a foreign position");
         Execute(connection, "UPDATE dbo.positions SET parent_id=NULL WHERE id=4");
 
-        var dop = SqlServerProcurement.CreateDopFromExtras(connection, 1, Revision(connection));
+        var scopeRev = Revision(connection);
+        var wrongRoots = SqlServerProcurement.CreateDopFromExtras(connection, 1, scopeRev, new[] { extra.Id!.Value });
+        Check(!wrongRoots.Saved && Revision(connection) == scopeRev, "Unconfirmed extra scope was moved");
+        var dop = SqlServerProcurement.CreateDopFromExtras(connection, 1, scopeRev,
+            new[] { extra.Id!.Value, second.Id!.Value });
         Check(dop.Saved && dop.Id > 2, "Supplementary agreement not created");
         Check(Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.contracts WHERE id={dop.Id} AND kind=N'dop' AND base_contract_id=1") == 1,
             "Supplement parent contract broken");
@@ -356,6 +360,19 @@ CREATE TABLE dbo.price_history (
         var doomed = SqlServerProcurement.AddExtra(connection, 1, null,
             "Удаляемый материал", "шт", 5m, null, Revision(connection));
         Check(doomed.Saved, "Extra for deletion not created");
+        var archiveRev = Revision(connection);
+        Execute(connection, "UPDATE dbo.objects SET archived=1 WHERE id=1");
+        AssertCannotSave(SqlServerProcurement.DeleteExtra(connection, 1, doomed.Id!.Value, archiveRev),
+            "Archived extra deleted");
+        AssertCannotSave(SqlServerProcurement.DeleteMovement(connection, 1, 1, originalId, archiveRev),
+            "Archived movement deleted");
+        AssertCannotSave(SqlServerProcurement.AddMovements(connection, 1,
+            new[] { new SqlServerProcurement.MovementInput(1, 1m) }, "back",
+            DateTime.Today, "", "", archiveRev), "Archived return accepted");
+        Check(Revision(connection) == archiveRev &&
+            Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.positions WHERE id={doomed.Id}") == 1,
+            "Archived operation changed data");
+        Execute(connection, "UPDATE dbo.objects SET archived=0 WHERE id=1");
         var del = SqlServerProcurement.DeleteExtra(connection, 1, doomed.Id!.Value, Revision(connection));
         Check(del.Saved, "Extra deletion failed");
         Check(Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.positions WHERE id={doomed.Id}") == 0,

@@ -44,7 +44,9 @@ public static partial class SqlServerProcurement
             return ExtraResult.Fail("Данные изменены. Обновите закупки.", rev);
         var objectId = 0L;
         using (var contract = new SqlCommand(
-            "SELECT object_id,locked FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
+            "SELECT c.object_id,c.locked FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE c.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             contract.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var reader = contract.ExecuteReader();
@@ -141,8 +143,10 @@ public static partial class SqlServerProcurement
         using (var cmd = new SqlCommand(
             "UPDATE p SET name=@name,unit=@unit,qty=@qty FROM dbo.positions p WITH (UPDLOCK,HOLDLOCK) " +
             "JOIN dbo.systems sy ON sy.id=p.system_id " +
-            "JOIN dbo.contracts c ON c.id=sy.contract_id " +
+            "JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=sy.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
             "WHERE p.id=@id AND sy.contract_id=@contract AND p.out_of_kp=1 AND p.parent_id IS NULL AND c.locked=0 " +
+            "AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0 " +
             "AND NOT EXISTS(SELECT 1 FROM dbo.act_lines a WHERE a.position_id=p.id) " +
             "AND NOT EXISTS(SELECT 1 FROM dbo.act_lines a JOIN dbo.positions ch ON ch.id=a.position_id WHERE ch.parent_id=p.id)", conn, tx))
         {
@@ -181,7 +185,7 @@ public static partial class SqlServerProcurement
     /// procurement, shipment links and history are retained.
     /// </summary>
     public static ExtraResult CreateDopFromExtras(
-        string connectionString, int sourceContractId, string expectedRevision)
+        string connectionString, int sourceContractId, string expectedRevision, IReadOnlyList<long>? expectedRoots = null)
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
@@ -196,8 +200,9 @@ public static partial class SqlServerProcurement
         decimal vat;
         string form;
         using (var source = new SqlCommand(
-            "SELECT object_id,kind,company_id,vat_rate,ISNULL(form,N''),locked " +
-            "FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@contract", conn, tx))
+            "SELECT c.object_id,c.kind,c.company_id,c.vat_rate,ISNULL(c.form,N''),c.locked " +
+            "FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE c.id=@contract AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             source.Parameters.Add("@contract", SqlDbType.BigInt).Value = sourceContractId;
             using var reader = source.ExecuteReader();
@@ -230,6 +235,9 @@ public static partial class SqlServerProcurement
                     reader.GetString(2),
                     reader.IsDBNull(3) ? null : Convert.ToInt64(reader.GetValue(3), CultureInfo.InvariantCulture)));
         }
+        if (expectedRoots is not null && !roots.Select(root => root.Id).OrderBy(id => id)
+            .SequenceEqual(expectedRoots.OrderBy(id => id)))
+            return ExtraResult.Fail("Состав докупленного изменился. Обновите подтверждение.", rev);
         if (roots.Count == 0) return ExtraResult.Fail("Вне КП нет докупленных позиций для ДС.", rev);
         if (roots.Count > 2500) return ExtraResult.Fail("Слишком много дополнительных позиций.", rev);
 

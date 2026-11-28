@@ -16,6 +16,7 @@ public partial class ProcurementPane
         {
             var snapshot = await Task.Run(() => ProcurementRequestPlanner.ReadReport(
                 _connectionString, _contractId, ProcurementRequestPlanner.ReportKind.Supplier, operation.Revision));
+            if (!operation.IsCurrent()) return;
             var selectedSupplier = (BuyGrid.SelectedItem as ProcurementPreviewRow)?.Supplier ?? "";
             var dialog = new ProcurementRequestDialog(
                 snapshot.Document, snapshot.Rows, snapshot.Children,
@@ -28,10 +29,12 @@ public partial class ProcurementPane
             }
             if (dialog.MarkedIds.Count > 0)
             {
+                var marked = dialog.MarkedIds.ToArray();
+                var requestNumber = dialog.RequestNumber;
                 var revision = operation.BeginWrite();
                 var saved = await Task.Run(() => SqlServerProcurement.SetProc(
-                    _connectionString, _contractId, dialog.MarkedIds, null, "ordered",
-                    $"Заявка №{(string.IsNullOrWhiteSpace(dialog.RequestNumber) ? "б/н" : dialog.RequestNumber)}",
+                    _connectionString, _contractId, marked, null, "ordered",
+                    $"Заявка №{(string.IsNullOrWhiteSpace(requestNumber) ? "б/н" : requestNumber)}",
                     null, null, null, null, null, null, revision));
                 if (!saved.Saved)
                 {
@@ -41,8 +44,8 @@ public partial class ProcurementPane
                     return;
                 }
 
-                await RefreshCommittedBuyRowsAsync(dialog.MarkedIds, saved.Revision);
-                SetStatus($"Заявка сохранена; отмечено «Заказано»: {dialog.MarkedIds.Count} позиций.");
+                await RefreshCommittedBuyRowsAsync(marked, saved.Revision);
+                SetStatus($"Заявка сохранена; отмечено «Заказано»: {marked.Length} позиций.");
             }
             else
                 SetStatus("Заявка Excel сохранена без изменения статусов закупок.");
@@ -77,7 +80,7 @@ public partial class ProcurementPane
                 _connectionString, _contractId, ids, SqlServerProcurement.ShopSupplier,
                 "shop_queued", reference.Length == 0 ? null : $"цех {reference}",
                 null, null, null, null, null, null, rev));
-            if (!result.Saved) { SetStatus("Заявка в цех не сохранена: " + result.Error); return; }
+            if (!result.Saved) { SetStatus("Заявка в цех не сохранена: " + result.Error); await TryReloadAsync(preserveStatus: true); return; }
 
             await RefreshCommittedBuyRowsAsync(ids, result.Revision);
             SetStatus($"В цех направлено: {ids.Count} позиций.");
@@ -108,17 +111,20 @@ public partial class ProcurementPane
         SetStatus("Сохранение заказа / оплаты…");
         try
         {
+            var (supplier, chosenStage, order, invoice, paid, clearPaid, source) =
+                (dialog.Supplier, dialog.Stage, dialog.OrderRef, dialog.InvoiceRef,
+                    dialog.PaidDate, dialog.ClearPaidDate, dialog.Source);
             var revision = operation.BeginWrite();
-            var stage = dialog.PaidDate is not null && dialog.Stage is null or "" or "ordered" or "invoice"
-                ? "paid" : dialog.Stage;
+            var stage = paid is not null && chosenStage is null or "" or "ordered" or "invoice"
+                ? "paid" : chosenStage;
             var result = await Task.Run(() => SqlServerProcurement.SetProc(
-                _connectionString, _contractId, ids, dialog.Supplier, stage,
-                dialog.OrderRef, dialog.InvoiceRef, null, null, null, null, null,
-                revision, paidDate: dialog.PaidDate,
-                clearPaidDate: dialog.ClearPaidDate, explicitSource: dialog.Source));
+                _connectionString, _contractId, ids, supplier, stage,
+                order, invoice, null, null, null, null, null,
+                revision, paidDate: paid, clearPaidDate: clearPaid, explicitSource: source));
             if (!result.Saved)
             {
                 SetStatus("Заказ / оплата не сохранены: " + result.Error);
+                await TryReloadAsync(preserveStatus: true);
                 return;
             }
 

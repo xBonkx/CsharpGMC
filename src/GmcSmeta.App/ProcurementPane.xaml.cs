@@ -169,6 +169,7 @@ public partial class ProcurementPane : UserControl
             SuspendBuyReads();
             ++_buyViewportGeneration;
             _revision = _historyRevision = "";
+            _snapshotCanWrite = false;
             _buySnapshotMayReuse = false;
             _categoryDispatchQueued = false;
             _needsReloadAfterAttach = true;
@@ -176,7 +177,10 @@ public partial class ProcurementPane : UserControl
     }
 
     // Only the revision of the successfully applied screen snapshot can authorize a write.
-    private bool CanStartOperation => IsLoaded && !_batchBusy && !string.IsNullOrEmpty(_revision);
+    private bool _snapshotCanWrite;
+    private bool CanStartReadOperation => IsLoaded && IsVisible && IsEnabled && !_batchBusy &&
+        !_needsReloadAfterAttach && !string.IsNullOrWhiteSpace(_revision);
+    private bool CanStartOperation => CanStartReadOperation && _snapshotCanWrite;
     internal bool HasCacheActivity => _batchBusy ||
         (BuyGrid.ItemsSource is System.ComponentModel.IEditableCollectionView { IsEditingItem: true });
 
@@ -184,17 +188,36 @@ public partial class ProcurementPane : UserControl
     {
         private readonly ProcurementPane _owner;
         private readonly int _attachment;
+        private readonly int _generation;
+        private readonly List<ProcurementPreviewRow> _rows;
+        private readonly ProcurementPreviewRow[] _selection;
+        private readonly object? _primary;
+        private bool _writeStarted;
         public string Revision { get; }
         public OperationLease(ProcurementPane owner, string revision)
         {
             _owner = owner;
             _attachment = owner._attachmentGeneration;
+            _generation = owner._reloadGeneration;
+            _rows = owner._allRows;
+            _selection = owner.BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
+            _primary = owner.BuyGrid.SelectedItem;
             Revision = revision;
         }
+        public bool IsCurrent() => !_writeStarted && _owner.IsLoaded && _owner.IsVisible &&
+            _owner._batchBusy && !_owner._needsReloadAfterAttach &&
+            _attachment == _owner._attachmentGeneration && _generation == _owner._reloadGeneration &&
+            ReferenceEquals(_rows, _owner._allRows) && _owner._revision == Revision &&
+            ReferenceEquals(_primary, _owner.BuyGrid.SelectedItem) &&
+            _owner.BuyGrid.SelectedItems.Count == _selection.Length &&
+            _owner.BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
+                .SequenceEqual(_selection, ReferenceEqualityComparer.Instance);
+
         public string BeginWrite()
         {
-            if (!_owner.IsLoaded || _attachment != _owner._attachmentGeneration)
-                throw new InvalidOperationException("Раздел закрыт или открыт заново. Запись не начата.");
+            if (!IsCurrent() || !_owner._snapshotCanWrite)
+                throw new InvalidOperationException("Снимок закупок или право записи изменились. Запись не начата.");
+            _writeStarted = true;
             // Never attach a returned/new revision to an old grid, even on failure.
             _owner._revision = "";
             _owner.CancelMovementHistory();
@@ -212,11 +235,13 @@ public partial class ProcurementPane : UserControl
         }
     }
 
-    private OperationLease? TryBeginOperation(bool deferDisable = false)
+    private OperationLease? TryBeginOperation(bool deferDisable = false, bool readOnly = false)
     {
-        if (!CanStartOperation)
+        if (!(readOnly ? CanStartReadOperation : CanStartOperation))
         {
-            if (!_batchBusy) SetStatus("Данные закупок не подтверждены. Нажмите «Обновить».");
+            if (!_batchBusy) SetStatus(CanStartReadOperation
+                ? "Документ доступен только для чтения."
+                : "Данные закупок не подтверждены. Нажмите «Обновить».");
             return null;
         }
         // Reserve synchronously, before a modal dialog or any await.
@@ -228,7 +253,7 @@ public partial class ProcurementPane : UserControl
 
     private async Task<bool> CheckPreviewRevisionAsync(OperationLease operation, string revision)
     {
-        if (revision == operation.Revision && revision.Length != 0) return true;
+        if (operation.IsCurrent() && revision == operation.Revision && revision.Length != 0) return true;
         _revision = "";
         SetStatus("Закупки изменены другим сотрудником. Данные перечитываются; повторите действие.");
         await TryReloadAsync(preserveStatus: true);
@@ -611,7 +636,7 @@ public partial class ProcurementPane : UserControl
         if (MessageBox.Show(Window.GetWindow(this),
                 $"Удалить запись «{movement.KindLabel}» на {movement.Qty:0.###} {row.Unit}?" +
                 "\nЭто изменит приход/выдачу и производный статус позиции.",
-                "Удаление движения", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                "Удаление движения", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
             != MessageBoxResult.Yes) return;
 
         MovementDeleteButton.IsEnabled = false;
@@ -619,6 +644,8 @@ public partial class ProcurementPane : UserControl
         var positionId = row.PositionId;
         try
         {
+            if (!CurrentHistoryTarget(row, movement, operation.Revision))
+                throw new InvalidOperationException("Запись истории изменилась. Откройте её заново.");
             var revision = operation.BeginWrite();
             var result = await Task.Run(() => SqlServerProcurement.DeleteMovement(
                 _connectionString, _contractId, positionId, movement.Id, revision));
@@ -643,13 +670,10 @@ public partial class ProcurementPane : UserControl
 
     private IReadOnlyList<long> SelectedBuyingIds()
     {
-        // A synthetic group heading is never sent to SQL. Use only real IDs
-        // already in this contract's current server snapshot.
-        var valid = _allRows.Where(row => !row.Work && row.PositionId > 0)
-            .ToHashSet(ReferenceEqualityComparer.Instance);
-        return BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
-            .Where(valid.Contains).Select(row => row.PositionId)
-            .Distinct().ToArray();
+        var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
+        return CurrentBuyingSelection(selected)
+            ? selected.Select(row => row.PositionId).Distinct().ToArray()
+            : Array.Empty<long>();
     }
 
     private async Task ApplyBulkProcAsync(string? supplier, string? stage, string description, DateTime? due = null, bool clearDue = false)
@@ -684,7 +708,7 @@ public partial class ProcurementPane : UserControl
             _revision = "";
             message = "Ошибка пакетной операции: " + ex.Message;
         }
-        finally { BuyGrid.IsReadOnly = false; }
+        finally { BuyGrid.IsReadOnly = !_snapshotCanWrite; }
         try
         {
             if (committedRevision is not null) await RefreshCommittedBuyRowsAsync(ids, committedRevision);
@@ -704,9 +728,14 @@ public partial class ProcurementPane : UserControl
             "Поставщик для выделенных строк (пустое значение очищает):",
             initial) { Owner = Window.GetWindow(this) };
         var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
+        var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds().ToArray();
-        if (dialog.ShowDialog() != true) return;
-        if (_revision != revision || !SelectedBuyingIds().SequenceEqual(ids))
+        if (ids.Length == 0 || dialog.ShowDialog() != true) return;
+        if (!CanStartOperation || _revision != revision || attachment != _attachmentGeneration ||
+            generation != _reloadGeneration || !CurrentBuyingSelection(selected) ||
+            !SelectedBuyingIds().SequenceEqual(ids))
         {
             SetStatus("Выбор или данные изменились. Повторите назначение поставщика.");
             return;
@@ -865,6 +894,8 @@ public partial class ProcurementPane : UserControl
                 return;
             }
             IsEnabled = false;
+            if (!CurrentBuyingRow(row))
+                throw new InvalidOperationException("Редактируемая строка изменилась.");
             var revision = operation.BeginWrite();
             var saved = await Task.Run(() => SqlServerProcurement.SetProc(
                 _connectionString, _contractId, new[] { row.PositionId },
@@ -937,10 +968,12 @@ public partial class ProcurementPane : UserControl
         }
         var revision = _revision;
         var attachment = _attachmentGeneration;
+        var generation = _reloadGeneration;
         var selection = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
         var ids = SelectedBuyingIds().OrderBy(id => id).ToArray();
+        if (ids.Length == 0 || !CurrentBuyingSelection(selection)) { e.Handled = true; return; }
         bool CanExecute() => CanStartOperation && _revision == revision &&
-            attachment == _attachmentGeneration &&
+            attachment == _attachmentGeneration && generation == _reloadGeneration &&
             _allRows.Any(current => ReferenceEquals(current, row)) &&
             BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
             ids.Contains(row.PositionId) && SelectedBuyingIds().OrderBy(id => id).SequenceEqual(ids);

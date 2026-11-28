@@ -13,19 +13,23 @@ public partial class ProcurementPane
         if (operation is null) return;
 
         var current = BuyGrid.SelectedItem as ProcurementPreviewRow;
+        if (BuyGrid.SelectedItems.Count > 1 || (current is not null && !CurrentBuyingRow(current)))
+        { SetStatus("Выберите один раздел через его позицию или снимите выделение."); return; }
         var dialog = new ProcurementExtraDialog { Owner = Window.GetWindow(this) };
         if (dialog.ShowDialog() != true) return;
 
         SetStatus("Создание позиции вне КП…");
         try
         {
+            var (name, unit, quantity, cost) = (dialog.PositionName, dialog.Unit, dialog.Quantity, dialog.PurchaseCost);
+            var system = current?.SystemId;
             var revision = operation.BeginWrite();
             var result = await Task.Run(() => SqlServerProcurement.AddExtra(
-                _connectionString, _contractId, current?.SystemId,
-                dialog.PositionName, dialog.Unit, dialog.Quantity, dialog.PurchaseCost, revision));
+                _connectionString, _contractId, system, name, unit, quantity, cost, revision));
             if (!result.Saved)
             {
                 SetStatus("Не добавлено: " + result.Error);
+                await TryReloadAsync(preserveStatus: true);
                 return;
             }
 
@@ -54,7 +58,7 @@ public partial class ProcurementPane
         if (operation is null) return;
 
         var row = BuyGrid.SelectedItem as ProcurementPreviewRow;
-        if (row is null || !row.OutOfKp)
+        if (row is null || !row.OutOfKp || row.IsSub || BuyGrid.SelectedItems.Count != 1 || !CurrentBuyingRow(row))
         {
             SetStatus("Выберите одну строку «вне КП».");
             return;
@@ -64,11 +68,11 @@ public partial class ProcurementPane
 
         try
         {
+            var (name, unit, quantity) = (dialog.PositionName, dialog.Unit, dialog.Quantity);
             var revision = operation.BeginWrite();
             var result = await Task.Run(() => SqlServerProcurement.EditExtra(
-                _connectionString, _contractId, row.PositionId, dialog.PositionName,
-                dialog.Unit, dialog.Quantity, revision));
-            if (!result.Saved) { SetStatus("Изменение не сохранено: " + result.Error); return; }
+                _connectionString, _contractId, row.PositionId, name, unit, quantity, revision));
+            if (!result.Saved) { SetStatus("Изменение не сохранено: " + result.Error); await TryReloadAsync(preserveStatus: true); return; }
 
             await TryReloadAsync(preserveStatus: true);
             var updated = _allRows.FirstOrDefault(x => x.PositionId == row.PositionId);
@@ -96,14 +100,15 @@ public partial class ProcurementPane
         using var operation = TryBeginOperation();
         if (operation is null) return;
 
-        var count = _allRows.Count(x => x.OutOfKp);
+        var roots = _allRows.Where(x => x.OutOfKp && !x.IsSub).Select(x => x.PositionId).OrderBy(id => id).ToArray();
+        var count = roots.Length;
         if (count == 0) { SetStatus("Дополнительных закупок вне КП нет."); return; }
         if (MessageBox.Show(Window.GetWindow(this),
                 $"Создать допсоглашение из докупленного ({count} строк)?\n\n" +
                 "Движения и поставки перенесутся с исходными ID. " +
                 "Цены подставятся из справочника или закупки; проверьте их в «Смете».",
                 "Допсоглашение из докупленного",
-                MessageBoxButton.YesNo, MessageBoxImage.Question)
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No)
             != MessageBoxResult.Yes) return;
 
         SetStatus("Создание допсоглашения из докупленного…");
@@ -111,8 +116,8 @@ public partial class ProcurementPane
         {
             var revision = operation.BeginWrite();
             var result = await Task.Run(() =>
-                SqlServerProcurement.CreateDopFromExtras(_connectionString, _contractId, revision));
-            if (!result.Saved) { SetStatus("Допсоглашение не создано: " + result.Error); return; }
+                SqlServerProcurement.CreateDopFromExtras(_connectionString, _contractId, revision, roots));
+            if (!result.Saved) { SetStatus("Допсоглашение не создано: " + result.Error); await TryReloadAsync(preserveStatus: true); return; }
 
             await TryReloadAsync(preserveStatus: true);
             SetStatus($"ДС № {result.Id} создано из докупленного. " +

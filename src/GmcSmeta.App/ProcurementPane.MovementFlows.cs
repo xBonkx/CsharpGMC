@@ -13,17 +13,24 @@ public partial class ProcurementPane
         if (operation is null) return;
         var valid = _allRows.Where(row => !row.Work && row.PositionId > 0)
             .ToHashSet(ReferenceEqualityComparer.Instance);
-        if (!valid.Contains(clicked)) { SetStatus("Выбор изменился. Повторите действие."); return; }
-        var chosen = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
-            .Where(valid.Contains)
-            .DistinctBy(x => x.PositionId).ToList();
-        if (!chosen.Any(x => x.PositionId == clicked.PositionId))
-            chosen = new List<ProcurementPreviewRow> { clicked };
+        if (!valid.Contains(clicked) || !CurrentBuyingRow(clicked))
+        { SetStatus("Выбор изменился. Повторите действие."); return; }
+        var chosen = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
+        if (!CurrentBuyingSelection(chosen) || !chosen.Contains(clicked))
+        { SetStatus("Выделите только актуальные строки закупок."); return; }
+        var allowed = chosen.Select(row => row.PositionId).ToHashSet();
         var dialog = new ProcurementMovementDialog(kind, chosen, defaultDocument: defaultDocument)
         { Owner = Window.GetWindow(this) };
         if (dialog.ShowDialog() != true) return;
 
-        SetStatus($"Проведение движения: {dialog.Items.Count} позиций…");
+        var items = dialog.Items.ToArray();
+        if (items.Length == 0 || items.Any(item => !allowed.Contains(item.PositionId)) ||
+            !CurrentBuyingSelection(chosen)) { SetStatus("Выбор изменился. Движение отменено."); return; }
+        var date = dialog.MovementDate;
+        var document = dialog.Document;
+        var note = dialog.Note;
+        var direct = dialog.DirectToSite;
+        SetStatus($"Проведение движения: {items.Length} позиций…");
         try
         {
             var revision = operation.BeginWrite();
@@ -32,17 +39,16 @@ public partial class ProcurementPane
             {
                 var (_, newRevision) = await Task.Run(() =>
                     SqlServerProcurement.IssueViaListBatch(
-                        _connectionString, _contractId, dialog.Items,
-                        dialog.MovementDate!.Value,
-                        string.IsNullOrWhiteSpace(dialog.Note) ? dialog.Document : dialog.Note,
-                        dialog.DirectToSite, revision));
+                        _connectionString, _contractId, items,
+                        date!.Value, string.IsNullOrWhiteSpace(note) ? document : note,
+                        direct, revision));
                 committedRevision = newRevision;
             }
             else
             {
                 var result = await Task.Run(() => SqlServerProcurement.AddMovements(
-                    _connectionString, _contractId, dialog.Items, kind,
-                    dialog.MovementDate, dialog.Document, dialog.Note, revision));
+                    _connectionString, _contractId, items, kind,
+                    date, document, note, revision));
                 if (!result.Saved)
                 {
                     SetStatus("Движение не проведено: " + result.Error);
@@ -51,8 +57,8 @@ public partial class ProcurementPane
                 }
                 committedRevision = result.Revision;
             }
-            await RefreshCommittedBuyRowsAsync(dialog.Items.Select(item => item.PositionId).ToArray(), committedRevision);
-            SetStatus($"{SqlServerProcurement.MovementKindLabel(kind)}: {dialog.Items.Count} позиций. " +
+            await RefreshCommittedBuyRowsAsync(items.Select(item => item.PositionId).ToArray(), committedRevision);
+            SetStatus($"{SqlServerProcurement.MovementKindLabel(kind)}: {items.Length} позиций. " +
                 "Остатки и статусы перечитаны из SQL Server.");
         }
         catch (Exception ex)
@@ -82,14 +88,21 @@ public partial class ProcurementPane
         MovementDeleteButton.IsEnabled = false;
         try
         {
+            if (!CurrentHistoryTarget(position, movement, operation.Revision))
+                throw new InvalidOperationException("Запись истории изменилась.");
+            var item = dialog.Items.Single();
+            if (item.PositionId != position.PositionId) throw new InvalidOperationException("Неверная позиция.");
+            var date = dialog.MovementDate;
+            var document = dialog.Document;
+            var note = dialog.Note;
             var revision = operation.BeginWrite();
             var result = await Task.Run(() => SqlServerProcurement.EditMovement(
                 _connectionString, _contractId, position.PositionId, movement.Id,
-                dialog.Items.Single().Quantity, dialog.MovementDate,
-                dialog.Document, dialog.Note, revision));
+                item.Quantity, date, document, note, revision));
             if (!result.Saved)
             {
                 SetStatus("Движение не изменено: " + result.Error);
+                await TryReloadAsync(preserveStatus: true);
                 return;
             }
 

@@ -11,13 +11,13 @@ public partial class ProcurementPane
         using var operation = TryBeginOperation();
         if (operation is null) return;
 
-        var ids = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>()
-            .Where(x => x.OutOfKp).Select(x => x.PositionId).Distinct().ToArray();
-        if (ids.Length == 0)
+        var selected = BuyGrid.SelectedItems.OfType<ProcurementPreviewRow>().ToArray();
+        if (!CurrentBuyingSelection(selected) || selected.Any(row => !row.OutOfKp || row.IsSub))
         {
             SetStatus("Выделите одну или несколько дополнительных позиций вне КП.");
             return;
         }
+        var ids = selected.Select(row => row.PositionId).Distinct().ToArray();
 
         try
         {
@@ -25,6 +25,8 @@ public partial class ProcurementPane
             var preview = await Task.Run(() => SqlServerProcurement.PreviewDeleteExtras(
                 _connectionString, _contractId, ids));
             if (!await CheckPreviewRevisionAsync(operation, preview.Revision)) return;
+            if (!preview.Decisions.Select(x => x.PositionId).SequenceEqual(ids))
+                throw new InvalidOperationException("Предпросмотр не соответствует выделению.");
             var blocked = preview.Decisions.Where(x => x.State == "BLOCKED").ToArray();
             if (blocked.Length > 0)
             {
@@ -43,19 +45,22 @@ public partial class ProcurementPane
             if (MessageBox.Show(Window.GetWindow(this),
                     $"Удалить {preview.Allowed} дополнительных закупок одним действием?\n\n" +
                     "Проверены связи с КС, движениями, ведомостями, заявками и ценами. " +
-                    "При конфликте все удаления откатываются.",
+                    "При конфликте все удаления откатываются. Восстановление этих строк не предусмотрено.",
                     "Удаление докупленного: подтверждение",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             {
                 SetStatus("Удаление отменено без изменений.");
                 return;
             }
+            if (!CurrentBuyingSelection(selected))
+                throw new InvalidOperationException("Выделение изменилось после предпросмотра.");
             var revision = operation.BeginWrite();
             var saved = await Task.Run(() => SqlServerProcurement.DeleteExtras(
                 _connectionString, _contractId, ids, revision));
             if (!saved.Saved)
             {
                 SetStatus("Пакетное удаление не выполнено: " + saved.Error);
+                await TryReloadAsync(preserveStatus: true);
                 return;
             }
 
