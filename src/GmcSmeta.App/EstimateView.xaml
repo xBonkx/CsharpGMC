@@ -631,23 +631,23 @@
                         <TextBlock Text="ДОКУМЕНТ" Style="{StaticResource EstimateMenuHeader}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Обновить из SQL Server" Click="RefreshNow_Click" Tag="{StaticResource GlyphRefresh}"
                                 ToolTip="Перечитать смету из базы, включая изменения коллег"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Свойства: номер, дата, организация, НДС…" Click="EditTitle_Click" Tag="{StaticResource GlyphEdit}"
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="EditPropertiesMenuItem" Content="Свойства: номер, дата, организация, НДС…" Click="EditTitle_Click" Tag="{StaticResource GlyphEdit}"
                                 ToolTip="Реквизиты документа"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Заблокировать — смета подписана" Click="LockToggle_Click" Tag="{StaticResource GlyphCheck}" x:Name="LockMenuItem"
                                 ToolTip="Цены, количество и строки больше не поменяются случайно"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Создать копию КП (вариант)…" Click="CopyContract_Click" Tag="{StaticResource GlyphDuplicate}"
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="CopyContractMenuItem" Content="Создать копию КП (вариант)…" Click="CopyContract_Click" Tag="{StaticResource GlyphDuplicate}"
                                 ToolTip="Полная копия документа рядом с этим"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Оформить как приложение (закупки, выдача, КС)…" Click="MakeContract_Click" Tag="{StaticResource GlyphCheck}" x:Name="MakeContractItem"
                                 ToolTip="У КП появятся Закупки, Выдача и КС-2 / КС-3"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Создать допсоглашение к этому приложению…" Click="CreateDop_Click" Tag="{StaticResource GlyphFilePlus}" x:Name="CreateDopItem"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="MoveContractItem" Content="Перенести в другой договор / группу…" Click="MoveContract_Click" Tag="{StaticResource GlyphFilePlus}"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть приложения из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphStage}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="MoveContractItem" Content="Перенести в другой договор / группу…" Click="MoveContract_Click"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" Content="Этапы — вычесть приложения из КП (режим вкл / выкл)" Click="ToggleInlineStages_Click" Tag="{StaticResource GlyphLayers}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сравнить с другим документом…" Click="CompareDocs_Click" Tag="{StaticResource GlyphList}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>
                         <TextBlock Text="ЦЕНЫ" Style="{StaticResource EstimateMenuHeader}"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Скопировать расценки" Click="TransferRates_Click" Tag="{StaticResource GlyphCopy}"
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="TransferRatesMenuItem" Content="Скопировать расценки" Click="TransferRates_Click" Tag="{StaticResource GlyphDownload}"
                                 ToolTip="Скопировать цены из другого КП: СМР или материалы"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Скидка на всю смету…" Click="Discount_Click" Tag="{StaticResource GlyphEdit}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" Content="Скидка на всю смету…" Click="Discount_Click" Tag="{StaticResource GlyphDownload}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Цена работы для выделенных строк…" Click="SetWork_Click" Tag="{StaticResource GlyphEdit}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Цены работ из справочника (где пусто)" Click="FillWork_Click" Tag="{StaticResource GlyphBook}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>
@@ -656,7 +656,7 @@
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Что менялось по изм. — отчёты…" Click="SpecHistory_Click" Tag="{StaticResource GlyphHistory}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Свернуть воздуховоды и изоляцию в м² — по системам" Click="CollapseAreaSystem_Click" Tag="{StaticResource GlyphLayers}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Свернуть в м² — одной группой на всё КП" Click="CollapseAreaWhole_Click" Tag="{StaticResource GlyphLayers}"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Развернуть м² обратно в строки" Click="ExpandAreaAll_Click" Tag="{StaticResource GlyphList}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" Content="Развернуть м² обратно в строки" Click="ExpandAreaAll_Click" Tag="{StaticResource GlyphUndo}"/>
                         <Separator Style="{StaticResource MenuSeparator}"/>
                         <TextBlock Text="ОБЪЕКТ" Style="{StaticResource EstimateMenuHeader}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Список людей на допуск…" Click="ShowPeople_Click" Tag="{StaticResource GlyphUsers}"/>
@@ -667,7 +667,7 @@
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Сохранить ссылку на расчёт в папку…" Click="SaveDocumentLink_Click" Tag="{StaticResource GlyphFolder}"/>
                         <Button Style="{StaticResource EstimateMenuItem}" Content="Пересортировать строки КП (запись)…" Click="Sort_Click" Tag="{StaticResource GlyphSort}"
                                 ToolTip="Физически изменить порядок строк в SQL Server: отдельно от временного вида"/>
-                        <Button Style="{StaticResource EstimateMenuItem}" Content="Удалить документ…" Click="DeleteContract_Click" Tag="{StaticResource GlyphTrash}"/>
+                        <Button Style="{StaticResource EstimateMenuItem}" x:Name="DeleteDocumentMenuItem" Content="Удалить документ…" Click="DeleteContract_Click" Tag="{StaticResource GlyphTrash}"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

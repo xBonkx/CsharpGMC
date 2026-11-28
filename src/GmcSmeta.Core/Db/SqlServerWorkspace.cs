@@ -791,7 +791,7 @@ public static partial class SqlServerWorkspace
         string title = "";
         bool wasLocked = false;
         using (var read = new SqlCommand(
-            "SELECT object_id, kind, ISNULL(number,''), ISNULL(name,''), ISNULL(locked,0) " +
+            "SELECT object_id, kind, ISNULL(number,''), ISNULL(name,''), ISNULL(locked,0), ISNULL(stage_rest,0) " +
             "FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@id", conn, tx))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
@@ -802,6 +802,8 @@ public static partial class SqlServerWorkspace
                     (r.IsDBNull(2) || r.GetString(2).Length == 0 ? "" : $" № {r.GetString(2)}") +
                     (r.IsDBNull(3) || r.GetString(3).Length == 0 ? "" : $" — {r.GetString(3)}");
             wasLocked = !r.IsDBNull(4) && Convert.ToBoolean(r.GetValue(4), CultureInfo.InvariantCulture);
+            if (Convert.ToBoolean(r.GetValue(5), CultureInfo.InvariantCulture))
+                throw new InvalidOperationException("Расчётный остаток нельзя разблокировать или подписать.");
         }
         if (ReadObjectName(conn, tx, objectId).Archived)
             throw new InvalidOperationException("Архивный объект нельзя изменять.");

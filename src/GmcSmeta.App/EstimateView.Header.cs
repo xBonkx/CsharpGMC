@@ -33,12 +33,13 @@ public partial class EstimateView
     private void UpdatePhaseButton()
     {
         if (PhaseButton is null) return;
-        var visible = _isKp && _estimate is not null;
+        var visible = _isKp && !_doc.IsStage && !_doc.StageRest && _estimate is not null;
         PhaseButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         if (!visible) return;
         var (phase, number) = PhaseInfo(_estimate!.KpPhase);
         PhaseButtonText.Text = $"{number} · {phase.Split(" · ")[0]} ▾";
-        PhaseButton.ToolTip = $"Подготовка КП: {phase}\nНажмите, чтобы передать на следующий этап";
+        PhaseButton.ToolTip = $"Подготовка КП: {phase}\nНажмите, чтобы выбрать этап подготовки";
+        PhaseButton.IsEnabled = !_estimate.Locked && !_doc.StageRest;
     }
 
     private static (string Title, string Number) PhaseInfo(string key) => key switch
@@ -53,7 +54,10 @@ public partial class EstimateView
 
     private void Phase_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || _estimate is null || !_isKp) return;
+        if (sender is not Button button || _estimate is not { } snapshot || !_isKp ||
+            _doc.IsStage || _doc.StageRest) return;
+        var revision = _serverRevision;
+        if (!CanChangeHeader(snapshot, revision, allowLocked: false)) return;
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
         foreach (var (key, title, number) in new[]
         {
@@ -69,39 +73,83 @@ public partial class EstimateView
             {
                 Header = $"{number}. {title}",
                 IsCheckable = true,
-                IsChecked = _estimate.KpPhase == phaseKey
+                IsChecked = snapshot.KpPhase == phaseKey
             };
-            item.Click += async (_, _) => await SaveKpPhaseAsync(phaseKey);
+            item.Click += async (_, _) => await SaveKpPhaseAsync(snapshot, revision, phaseKey);
             menu.Items.Add(item);
         }
         menu.Items.Add(new Separator());
         var none = new MenuItem { Header = "Этап не указан" };
-        none.Click += async (_, _) => await SaveKpPhaseAsync("");
+        none.Click += async (_, _) => await SaveKpPhaseAsync(snapshot, revision, "");
         menu.Items.Add(none);
         menu.IsOpen = true;
     }
 
-    private async Task SaveKpPhaseAsync(string phase)
+    private Task SaveKpPhaseAsync(EstimateDocument snapshot, string revision, string phase)
     {
-        if (_serverConflict)
+        if (!_isKp || _doc.IsStage || _doc.StageRest || phase == (snapshot.KpPhase ?? ""))
+            return Task.CompletedTask;
+        return SaveHeaderMutationAsync(snapshot, revision, false,
+            () => SqlServerWorkspace.SetKpPhase(_sqlConnectionString, _contractId, phase, revision),
+            "Этап подготовки");
+    }
+
+    private bool CanChangeHeader(EstimateDocument snapshot, string revision, bool allowLocked) =>
+        !_detached && IsLoaded && IsEnabled && !_serverConflict && !_doc.StageRest &&
+        ReferenceEquals(snapshot, _estimate) && (allowLocked || !snapshot.Locked) &&
+        !string.IsNullOrWhiteSpace(revision) && revision == _serverRevision && CanTransferDocument &&
+        Window.GetWindow(this) is MainWindow main && main.CanEditEstimateHeader(_contractId, _objectId);
+
+    // Header changes participate in the same FIFO writer gate as estimate cells.
+    // The displayed revision remains fixed, including after a modal confirmation.
+    private async Task SaveHeaderMutationAsync(EstimateDocument snapshot, string revision,
+        bool allowLocked, Func<bool> writer, string caption)
+    {
+        if (!CanChangeHeader(snapshot, revision, allowLocked))
         {
-            SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
+            SetStatus("Документ изменился или занят сохранением. Откройте меню заново.", true);
             return;
         }
+        _reloadTimer.Stop();
+        AttachSaveCloseGuard();
+        Interlocked.Increment(ref _pendingWrites);
+        SetStatus(caption + ": сохранение…", false);
+        await _writeLock.WaitAsync();
         try
         {
-            var changed = await Task.Run(() => SqlServerWorkspace.SetKpPhase(
-                _sqlConnectionString, _contractId, phase, _serverRevision));
-            if (changed)
+            if (_serverConflict || _detached || !ReferenceEquals(snapshot, _estimate) ||
+                revision != _serverRevision || Window.GetWindow(this) is not MainWindow main ||
+                !main.CanEditEstimateHeader(_contractId, _objectId))
             {
-                SetStatus("Этап подготовки сохранён ✓", false);
-                _reloadTimer.Stop();
-                _reloadTimer.Start();
+                _saveError = "Документ изменился до записи.";
+                _serverConflict = true;
+                return;
             }
+            await Task.Run(writer);
+            // Do not guess the new revision. Prevent queued writes until
+            // the authoritative reload publishes the committed snapshot.
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
         }
         catch (Exception ex)
         {
-            SetStatus("Этап не сохранён: " + ex.Message, true);
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
+            _saveError = caption + ": запись не подтверждена — " + ex.Message;
+        }
+        finally
+        {
+            _writeLock.Release();
+            if (Interlocked.Decrement(ref _pendingWrites) == 0)
+            {
+                SetStatus(_saveError ?? (caption + ": сверка с SQL Server…"), _saveError is not null);
+                _reloadTimer.Start();
+            }
+        }
+        if (Volatile.Read(ref _pendingWrites) == 0)
+        {
+            _reloadTimer.Stop();
+            await ReloadDocumentAsync();
         }
     }
 
@@ -138,6 +186,25 @@ public partial class EstimateView
     }
 
     // ---------------------------------------------------------------- Действия документа (btn_more menu)
+    private void RefreshDocumentActionsMenu()
+    {
+        var ready = _estimate is { } snapshot && CanChangeHeader(snapshot, _serverRevision, allowLocked: true);
+        var editable = ready && _estimate?.Locked == false && !_doc.IsStage;
+        LockMenuItem.Content = _estimate?.Locked == true ? "Снять блокировку сметы" : "Заблокировать — смета подписана";
+        LockMenuItem.IsEnabled = ready;
+        MakeContractItem.Visibility = _isKp && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
+        MakeContractItem.IsEnabled = editable;
+        CreateDopItem.Visibility = _doc.Kind == "main" && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
+        CreateDopItem.IsEnabled = ready;
+        MoveContractItem.IsEnabled = ready && !_doc.IsStage;
+        TransferRatesMenuItem.IsEnabled = editable && _isKp;
+        TransferRatesMenuItem.Visibility = _isKp && !_doc.IsStage ? Visibility.Visible : Visibility.Collapsed;
+        CopyContractMenuItem.Visibility = _isKp && !_doc.StageRest ? Visibility.Visible : Visibility.Collapsed;
+        CopyContractMenuItem.IsEnabled = ready;
+        EditPropertiesMenuItem.IsEnabled = editable;
+        DeleteDocumentMenuItem.IsEnabled = ready && !_doc.IsStage;
+    }
+
     private void CopyContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null && _estimate is not null)
@@ -222,45 +289,20 @@ public partial class EstimateView
     // ---------------------------------------------------------------- блокировка (toggle_lock)
     private async void LockToggle_Click(object sender, RoutedEventArgs e)
     {
-        if (_estimate is null) return;
         ExtraActionsExpander.IsOpen = false;
-        if (_serverConflict)
-        {
-            SetStatus("Сначала обнови смету: данные на сервере изменились.", true);
-            return;
-        }
-        var toLock = !_estimate.Locked;
-        if (toLock)
-        {
-            var answer = MessageBox.Show(Window.GetWindow(this),
-                "Заблокировать смету? Цены, количество и строки больше не поменяются случайно.",
-                "Заблокировать — смета подписана", MessageBoxButton.YesNo, MessageBoxImage.Question,
-                MessageBoxResult.Yes);
-            if (answer != MessageBoxResult.Yes) return;
-        }
-        else
-        {
-            var answer = MessageBox.Show(Window.GetWindow(this),
-                "Снять блокировку? Цены и количество снова можно менять.",
-                "Снять блокировку", MessageBoxButton.YesNo, MessageBoxImage.Warning,
-                MessageBoxResult.No);
-            if (answer != MessageBoxResult.Yes) return;
-        }
-        try
-        {
-            var changed = await Task.Run(() => SqlServerWorkspace.SetContractLocked(
-                _sqlConnectionString, _contractId, toLock, _serverRevision));
-            if (changed)
-            {
-                SetStatus(toLock ? "Смета заблокирована ✓" : "Блокировка снята ✓", false);
-                _reloadTimer.Stop();
-                _reloadTimer.Start();
-            }
-        }
-        catch (Exception ex)
-        {
-            SetStatus("Блокировка не изменена: " + ex.Message, true);
-        }
+        if (_estimate is not { } snapshot) return;
+        var revision = _serverRevision;
+        if (!CanChangeHeader(snapshot, revision, allowLocked: true)) return;
+        var toLock = !snapshot.Locked;
+        var answer = MessageBox.Show(Window.GetWindow(this),
+            toLock ? "Заблокировать смету? Цены, количество и строки больше не поменяются случайно."
+                : "Снять блокировку? Цены и количество снова можно менять.",
+            toLock ? "Заблокировать — смета подписана" : "Снять блокировку",
+            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+        await SaveHeaderMutationAsync(snapshot, revision, true,
+            () => SqlServerWorkspace.SetContractLocked(_sqlConnectionString, _contractId, toLock, revision),
+            "Блокировка сметы");
     }
 
     // ---------------------------------------------------------------- итоговые карточки (tile_smr / tile_tr / tile_pnr)

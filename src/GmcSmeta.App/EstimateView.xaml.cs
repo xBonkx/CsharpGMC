@@ -525,11 +525,14 @@ public partial class EstimateView : UserControl
     {
         ExtraActionsExpander.IsOpen = !ExtraActionsExpander.IsOpen;
         if (ExtraActionsExpander.IsOpen)
+        {
+            RefreshDocumentActionsMenu();
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
             {
                 if (ExtraActionsExpander.IsOpen)
                     ActionsMenuPanel.Children.OfType<Button>().FirstOrDefault(b => b.IsVisible && b.IsEnabled)?.Focus();
             }));
+        }
     }
 
     private void ActionsMenu_PreviewKeyDown(object sender, KeyEventArgs e)
