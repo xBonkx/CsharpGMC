@@ -7,7 +7,10 @@ namespace GmcSmeta.Core.Db;
 public static partial class SqlServerWorkspace
 {
     public sealed record TransferDocument(long Id,long ObjectId,string Kind,long? StageOf);
-    public sealed record ContractTransferSnapshot(long SourceId,string SourceName,string Revision,IReadOnlyList<long> DocumentIds);
+    public sealed record ContractTransferSnapshot(long SourceId,string SourceName,string Revision,IReadOnlyList<long> DocumentIds)
+    {
+        public string LegalCaption { get; init; } = "";
+    }
 
     private static List<TransferDocument> ReadTransferGroup(SqlConnection conn,SqlTransaction tx,long contractId)
     {
@@ -35,6 +38,25 @@ public static partial class SqlServerWorkspace
             throw new InvalidOperationException("Договор связан с этапами другого документа.");
     }
 
+    // Never infer legal identity from a legacy contract number or the first card.
+    public static long ValidateTransferLegalGroup(IReadOnlyList<long?> links,IReadOnlyCollection<long> activeSourceIds)
+    {
+        if(links.Count==0||links[0] is not long id||id<=0||
+            !activeSourceIds.Contains(id)||links.Any(link=>link!=id))
+            throw new InvalidOperationException("Приложение и ДС должны принадлежать одному действующему юридическому договору исходного объекта. Проверьте связи.");
+        return id;
+    }
+
+    private static SqlServerAgreements.Values? ReadTransferLegalContext(SqlConnection conn,SqlTransaction tx,
+        IReadOnlyList<TransferDocument> group)
+    {
+        if(!SqlServerAgreements.Enabled(conn,tx))return null;
+        var cards=SqlServerAgreements.Read(conn,group[0].ObjectId,tx);
+        var links=group.Select(d=>SqlServerAgreements.DocumentAgreementId(conn,d.Id,tx)).ToArray();
+        var id=ValidateTransferLegalGroup(links,cards.Select(c=>c.Id).ToArray());
+        return cards.Single(c=>c.Id==id);
+    }
+
     public static ContractTransferSnapshot DescribeContractTransfer(string cs,long contractId)
     {
         RequirePilotDatabase(cs);
@@ -46,8 +68,10 @@ public static partial class SqlServerWorkspace
         var group=ReadTransferGroup(conn,tx,contractId);
         var source=ReadObjectName(conn,tx,group[0].ObjectId);
         if(source.Archived) throw new InvalidOperationException("Архивный объект нельзя изменять.");
+        var legal=ReadTransferLegalContext(conn,tx,group);
         tx.Commit();
-        return new(group[0].ObjectId,source.Name,revision,group.Select(d=>d.Id).ToArray());
+        return new(group[0].ObjectId,source.Name,revision,group.Select(d=>d.Id).ToArray())
+            { LegalCaption=legal?.Caption??"" };
     }
 
     public static void TransferContract(string cs,long contractId,long sourceId,long targetId,
@@ -65,6 +89,7 @@ public static partial class SqlServerWorkspace
         var source=ReadObjectName(conn,tx,sourceId);
         var target=ReadObjectName(conn,tx,targetId);
         if(source.Archived||target.Archived) throw new InvalidOperationException("Выберите другой действующий объект.");
+        var legal=ReadTransferLegalContext(conn,tx,group);
         // Query each ID rather than creating an unbounded IN parameter list.
         foreach(var id in ids)
         {
@@ -85,8 +110,8 @@ public static partial class SqlServerWorkspace
         using var max=new SqlCommand("SELECT COALESCE(MAX([order]),0) FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE object_id=@target",conn,tx);
         max.Parameters.Add("@target",SqlDbType.BigInt).Value=targetId;
         var order=Convert.ToInt32(max.ExecuteScalar());
-        var hasLegal=SqlServerAgreements.Enabled(conn,tx);
-        var targetLegal=hasLegal?SqlServerAgreements.TransferTarget(conn,tx,contractId,targetId):null;
+        var hasLegal=legal is not null;
+        var targetLegal=legal is not null?SqlServerAgreements.TransferTarget(conn,tx,legal,targetId):null;
         foreach(var doc in group)
         {
             using var update=new SqlCommand("UPDATE dbo.contracts SET object_id=@target,[order]=@order"+(hasLegal?",agreement_id=@legal":"")+" WHERE id=@id AND object_id=@source",conn,tx);

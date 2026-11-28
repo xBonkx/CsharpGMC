@@ -202,17 +202,27 @@ public static class SqlServerAgreements
         return id is long value ? Read(conn, objectId).SingleOrDefault(a => a.Id == value) : null;
     }
 
-    internal static long? TransferTarget(SqlConnection conn, SqlTransaction tx, long sourceDocument, long targetObject)
+    // The existing command moves an annex group, not a legal agreement or
+    // its signed files. Reassigning to an existing legal ID requires a
+    // separately agreed mapping workflow, even when numbers look identical.
+    public static void ValidateTransferDestination(int activeAgreementCount,bool sourceHasFiles)
     {
-        if (!Enabled(conn,tx)) return null;
-        var target=Read(conn,targetObject,tx);
-        if(target.Count>1)throw new InvalidOperationException("В объекте назначения несколько договоров. Сначала выберите юридический договор назначения.");
-        if(target.Count==1)return target[0].Id;
-        var sourceId=DocumentAgreementId(conn,sourceDocument,tx);
-        if(sourceId is null)return null;
-        using var owner=new SqlCommand("SELECT object_id FROM dbo.agreements WHERE id=@id",conn,tx);
-        owner.Parameters.Add("@id",SqlDbType.BigInt).Value=sourceId.Value;
-        var source=Read(conn,Convert.ToInt64(owner.ExecuteScalar()),tx).Single(a=>a.Id==sourceId);
+        if(activeAgreementCount!=0)
+            throw new InvalidOperationException("В объекте назначения уже есть юридические договоры. Автоматическая перепривязка приложения запрещена.");
+        if(sourceHasFiles)
+            throw new InvalidOperationException("К исходному юридическому договору прикреплены файлы. Перенос без согласованного переноса юридического контекста запрещён.");
+    }
+
+    internal static long TransferTarget(SqlConnection conn, SqlTransaction tx, Values source, long targetObject)
+    {
+        // Count archived cards as well: a new clone must not obscure a previous
+        // legal context, and no existing agreement may be silently substituted.
+        using var target=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.agreements WITH(UPDLOCK,HOLDLOCK) WHERE object_id=@id",conn,tx);
+        target.Parameters.Add("@id",SqlDbType.BigInt).Value=targetObject;
+        var count=Convert.ToInt64(target.ExecuteScalar(),CultureInfo.InvariantCulture);
+        using var files=new SqlCommand("SELECT TOP(1) id FROM dbo.agreement_files WITH(UPDLOCK,HOLDLOCK) WHERE agreement_id=@id",conn,tx);
+        files.Parameters.Add("@id",SqlDbType.BigInt).Value=source.Id;
+        ValidateTransferDestination(count==0?0:1,files.ExecuteScalar() is not null);
         var print=source.Print with{ObjectId=targetObject};
         return Save(conn,tx,source with{Id=0,ObjectId=targetObject,Print=print});
     }

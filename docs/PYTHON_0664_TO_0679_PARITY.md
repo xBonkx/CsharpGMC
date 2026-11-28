@@ -1,4 +1,6 @@
 
+
+28.11.2026 ChatGPT/main (base dc14314) — AGR-08/11 / Python 0.66.9 PARTIAL: legal-schema annex transfer validates one active same-object agreement ID for the entire annex/DS group both in preview and inside the existing serializable revision-checked transaction. No implicit reassignment to any existing destination agreement (including archived cards or identical numbers); empty destination clones the original legal requisites only when no legal files are attached. Dialog explains the conservative restriction; legacy transfer, stage/shipment guards, IDs and financial formulas retained. Nine offline policy cases plus dedicated Agreement Pilot transfer rejection/rollback and empty-destination scenario added, not run. Explicit reassignment/file transfer requires a separate agreed workflow; real schema 28/32 Windows/SQL acceptance remains. No DB/schema/release changes.
 # Перенос Python 0.66.4 → 0.67.9
 
 Источник зафиксирован: [Python main aa6b34d](https://github.com/xBonkx/gmcsmeta/commit/aa6b34dcf0314df93086a297f01d549ff58cf705), C# база 213cab3733ee4c04b2d5f12ff0fcd66111d555ce.

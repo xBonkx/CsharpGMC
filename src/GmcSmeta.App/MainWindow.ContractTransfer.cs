@@ -23,11 +23,15 @@ public partial class MainWindow
             panel.Children.Add(new TextBlock{Text=AgreementPresentation.FullAnnexTitle(doc),FontSize=17,FontWeight=FontWeights.SemiBold,TextWrapping=TextWrapping.Wrap});
             panel.Children.Add(new TextBlock{Text=$"Из карточки «{snapshot.SourceName}». Документов к переносу: {snapshot.DocumentIds.Count}.",
                 Margin=new Thickness(0,8,0,12),TextWrapping=TextWrapping.Wrap});
+            if(snapshot.LegalCaption.Length>0)
+                panel.Children.Add(new TextBlock{Text="Юридический договор: "+snapshot.LegalCaption,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,8)});
             panel.Children.Add(new TextBlock{Text="Карточка назначения",Margin=new Thickness(0,0,0,4)});
             var picker=new ComboBox{ItemsSource=candidates,DisplayMemberPath="Name",SelectedIndex=-1,MinHeight=34};
             panel.Children.Add(picker);
             panel.Children.Add(new TextBlock{Text="Переносятся только выбранное приложение и связанные с ним ДС. Другие приложения останутся в прежней карточке. КС, сметы, вложения и идентификаторы переносятся вместе с документами, но состав общей КС-3 может измениться: он зависит от карточки и номера договора. При наличии связанных этапов или ведомостей выдачи перенос будет отклонён.",
                 TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,10,0,12)});
+            if(snapshot.LegalCaption.Length>0)
+                panel.Children.Add(new TextBlock{Text="При самостоятельных договорах перенос разрешён только в карточку без юридических договоров. Реквизиты копируются, существующие договоры не подменяются. При наличии юридических файлов перенос отклоняется.",TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,12)});
             var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             var cancel=new Button{Content="Отмена",IsCancel=true,MinWidth=100,Margin=new Thickness(0,0,8,0)};
             var confirm=new Button{Content="Перенести",IsDefault=true,IsEnabled=false,MinWidth=110};

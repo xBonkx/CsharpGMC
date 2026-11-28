@@ -40,6 +40,32 @@ internal static class AgreementAcceptance
             throw new Exception("Cross-object agreement was accepted.");
         }
         catch(ArgumentException) { }
-        Console.WriteLine("PASS agreement CRUD: before annex, own fields, two agreements, annex/DS inheritance, stale revision, cross-object protection.");
+        var transferSource=SqlServerWorkspace.CreateObject(connection,new ObjectProperties("Synthetic transfer source"),Revision());
+        var transferCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)transferSource));
+        var transferPrint=print with{ObjectId=transferSource};
+        SqlServerWorkspace.SaveAgreementCard(connection,checked((int)transferSource),transferCard.Properties,
+            transferPrint,Revision(),legal with{ObjectId=transferSource,Number="TRANSFER-1",Print=transferPrint});
+        var transferLegal=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)transferSource)).SelectedLegal!;
+        var annex=SqlServerWorkspace.CreateEmptyContract(connection,transferSource,
+            new("main","TRANSFER-1","01.01.2026","Transfer annex",null,null){AgreementId=transferLegal.Id},Revision());
+        var supplement=SqlServerWorkspace.CreateEmptyContract(connection,transferSource,
+            new("dop","5","11.08.2026","Transfer supplement",null,annex),Revision());
+        var described=SqlServerWorkspace.DescribeContractTransfer(connection,annex);
+        if(described.DocumentIds.Count!=2||!described.DocumentIds.Contains(supplement))
+            throw new Exception("Transfer group lost supplement.");
+        var transferRejected=false;
+        try { SqlServerWorkspace.TransferContract(connection,annex,transferSource,obj,described.DocumentIds,described.Revision); }
+        catch(InvalidOperationException) { transferRejected=true; }
+        if(!transferRejected)throw new Exception("Transfer into existing legal context was accepted.");
+        if(Revision()!=described.Revision||SqlServerAgreements.DocumentAgreementId(read,annex)!=transferLegal.Id||
+            SqlServerAgreements.DocumentAgreementId(read,supplement)!=transferLegal.Id)
+            throw new Exception("Rejected transfer changed revision or legal identity.");
+        SqlServerWorkspace.TransferContract(connection,annex,transferSource,other,described.DocumentIds,described.Revision);
+        var destination=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)other)).SelectedLegal;
+        if(destination is null||destination.Id==transferLegal.Id||destination.Number!=transferLegal.Number||
+            SqlServerAgreements.DocumentAgreementId(read,annex)!=destination.Id||
+            SqlServerAgreements.DocumentAgreementId(read,supplement)!=destination.Id)
+            throw new Exception("Transfer did not preserve legal requisites and group identity.");
+        Console.WriteLine("PASS agreement CRUD and transfer: before annex, own fields, two agreements, annex/DS inheritance, stale revision, cross-object protection, existing-context rejection and empty-target transfer.");
     }
 }
