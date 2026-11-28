@@ -152,6 +152,7 @@ public static partial class SqlServerCostSummary
             finalized = FinalizeRows(rows);
 
         var extra = new List<(string, decimal, decimal, string)>();
+        using var smrTiming = StartupTrace.Measure("cost_smr_expense_projection");
         decimal other = 0m;
         Next();
         {
@@ -161,6 +162,8 @@ public static partial class SqlServerCostSummary
         if (other != 0m) extra.Add(("Прочие затраты на монтаж", other, 0m, "works"));
         if (outCost != 0m) extra.Add(("Куплено вне КП", decimal.Round(outCost, 2), 0m, "mat"));
 
+        smrTiming?.Dispose();
+        using var transportTiming = StartupTrace.Measure("cost_transport_projection");
         decimal transportSell = 0m, transportCost = 0m;
         bool transportCostMissing = true;
         var notes = new List<string>();
@@ -177,6 +180,7 @@ public static partial class SqlServerCostSummary
         if (transportSell != 0m && transportCostMissing)
             notes.Add("наш расход на транспорт не вписан");
 
+        transportTiming?.Dispose();
         // СМР документа — из проверенного Totals (Contract.stats()["smr"] эталона).
         // Release the reader before the existing contract totals query. No MARS required.
         token.ThrowIfCancellationRequested();

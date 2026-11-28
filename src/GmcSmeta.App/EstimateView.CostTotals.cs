@@ -148,6 +148,7 @@ public partial class EstimateView
                 if (string.IsNullOrWhiteSpace(observed)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
                 if (observed != expected || CostTabRevisionPolicy.CanReuse(expected, ownRevision, observed, force))
                     return (Snapshot: (CostFinancialSnapshot?)null, Revision: observed);
+                using var timing = StartupTrace.MeasureElapsed("embedded_totals_sql_and_projection");
                 var snapshot = await CostFinancialSnapshot.ReadTotalsAsync(conn, _contractId, cachedSummary, cachedRevision, token).ConfigureAwait(false);
                 return (Snapshot: (CostFinancialSnapshot?)snapshot, Revision: snapshot.Revision);
             }, token);
@@ -159,6 +160,7 @@ public partial class EstimateView
                 StartupTrace.Mark("embedded_totals_revision_hit");
                 return;
             }
+            using var bind = StartupTrace.Measure("embedded_totals_bind");
             _costTotalsData = result.Snapshot.Totals;
             _totalsSourceSummary = result.Snapshot.Summary;
             TotalsShow();

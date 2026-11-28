@@ -1,5 +1,6 @@
 using System.Data;
 using System.Diagnostics;
+using GmcSmeta.Core;
 using GmcSmeta.Core.Db;
 using Microsoft.Data.SqlClient;
 

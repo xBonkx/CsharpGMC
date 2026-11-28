@@ -224,8 +224,9 @@ public partial class EstimateView
                     before != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
                     throw new InvalidOperationException("Данные изменились во время чтения сводной. Повтори обновление.");
                 token.ThrowIfCancellationRequested();
+                using var prepare = StartupTrace.Measure("embedded_summary_prepare");
                 var labels = SummarySystemSelection.Labels(data.Systems.Select(s => (s.Id, s.Label)), data.SystemParents);
-                var missing = new CostMissingPriceIndex(data.Rows);
+                var missing = new CostMissingPriceIndex(data.Rows, token);
                 token.ThrowIfCancellationRequested();
                 var search = new CostSummarySearchIndex(data.Rows, labels);
                 token.ThrowIfCancellationRequested();
@@ -240,6 +241,7 @@ public partial class EstimateView
                 StartupTrace.Mark("embedded_summary_revision_hit");
                 return;
             }
+            using var bind = StartupTrace.Measure("embedded_summary_bind");
             _costSummaryData = snapshot.Data;
             _summaryMissingIndex = snapshot.Missing!;
             _summaryLabels = snapshot.Labels!;
@@ -321,6 +323,7 @@ public partial class EstimateView
     {
         var data = _costSummaryData;
         if (data is null || SummaryGrid is null) return;
+        using var timing = StartupTrace.Measure("embedded_summary_filter_group_format");
         var recs = SummaryRecs;
         var chosen = SummaryMissingSelected();
         var missingMask = chosen.Aggregate(CostMissingPrice.None, (mask, key) => mask | SummaryFlag(key));

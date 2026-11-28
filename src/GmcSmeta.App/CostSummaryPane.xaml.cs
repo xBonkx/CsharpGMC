@@ -60,6 +60,9 @@ public partial class CostSummaryPane : UserControl
     private int _contractId;
     private readonly bool _readOnly;
     private bool _loadingCosts;
+    private CostLoadSnapshot? _cachedCostSnapshot;
+    private int _publishedCostTab = -1;
+    private bool _restoringCostTab;
     private bool _operationActive;
     private volatile bool _writeAttempted;
     private string _operationRevision = "";
@@ -70,7 +73,8 @@ public partial class CostSummaryPane : UserControl
     private long _attachmentGeneration;
     private long _operationAttachment;
     private bool _needsReloadAfterAttach = true;
-    private bool CanUseSnapshot => _attached && !_loadingCosts && !_operationActive && _revision.Length > 0;
+    private bool CanUseSnapshot => _attached && !_loadingCosts && !_operationActive && _revision.Length > 0 &&
+        _publishedCostTab == CostTabs.SelectedIndex;
     private ObservableCollection<CostSummaryPreviewRow> _allRows = new();
     private List<CostSummaryRow> _summaryRows = new();
     private CostMissingPriceIndex _missingPrices = new(Array.Empty<CostSummaryRow>());
@@ -166,6 +170,7 @@ public partial class CostSummaryPane : UserControl
         TotalsGrid.IsReadOnly = readOnly;
         _connectionString = connectionString;
         _contractId = contractId;
+        CostTabs.SelectionChanged += CostTabs_SelectionChanged;
         Loaded += (_, _) =>
         {
             _attached = true;
@@ -181,8 +186,31 @@ public partial class CostSummaryPane : UserControl
             _loadingCosts = false;
             _needsReloadAfterAttach = true;
             _filteredRows.Clear();
+            _cachedCostSnapshot = null;
+            _publishedCostTab = -1;
             ResetMaterialProjection();
         };
+    }
+
+    private void CostTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, CostTabs) || !_attached || _restoringCostTab) return;
+        if (_loadingCosts) return; // the worker checks the selected tab again before publishing
+        if (_operationActive)
+        {
+            _needsReloadAfterAttach = true; // mandatory readback or operation disposal loads the selected tab
+            return;
+        }
+        if (_publishedCostTab >= 0 && new[] { SummaryGrid, MaterialsGrid, SmrWorkGrid, SmrExpenseGrid, TotalsGrid }
+            .Any(grid => grid.Items is System.ComponentModel.IEditableCollectionView { IsEditingItem: true }))
+        {
+            _restoringCostTab = true;
+            try { CostTabs.SelectedIndex = _publishedCostTab; }
+            finally { _restoringCostTab = false; }
+            SetStatus("Завершите редактирование ячейки перед сменой вкладки.");
+            return;
+        }
+        _ = ReloadAsync(allowReuse: true);
     }
 
     public void RefreshFromSqlServer()
@@ -209,6 +237,7 @@ public partial class CostSummaryPane : UserControl
     {
         if (_readOnly || !CanUseSnapshot) return null;
         _operationActive = true;
+        _cachedCostSnapshot = null; // mutable preview rows must never survive a write attempt as a clean cache
         _operationRevision = _revision;
         _operationAttachment = Interlocked.Read(ref _attachmentGeneration);
         _writeAttempted = false;
@@ -260,12 +289,13 @@ public partial class CostSummaryPane : UserControl
 
     private void Filter_Changed(object sender, RoutedEventArgs e) => ApplyFilter();
 
-    private sealed record CostLoadSnapshot(CostSummaryData Summary, CostTotalsData Totals,
-        List<CostSummaryPreviewRow> Rows, List<SmrExpensePreviewRow> Expenses, string SmrMode, string Revision,
-        CostMissingPriceIndex MissingPrices, List<CostSummaryPreviewRow> Materials,
-        List<CostSummaryPreviewRow> WorkRows, MaterialOptions MaterialOptions);
+    private sealed record CostLoadSnapshot(CostSummaryData Summary, CostTotalsData? Totals,
+        List<CostSummaryPreviewRow> Rows, List<SmrExpensePreviewRow>? Expenses, string SmrMode, string Revision,
+        CostMissingPriceIndex MissingPrices, List<CostSummaryPreviewRow>? Materials,
+        List<CostSummaryPreviewRow>? WorkRows, MaterialOptions MaterialOptions, string Culture);
 
-    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId, MaterialOptions materialOptions, CancellationToken token)
+    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId,
+        MaterialOptions materialOptions, int activeTab, CostLoadSnapshot? cached, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var conn = SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult();
@@ -275,62 +305,74 @@ public partial class CostSummaryPane : UserControl
             token.ThrowIfCancellationRequested();
             var before = Revision();
             token.ThrowIfCancellationRequested();
-            StartupTrace.Mark("cost_snapshot_financial_begin");
-            var (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId, token);
-            StartupTrace.Mark("cost_snapshot_financial_end");
-            token.ThrowIfCancellationRequested();
-            StartupTrace.Mark("cost_snapshot_expenses_begin");
-            var expenses = SqlServerSmrExpenses.List(conn, contractId, token).Select(x =>
+            if (string.IsNullOrWhiteSpace(before)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
+            var same = cached is not null && cached.Revision == before &&
+                cached.Culture == CultureInfo.CurrentCulture.Name ? cached : null;
+            CostSummaryData summary;
+            CostTotalsData? totals = same?.Totals;
+            using (StartupTrace.Measure("cost_snapshot_financial"))
             {
-                token.ThrowIfCancellationRequested();
-                return new SmrExpensePreviewRow
-                {
-                    Id = x.Id,
-                    Date = x.Date?.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) ?? "",
-                    Kind = x.Kind, Who = x.Who,
-                    Amount = x.Amount.ToString("0.##", CultureInfo.CurrentCulture), Note = x.Note,
-                };
-            }).ToList();
-            StartupTrace.Mark("cost_snapshot_expenses_end");
+                if (same is not null) summary = same.Summary;
+                else if (activeTab == 3)
+                    (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId, token);
+                else summary = SqlServerCostSummary.Summary(conn, contractId, token);
+                if (activeTab == 3 && totals is null)
+                    totals = SqlServerCostTotals.Totals(conn, contractId, summary, token);
+            }
             token.ThrowIfCancellationRequested();
-            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
-                "SELECT smr_mode FROM dbo.contracts WHERE id=@id", conn);
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            var mode = Convert.ToString(cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult(), CultureInfo.InvariantCulture) ?? "sum";
+            var expenses = same?.Expenses;
+            var mode = same?.SmrMode ?? "sum";
+            if (activeTab == 1 && expenses is null)
+            {
+                using var expenseTiming = StartupTrace.Measure("cost_snapshot_expenses");
+                expenses = SqlServerSmrExpenses.List(conn, contractId, token).Select(x =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    return new SmrExpensePreviewRow
+                    {
+                        Id = x.Id, Date = x.Date?.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) ?? "",
+                        Kind = x.Kind, Who = x.Who,
+                        Amount = x.Amount.ToString("0.##", CultureInfo.CurrentCulture), Note = x.Note,
+                    };
+                }).ToList();
+                using var cmd = new Microsoft.Data.SqlClient.SqlCommand("SELECT smr_mode FROM dbo.contracts WHERE id=@id", conn);
+                cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+                mode = Convert.ToString(cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult(), CultureInfo.InvariantCulture) ?? "sum";
+            }
             token.ThrowIfCancellationRequested();
             var after = Revision();
             token.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(before) && before == after)
+            if (before == after)
             {
-                StartupTrace.Mark("cost_snapshot_format_begin");
                 List<CostSummaryPreviewRow> rows;
                 using (StartupTrace.Measure("cost_summary_format"))
-                    rows = BuildSummaryPreview(summary, token);
+                    rows = same?.Rows ?? BuildSummaryPreview(summary, token);
                 CostMissingPriceIndex missing;
                 using (StartupTrace.Measure("cost_missing_index"))
-                    missing = new CostMissingPriceIndex(summary.Rows, token);
-                List<CostSummaryPreviewRow> workRows;
-                using (StartupTrace.Measure("cost_smr_work_projection"))
-                    workRows = rows.Where(r => r.Id > 0).ToList();
-                StartupTrace.Mark("cost_snapshot_format_end");
-                StartupTrace.Mark("cost_snapshot_group_begin");
-                List<CostSummaryPreviewRow> materials;
-                using (StartupTrace.Measure("cost_material_group_projection"))
-                    materials = BuildMaterialRows(summary, rows, materialOptions, token);
-                StartupTrace.Mark("cost_snapshot_group_end");
+                    missing = same?.MissingPrices ?? new CostMissingPriceIndex(summary.Rows, token);
+                var workRows = same?.WorkRows;
+                if (activeTab == 1 && workRows is null)
+                    using (StartupTrace.Measure("cost_smr_work_projection"))
+                        workRows = rows.Where(r => r.Id > 0).ToList();
+                var materials = same is not null && same.MaterialOptions == materialOptions ? same.Materials : null;
+                if (activeTab == 0 && materials is null)
+                    using (StartupTrace.Measure("cost_material_group_projection"))
+                        materials = BuildMaterialRows(summary, rows, materialOptions, token);
                 token.ThrowIfCancellationRequested();
                 return new CostLoadSnapshot(summary, totals, rows, expenses, mode, after,
-                    missing, materials, workRows, materialOptions);
+                    missing, materials, workRows, materialOptions, CultureInfo.CurrentCulture.Name);
             }
         }
         throw new InvalidOperationException("Себестоимость изменилась во время чтения. Повторите загрузку.");
     }
 
-    private async Task ReloadAsync()
+    private async Task ReloadAsync(bool allowReuse = false)
     {
         if (!_attached) return;
         using var operationTiming = StartupTrace.BeginOperation();
         var generation = ++_loadGeneration;
+        var cached = allowReuse && !_operationActive && _revision.Length > 0 ? _cachedCostSnapshot : null;
+        _cachedCostSnapshot = null;
         _costReadCancellation?.Cancel();
         _loadingCosts = true;
         _revision = "";
@@ -344,32 +386,62 @@ public partial class CostSummaryPane : UserControl
         using var cancellation = new CancellationTokenSource();
         _costReadCancellation = cancellation;
         var token = cancellation.Token;
+        var activeTab = Math.Clamp(CostTabs.SelectedIndex, 0, 3);
+        var selectedChanged = false;
         try
         {
             var materialOptions = CaptureMaterialOptions();
-            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, materialOptions, token), token);
+            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, materialOptions,
+                activeTab, cached, token), token);
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
+            if (CostTabs.SelectedIndex != activeTab)
+            {
+                selectedChanged = true;
+                return;
+            }
             StartupTrace.Mark("cost_snapshot_bind_begin");
             using var bindTiming = StartupTrace.Measure("cost_snapshot_bind");
-            _summaryRows = data.Summary.Rows.ToList();
-            ResetMaterialProjection();
-            _summaryData = data.Summary;
-            _allRows = new ObservableCollection<CostSummaryPreviewRow>(data.Rows);
-            _missingPrices = data.MissingPrices;
-            _filteredRows.Clear();
-            ApplyFilter();
-            if (data.MaterialOptions == CaptureMaterialOptions())
+            var sameBase = ReferenceEquals(cached?.Summary, data.Summary);
+            if (!sameBase)
             {
-                ReplaceCostRows(MaterialsGrid, data.Materials);
-                _lastMaterialOptions = data.MaterialOptions;
-                _lastMaterialSource = data.Materials;
-                _lastMaterialCulture = CultureInfo.CurrentCulture;
+                _summaryRows = data.Summary.Rows.ToList();
+                ResetMaterialProjection();
+                _summaryData = data.Summary;
+                _allRows = new ObservableCollection<CostSummaryPreviewRow>(data.Rows);
+                _missingPrices = data.MissingPrices;
+                _filteredRows.Clear();
+                _totalsData = null;
             }
-            else ReloadMaterialView();
-            using (StartupTrace.Measure("cost_smr_bind"))
-                ApplySmrTab(data.Expenses, data.SmrMode, data.WorkRows);
-            using (StartupTrace.Measure("cost_totals_bind"))
-                ApplyTotalsTab(data.Totals);
+            // Only the active projection is published. Hidden rows remain
+            // identity anchors, not editable data, until verified on activation.
+            switch (activeTab)
+            {
+                case 0:
+                    if (data.Materials is not null && data.MaterialOptions == CaptureMaterialOptions())
+                    {
+                        ReplaceCostRows(MaterialsGrid, data.Materials);
+                        _lastMaterialOptions = data.MaterialOptions;
+                        _lastMaterialSource = data.Materials;
+                        _lastMaterialCulture = CultureInfo.CurrentCulture;
+                    }
+                    else ReloadMaterialView();
+                    break;
+                case 1:
+                    if (!sameBase || !ReferenceEquals(cached?.Expenses, data.Expenses) || SmrExpenseGrid.ItemsSource is null)
+                        using (StartupTrace.Measure("cost_smr_bind"))
+                            ApplySmrTab(data.Expenses!, data.SmrMode, data.WorkRows!);
+                    break;
+                case 2:
+                    ApplyFilter();
+                    break;
+                case 3:
+                    if (!sameBase || !ReferenceEquals(_totalsData, data.Totals))
+                        using (StartupTrace.Measure("cost_totals_bind"))
+                            ApplyTotalsTab(data.Totals!);
+                    break;
+            }
+            _cachedCostSnapshot = data;
+            _publishedCostTab = activeTab;
             _revision = data.Revision;
             _needsReloadAfterAttach = false;
             var summary = data.Summary;
@@ -386,6 +458,8 @@ public partial class CostSummaryPane : UserControl
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             _revision = "";
             _summaryData = null;
+            _cachedCostSnapshot = null;
+            _publishedCostTab = -1;
             ResetMaterialProjection();
             _totalsData = null;
             _loadError = "Не удалось загрузить себестоимость: " + ex.Message;
@@ -395,7 +469,11 @@ public partial class CostSummaryPane : UserControl
         finally
         {
             if (ReferenceEquals(_costReadCancellation, cancellation)) _costReadCancellation = null;
-            if (generation == _loadGeneration) _loadingCosts = false;
+            if (generation == _loadGeneration)
+            {
+                _loadingCosts = false;
+                if (selectedChanged && _attached) _ = ReloadAsync();
+            }
         }
     }
 

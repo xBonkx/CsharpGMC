@@ -142,6 +142,7 @@ public partial class EstimateView
                 if (string.IsNullOrWhiteSpace(revision)) throw new InvalidOperationException("SQL Server не подтвердил ревизию.");
                 if (revision != expected || CostTabRevisionPolicy.CanReuse(expected, ownRevision, revision, force))
                     return (data: (CostMaterialsData?)null, revision);
+                using var timing = StartupTrace.Measure("embedded_materials_sql_and_projection");
                 var data = SqlServerCostSummary.MaterialsData(conn, _contractId, token);
                 if (string.IsNullOrWhiteSpace(revision) ||
                     revision != await SqlServerDatabase.RevisionAsync(conn, token).ConfigureAwait(false))
@@ -157,6 +158,7 @@ public partial class EstimateView
                 StartupTrace.Mark("embedded_materials_revision_hit");
                 return;
             }
+            using var bind = StartupTrace.Measure("embedded_materials_bind");
             _materialsData = snapshot.data;
             MaterialsPrepareCache();
             MaterialsRebuild();
@@ -202,6 +204,7 @@ public partial class EstimateView
     {
         var data = _materialsData;
         if (data is null || MaterialsGrid is null) return;
+        using var timing = StartupTrace.Measure("embedded_materials_group_format_bind");
         var counts = GmcSmeta.Core.Domain.MaterialsTileTotals.Count(data.Positions);
         _materialsBuilt = _materialsMode == "kp" && _materialsSort == "kp"
             ? MaterialsBuildKp(data)
