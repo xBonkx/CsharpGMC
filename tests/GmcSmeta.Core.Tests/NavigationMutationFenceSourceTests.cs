@@ -41,7 +41,7 @@ public sealed class NavigationMutationFenceSourceTests
         var code = Source("MainWindow.xaml.cs");
         Assert.Contains("menuConnection == _sqlConnectionString", code);
         Assert.Contains("_objects.Any(row => Equals(row, parent))", code);
-        Assert.Contains("!doc.Locked && !doc.StageRest", code);
+        Assert.Contains("!doc.Locked && !doc.IsStage && !doc.StageRest", code);
         Assert.Contains("ContextMenuIcons.Create(\"Скопировать расценки…\", \"Copy\", editable)", code);
     }
 }

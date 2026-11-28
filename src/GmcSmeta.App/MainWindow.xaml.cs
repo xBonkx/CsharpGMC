@@ -1157,8 +1157,9 @@ public partial class MainWindow : Window
     /// <summary>Меню дерева — как _tree_menu в Python, пока только команды, перенесённые на SQL Server.</summary>
     private void NavigationTree_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        // Do not expose legacy archive, deletion or other not-yet-ported operations.
-        if (!SqlWritesEnabled)
+        // A readable SQL connection may export/view documents, but mutations
+        // and legacy editing windows are still Pilot-only.
+        if (_serverConn is null || _sqlConnectionString is null || _startupClosed)
         {
             NavigationTree.ContextMenu = null;
             e.Handled = true;
@@ -1172,9 +1173,11 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         var menuMode = CurrentMode;
         var menuConnection = _sqlConnectionString;
-        bool MenuCurrent() => SqlWritesEnabled && CurrentMode == menuMode && menuConnection == _sqlConnectionString;
-        var create = ContextMenuIcons.Create(NavigationModeCaptions.For(CurrentMode).Create + "…", "FolderPlus");
-        create.Click += (_, _) => { if (MenuCurrent()) EditObjectProperties(null); };
+        bool MenuCurrent() => !_startupClosed && _serverConn is not null &&
+            CurrentMode == menuMode && menuConnection == _sqlConnectionString;
+        bool CanWriteMenu() => MenuCurrent() && SqlWritesEnabled;
+        var create = ContextMenuIcons.Create(NavigationModeCaptions.For(CurrentMode).Create + "…", "FolderPlus", SqlWritesEnabled);
+        create.Click += (_, _) => { if (CanWriteMenu()) EditObjectProperties(null); };
         menu.Items.Add(create);
         // Global history and trash already live in the main menu (Python).
         // Keep only target-specific commands here.
@@ -1186,10 +1189,10 @@ public partial class MainWindow : Window
             // or the previously opened object card.
             void AddObjectCommand(string title, Action<ObjectRow> action, string glyph, bool enabled = true, string shortcut = "", bool danger = false)
             {
-                var item = ContextMenuIcons.Create(title, glyph, enabled, shortcut, danger);
+                var item = ContextMenuIcons.Create(title, glyph, enabled && SqlWritesEnabled, shortcut, danger);
                 item.Click += (_, _) =>
                 {
-                    if (!MenuCurrent() ||
+                    if (!CanWriteMenu() || !enabled ||
                         !_objectNodes.TryGetValue(selected.Id, out var currentNode) ||
                         !ReferenceEquals(currentNode, target) ||
                         _objects.FirstOrDefault(obj => obj.Id == selected.Id) is not { } fresh ||
@@ -1233,31 +1236,37 @@ public partial class MainWindow : Window
                 if (ValidDocumentTarget()) action();
                 else StatusText.Text = "Документ изменился. Обновите список и откройте меню снова.";
             }
+            void RunDocumentWrite(Action action)
+            {
+                if (CanWriteMenu()) RunDocumentCommand(action);
+            }
+            var activeWrite = SqlWritesEnabled && parent is { Archived: false };
+            var contractWorkspace = activeWrite && (doc.Kind is "main" or "dop") && !doc.IsStage && !doc.StageRest;
             menu.Items.Add(new Separator());
             if (doc.Kind == "kp")
             {
-                var editable = parent is { Archived: false } && !doc.Locked && !doc.IsStage && !doc.StageRest;
+                var editable = activeWrite && !doc.Locked && !doc.IsStage && !doc.StageRest;
                 var make = ContextMenuIcons.Create("Оформить как приложение…", "Check", editable);
-                make.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc, makeContract: true));
+                make.Click += (_, _) => RunDocumentWrite(() => EditContractProperties(doc, makeContract: true));
                 menu.Items.Add(make);
                 var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate",
-                    parent is { Archived: false } && !doc.StageRest);
-                copy.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id));
+                    activeWrite && !doc.StageRest);
+                copy.Click += (_, _) => RunDocumentWrite(() => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id));
                 menu.Items.Add(copy);
                 var rates = ContextMenuIcons.Create("Скопировать расценки…", "Copy", editable);
-                rates.Click += (_, _) => RunDocumentCommand(() => TransferRates(doc));
+                rates.Click += (_, _) => RunDocumentWrite(() => TransferRates(doc));
                 menu.Items.Add(rates);
-                var stages = ContextMenuIcons.Create("Этапы (разбивка)…", "Stage");
-                stages.Click += (_, _) => RunDocumentCommand(() => OpenStages(doc));
+                var stages = ContextMenuIcons.Create("Этапы (разбивка)…", "Stage", activeWrite);
+                stages.Click += (_, _) => RunDocumentWrite(() => OpenStages(doc));
                 menu.Items.Add(stages);
             }
             else if (doc.Kind == "main")
             {
-                var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus", parent is { Archived: false });
-                dop.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id));
+                var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus", activeWrite && !doc.IsStage);
+                dop.Click += (_, _) => RunDocumentWrite(() => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id));
                 menu.Items.Add(dop);
-                var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", parent is { Archived: false });
-                move.Click += (_, _) => RunDocumentCommand(() => MoveCurrentContract(doc));
+                var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", activeWrite && !doc.IsStage);
+                move.Click += (_, _) => RunDocumentWrite(() => MoveCurrentContract(doc));
                 menu.Items.Add(move);
             }
             menu.Items.Add(new Separator());
@@ -1291,14 +1300,14 @@ public partial class MainWindow : Window
             documentHistory.Click += (_, _) => RunDocumentCommand(() => OpenHistory(doc.Id));
             menu.Items.Add(documentHistory);
             menu.Items.Add(new Separator());
-            var procurement = ContextMenuIcons.Create("Закупки (контроль оборудования)…", "List");
-            procurement.Click += (_, _) => RunDocumentCommand(() => OpenProcurement(doc));
+            var procurement = ContextMenuIcons.Create("Закупки (контроль оборудования)…", "List", contractWorkspace);
+            procurement.Click += (_, _) => RunDocumentWrite(() => OpenProcurement(doc));
             menu.Items.Add(procurement);
-            var shipping = ContextMenuIcons.Create("Выдача на объект…", "Upload");
-            shipping.Click += (_, _) => RunDocumentCommand(() => OpenShipments(doc));
+            var shipping = ContextMenuIcons.Create("Выдача на объект…", "Upload", contractWorkspace);
+            shipping.Click += (_, _) => RunDocumentWrite(() => OpenShipments(doc));
             menu.Items.Add(shipping);
-            var acts = ContextMenuIcons.Create("КС-2 (акты)…", "File");
-            acts.Click += (_, _) => RunDocumentCommand(() => OpenActs(doc));
+            var acts = ContextMenuIcons.Create("КС-2 (акты)…", "File", contractWorkspace);
+            acts.Click += (_, _) => RunDocumentWrite(() => OpenActs(doc));
             menu.Items.Add(acts);
             menu.Items.Add(new Separator());
             AddDocumentFileMenu(menu, doc, ValidDocumentTarget);
@@ -1307,14 +1316,14 @@ public partial class MainWindow : Window
             menu.Items.Add(link);
             // C# also exposes properties directly from the navigation tree.
             var props = ContextMenuIcons.Create("Свойства документа…", "Edit",
-                parent is { Archived: false } && !doc.Locked && !doc.IsStage && !doc.StageRest);
-            props.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc));
+                activeWrite && !doc.Locked && !doc.IsStage && !doc.StageRest);
+            props.Click += (_, _) => RunDocumentWrite(() => EditContractProperties(doc));
             menu.Items.Add(props);
             menu.Items.Add(new Separator());
             var delete = ContextMenuIcons.Create(
                 doc.Kind switch { "main" => "Удалить приложение…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
-                "Trash", !doc.IsStage && !doc.StageRest, danger: true);
-            delete.Click += (_, _) => RunDocumentCommand(() => DeleteSqlServerContractFlow(doc));
+                "Trash", SqlWritesEnabled && !doc.IsStage && !doc.StageRest, danger: true);
+            delete.Click += (_, _) => RunDocumentWrite(() => DeleteSqlServerContractFlow(doc));
             menu.Items.Add(delete);
         }
 

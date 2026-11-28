@@ -21,6 +21,22 @@ public partial class MainWindow
     private bool DocumentLocallyCurrent(DocRow expected) =>
         _docs.Any(row => Equals(DocumentMetadata(row), DocumentMetadata(expected)));
 
+    // Opening legacy editing workspaces must not be a back door from a
+    // read-only connection, archived card, plain KP or generated stage.
+    private bool CanOpenContractWorkspace(DocRow expected)
+    {
+        if (!SqlWritesEnabled || (expected.Kind is not ("main" or "dop")) ||
+            expected.IsStage || expected.StageRest || !CanStartDocumentMutation(expected) ||
+            _objects.FirstOrDefault(o => o.Id == expected.ObjectId && !o.Archived) is not { } parent ||
+            CaptureObjectMutation(parent) is not { } target ||
+            !DocumentMatchesServer(expected, target.Revision))
+        {
+            StatusText.Text = "Рабочая вкладка недоступна: проверьте тип документа, архив и сохранение.";
+            return false;
+        }
+        return true;
+    }
+
     private bool CanStartDocumentMutation(DocRow expected) =>
         !_estimateCache.TryGetValue(expected.Id, out var cached) || cached.CanTransferDocument;
 }

@@ -154,7 +154,14 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
+            if (!CanStartDocumentMutation(doc))
+                throw new InvalidOperationException("Сначала завершите сохранение сметы.");
+            var revision = SqlServerDatabase.Revision(_serverConn);
+            if (!DocumentMatchesServer(doc, revision))
+                throw new InvalidOperationException("Документ изменился. Обновите список перед экспортом.");
             var estimate = EstimateReader.Load(_serverConn, doc.Id);
+            if (revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Данные изменились во время чтения сметы. Повторите экспорт.");
             var title = estimate.Title;
             XlsxExport.Save(this, $"Смета — {title}", sheet =>
             {
@@ -220,6 +227,7 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
+            if (!CanOpenContractWorkspace(doc)) return;
             new ProcurementWindow(_sqlConnectionString, doc.Id, doc.Title) { Owner = this }.Show();
         }
         catch (Exception ex)
@@ -235,8 +243,8 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
-            var objectId = _docs.FirstOrDefault(d => d.Id == doc.Id)?.ObjectId ?? doc.ObjectId;
-            new ShipmentsWindow(_sqlConnectionString, objectId, doc.Title) { Owner = this }.Show();
+            if (!CanOpenContractWorkspace(doc)) return;
+            new ShipmentsWindow(_sqlConnectionString, doc.ObjectId, doc.Title) { Owner = this }.Show();
         }
         catch (Exception ex)
         {
@@ -251,6 +259,7 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
+            if (!CanOpenContractWorkspace(doc)) return;
             new ActsWindow(_sqlConnectionString, doc.Id, doc.Title) { Owner = this }.Show();
         }
         catch (Exception ex)
@@ -290,7 +299,16 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
+            if (doc.Kind != "kp" ||
+                _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
+                CaptureObjectMutation(parent) is not { } captured ||
+                !DocumentMatchesServer(doc, captured.Revision) || !CanStartDocumentMutation(doc)) return;
             var fullId = SqlServerStages.FullOf(_serverConn, doc.Id);
+            if (fullId != (doc.StageOf ?? doc.Id) ||
+                _docs.FirstOrDefault(d => d.Id == fullId && d.ObjectId == doc.ObjectId &&
+                    d.Kind == "kp" && !d.IsStage && !d.StageRest) is not { } full ||
+                !DocumentMatchesServer(full, captured.Revision) || !CanStartDocumentMutation(full))
+                throw new InvalidOperationException("Полное КП изменилось или ещё сохраняется. Обновите список.");
             OpenEstimate(checked((int)fullId), showStages: true);
         }
         catch (Exception ex)

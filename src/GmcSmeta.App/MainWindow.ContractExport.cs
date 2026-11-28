@@ -70,6 +70,14 @@ public partial class MainWindow
         return new KpSnapshot(estimate, header, systemSmr, requisites, percent, manualNumbering);
     }
 
+    private static KpSnapshot LoadKpPrintData(string connectionString, DocRow expected)
+    {
+        var snapshot = LoadKpPrintData(connectionString, expected.Id);
+        if (!Equals(DocumentMetadata(expected), DocumentMetadata(snapshot.Header)))
+            throw new InvalidOperationException("Реквизиты документа изменились. Обновите список перед экспортом.");
+        return snapshot;
+    }
+
     /// <summary>Экспорт КП из редактора сметы (btn_export: «Сохранить в Excel / PDF»).</summary>
     internal void ExportKpDocument(DocRow doc, bool internalPrices = false,
         bool positional = false, bool pdf = false, bool vatLine = false) =>
@@ -79,6 +87,11 @@ public partial class MainWindow
         bool positional = false, bool pdf = false, bool vatLine = false)
     {
         if (_kpExportInProgress || _sqlConnectionString is not { } connectionString) return;
+        if (!CanStartDocumentMutation(doc) || !DocumentLocallyCurrent(doc))
+        {
+            StatusText.Text = "Сначала завершите сохранение и обновите документ перед экспортом.";
+            return;
+        }
         // Python kp_export._default_file: object-based name, number and date.
         var prefix = doc.Kind switch
         {
@@ -99,7 +112,7 @@ public partial class MainWindow
             {
                 await ContractDocumentSave.PdfAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(connectionString, doc.Id);
+                    var snapshot = LoadKpPrintData(connectionString, doc);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
@@ -113,7 +126,7 @@ public partial class MainWindow
             {
                 await ContractDocumentSave.XlsxAsync(this, fileName, () =>
                 {
-                    var snapshot = LoadKpPrintData(connectionString, doc.Id);
+                    var snapshot = LoadKpPrintData(connectionString, doc);
                     var effectivePositional = positional ||
                         (!internalPrices && snapshot.Estimate.SmrMode == "pos");
                     if (positional && snapshot.Estimate.SmrMode != "pos")
