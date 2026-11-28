@@ -166,7 +166,7 @@ public partial class MainWindow : Window
                     _objects.AddRange(loaded.Objects);
                     _docs.AddRange(loaded.Documents);
                     Undo = new UndoManager(
-                        id => { using var conn = SqlServerDatabase.Open(_sqlConnectionString!); return SqlServerUndo.Snapshot(conn, null, id); },
+                        id => SqlServerUndo.ReadConsistent(_sqlConnectionString!, id),
                         (id, target, expected, undo) => SqlServerUndo.Apply(_sqlConnectionString!, id, target, expected, undo));
                     var schema31Preview = SqlSchemaCompatibility.IsPreviewDatabase(_serverConn.Database);
                     Title = schema31Preview
@@ -1347,6 +1347,8 @@ public partial class MainWindow : Window
                 _openDocumentId = contractId;
                 SynchronizeNavigation(doc);
                 SetEstimateStatus($"{doc.Title} · проверка актуальности данных…", false);
+                using var cacheOperation = StartupTrace.BeginOperation();
+                using var cacheTiming = StartupTrace.MeasureElapsed("estimate_cache_validation");
                 StartupTrace.Mark("estimate_cache_validation_begin");
 
                 // Never discard an editor which still owns local writes/readback.
@@ -1381,6 +1383,7 @@ public partial class MainWindow : Window
                         _estimateCacheOrder.Remove(contractId);
                         _estimateCacheOrder.AddFirst(contractId);
                         cached.IsEnabled = true;
+                        TraceEstimateCache("estimate_cache_hit");
                         CompleteEstimateOpen(doc, cached);
                         if (showStages) cached.RequestInlineStages();
                         return;
@@ -1393,6 +1396,7 @@ public partial class MainWindow : Window
                 _estimateCacheOrder.Remove(contractId);
             }
 
+            TraceEstimateCache("estimate_cache_miss");
             var page = new EstimateView(_serverConn, doc, _sqlConnectionString!);
             CacheEstimate(contractId, page);
             ShowPage(page);
@@ -1405,6 +1409,7 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (validation?.IsCancellationRequested == true)
         {
             // Superseded by navigation or window close; no error on the new page.
+            TraceEstimateCache("estimate_cache_cancelled");
         }
         catch (Exception ex)
         {

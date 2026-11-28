@@ -41,7 +41,16 @@ public partial class EstimateView
         if (undo is null || _contractId <= 0 || undo.HasCheckpoint(_contractId)) return;
         try
         {
-            await Task.Run(() => undo.EnsureCheckpoint(_contractId)).ConfigureAwait(false);
+            var expectedRevision = _serverRevision;
+            if (string.IsNullOrWhiteSpace(expectedRevision)) return;
+            await Task.Run(() =>
+            {
+                using var timing = StartupTrace.Measure("undo_first_edit_baseline");
+                var snapshot = SqlServerUndo.ReadConsistent(_sqlConnectionString, _contractId, expectedRevision);
+                if (snapshot is not null && !undo.HasCheckpoint(_contractId) &&
+                    _serverRevision == expectedRevision)
+                    undo.CheckpointSnapshot(_contractId, snapshot);
+            }).ConfigureAwait(false);
         }
         catch
         {

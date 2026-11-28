@@ -28,10 +28,14 @@ public sealed class EstimateReloadGate
         string.Equals(publishedRevision, localRevision, StringComparison.Ordinal) &&
         string.Equals(publishedRevision, observedRevision, StringComparison.Ordinal);
 
+    public static bool CanCoalesceOrdinaryRead(bool allowUnchanged, bool readActive,
+        bool unsettledWrites, bool activeEdit, bool reloadAfterAttach) =>
+        allowUnchanged && readActive && !unsettledWrites && !activeEdit && !reloadAfterAttach;
+
     public bool CanApply(long request, int pendingWrites,
         string localRevisionAtStart, string localRevisionNow, string loadedRevision)
     {
-        if (!IsLatest(request) || pendingWrites != 0) return false;
+        if (!IsLatest(request) || pendingWrites != 0 || string.IsNullOrWhiteSpace(loadedRevision)) return false;
         // Even a matching loaded revision cannot prove that ancillary data
         // (for example the lazy Undo checkpoint) was requested after the write.
         // Re-read once using the latest local state rather than settling it early.

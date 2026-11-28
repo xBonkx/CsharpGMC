@@ -63,4 +63,24 @@ public sealed class EstimateReloadGateTests
         Assert.False(gate.IsLatest(0));
         Assert.False(gate.CanApply(-1, 0, "a", "a", "a"));
     }
+
+    [Theory]
+    [InlineData(true, true, false, false, false, true)]
+    [InlineData(false, true, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false)]
+    [InlineData(true, true, true, false, false, false)]
+    [InlineData(true, true, false, true, false, false)]
+    [InlineData(true, true, false, false, true, false)]
+    public void OnlyRedundantCleanReadsCanCoalesce(bool ordinary, bool active,
+        bool pending, bool editing, bool attach, bool expected) =>
+        Assert.Equal(expected, EstimateReloadGate.CanCoalesceOrdinaryRead(ordinary, active, pending, editing, attach));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void MissingServerRevisionCannotBePublished(string revision)
+    {
+        var gate = new EstimateReloadGate();
+        Assert.False(gate.CanApply(gate.NextRequest(), 0, "a", "a", revision));
+    }
 }

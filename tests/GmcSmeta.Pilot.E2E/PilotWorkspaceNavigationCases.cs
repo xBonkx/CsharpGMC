@@ -45,6 +45,25 @@ internal static class PilotWorkspaceNavigationCases
         PilotRunner.Check(!Workspace.ObjectCardMetadataMatches(conn,
             first with { Id = int.MaxValue }, actual.Documents),
             "Missing object must not match an empty metadata batch");
+        using var cancellation = new CancellationTokenSource();
+        var large = actual.Documents.First(d => d.Positions >= 10000);
+        var oldUndo = SqlServerUndo.Snapshot(conn, null, large.Id);
+        var newUndo = SqlServerUndo.ReadConsistent(cs, large.Id, revision, cancellation.Token);
+        PilotRunner.Check(oldUndo is not null && oldUndo.Equals(newUndo),
+            "Revision-fenced Undo baseline changed a large snapshot");
+        PilotRunner.Check(SqlServerUndo.ReadConsistent(cs, large.Id, "intentionally-stale-pilot-revision") is null,
+            "Undo baseline accepted an obsolete revision");
+        PilotRunner.Check(Workspace.ReadDocumentMetadata(conn, large.Id) == Workspace.ReadDocumentMetadata(conn, large.Id, cancellation.Token),
+            "Cancellable document metadata changed data");
+        PilotRunner.Check(SqlServerSpecUpdate.LatestRevision(conn, null, large.Id) == SqlServerSpecUpdate.LatestRevision(conn, null, large.Id, cancellation.Token),
+            "Cancellable spec head changed data");
+        cancellation.Cancel();
+        try
+        {
+            SqlServerUndo.Snapshot(conn, null, large.Id, cancellation.Token);
+            throw new InvalidOperationException("Pre-cancelled Undo snapshot did not stop");
+        }
+        catch (OperationCanceledException) { }
         PilotRunner.Check(!string.IsNullOrWhiteSpace(revision) &&
             SqlServerDatabase.Revision(conn) == revision,
             "Read-only navigation changed revision or left an active reader");

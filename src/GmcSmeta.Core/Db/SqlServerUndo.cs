@@ -1,4 +1,6 @@
 using System.Data;
+using System.Data.Common;
+using GmcSmeta.Core;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -96,22 +98,63 @@ public static class SqlServerUndo
 
     private static readonly string SnapshotSql = string.Join(";\n", SnapshotQueries.Select(q => q.Sql));
 
-    public static UndoSnapshot? Snapshot(SqlConnection conn, SqlTransaction? tx, int contractId)
+    public static UndoSnapshot? Snapshot(SqlConnection conn, SqlTransaction? tx, int contractId,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
+        using var timing = StartupTrace.Measure("undo_snapshot_read");
         var tables = new Dictionary<string, List<Dictionary<string, object?>>>();
         using var cmd = Exec(conn, tx, SnapshotSql, contractId);
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         for (var i = 0; i < SnapshotQueries.Length; i++)
         {
-            if (i != 0 && !reader.NextResult())
-                throw new InvalidOperationException("Неполный снимок Undo: " + SnapshotQueries[i].Key);
+            token.ThrowIfCancellationRequested();
+            if (i != 0)
+            {
+                var hasNext = reader.NextResult();
+                token.ThrowIfCancellationRequested();
+                if (!hasNext) throw new InvalidOperationException("Неполный снимок Undo: " + SnapshotQueries[i].Key);
+            }
             var key = SnapshotQueries[i].Key;
-            tables[key] = ReadRows(reader, key == "procurement" ? ProcurementSkip : null);
+            tables[key] = ReadRows(reader, key == "procurement" ? ProcurementSkip : null, token);
             if (i == 0 && tables[key].Count == 0) return null;
         }
-        if (reader.NextResult())
+        var extra = reader.NextResult();
+        token.ThrowIfCancellationRequested();
+        if (extra)
             throw new InvalidOperationException("Неожиданный результат SQL в снимке Undo.");
+        if (StartupTrace.Enabled)
+            StartupTrace.Sample("undo_snapshot_volume", tables.Values.Sum(rows => (long)rows.Count), SnapshotQueries.Length);
         return new UndoSnapshot(contractId, tables);
+    }
+
+    // Only for the non-transactional read before the first local edit.
+    // Undo/Redo restoration still uses the original serializable transaction.
+    public static UndoSnapshot? ReadConsistent(string connectionString, int contractId,
+        string? expectedRevision = null, CancellationToken token = default)
+    {
+        using var conn = SqlReadCancellation.Open(connectionString, token);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var before = SqlReadCancellation.Revision(conn, token);
+            if (string.IsNullOrWhiteSpace(before) ||
+                (expectedRevision is not null && expectedRevision != before)) return null;
+            var snapshot = Snapshot(conn, null, contractId, token);
+            if (before != SqlReadCancellation.Revision(conn, token))
+            {
+                if (expectedRevision is not null) return null;
+                continue;
+            }
+            if (snapshot is not null)
+            {
+                using var timing = StartupTrace.Measure("undo_snapshot_canonical");
+                _ = snapshot.Canonical;
+            }
+            token.ThrowIfCancellationRequested();
+            return snapshot;
+        }
+        return null;
     }
 
     /// <summary>Отменить/повторить под одной транзакцией: сравнение снимка, восстановление, журнал, верификация.</summary>
@@ -388,7 +431,8 @@ public static class SqlServerUndo
             return ReadRows(reader, skip);
     }
 
-    private static List<Dictionary<string, object?>> ReadRows(SqlDataReader reader, string[]? skip = null)
+    private static List<Dictionary<string, object?>> ReadRows(DbDataReader reader, string[]? skip = null,
+        CancellationToken token = default)
     {
         // Resolve field names and skipped columns once per result set, not once per row.
         var columns = Enumerable.Range(0, reader.FieldCount)
@@ -397,6 +441,7 @@ public static class SqlServerUndo
         var rows = new List<Dictionary<string, object?>>();
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var row = new Dictionary<string, object?>(columns.Length);
             foreach (var column in columns)
             {
@@ -406,6 +451,7 @@ public static class SqlServerUndo
             }
             rows.Add(row);
         }
+        token.ThrowIfCancellationRequested();
         return rows;
     }
 

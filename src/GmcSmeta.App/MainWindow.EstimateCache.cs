@@ -31,6 +31,12 @@ public partial class MainWindow
         };
     }
 
+    private void TraceEstimateCache(string phase)
+    {
+        if (StartupTrace.Enabled)
+            StartupTrace.Sample(phase, _estimateCache.Count, _estimateCache.Values.Sum(view => view.CacheRowWeight));
+    }
+
     private bool EstimateCacheOverBudget() =>
         EstimateCachePolicy.IsOverBudget(_estimateCache.Count,
             _estimateCache.Values.Sum(view => view.CacheRowWeight));
@@ -41,6 +47,7 @@ public partial class MainWindow
         _estimateCacheOrder.Remove(contractId);
         _estimateCacheOrder.AddFirst(contractId);
         TrimEstimateCache(protectedId: contractId);
+        TraceEstimateCache("estimate_cache_insert");
     }
 
     internal void ScheduleEstimateCacheTrim()
@@ -68,6 +75,7 @@ public partial class MainWindow
             _estimateCache.Remove(id);
             _estimateCacheOrder.Remove(id);
             StartupTrace.Mark("estimate_cache_evicted");
+            TraceEstimateCache("estimate_cache_after_eviction");
         }
     }
 }

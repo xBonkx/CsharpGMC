@@ -221,6 +221,8 @@ public static partial class EstimateReader
         Microsoft.Data.SqlClient.SqlConnection conn, int contractId, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        using var sqlTiming = GmcSmeta.Core.StartupTrace.MeasureElapsed("estimate_sql_batch");
+        GmcSmeta.Core.StartupTrace.Mark("estimate_sql_batch_begin");
         using var cmd = CreateLoadCommand(conn, contractId);
         using var r = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
         if (!await r.ReadAsync(token).ConfigureAwait(false))
@@ -239,6 +241,10 @@ public static partial class EstimateReader
         var positions = new List<PositionRow>();
         while (await r.ReadAsync(token).ConfigureAwait(false))
             positions.Add(ReadPositionCurrent(r));
+        token.ThrowIfCancellationRequested();
+        sqlTiming?.Dispose();
+        GmcSmeta.Core.StartupTrace.Mark("estimate_sql_batch_end");
+        using var timing = GmcSmeta.Core.StartupTrace.Measure("estimate_worker_dto_projection");
         return BuildDocument(contractId, head, rules, systems, positions, token);
     }
 

@@ -129,7 +129,7 @@ public partial class EstimateView : UserControl
             ContractSqlWriteLock.For(_sqlConnectionString, _contractId),
             EnsureUndoBaselineAsync);
         _cellSaveQueue = new ContractCellSaveQueue(WriteCellOnBackgroundAsync);
-        InitializeComponent();
+        using (StartupTrace.Measure("estimate_shell_initialize")) InitializeComponent();
         // Python kp_table: «Обоснование» — последний столбец сметы.
         BasisColumn.DisplayIndex = EstimateGrid.Columns.Count - 1;
         BasisColumn.CanUserReorder = false;
@@ -212,7 +212,9 @@ public partial class EstimateView : UserControl
         ReconcilePendingInsert(est);
         // Full authoritative readback stays mandatory. Reuse only equal
         // source records, never infer a committed value from the editor.
-        var nextRows = EstimateRowViewIndex.Reconcile(_rows, est.Rows, !_inlineStagesOn);
+        List<EditableEstimateRow> nextRows;
+        using (StartupTrace.Measure("estimate_ui_row_reconcile"))
+            nextRows = EstimateRowViewIndex.Reconcile(_rows, est.Rows, !_inlineStagesOn);
         if (_rowViewIndex is { } index &&
             (!ReferenceEquals(index.Rows, _rows) || !index.TryAdvance(nextRows)))
             _rowViewIndex = null;
@@ -221,7 +223,7 @@ public partial class EstimateView : UserControl
             section.IsCollapsed = _collapsedSectionIds.Contains(section.Source.SystemId);
         foreach (var summary in _rows.Where(r => r.IsAreaSummary))
             summary.IsCollapsed = !_expandedAreaSummaries.Contains(summary.Id);
-        ApplyFilter();
+        using (StartupTrace.Measure("estimate_ui_projection")) ApplyFilter();
         var focusId = _focusAfterReload ?? selectedId;
         var focusSystem = _focusSystemAfterReload;
         var editAfterReload = _editAfterReload;
@@ -277,6 +279,7 @@ public partial class EstimateView : UserControl
         TransferRatesButton.Visibility = _isKp ? Visibility.Visible : Visibility.Collapsed;
         SetSmrControls(est);
 
+        using var totalsTiming = StartupTrace.Measure("estimate_ui_header_totals");
         MaterialsText.Text = N2(est.VatTop ? est.Totals.Materials : est.Statistics.Materials);
         MaterialsCaption.Text = est.VatTop ? "Строки сметы (без НДС)" : "Материалы";
         SmrCard.Visibility = est.VatTop ? Visibility.Collapsed : Visibility.Visible;
@@ -320,6 +323,7 @@ public partial class EstimateView : UserControl
               $"   ·   ИТОГО с НДС {N2(est.Totals.Total)} ₽";
         if (hasDiscount)
             TotalsSummary.Text += $"   ·   {DiscountTotalText.Text}";
+        totalsTiming?.Dispose();
 
         // Undo snapshot was captured with the estimate on the background thread
         // and applied by ReloadDocumentAsync, after checking the SQL revision.
@@ -381,6 +385,7 @@ public partial class EstimateView : UserControl
     internal static ContractActsWorkspace EnsureContractActsWorkspace(Border host)
     {
         if (host.Child is ContractActsWorkspace existing) return existing;
+        using var timing = StartupTrace.Measure("estimate_lazy_acts");
         var workspace = new ContractActsWorkspace();
         host.Child = workspace;
         return workspace;
@@ -459,14 +464,20 @@ public partial class EstimateView : UserControl
                     break;
                 case "procurement":
                     if (_contractProcurementPane is null)
+                    {
+                        using var timing = StartupTrace.Measure("estimate_lazy_procurement");
                         ContractProcurementHost.Content = _contractProcurementPane =
                             new ProcurementPane(_sqlConnectionString, _contractId, _estimate.Title);
+                    }
                     else if (was != page) _contractProcurementPane.RefreshOnTabReturn();
                     break;
                 case "shipments":
                     if (_contractShipmentsPane is null)
+                    {
+                        using var timing = StartupTrace.Measure("estimate_lazy_shipments");
                         ContractShipmentsHost.Content = _contractShipmentsPane =
                             new ShipmentsPane(_sqlConnectionString, _objectId, _estimate.ObjectName);
+                    }
                     else if (was != page) _contractShipmentsPane.RefreshOnTabReturn();
                     break;
             }
@@ -736,6 +747,7 @@ public partial class EstimateView : UserControl
         if (EstimateGrid.ItemsSource is not IEnumerable<EditableEstimateRow> existing ||
             !existing.SequenceEqual(visible, ReferenceEqualityComparer.Instance))
         {
+            using var timing = StartupTrace.Measure("estimate_ui_items_source");
             if (_inlineStagesOn || !EstimateGridRowUpdates.TryReplace(EstimateGrid, visible))
                 EstimateGridRowUpdates.PublishFull(EstimateGrid, visible);
         }
@@ -785,6 +797,16 @@ public partial class EstimateView : UserControl
             allowUnchanged = false;
             _reloadTimer.Stop();
         }
+        // Only a redundant clean tab probe may join an active read. Explicit
+        // refresh and pending/failed write reconciliation always take priority.
+        if (EstimateReloadGate.CanCoalesceOrdinaryRead(allowUnchanged,
+            _reloadCancellation is { IsCancellationRequested: false }, HasUnsettledCacheWrites,
+            HasActiveEstimateEdit(), _reloadAfterAttach))
+        {
+            StartupTrace.Mark("estimate_reload_coalesced");
+            return;
+        }
+        using var operation = StartupTrace.BeginOperation();
         var request = _reloadGate.NextRequest();
         var previous = _reloadCancellation;
         using var cancellation = new CancellationTokenSource();
@@ -807,22 +829,37 @@ public partial class EstimateView : UserControl
             var localRevisionAtStart = _serverRevision;
             // Undo is lazy: only a document edited locally needs its snapshot.
             var needUndoCheckpoint = Volatile.Read(ref _undoCheckpointNeeded) != 0;
+            var captureUndo = needUndoCheckpoint && MainWindow.Undo is not null;
             var reusableRevision = allowUnchanged && CanReusePublishedEstimate(_publishedEstimateRevision)
                 ? _publishedEstimateRevision : "";
             try
             {
                 var loaded = await Task.Run(async () =>
                 {
-                    await ReloadSqlSlots.WaitAsync(token).ConfigureAwait(false);
+                    StartupTrace.Mark("estimate_sql_slot_wait_begin");
+                    using (StartupTrace.MeasureElapsed("estimate_sql_slot_wait"))
+                        await ReloadSqlSlots.WaitAsync(token).ConfigureAwait(false);
+                    StartupTrace.Mark("estimate_sql_slot_wait_end");
                     try
                     {
-                        using var read = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
+                        StartupTrace.Mark("estimate_sql_open_begin");
+                        Microsoft.Data.SqlClient.SqlConnection opened;
+                        using (StartupTrace.MeasureElapsed("estimate_sql_open"))
+                            opened = await SqlServerDatabase.OpenAsync(_sqlConnectionString, token).ConfigureAwait(false);
+                        using var read = opened;
+                        StartupTrace.Mark("estimate_sql_open_end");
                         // Read one coherent document revision: estimate, the cheap
                         // spec-news check and (only after a local edit) the undo
                         // baseline all use the same SQL connection.
                         for (var attempt = 0; attempt < 2; attempt++)
                         {
-                            var before = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                            StartupTrace.Mark("estimate_revision_before_begin");
+                            string before;
+                            using (StartupTrace.MeasureElapsed("estimate_revision_before"))
+                                before = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                            StartupTrace.Mark("estimate_revision_before_end");
+                            if (string.IsNullOrWhiteSpace(before))
+                                throw new InvalidOperationException("SQL Server не подтвердил ревизию сметы.");
                             if (EstimateReloadGate.CanReusePublishedRevision(
                                 reusableRevision, localRevisionAtStart, before, needUndoCheckpoint))
                                 return (Estimate: (EstimateDocument?)null, Revision: before,
@@ -831,18 +868,33 @@ public partial class EstimateView : UserControl
                             var document = await EstimateReader.LoadSqlAsync(read, _contractId, token).ConfigureAwait(false);
                             StartupTrace.Mark("estimate_read_end");
                             token.ThrowIfCancellationRequested();
-                            var metadata = Workspace.ReadDocumentMetadata(read, _contractId)
-                                ?? throw new InvalidOperationException("Документ удалён. Обновите список.");
-                            var specHead = SqlServerSpecUpdate.LatestRevision(read, null, _contractId);
+                            DocRow metadata;
+                            using (StartupTrace.Measure("estimate_metadata_read"))
+                                metadata = Workspace.ReadDocumentMetadata(read, _contractId, token)
+                                    ?? throw new InvalidOperationException("Документ удалён. Обновите список.");
+                            SpecRevisionHead? specHead;
+                            using (StartupTrace.Measure("estimate_spec_head_read"))
+                                specHead = SqlServerSpecUpdate.LatestRevision(read, null, _contractId, token);
                             token.ThrowIfCancellationRequested();
                             UndoSnapshot? checkpoint = null;
-                            if (needUndoCheckpoint && MainWindow.Undo is not null)
+                            if (captureUndo)
                             {
                                 StartupTrace.Mark("estimate_undo_read_begin");
-                                checkpoint = SqlServerUndo.Snapshot(read, null, _contractId);
+                                checkpoint = SqlServerUndo.Snapshot(read, null, _contractId, token);
+                                token.ThrowIfCancellationRequested();
+                                if (checkpoint is not null)
+                                {
+                                    using var timing = StartupTrace.Measure("undo_snapshot_canonical");
+                                    _ = checkpoint.Canonical;
+                                }
                                 StartupTrace.Mark("estimate_undo_read_end");
                             }
-                            var after = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                            StartupTrace.Mark("estimate_revision_after_begin");
+                            string after;
+                            using (StartupTrace.MeasureElapsed("estimate_revision_after"))
+                                after = await SqlServerDatabase.RevisionAsync(read, token).ConfigureAwait(false);
+                            StartupTrace.Mark("estimate_revision_after_end");
+                            token.ThrowIfCancellationRequested();
                             if (before == after)
                                 return (Estimate: (EstimateDocument?)document, Revision: after,
                                     Undo: checkpoint, SpecHead: specHead, Metadata: (DocRow?)metadata);
@@ -900,7 +952,7 @@ public partial class EstimateView : UserControl
                 var firstLoad = _estimate is null;
                 _publishedEstimateRevision = "";
                 StartupTrace.Mark("estimate_publish_begin");
-                SetDocument(loaded.Estimate);
+                using (StartupTrace.Measure("estimate_ui_publish")) SetDocument(loaded.Estimate);
                 StartupTrace.Mark("estimate_publish_end");
                 // A confirmed readback replaces any optimistic, unconfirmed cells.
                 // It is now safe to unblock the queue; discarded edits are NOT replayed.

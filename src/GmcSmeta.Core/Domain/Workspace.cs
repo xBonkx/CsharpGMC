@@ -131,8 +131,9 @@ public static class Workspace
         ReadDocuments(conn, objectId, false);
 
     /// <summary>Single print header, without unrelated contract totals.</summary>
-    public static DocRow? ReadDocumentMetadata(DbConnection conn, int contractId)
+    public static DocRow? ReadDocumentMetadata(DbConnection conn, int contractId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (contractId <= 0) throw new ArgumentOutOfRangeException(nameof(contractId));
         using var cmd = conn.CreateCommand();
         cmd.CommandText = DocumentQuery(null, contractId);
@@ -141,8 +142,9 @@ public static class Workspace
         parameter.DbType = System.Data.DbType.Int32;
         parameter.Value = contractId;
         cmd.Parameters.Add(parameter);
-        using var reader = cmd.ExecuteReader();
-        return ReadDocumentRows(reader, null).SingleOrDefault();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
+        return ReadDocumentRows(reader, null, token).SingleOrDefault();
     }
 
     private static string DocumentQuery(int? objectId, int? contractId = null) =>
@@ -160,11 +162,13 @@ public static class Workspace
         return ReadDocumentRows(reader, totals);
     }
 
-    private static List<DocRow> ReadDocumentRows(DbDataReader reader, IReadOnlyDictionary<int, ContractTotals>? totals)
+    private static List<DocRow> ReadDocumentRows(DbDataReader reader, IReadOnlyDictionary<int, ContractTotals>? totals,
+        CancellationToken token = default)
     {
         var list = new List<DocRow>();
         while (reader.Read())
         {
+            token.ThrowIfCancellationRequested();
             var id = SqlInteger.ReadInt32(reader, 0);
             var kind = Str(reader, 2);
             var kindTitle = KindTitles.GetValueOrDefault(kind, "КП");
@@ -193,6 +197,7 @@ public static class Workspace
                 CompanyId = reader.IsDBNull(13) ? null : SqlInteger.ReadInt64(reader, 13)
             });
         }
+        token.ThrowIfCancellationRequested();
         return list;
     }
 

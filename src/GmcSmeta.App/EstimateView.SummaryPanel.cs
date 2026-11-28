@@ -32,6 +32,7 @@ public partial class EstimateView
     internal static EstimateSummaryPanel EnsureSummaryView(Border host, EstimateView? owner)
     {
         if (host.Child is EstimateSummaryPanel existing) return existing;
+        using var timing = GmcSmeta.Core.StartupTrace.Measure("estimate_lazy_summary");
         var view = new EstimateSummaryPanel { Owner = owner };
         host.Child = view;
         return view;

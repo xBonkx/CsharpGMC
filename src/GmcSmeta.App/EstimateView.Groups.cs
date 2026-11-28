@@ -28,6 +28,7 @@ public partial class EstimateView
             return false;
         }
 
+        using var timing = GmcSmeta.Core.StartupTrace.Measure("estimate_ui_group_projection");
         if (_preparedGroups is null || !ReferenceEquals(_preparedGroups.Rows, _estimate.Rows))
             _preparedGroups = EstimateGroups.Prepare(_estimate.Rows);
         var sections = EstimateGroups.BuildPrepared(_preparedGroups, _temporaryGroupMode,
@@ -136,7 +137,9 @@ public partial class EstimateView
         }
 
         projected = ApplyInlineStagesFilter(projected);
-        EstimateGridRowUpdates.PublishFull(EstimateGrid, projected, observable: false);
+        timing?.Dispose();
+        using (GmcSmeta.Core.StartupTrace.Measure("estimate_ui_group_items_source"))
+            EstimateGridRowUpdates.PublishFull(EstimateGrid, projected, observable: false);
 
         // Materials has its own SQL snapshot, filter and row type.
         // Never publish the estimate's temporary projection to that grid.

@@ -70,6 +70,7 @@ public partial class EstimateView
     private EstimateTotalsPanel EnsureTotalsView()
     {
         if (TotalsView is { } existing) return existing;
+        using var timing = GmcSmeta.Core.StartupTrace.Measure("estimate_lazy_totals");
         var view = new EstimateTotalsPanel();
         view.TotalsGrid.BeginningEdit += TotalsGrid_BeginningEdit;
         view.TotalsGrid.PreparingCellForEdit += TotalsGrid_PreparingCellForEdit;

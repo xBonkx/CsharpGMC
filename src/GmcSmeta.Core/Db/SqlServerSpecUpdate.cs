@@ -70,14 +70,18 @@ public static class SqlServerSpecUpdate
     /// таблицы. Читается на том же соединении, что и смета (S-01).
     /// </summary>
     public static SpecRevisionHead? LatestRevision(SqlConnection conn, SqlTransaction? tx,
-        long contractId)
+        long contractId, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT TOP(1) id,title,[user] FROM dbo.spec_revisions " +
             "WHERE contract_id=@id ORDER BY id DESC", conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var r = cmd.ExecuteReader();
-        if (!r.Read()) return null;
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var r = SqlReadCancellation.ExecuteReader(cmd, token);
+        var found = r.Read();
+        token.ThrowIfCancellationRequested();
+        if (!found) return null;
         return new SpecRevisionHead(
             Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
             r.IsDBNull(1) ? null : r.GetString(1),

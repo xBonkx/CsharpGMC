@@ -27,6 +27,7 @@ public partial class EstimateView
     private void EnsureMaterialsView()
     {
         if (MaterialsView is not null) return;
+        using var timing = GmcSmeta.Core.StartupTrace.Measure("estimate_lazy_materials");
         var view = new EstimateMaterialsPanel();
         view.MaterialsMarkupButton.Click += MaterialsMarkup_Click;
         view.MaterialsCatalogButton.Click += MaterialsCatalog_Click;
