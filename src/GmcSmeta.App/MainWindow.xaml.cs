@@ -801,7 +801,10 @@ public partial class MainWindow : Window
             var letters = ContextMenuIcons.Create("Письма документа…", "File", writableFiles);
             letters.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, false); };
             menu.Items.Add(letters);
-            if (PtoUserSettings.Enabled)
+            // Use the already applied local UI mode for menu presentation; a
+            // redirected profile can make a settings-file read block the dispatcher.
+            // OpenContractDocuments still rechecks the persisted mode at execution.
+            if (PtoModeVisibility == Visibility.Visible)
             {
                 var pto = ContextMenuIcons.Create("АОСР документа…", "File", writableFiles);
                 pto.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, true); };

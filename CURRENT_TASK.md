@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-044.01 PARTIAL: убрано чтение JSON режима ПТО при открытии меню документа, проверка при выполнении сохранена. Один source test добавлен, не запускался. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — PERF-047.02 PARTIAL: пакетная публикация страницы справочника и импорт логотипа в фоне; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — CTX-046.02 PARTIAL: safe keyboard routes in Prompt/Help/SectionPicker, 3 source tests added (not run); remaining inventory and Windows checks open. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
