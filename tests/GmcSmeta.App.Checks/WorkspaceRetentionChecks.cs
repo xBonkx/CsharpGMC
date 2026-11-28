@@ -60,7 +60,7 @@ internal static class WorkspaceRetentionChecks
 
                 window.RetentionOpen(ids[(i - 1) % ids.Length]);
                 Program.PumpUntil(() => host.Content is EstimateView view &&
-                    view.IsEnabled && view.CanReuseCacheRevision(view.ServerRevision), "authoritative estimate");
+                    view.IsEnabled && view.CanReuseCacheRevision(view.ServerRevision), DescribeEstimateWait(host));
                 Remember(host, seen);
                 VisitTabs(host, cancelImmediately: i % 3 == 0);
                 window.RetentionClose();
@@ -111,6 +111,14 @@ internal static class WorkspaceRetentionChecks
             window.RetentionCacheState() is { Settled: true, OverBudget: false },
             "detached reads and cache budget");
     }
+
+    /// <summary>Timeout diagnostics: publish gates visible to the harness, no internals.</summary>
+    private static string DescribeEstimateWait(ContentControl host) =>
+        host.Content is EstimateView view
+            ? $"authoritative estimate (content={view.GetType().Name}, enabled={view.IsEnabled}, " +
+              $"revision='{view.ServerRevision[..Math.Min(12, view.ServerRevision.Length)]}', " +
+              $"reusable={view.CanReuseCacheRevision(view.ServerRevision)}, busy={view.CacheReadOrWriteInProgress})"
+            : $"authoritative estimate (content={(host.Content?.GetType().Name ?? "null")})";
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Remember(ContentControl host, List<WeakReference<EstimateView>> seen)

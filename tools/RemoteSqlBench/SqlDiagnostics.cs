@@ -312,7 +312,9 @@ internal static class SqlDiagnostics
         int rows = 0;
         try
         {
-            Enable(conn, "SET STATISTICS IO ON; SET STATISTICS TIME ON;");
+            // Statistics messages follow the session language; the capture below matches
+            // English wording only, so pin the language for this diagnostic session.
+            Enable(conn, "SET LANGUAGE us_english; SET STATISTICS IO ON; SET STATISTICS TIME ON;");
             using var command = create();
             using var reader = command.ExecuteReader();
             do

@@ -291,10 +291,13 @@ $summary = [pscustomobject]@{
     visual_evidence_requested = [bool]$VisualEvidence
     layout_performance_requested = [bool]$LayoutPerformance
     pilot_e2e_requested = [bool]$PilotE2E
-    results = @($results)
+    results = $results.ToArray()
 }
 $json = Join-Path $out 'automated-results.json'
-$summary | ConvertTo-Json -Depth 8 | Set-Content -Path $json -Encoding UTF8
+# PS 5.1 binder crash ("Типы аргумента не совпадают") при передаче вложенных
+# pscustomobject-коллекций в ConvertTo-Json по конвейеру; -InputObject минует
+# конвертацию в object[].
+ConvertTo-Json -InputObject $summary -Depth 8 | Set-Content -Path $json -Encoding UTF8
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('# P0 #55 local QA evidence')
 $lines.Add('')

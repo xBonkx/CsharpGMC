@@ -108,12 +108,6 @@ internal static class Program
                 return 0;
             }
             var app = CreateApplication();
-            // Харнесс работает без Application.Run: у главного потока нет
-            // DispatcherSynchronizationContext, поэтому продолжения async-загрузки
-            // сметы уходили на поток пула и падали на первом доступе к UI.
-            System.Threading.SynchronizationContext.SetSynchronizationContext(
-                new System.Windows.Threading.DispatcherSynchronizationContext(
-                    System.Windows.Threading.Dispatcher.CurrentDispatcher));
             RunOfflineChecks();
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))
@@ -261,6 +255,15 @@ internal static class Program
     /// </summary>
     private static Application CreateApplication()
     {
+        // Харнесс работает без Application.Run: у главного потока нет
+        // DispatcherSynchronizationContext, поэтому продолжения async-загрузки
+        // сметы уходили на поток пула и падали на первом доступе к UI.
+        // Фикс 28.11 стоял только в дефолтном режиме; режим retention с реальным
+        // SQL-открытием сметы воспроизводил ту же гонку — закрепляем контекст
+        // для всех режимов сразу.
+        System.Threading.SynchronizationContext.SetSynchronizationContext(
+            new System.Windows.Threading.DispatcherSynchronizationContext(
+                System.Windows.Threading.Dispatcher.CurrentDispatcher));
         // Load the app assembly up front: the merged dictionary pack URI needs it resolved.
         var appAssembly = typeof(MainWindow).Assembly.GetName().Name!;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
