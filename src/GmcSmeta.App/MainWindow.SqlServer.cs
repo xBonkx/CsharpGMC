@@ -347,19 +347,42 @@ public partial class MainWindow
                 _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
                 CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc) ||
                 !DocumentMatchesServer(doc, captured.Revision)) return;
+            bool Current() => ObjectMutationCurrent(parent, captured) && DocumentLocallyCurrent(doc) &&
+                CanStartDocumentMutation(doc);
+            async Task<SqlServerRateTransfer.Receipt> Execute(Func<SqlServerRateTransfer.Receipt> writer)
+            {
+                var gate = ContractSqlWriteLock.For(captured.Connection, doc.Id);
+                await gate.WaitAsync();
+                try
+                {
+                    if (!Current()) throw new InvalidOperationException("Документ изменился до переноса.");
+                    var receipt = await Task.Run(writer);
+                    Undo?.RecordChange(doc.Id, receipt.Before, receipt.After);
+                    return receipt;
+                }
+                finally { gate.Release(); }
+            }
             var dialog = new RateTransferDialog(captured.Connection, doc.Id, doc.Title, captured.Revision,
-                () => ObjectMutationCurrent(parent, captured) && DocumentLocallyCurrent(doc) &&
-                    CanStartDocumentMutation(doc)) { Owner = this };
+                Current, Execute) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.ResultData is not { } result)
             {
-                if (dialog.WriteAttempted && _estimateCache.TryGetValue(doc.Id, out var cached))
-                    cached.RequestRefresh();
+                if (dialog.WriteAttempted)
+                {
+                    Undo?.Forget(doc.Id);
+                    if (_estimateCache.TryGetValue(doc.Id, out var cached))
+                        cached.RequireRateTransferReadback();
+                }
                 return;
             }
 
+            if (_estimateCache.TryGetValue(doc.Id, out var prior) && prior.CanTransferDocument)
+            {
+                _estimateCache.Remove(doc.Id);
+                _estimateCacheOrder.Remove(doc.Id);
+            }
             ReloadAndSelect(doc.ObjectId);
             OpenEstimate(doc.Id);
-            StatusText.Text = $"Перенесено расценок: {result.Prices}. Отменить — Ctrl+Z";
+            StatusText.Text = $"Перенесено расценок: {result.Prices}. Отмена — при доступности Ctrl+Z";
             var estimateSmr = Totals.ReadOne(_serverConn, doc.Id)?.Smr ?? 0m;
             if (Math.Abs((decimal)result.WorkTotal - estimateSmr) >= 0.01m)
                 MessageBox.Show(this,

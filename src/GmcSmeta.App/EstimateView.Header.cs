@@ -166,17 +166,15 @@ public partial class EstimateView
         var revision = _publishedEstimateRevision;
         if (!CanChangeHeader(snapshot, revision, false)) return;
         var dialog = new RateTransferDialog(_sqlConnectionString, _contractId, snapshot.Title,
-            revision, () => CanChangeHeader(snapshot, revision, false))
+            revision, () => CanChangeHeader(snapshot, revision, false),
+            writer => ApplyRateTransferAsync(snapshot, revision, writer))
         {
             Owner = Window.GetWindow(this)
         };
         var accepted = dialog.ShowDialog() == true;
         if (!dialog.WriteAttempted) return;
-        _serverConflict = true;
-        _saveAwaitingReadback = true;
-        if (!accepted) _saveError = "Перенос расценок не подтверждён.";
-        AttachSaveCloseGuard();
-        RequestRefresh();
+        if (!accepted) RequireRateTransferReadback();
+        else RequestRefresh();
     }
 
     // ---------------------------------------------------------------- Сохранить в Excel / PDF (btn_export)

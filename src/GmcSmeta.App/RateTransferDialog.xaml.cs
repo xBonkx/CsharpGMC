@@ -39,6 +39,8 @@ public partial class RateTransferDialog : Window
     private readonly string _connectionString;
     private readonly string _expectedRevision;
     private readonly Func<bool> _canApply;
+    private readonly Func<Func<SqlServerRateTransfer.Receipt>, Task<SqlServerRateTransfer.Receipt>> _execute;
+    private bool _applying;
     public bool WriteAttempted { get; private set; }
     private readonly List<(int Id, int ObjectId, string Title)> _docs = new();
     private TransferData? _data;
@@ -50,16 +52,19 @@ public partial class RateTransferDialog : Window
     private int[] _fields = RateFields.Work;
 
     /// <summary>Итог переноса: перенесённых цен, позиций, СМР работ после переноса.</summary>
-    public (int Prices, int Positions, double WorkTotal)? ResultData { get; private set; }
+    public SqlServerRateTransfer.Receipt? ResultData { get; private set; }
 
     public RateTransferDialog(string connectionString, int targetId, string targetTitle,
-        string expectedRevision, Func<bool> canApply)
+        string expectedRevision, Func<bool> canApply,
+        Func<Func<SqlServerRateTransfer.Receipt>, Task<SqlServerRateTransfer.Receipt>> execute)
     {
         _connectionString = connectionString;
         _targetId = targetId;
         _expectedRevision = expectedRevision;
         _canApply = canApply;
+        _execute = execute;
         InitializeComponent();
+        Closing += (_, args) => { if (_applying) args.Cancel = true; };
         TargetText.Text = "В: " + targetTitle;
         LoadDocs();
         FillSources();
@@ -329,9 +334,9 @@ public partial class RateTransferDialog : Window
         if (dialog.ShowDialog() == true) RefreshRows();
     }
 
-    private void Apply_Click(object sender, RoutedEventArgs e)
+    private async void Apply_Click(object sender, RoutedEventArgs e)
     {
-        if (_data is not { } data || string.IsNullOrWhiteSpace(_revision)) return;
+        if (_applying || _data is not { } data || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         var replace = OverwriteCheck.IsChecked == true || _allowZero.Count > 0;
         if (replace && MessageBox.Show(this,
@@ -345,17 +350,30 @@ public partial class RateTransferDialog : Window
             InfoText.Text = "Документ изменился. Закройте диалог и обновите смету.";
             return;
         }
+        // Freeze the exact reviewed inputs before leaving the dispatcher.
+        var fields = _fields.ToArray();
+        var overwrite = OverwriteCheck.IsChecked == true;
+        var manual = new Dictionary<int, int>(_manual);
+        var excluded = new HashSet<int>(_excluded);
+        var allowZero = new HashSet<int>(_allowZero);
+        _applying = true;
+        IsEnabled = false;
+        Exception? failure = null;
         try
         {
             WriteAttempted = true;
-            var result = SqlServerRateTransfer.ApplyTransfer(_connectionString, data, _fields,
-                OverwriteCheck.IsChecked == true, _manual, _excluded, _allowZero, revision);
-            ResultData = result;
+            ResultData = await _execute(() => SqlServerRateTransfer.ApplyTransferWithReceipt(
+                _connectionString, data, fields, overwrite, manual, excluded, allowZero, revision));
         }
-        catch (Exception error)
+        catch (Exception error) { failure = error; }
+        finally
         {
-            Invalidate();
-            MessageBox.Show(this, "Перенос не подтверждён: " + error.Message +
+            _applying = false;
+            IsEnabled = true;
+        }
+        if (failure is not null)
+        {
+            MessageBox.Show(this, "Перенос не подтверждён: " + failure.Message +
                 "\nПроверьте смету перед повтором.", "Перенос расценок",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             DialogResult = false;

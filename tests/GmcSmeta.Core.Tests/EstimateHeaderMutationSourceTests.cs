@@ -83,6 +83,11 @@ public sealed class EstimateHeaderMutationSourceTests
     {
         var header = Source("GmcSmeta.App", "EstimateView.Header.cs");
         Assert.Contains("revision, () => CanChangeHeader(snapshot, revision, false)", header);
+        Assert.Contains("writer => ApplyRateTransferAsync(snapshot, revision, writer)", header);
+        var writer = Source("GmcSmeta.App", "EstimateView.RateTransfer.cs");
+        Assert.Contains("await _writeLock.WaitWithoutBaselineAsync();", writer);
+        Assert.Contains("_serverRevision = receipt.Revision;", writer);
+        Assert.Contains("RecordChange(_contractId, receipt.Before, receipt.After)", writer);
         Assert.Contains("if (!dialog.WriteAttempted) return;", header);
         Assert.Contains("pdf: pdf, expectedRevision: revision", header);
         var dialog = Source("GmcSmeta.App", "RateTransferDialog.xaml.cs");

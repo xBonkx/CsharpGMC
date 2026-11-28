@@ -77,7 +77,20 @@ public static class SqlServerRateTransfer
     /// совпадений и запись в одной транзакции с meta.rev; материальные формулы сбрасываются.
     /// Возвращает (перенесённых цен, позиций, СМР работ после переноса).
     /// </summary>
+    public sealed record Receipt(int Prices, int Positions, double WorkTotal, string Revision,
+        UndoSnapshot Before, UndoSnapshot After);
+
     public static (int Prices, int Positions, double WorkTotal) ApplyTransfer(string connectionString,
+        TransferData data, IReadOnlyList<int> fields, bool overwrite,
+        IReadOnlyDictionary<int, int> manual, IReadOnlySet<int> excluded, IReadOnlySet<int> allowZero,
+        string expectedRevision)
+    {
+        var result = ApplyTransferWithReceipt(connectionString, data, fields, overwrite, manual,
+            excluded, allowZero, expectedRevision);
+        return (result.Prices, result.Positions, result.WorkTotal);
+    }
+
+    public static Receipt ApplyTransferWithReceipt(string connectionString,
         TransferData data, IReadOnlyList<int> fields, bool overwrite,
         IReadOnlyDictionary<int, int> manual, IReadOnlySet<int> excluded, IReadOnlySet<int> allowZero,
         string expectedRevision)
@@ -114,6 +127,8 @@ public static class SqlServerRateTransfer
                 throw new InvalidOperationException("Целевое КП заблокировано или находится в архиве.");
         }
 
+        var before = SqlServerUndo.Snapshot(conn, tx, data.Target.Id)
+            ?? throw new InvalidOperationException("Не удалось снять исходное состояние для отмены.");
         var count = 0;
         foreach (var (positionId, changeList) in changes)
         {
@@ -187,8 +202,8 @@ public static class SqlServerRateTransfer
             log.Parameters.Add("@object", SqlDbType.BigInt).Value = DBNull.Value;
             log.ExecuteNonQuery();
         }
-        var updated = SqlServerDatabase.BumpPositionRevision(conn, tx);
-        tx.Commit();
+        var after = SqlServerUndo.Snapshot(conn, tx, data.Target.Id)
+            ?? throw new InvalidOperationException("Не удалось снять итоговое состояние для отмены.");
 
         // СМР работ после переноса — для предупреждения о расхождении с итогом сметы.
         double workTotal = 0;
@@ -204,7 +219,9 @@ public static class SqlServerRateTransfer
             workTotal += (double)(row.Qty * value);
         }
         workTotal = FinanceReader.PythonRound(workTotal);
-        return (count, rows.Count, workTotal);
+        var updated = SqlServerDatabase.BumpPositionRevision(conn, tx);
+        tx.Commit();
+        return new Receipt(count, rows.Count, workTotal, updated, before, after);
     }
 
     private static decimal list0(decimal? changed, decimal? current) =>

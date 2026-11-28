@@ -35,10 +35,18 @@ public sealed class DocumentMenuMutationSourceTests
         Assert.DoesNotContain("_revision = null", code);
         Assert.Contains("revision != SqlServerDatabase.Revision(conn)", code);
         Assert.Contains("_revision = revision", code);
-        Assert.Contains("_allowZero, revision)", code);
+        Assert.Contains("allowZero, revision)", code);
+        Assert.Contains("ResultData = await _execute", code);
+        Assert.Contains("Closing += (_, args) => { if (_applying) args.Cancel = true; };", code);
         var sql = Source("GmcSmeta.Core", "Db/SqlServerRateTransfer.cs");
         Assert.Contains("SqlServerWorkspace.RequirePilotDatabase(connectionString)", sql);
         Assert.Contains("ISNULL(o.archived,0)=0", sql);
         Assert.Contains("WHERE contract_id=@target", sql);
+        Assert.Contains("var before = SqlServerUndo.Snapshot(conn, tx, data.Target.Id)", sql);
+        Assert.Contains("var after = SqlServerUndo.Snapshot(conn, tx, data.Target.Id)", sql);
+        Assert.Contains("return new Receipt(count, rows.Count, workTotal, updated, before, after)", sql);
+        var main = Source("GmcSmeta.App", "MainWindow.SqlServer.cs");
+        Assert.Contains("ContractSqlWriteLock.For(captured.Connection, doc.Id)", main);
+        Assert.Contains("Undo?.RecordChange(doc.Id, receipt.Before, receipt.After)", main);
     }
 }
