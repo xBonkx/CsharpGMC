@@ -956,7 +956,7 @@ public partial class EstimateView
             preview.Children.Add(new TextBlock
             {
                 Text = "•  " + row.Name.Replace('\r', ' ').Replace('\n', ' '),
-                TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = row.Name,
+                TextWrapping = TextWrapping.Wrap, ToolTip = row.Name,
                 Margin = new Thickness(0, 2, 0, 2), Foreground = ExcelPasteBrush("#334155")
             });
         if (rows.Count > 5)
@@ -996,6 +996,7 @@ public partial class EstimateView
         body.Children.Add(new ScrollViewer
         {
             MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Margin = new Thickness(0, 12, 0, 0),
             Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }
         });
@@ -1013,11 +1014,12 @@ public partial class EstimateView
             AllowsTransparency = true, Background = Brushes.Transparent,
             ShowInTaskbar = false, Owner = owner,
             WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
-            FontFamily = (FontFamily)FindResource("UiFontFamily"),
-            FontSize = (double)FindResource("UiBodySize"),
+            
             Foreground = ExcelPasteBrush("#0F172A"), UseLayoutRounding = true
         };
         DynamicFormLayout.Apply(window);
+        window.SetResourceReference(Control.FontFamilyProperty, "UiFontFamily");
+        window.SetResourceReference(Control.FontSizeProperty, "UiBodySize");
         body = new StackPanel();
         var chrome = new Border
         {
