@@ -25,6 +25,8 @@
     <!-- Python navigation: 8.8pt, not a second application-scale multiplier. -->
     <sys:Double x:Key="UiNavigationDetailSize">11.733333333333333</sys:Double>
     <sys:Double x:Key="UiTotalsTableSize">14</sys:Double>
+    <!-- Qt H1 uses 18pt/700 and letter-spacing -0.3px. WPF TextBlock has no
+         tracking property; keep native shaping, not a ScaleTransform. -->
     <Style x:Key="UiPageHeading" TargetType="TextBlock" BasedOn="{StaticResource UiWrappedHeading}">
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
