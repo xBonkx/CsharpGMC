@@ -7,16 +7,50 @@ namespace GmcSmeta.Core.Db;
 /// <summary>Immutable signed legal PDFs; document attachments remain independent.</summary>
 public static class SqlServerAgreementFiles
 {
+    public sealed record SignedFile(long Id, string Name, string Path, DateTime CreatedUtc)
+    {
+        public string Caption => $"{Name} · {CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm} · ID {Id}";
+    }
+
+    // Only metadata is read here, under the card's existing revision fence.
+    public static IReadOnlyList<SignedFile> ReadSigned(SqlConnection conn, long objectId, long agreementId)
+    {
+        using var cmd = new SqlCommand(
+            "SELECT f.id,f.original_name,f.file_address,f.created_utc FROM dbo.agreement_files f " +
+            "JOIN dbo.agreements a ON a.id=f.agreement_id JOIN dbo.objects o ON o.id=a.object_id " +
+            "WHERE a.id=@id AND a.object_id=@object AND a.archived=0 AND o.archived=0 " +
+            "AND f.role=N'signed_contract' AND f.signed=1 ORDER BY f.id DESC", conn);
+        cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=agreementId;
+        cmd.Parameters.Add("@object",SqlDbType.BigInt).Value=objectId;
+        using var reader=cmd.ExecuteReader();
+        var rows=new List<SignedFile>();
+        while(reader.Read())
+            rows.Add(new(SqlInteger.ReadInt64(reader,0),reader.GetString(1),reader.GetString(2),
+                DateTime.SpecifyKind(reader.GetDateTime(3),DateTimeKind.Utc)));
+        return rows;
+    }
+
     public static string Latest(SqlConnection conn,long agreementId)
     {
-        using var cmd=new SqlCommand("SELECT TOP(1) file_address FROM dbo.agreement_files WHERE agreement_id=@id AND role=N'signed_contract' ORDER BY id DESC",conn);
+        using var cmd=new SqlCommand("SELECT TOP(1) file_address FROM dbo.agreement_files WHERE agreement_id=@id AND role=N'signed_contract' AND signed=1 ORDER BY id DESC",conn);
         cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=agreementId;
         return cmd.ExecuteScalar() as string??"";
     }
 
+    public static string VerifyLatest(string connection, long objectId, long agreementId,
+        string expectedPath, string expectedRevision) =>
+        Verify(connection, objectId, agreementId, null, expectedPath, expectedRevision);
+
+    public static string VerifySelected(string connection, long objectId, long agreementId,
+        SignedFile selected, string expectedRevision)
+    {
+        if (selected.Id <= 0) throw new ArgumentException("Некорректный ID файла.");
+        return Verify(connection, objectId, agreementId, selected.Id, selected.Path, expectedRevision);
+    }
+
     /// <summary>Verify the exact published file, not user-editable shell input.
     /// SHA-256 confirms content integrity, not a cryptographic signature.</summary>
-    public static string VerifyLatest(string connection, long objectId, long agreementId,
+    private static string Verify(string connection, long objectId, long agreementId, long? fileId,
         string expectedPath, string expectedRevision)
     {
         using var conn = SqlServerDatabase.Open(connection);
@@ -29,10 +63,11 @@ public static class SqlServerAgreementFiles
             "SELECT TOP(1) f.file_address,f.sha256 FROM dbo.agreement_files f " +
             "JOIN dbo.agreements a ON a.id=f.agreement_id JOIN dbo.objects o ON o.id=a.object_id " +
             "WHERE a.id=@id AND a.object_id=@object AND a.archived=0 AND o.archived=0 " +
-            "AND f.role=N'signed_contract' AND f.signed=1 ORDER BY f.id DESC", conn))
+            "AND f.role=N'signed_contract' AND f.signed=1 AND (@file IS NULL OR f.id=@file) ORDER BY f.id DESC", conn))
         {
             cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=agreementId;
             cmd.Parameters.Add("@object",SqlDbType.BigInt).Value=objectId;
+            cmd.Parameters.Add("@file",SqlDbType.BigInt).Value=fileId is long id ? id : DBNull.Value;
             using var reader=cmd.ExecuteReader();
             if (!reader.Read()) throw new InvalidOperationException("Подписанный PDF не найден.");
             path=reader.GetString(0);

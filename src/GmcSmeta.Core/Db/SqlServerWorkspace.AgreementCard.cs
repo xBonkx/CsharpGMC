@@ -12,6 +12,7 @@ public static partial class SqlServerWorkspace
         string Contractor, IReadOnlyList<ObjectTag> Tags, string Revision)
     {
         public string SignedLegalPdf { get; init; } = "";
+        public IReadOnlyList<SqlServerAgreementFiles.SignedFile> SignedLegalFiles { get; init; } = Array.Empty<SqlServerAgreementFiles.SignedFile>();
         public bool LegalEnabled { get; init; }
         public IReadOnlyList<SqlServerAgreements.Values> LegalCards { get; init; } = Array.Empty<SqlServerAgreements.Values>();
         public SqlServerAgreements.Values? SelectedLegal { get; init; }
@@ -57,10 +58,12 @@ public static partial class SqlServerWorkspace
                 .Where(d => !enabled || legalDocumentIds.Contains(d.Id))
                 .Select(d => new AgreementCardDocument(d, CompanyName(d.CompanyId))).ToArray();
             var tags = ObjectTags(conn, properties.Form);
-            var signedPdf = selected is null ? "" : SqlServerAgreementFiles.Latest(conn, selected.Id);
+            var signedFiles = selected is null ? Array.Empty<SqlServerAgreementFiles.SignedFile>()
+                : SqlServerAgreementFiles.ReadSigned(conn, objectId, selected.Id);
+            var signedPdf = signedFiles.FirstOrDefault()?.Path ?? "";
             var legalCompanies = enabled ? SqlServerAgreements.Companies(conn) : Array.Empty<SqlServerAgreements.Company>();
             if (!string.IsNullOrWhiteSpace(revision) && revision == SqlServerDatabase.Revision(conn))
-                return new(properties, print, agreement, company, tags, revision) { Documents = documents, SignedLegalPdf = signedPdf, LegalEnabled = enabled, LegalCards = cards, SelectedLegal = selected, LegalCompanies = legalCompanies };
+                return new(properties, print, agreement, company, tags, revision) { Documents = documents, SignedLegalPdf = signedPdf, SignedLegalFiles = signedFiles, LegalEnabled = enabled, LegalCards = cards, SelectedLegal = selected, LegalCompanies = legalCompanies };
         }
         throw new InvalidOperationException("Реквизиты изменились во время чтения. Откройте страницу заново.");
     }

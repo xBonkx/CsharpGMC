@@ -27,6 +27,9 @@ public partial class AgreementCardView
                 AgreementDateBox.Text = legal?.Date ?? "";
                 LegalCompanySelector.SelectedValue = legal?.CompanyId;
                 LegalPdfBox.Text = snapshot.SignedLegalPdf;
+                LegalPdfBox.ToolTip = snapshot.SignedLegalFiles.Count > 1
+                    ? $"Сохранено PDF: {snapshot.SignedLegalFiles.Count}. При открытии можно выбрать версию."
+                    : snapshot.SignedLegalPdf;
                 LegalSubjectBox.Text = legal?.Subject ?? "";
                 LegalCustomerAddressBox.Text = legal?.CustomerAddress ?? "";
                 LegalContractorFullBox.Text = legal?.ContractorFull ?? "";
@@ -102,13 +105,16 @@ public partial class AgreementCardView
     private async void LegalPdf_Open(object sender, RoutedEventArgs e)
     {
         if (_saving || _loadingCard || _snapshot is not { SelectedLegal: { } legal } snapshot ||
-            string.IsNullOrWhiteSpace(snapshot.SignedLegalPdf)) return;
+            snapshot.SignedLegalFiles.Count == 0) return;
         _saving = true;
         Fields.IsEnabled = SaveButton.IsEnabled = false;
         try
         {
-            var path = await Task.Run(() => SqlServerAgreementFiles.VerifyLatest(_connection,
-                _objectId, legal.Id, snapshot.SignedLegalPdf, snapshot.Revision));
+            var selected = snapshot.SignedLegalFiles.Count == 1 ? snapshot.SignedLegalFiles[0]
+                : AgreementPdfVersionDialog.Choose(Window.GetWindow(this), snapshot.SignedLegalFiles);
+            if (selected is null || !IsLoaded || !ReferenceEquals(snapshot, _snapshot)) return;
+            var path = await Task.Run(() => SqlServerAgreementFiles.VerifySelected(_connection,
+                _objectId, legal.Id, selected, snapshot.Revision));
             if (IsLoaded && ReferenceEquals(snapshot, _snapshot))
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
         }
