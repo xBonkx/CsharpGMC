@@ -87,6 +87,9 @@ public sealed class SharedTypographyMetricsTests
     [InlineData("UiMutedTextBrush", "F4F6FA")]
     [InlineData("UiDisabledTextBrush", "FFFFFF")]
     [InlineData("UiDisabledTextBrush", "F4F6FA")]
+    [InlineData("UiDisabledTextBrush", "F7F9FC")]
+    [InlineData("UiDisabledTextBrush", "E8F0FE")]
+    [InlineData("UiMutedTextBrush", "C9DBFB")]
     public void SemanticTextHasReadableContrastOnLightSurfaces(string key, string background)
     {
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
