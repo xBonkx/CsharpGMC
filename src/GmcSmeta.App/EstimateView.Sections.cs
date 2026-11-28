@@ -1014,12 +1014,9 @@ public partial class EstimateView
             AllowsTransparency = true, Background = Brushes.Transparent,
             ShowInTaskbar = false, Owner = owner,
             WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
-            
             Foreground = ExcelPasteBrush("#0F172A"), UseLayoutRounding = true
         };
         DynamicFormLayout.Apply(window);
-        window.SetResourceReference(Control.FontFamilyProperty, "UiFontFamily");
-        window.SetResourceReference(Control.FontSizeProperty, "UiBodySize");
         body = new StackPanel();
         var chrome = new Border
         {
