@@ -929,10 +929,15 @@ public partial class ActsEditorView : UserControl
         }
         var menu = new ContextMenu();
         var menuActId = _actId;
+        var menuContractId = _contractId;
+        var menuConnection = _connectionString;
+        var menuSheet = _sheet;
         var menuRevision = _revision;
         var menuRows = ActGrid.SelectedItems.OfType<KsRowVm>().ToArray();
         bool CanExecute() => !_signed && !_contractLocked && !_loadingAct && !_loadFailed &&
             !_building && !ActWritePending && _actId == menuActId &&
+            _contractId == menuContractId && _connectionString == menuConnection &&
+            ReferenceEquals(_sheet, menuSheet) &&
             !string.IsNullOrWhiteSpace(menuRevision) && _revision == menuRevision &&
             ActGrid.SelectedItems.OfType<KsRowVm>().SequenceEqual(menuRows);
         var rest = ContextMenuIcons.Create("Закрыть выделенное", "Check");
@@ -982,7 +987,9 @@ public partial class ActsEditorView : UserControl
             AddExtraMoveCommands(menu, hit, menuActId, menuRevision);
         }
         menu.PlacementTarget = ActGrid;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.Placement = e.CursorLeft < 0 && e.CursorTop < 0
+            ? System.Windows.Controls.Primitives.PlacementMode.Bottom
+            : System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen = true;
         e.Handled = true;
     }

@@ -406,16 +406,23 @@ public partial class StagesDialog : Window
             return;
         }
         var stageName = (target.Header as string) ?? "этап";
-        var selectedStage = _cachedStages.FirstOrDefault(stage => stage.Id == stageId);
-        var editableStage = selectedStage is not null &&
-                            !selectedStage.Locked && selectedStage.StageSum is null;
+        var selectedStage = _cachedStages.FirstOrDefault(stage => stage.Id == stageId && !stage.Rest);
+        if (selectedStage is null)
+        {
+            TableColumnMenu.AppendDynamicMenu(StagesGrid, StageMenu);
+            e.Handled = StageMenu.Items.Count == 0;
+            return;
+        }
+        var editableStage = !selectedStage.Locked && selectedStage.StageSum is null;
         var menuRevision = _revision;
         MenuItem Add(string header, string glyph, RoutedEventHandler onClick, bool enabled = true, bool danger = false)
         {
             var item = ContextMenuIcons.Create(header, glyph, enabled, danger: danger);
             item.Click += (sender, args) =>
             {
-                if (!_quantityWriteBusy && menuRevision == _revision) onClick(sender, args);
+                if (!_building && !_quantityWriteBusy && menuRevision == _revision &&
+                    _cachedStages.Any(stage => stage.Id == stageId && !stage.Rest))
+                    onClick(sender, args);
             };
             StageMenu.Items.Add(item);
             return item;

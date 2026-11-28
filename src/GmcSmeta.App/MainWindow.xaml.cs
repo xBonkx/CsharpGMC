@@ -1171,23 +1171,23 @@ public partial class MainWindow : Window
             exportEstimate.Click += (_, _) => ExportEstimate(doc);
             exportKp.Items.Add(exportEstimate);
             exportKp.Items.Add(new Separator());
-            void AddKpExport(string label, bool internalPrices = false, bool positional = false,
-                bool pdf = false, bool vatLine = false)
+            void AddKpExport(string label, bool pdf, bool internalPrices = false,
+                bool positional = false, bool vatLine = false)
             {
                 var command = new MenuItem { Header = label };
                 command.Click += (_, _) => ExportKpDocument(doc, internalPrices, positional, pdf, vatLine);
                 exportKp.Items.Add(command);
             }
-            AddKpExport("КП / смета — Excel (как в Python)");
+            AddKpExport("КП / смета — Excel (как в Python)", pdf: false);
             AddKpExport("КП / смета — PDF", pdf: true);
-            AddKpExport("КП — Excel, с выделением НДС", vatLine: true);
+            AddKpExport("КП — Excel, с выделением НДС", pdf: false, vatLine: true);
             AddKpExport("КП — PDF, с выделением НДС", pdf: true, vatLine: true);
             exportKp.Items.Add(new Separator());
-            AddKpExport("Внутренние расценки — Excel", internalPrices: true);
-            AddKpExport("Внутренние расценки — PDF", internalPrices: true, pdf: true);
+            AddKpExport("Внутренние расценки — Excel", pdf: false, internalPrices: true);
+            AddKpExport("Внутренние расценки — PDF", pdf: true, internalPrices: true);
             exportKp.Items.Add(new Separator());
-            AddKpExport("Позиционная смета — Excel", positional: true);
-            AddKpExport("Позиционная смета — PDF", positional: true, pdf: true);
+            AddKpExport("Позиционная смета — Excel", pdf: false, positional: true);
+            AddKpExport("Позиционная смета — PDF", pdf: true, positional: true);
             menu.Items.Add(exportKp);
             var compare = ContextMenuIcons.Create("Сравнить с другим документом…", "List");
             compare.Click += (_, _) => OpenCompare(doc);
