@@ -50,7 +50,7 @@
         <DataGrid local:TableColumnMenu.Key="estimate-totals" x:Name="TotalsGrid" AutoGenerateColumns="False" IsReadOnly="False"
                   MinRowHeight="{StaticResource LayoutTotalsRowHeight}" FontSize="{StaticResource UiTotalsTableSize}"
                   CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsPageRow}" ColumnHeaderStyle="{StaticResource TotalsArticleHeader}"
-                  SelectionMode="Single" SelectionUnit="Cell"
+                  SelectionMode="Extended" SelectionUnit="Cell" ClipboardCopyMode="ExcludeHeader"
                   EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling"
                   CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                   CanUserReorderColumns="False" CanUserResizeRows="False" CanUserResizeColumns="True" RowHeaderWidth="0"
