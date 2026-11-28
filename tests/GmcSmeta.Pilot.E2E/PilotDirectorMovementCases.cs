@@ -73,10 +73,12 @@ internal static class PilotDirectorMovementCases
         // 1290 main material + 40 DS; issue 500 + 10 - 10 + 40.
         // Late: missing, fully returned receipt, and work row; partial receipts,
         // children and outside-KP rows must not count.
+        PilotRunner.Check(row.LegalScope is null, "Legacy schema must not infer legal agreement scope");
         PilotRunner.Check(!row.KpOnly && row.Progress == 540m / 1330m * 100m && row.Late == 3,
             "Contract progress, late deliveries or DS scope changed");
         var kpRows = SqlServerDirector.DirectorRows(p.PilotConnection, "kp");
         var kpRow = kpRows.Single(x => x.ObjectId == obj);
+        PilotRunner.Check(kpRow.LegalScope is null, "KP mode must not infer legal agreement scope");
         PilotRunner.Check(kpRow.KpOnly && kpRow.Progress == 50m && kpRow.Late == 0 &&
             kpRow.Total == Totals.ReadOne(conn, checked((int)latest))!.Total,
             "KP progress or latest non-stage scope changed");

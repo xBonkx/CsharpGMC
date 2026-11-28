@@ -11,7 +11,10 @@ public sealed record DirectorRow(long ObjectId, string Object, bool KpOnly,
     decimal Total, decimal Closed, decimal ClosedPct, decimal Revenue, decimal Cost,
     decimal Covered, decimal Margin, decimal? MarginPct, decimal? Coverage,
     decimal OutCost, decimal Smr, decimal? SmrCost, decimal? SmrMargin, decimal Earned,
-    int Late, decimal? Progress);
+    int Late, decimal? Progress)
+{
+    public DirectorLegalScope? LegalScope { get; init; }
+}
 
 /// <summary>
 /// Главная страница руководителя (procurement.director_rows): по объектам — договор
@@ -62,11 +65,16 @@ public static class SqlServerDirector
         DateTime day, CancellationToken token)
     {
         var objects = new List<(long Id, string Name)>();
-        var contracts = new Dictionary<long, List<(long Id, int Order, string Kind, int? StageOf)>>();
+        var kpOnly = mode == "kp";
+        var legalEnabled = !kpOnly && SqlServerAgreements.Enabled(conn);
+        var contracts = new Dictionary<long, List<(long Id, int Order, string Kind, int? StageOf, long? LegalId)>>();
         using (var read = new SqlCommand(
             "SELECT id,name FROM dbo.objects WHERE archived=0 ORDER BY name;" +
-            "SELECT c.id,c.object_id,c.[order],c.kind,c.stage_of FROM dbo.contracts c " +
-            "JOIN dbo.objects o ON o.id=c.object_id WHERE o.archived=0 ORDER BY c.[order],c.id;", conn))
+            "SELECT c.id,c.object_id,c.[order],c.kind,c.stage_of," +
+            (legalEnabled ? "a.id " : "CAST(NULL AS bigint) ") +
+            "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id " +
+            (legalEnabled ? "LEFT JOIN dbo.agreements a ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 " : "") +
+            "WHERE o.archived=0 ORDER BY c.[order],c.id;", conn))
         using (var r = read.ExecuteReader())
         {
             while (r.Read())
@@ -76,17 +84,17 @@ public static class SqlServerDirector
             {
                 var objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
                 if (!contracts.TryGetValue(objectId, out var list))
-                    contracts[objectId] = list = new List<(long, int, string, int?)>();
+                    contracts[objectId] = list = new List<(long, int, string, int?, long?)>();
                 list.Add((
                     Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                     Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
                     r.IsDBNull(3) ? "kp" : r.GetString(3),
-                    r.IsDBNull(4) ? null : Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture)));
+                    r.IsDBNull(4) ? null : Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture),
+                    r.IsDBNull(5) ? null : Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture)));
             }
         }
 
         token.ThrowIfCancellationRequested();
-        var kpOnly = mode == "kp";
         var scopes = objects.Select(o =>
         {
             var candidates = contracts.GetValueOrDefault(o.Id) ?? new();
@@ -144,7 +152,10 @@ public static class SqlServerDirector
             var progress = matTotal != 0m ? issuedValue / matTotal * 100m : (decimal?)null;
             rows.Add(new DirectorRow(objectId, objectName, kpOnly, total,
                 closed, closedPct ?? 0m, revenue, cost, covered, margin, marginPct, coverage,
-                outCost, smr, smrCost, smrMargin, earned, late, progress));
+                outCost, smr, smrCost, smrMargin, earned, late, progress)
+            {
+                LegalScope = legalEnabled ? DirectorLegalScope.FromLinks(docs.Select(d => d.LegalId)) : null
+            });
         }
         return rows;
     }

@@ -195,18 +195,20 @@ public partial class DirectorView : UserControl
             token.ThrowIfCancellationRequested();
             var incompleteCoverage = d.Coverage is { } cov && cov < 95m;
             var missingSmr = d.Smr != 0m && (d.SmrCost ?? 0m) == 0m;
-            var incomplete = incompleteCoverage || missingSmr;
+            var incomplete = incompleteCoverage || missingSmr || d.LegalScope?.HasWarning == true;
+            var displayObject = d.Object + (d.KpOnly ? "   (КП)" : d.LegalScope?.LabelSuffix ?? "");
             var tips = new List<string>();
             if (incompleteCoverage)
                 tips.Add($"Закупочная цена известна только для {d.Coverage:0}% суммы материалов — маржа посчитана по этой части.");
             if (missingSmr) tips.Add("Затраты на монтаж не внесены — маржа на монтаже не посчитана.");
-            if (d.KpOnly) tips.Add("Договора ещё нет, показаны цифры КП.");
+            if (d.KpOnly) tips.Add("Показаны цифры последнего КП.");
+            if (d.LegalScope is { } scope) tips.Add(scope.Explanation);
             var mat = d.MarginPct is null ? "—" : $"{Money.Format(d.Margin)}  ·  {d.MarginPct:0}%";
             var smr = d.SmrMargin is null ? (d.Smr != 0m ? "не внесено" : "—") : Money.Format(d.SmrMargin.Value);
             items.Add(new DirectorPreviewRow
             {
                 ObjectId = d.ObjectId,
-                Object = (incomplete ? "⚠ " : "") + d.Object + (d.KpOnly ? "   (КП)" : ""),
+                Object = (incomplete ? "⚠ " : "") + displayObject,
                 Total = Money.Format(d.Total),
                 Closed = $"{Money.Format(d.Closed)}  ·  {Pct(d.ClosedPct)}",
                 Margin = mat,
@@ -216,7 +218,7 @@ public partial class DirectorView : UserControl
                 Earned = Money.Format(d.Earned),
                 Progress = Pct(d.Progress),
                 Late = d.Late > 0 ? d.Late.ToString() : "—",
-                DisplayObject = d.Object + (d.KpOnly ? "   (КП)" : ""),
+                DisplayObject = displayObject,
                 WarningTip = string.Join("\n", tips),
                 Incomplete = incomplete,
                 IncompleteCoverage = incompleteCoverage,

@@ -97,6 +97,21 @@ internal static class AgreementAcceptance
                 throw new Exception("Legal trash restore changed independent requisites.");
         }
         Console.WriteLine("PASS independent legal cards trash roundtrip and permanent-delete rejection.");
+        var beforeDirectorRevision=Revision();
+        var directorBefore=SqlServerDirector.DirectorRows(connection,"contracts").Single(r=>r.ObjectId==obj);
+        if(directorBefore.LegalScope is not {AgreementCount:1,LinkedDocumentCount:2,UnlinkedDocumentCount:0})
+            throw new Exception("Director counted an agreement without contributing documents.");
+        if(Revision()!=beforeDirectorRevision)throw new Exception("Director read changed revision.");
+        var secondLegal=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)obj)).LegalCards.Single(c=>c.Id!=id);
+        var secondAnnex=SqlServerWorkspace.CreateEmptyContract(connection,obj,
+            new("main",secondLegal.Number,secondLegal.Date,"Second legal annex",null,null){AgreementId=secondLegal.Id},Revision());
+        var afterDirectorRevision=Revision();
+        var directorAfter=SqlServerDirector.DirectorRows(connection,"contracts").Single(r=>r.ObjectId==obj);
+        if(directorAfter.LegalScope is not {AgreementCount:2,LinkedDocumentCount:3,UnlinkedDocumentCount:0}||
+            directorAfter.Total!=directorBefore.Total||directorAfter.Closed!=directorBefore.Closed||
+            directorAfter.Earned!=directorBefore.Earned||Revision()!=afterDirectorRevision)
+            throw new Exception("Director legal annotation changed object totals or lost contributing identity.");
+        Console.WriteLine("PASS director scope: independent agreements, empty-card exclusion, preserved object totals and revision.");
         Console.WriteLine("PASS agreement CRUD and transfer: before annex, own fields, two agreements, annex/DS inheritance, stale revision, cross-object protection, existing-context rejection and empty-target transfer.");
     }
 }
