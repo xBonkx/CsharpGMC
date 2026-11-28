@@ -62,9 +62,11 @@ public partial class App : Application
         var demoSmoke = demo && e.Args.Contains("--smoke-test");
         if (demo)
         {
+            if (demoSmoke) GmcSmeta.Core.Demo.DemoMode.ResetSmokeReport();
             try { GmcSmeta.Core.Demo.DemoMode.ConfigureProcess(e.Args); }
             catch (Exception ex)
             {
+                if (demoSmoke) GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("configure-demo", ex);
                 if (!demoSmoke)
                     MessageBox.Show(ex.Message, "ГМЦ-Смета — ТЕСТ", MessageBoxButton.OK, MessageBoxImage.Warning);
                 Shutdown(1);
@@ -128,17 +130,30 @@ public partial class App : Application
                 Shutdown(0);
                 return;
             }
-            MessageBox.Show("Откройте ГМЦ-Смету с рабочего ярлыка.", "ГМЦ-Смета",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            if (demoSmoke)
+                GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("missing-sql-connection");
+            else
+                MessageBox.Show("Откройте ГМЦ-Смету с рабочего ярлыка.", "ГМЦ-Смета",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             Shutdown(1);
             return;
         }
 
         StartupTrace.Mark("app_main_window_ctor_begin");
-        var window = new MainWindow();
-        StartupTrace.Mark("app_main_window_ctor_end");
-        window.InitializeWorkspaceNavigation();
-        StartupTrace.Mark("app_workspace_navigation_attached");
+        MainWindow window;
+        try
+        {
+            window = new MainWindow();
+            StartupTrace.Mark("app_main_window_ctor_end");
+            window.InitializeWorkspaceNavigation();
+            StartupTrace.Mark("app_workspace_navigation_attached");
+        }
+        catch (Exception ex) when (demoSmoke)
+        {
+            GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("main-window-construction", ex);
+            Shutdown(1);
+            return;
+        }
         MainWindow = window;
         if (!demo) OfficeTaskbarLaunch.Attach(window);
         EventHandler? rendered = null;
@@ -146,21 +161,34 @@ public partial class App : Application
         {
             window.ContentRendered -= rendered;
             StartupTrace.Mark("app_main_content_rendered");
-            var ready = await window.InitializeWorkspaceAsync(offerRetry: !demoSmoke);
-            if (demoSmoke)
+            if (!demoSmoke)
             {
-                try { ready = ready && await window.VerifyDemoEstimateAsync(); }
-                catch (Exception ex)
-                {
-                    ready = false;
-                    System.IO.File.WriteAllText(System.IO.Path.Combine(
-                        GmcSmeta.Core.Demo.DemoMode.ProfileRoot, "smoke-error.txt"), ex.ToString());
-                }
-                Shutdown(ready ? 0 : 1);
+                await window.InitializeWorkspaceAsync();
+                return;
             }
+
+            var ready = false;
+            try
+            {
+                if (await window.InitializeWorkspaceAsync(offerRetry: false))
+                    ready = await window.VerifyDemoEstimateAsync();
+                else
+                    GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("workspace-not-ready");
+            }
+            catch (Exception ex)
+            {
+                GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("workspace-or-estimate", ex);
+            }
+            Shutdown(ready ? 0 : 1);
         };
         window.ContentRendered += rendered;
-        window.Show();
+        try { window.Show(); }
+        catch (Exception ex) when (demoSmoke)
+        {
+            GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("main-window-show", ex);
+            Shutdown(1);
+            return;
+        }
         StartupTrace.Mark("app_main_show_returned");
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         if (!demo) UpdateRestartCoordinator.Attach(window);

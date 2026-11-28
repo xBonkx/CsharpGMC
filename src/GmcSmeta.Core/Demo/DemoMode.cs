@@ -11,6 +11,36 @@ public static class DemoMode
     public const string LocalServer = @"lpc:.\SQLEXPRESS";
     public const string Marker = "gmc_demo_ready";
     public static bool Active => IsRequested(Environment.GetCommandLineArgs().Skip(1));
+    public static bool SmokeTest => IsSmokeRequested(Environment.GetCommandLineArgs().Skip(1));
+    public static bool IsSmokeRequested(IEnumerable<string> args)
+    {
+        var items = args.ToArray();
+        return IsRequested(items) && items.Contains("--smoke-test");
+    }
+
+    // Best-effort diagnostics in the isolated local DEMO profile; never change
+    // the result of a database guard or try an office path if logging fails.
+    public static void ResetSmokeReport()
+    {
+        if (!SmokeTest) return;
+        try { File.Delete(Path.Combine(ProfileRoot, "smoke-error.txt")); }
+        catch { /* diagnostic only */ }
+    }
+
+    public static void ReportSmokeFailure(string phase, Exception? error = null)
+    {
+        if (!SmokeTest) return;
+        try
+        {
+            var root = ProfileRoot;
+            Directory.CreateDirectory(root);
+            File.AppendAllText(Path.Combine(root, "smoke-error.txt"),
+                $"{DateTime.UtcNow:O} {phase}" +
+                (error is null ? "" : $" · {error.GetType().Name}: {error.Message}") +
+                Environment.NewLine);
+        }
+        catch { /* diagnostic only */ }
+    }
     public static bool IsRequested(IEnumerable<string> args) =>
         args.Any(arg => string.Equals(arg, "--demo", StringComparison.Ordinal));
 

@@ -234,6 +234,7 @@ public partial class MainWindow : Window
                     _objectNodes.Clear();
                     _pendingNavigationDocuments.Clear();
                     StartupTrace.Mark("main_initialization_error");
+                    GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("workspace-initialization", e);
                     try
                     {
                         var errorRoot = GmcSmeta.Core.Demo.DemoMode.Active
@@ -1346,6 +1347,11 @@ public partial class MainWindow : Window
             if (_startupClosed || (request >= 0 &&
                 (request != _estimateOpenGeneration || _openDocumentId != contractId))) return;
             LogError(ex);
+            if (GmcSmeta.Core.Demo.DemoMode.SmokeTest)
+            {
+                GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("open-estimate", ex);
+                return;
+            }
             if (cached is not null && request >= 0)
             {
                 // Fail closed: stale rows cannot be edited or exported.
@@ -1561,7 +1567,9 @@ public partial class MainWindow : Window
     {
         try
         {
-            var path = Path.Combine(Path.GetTempPath(), "gmcsmeta-next.log");
+            var root = GmcSmeta.Core.Demo.DemoMode.Active
+                ? GmcSmeta.Core.Demo.DemoMode.ProfileRoot : Path.GetTempPath();
+            var path = Path.Combine(root, "gmcsmeta-next.log");
             File.AppendAllText(path, $"{DateTime.Now:dd.MM.yyyy HH:mm:ss}  {ex}\n\n");
         }
         catch

@@ -10,6 +10,14 @@ public sealed class DemoSqlModeTests
     private const string Db = DemoMode.Prefix + "123456abcdef";
 
     [Fact]
+    public void SmokeDiagnosticsAreLimitedToDemoSmokeArguments()
+    {
+        Assert.False(DemoMode.IsSmokeRequested(["--smoke-test"]));
+        Assert.False(DemoMode.IsSmokeRequested(["--demo", Db]));
+        Assert.True(DemoMode.IsSmokeRequested(["--demo", Db, "--smoke-test"]));
+    }
+
+    [Fact]
     public void OnlyGeneratedDatabaseIsAllowed()
     {
         Assert.Equal(Db, DemoMode.DatabaseFromArgs(["--demo", Db]));

@@ -26,6 +26,7 @@
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\PackageIntegrity.cs" Link="LauncherPackageIntegrity.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\AppPaths.cs" Link="LauncherAppPaths.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\DemoReleasePolicy.cs" Link="DemoReleasePolicy.cs" />
+    <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\DemoUpdateJournal.cs" Link="DemoUpdateJournal.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseDownloadTransfer.cs" Link="ReleaseDownloadTransfer.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseCheckCache.cs" Link="ReleaseCheckCache.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\LauncherBinaryPublisher.cs" Link="LauncherBinaryPublisher.cs" />
