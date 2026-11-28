@@ -20,11 +20,11 @@ public sealed class ContractCellSaveQueue
             new(false, revision, error, unknownCommit);
     }
 
-    private sealed record Entry(Edit Edit, TaskCompletionSource<Receipt> Completion);
+    private sealed record Entry(Edit Edit, TaskCompletionSource<Receipt> Completion, OrderedWriteGate.Ticket? Reservation);
 
     private readonly object _sync = new();
     private readonly Queue<Entry> _items = new();
-    private readonly Func<Edit, Task<Receipt>> _write;
+    private readonly Func<Edit, OrderedWriteGate.Ticket?, Task<Receipt>> _write;
     private readonly TimeSpan _debounce;
     private TaskCompletionSource<bool>? _idle;
     private bool _running;
@@ -33,6 +33,13 @@ public sealed class ContractCellSaveQueue
     private string? _lastError;
 
     public ContractCellSaveQueue(Func<Edit, Task<Receipt>> write, TimeSpan? debounce = null)
+        : this((edit, _) => write(edit), debounce)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+    }
+
+    public ContractCellSaveQueue(Func<Edit, OrderedWriteGate.Ticket?, Task<Receipt>> write,
+        TimeSpan? debounce = null)
     {
         _write = write ?? throw new ArgumentNullException(nameof(write));
         _debounce = debounce ?? TimeSpan.FromMilliseconds(85);
@@ -44,16 +51,19 @@ public sealed class ContractCellSaveQueue
     public bool Blocked { get { lock (_sync) return _blocked; } }
     public string? LastError { get { lock (_sync) return _lastError; } }
 
-    public Task<Receipt> Enqueue(Edit edit)
+    public Task<Receipt> Enqueue(Edit edit, OrderedWriteGate.Ticket? reservation = null)
     {
         lock (_sync)
         {
             if (_blocked)
+            {
+                reservation?.Dispose();
                 return Task.FromResult(Receipt.Reject(
                     _lastError ?? "Запись заблокирована до повторного чтения SQL Server."));
+            }
             var completion = new TaskCompletionSource<Receipt>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            _items.Enqueue(new Entry(edit, completion));
+            _items.Enqueue(new Entry(edit, completion, reservation));
             _outstanding++;
             _idle ??= new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
@@ -111,7 +121,7 @@ public sealed class ContractCellSaveQueue
             Receipt receipt;
             try
             {
-                receipt = await _write(entry.Edit).ConfigureAwait(false);
+                receipt = await _write(entry.Edit, entry.Reservation).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -119,6 +129,7 @@ public sealed class ContractCellSaveQueue
                 // Conservatively require readback and never blind-retry.
                 receipt = Receipt.Reject(ex.Message, unknownCommit: true);
             }
+            finally { entry.Reservation?.Dispose(); }
 
             lock (_sync)
             {
@@ -131,6 +142,7 @@ public sealed class ContractCellSaveQueue
                     while (_items.TryDequeue(out var skipped))
                     {
                         _outstanding--;
+                        skipped.Reservation?.Dispose();
                         skipped.Completion.TrySetResult(Receipt.Reject(
                             "Правка не отправлена: предыдущая операция не подтверждена SQL Server.",
                             receipt.Revision, receipt.UnknownCommit));

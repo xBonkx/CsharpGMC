@@ -253,6 +253,8 @@ public partial class EstimateView
     {
         private readonly SemaphoreSlim _inner;
         private readonly Func<Task> _beforeWrite;
+        private readonly OrderedWriteGate _order = new();
+        private OrderedWriteGate.Ticket? _held;
 
         public UndoAwareWriteLock(SemaphoreSlim inner, Func<Task> beforeWrite)
         {
@@ -260,23 +262,38 @@ public partial class EstimateView
             _beforeWrite = beforeWrite;
         }
 
-        public async Task WaitAsync()
+        public OrderedWriteGate.Ticket Reserve() => _order.Reserve();
+
+        public Task WaitAsync() => WaitReservedAsync(Reserve());
+
+        public async Task WaitReservedAsync(OrderedWriteGate.Ticket reservation, bool baseline = true)
         {
-            await _inner.WaitAsync().ConfigureAwait(false);
+            var acquired = false;
             try
             {
-                await _beforeWrite().ConfigureAwait(false);
+                await reservation.WaitAsync().ConfigureAwait(false);
+                await _inner.WaitAsync().ConfigureAwait(false);
+                acquired = true;
+                if (baseline) await _beforeWrite().ConfigureAwait(false);
+                _held = reservation;
             }
             catch
             {
-                _inner.Release();
+                if (acquired) _inner.Release();
+                reservation.Dispose();
                 throw;
             }
         }
 
         // Undo/Redo already owns a history baseline; do not create a new one.
-        public Task WaitWithoutBaselineAsync() => _inner.WaitAsync();
+        public Task WaitWithoutBaselineAsync() => WaitReservedAsync(Reserve(), baseline: false);
 
-        public void Release() => _inner.Release();
+        public void Release()
+        {
+            var reservation = _held ?? throw new InvalidOperationException("No acquired write reservation.");
+            _held = null;
+            try { _inner.Release(); }
+            finally { reservation.Dispose(); }
+        }
     }
 }

@@ -252,6 +252,7 @@ public partial class EstimateView
             return;
         }
         var previousInsert = _pendingInsertTail;
+        using var reservation = _writeLock.Reserve();
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pendingInsertTail = completion.Task;
         _reloadTimer.Stop();
@@ -260,14 +261,13 @@ public partial class EstimateView
         SetStatus($"Добавление строки… ({count})", false);
         PendingEstimateInsert? preview = null;
         var acquired = false;
-        var saved = false;
         try
         {
             // Publish a local draft before any SQL/undo wait; it is NOT in the
             // authoritative document or in the SQL row index.
             preview = TryShowPendingInsert(selected, component);
             await previousInsert;
-            await _writeLock.WaitAsync();
+            await _writeLock.WaitReservedAsync(reservation);
             acquired = true;
             if (_serverConflict || _cellSaveQueue.Blocked || _saveError is not null ||
                 _estimate?.Locked != false)
@@ -281,9 +281,21 @@ public partial class EstimateView
             _serverRevision = result.Revision;
             var id = checked((int)result.PositionId!.Value);
             _saveAwaitingReadback = true;
-            saved = true;
             if (preview is not null)
+            {
                 preview.ServerId = id;
+                // Earlier typed values belong to this insertion. Flush them
+                // under its reservation, before any subsequent structural command.
+                var buffered = preview.BufferedEdits.ToArray();
+                preview.BufferedEdits.Clear();
+                foreach (var edit in buffered)
+                {
+                    var receipt = await Task.Run(() => WriteCellUnderLock(
+                        new ContractCellSaveQueue.Edit(id, edit.Key, edit.Value)));
+                    if (!receipt.Saved)
+                        throw new InvalidOperationException(receipt.Error ?? "Правка новой позиции не подтверждена.");
+                }
+            }
             else
             {
                 _focusAfterReload = id;
@@ -302,14 +314,7 @@ public partial class EstimateView
         finally
         {
             if (acquired) _writeLock.Release();
-            // The insert is now committed and its real ID is known. Queue all
-            // edits entered while it was pending, without sending the local ID.
-            if (saved && preview is { ServerId: int realId })
-            {
-                foreach (var edit in preview.BufferedEdits)
-                    QueueSave(realId, edit.Key, edit.Value);
-                preview.BufferedEdits.Clear();
-            }
+            else reservation.Dispose();
             completion.TrySetResult(true);
             if (Interlocked.Decrement(ref _pendingWrites) == 0)
             {

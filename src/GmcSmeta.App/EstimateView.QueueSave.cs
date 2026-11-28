@@ -15,32 +15,12 @@ public partial class EstimateView
     // Invoked by ContractCellSaveQueue on a background worker; all estimate
     // mutations, not just cell writes, share the same per-contract semaphore.
     private async Task<ContractCellSaveQueue.Receipt> WriteCellOnBackgroundAsync(
-        ContractCellSaveQueue.Edit edit)
+        ContractCellSaveQueue.Edit edit, OrderedWriteGate.Ticket? reservation)
     {
-        await _writeLock.WaitAsync().ConfigureAwait(false);
+        await _writeLock.WaitReservedAsync(reservation ?? _writeLock.Reserve()).ConfigureAwait(false);
         try
         {
-            if (_serverConflict)
-                return ContractCellSaveQueue.Receipt.Reject(
-                    "Смета устарела. Обнови документ прежде чем повторять правку.");
-
-            // Fail closed even if this method is invoked without the main-window
-            // pilot guard. No production writes, regardless of credentials.
-            SqlServerWorkspace.RequirePilotDatabase(_sqlConnectionString);
-            var result = SqlServerDatabase.SaveCell(
-                _sqlConnectionString, edit.PositionId, edit.Field, edit.Input, _serverRevision);
-            if (!result.Saved)
-            {
-                // Publish the conflict BEFORE releasing the shared writer.
-                // A waiting structure mutation must not run while the UI
-                // continuation has yet to process the failed receipt.
-                _serverConflict = true;
-                return ContractCellSaveQueue.Receipt.Reject(
-                    result.Error ?? "Сервер отказал в сохранении ячейки.", result.Revision);
-            }
-
-            _serverRevision = result.Revision;
-            return ContractCellSaveQueue.Receipt.Success(result.Revision);
+            return WriteCellUnderLock(edit);
         }
         catch
         {
@@ -53,6 +33,26 @@ public partial class EstimateView
         {
             _writeLock.Release();
         }
+    }
+
+    // Caller owns the same ordered writer and undo baseline. Pending-insert
+    // buffered edits can use this without recursively enqueueing behind themselves.
+    private ContractCellSaveQueue.Receipt WriteCellUnderLock(ContractCellSaveQueue.Edit edit)
+    {
+        if (_serverConflict)
+            return ContractCellSaveQueue.Receipt.Reject(
+                "Смета устарела. Обнови документ прежде чем повторять правку.");
+        SqlServerWorkspace.RequirePilotDatabase(_sqlConnectionString);
+        var result = SqlServerDatabase.SaveCell(
+            _sqlConnectionString, edit.PositionId, edit.Field, edit.Input, _serverRevision);
+        if (!result.Saved)
+        {
+            _serverConflict = true; // publish before releasing any next reservation
+            return ContractCellSaveQueue.Receipt.Reject(
+                result.Error ?? "Сервер отказал в сохранении ячейки.", result.Revision);
+        }
+        _serverRevision = result.Revision;
+        return ContractCellSaveQueue.Receipt.Success(result.Revision);
     }
 
     /// <summary>
@@ -78,8 +78,9 @@ public partial class EstimateView
         SetStatus($"Не сохранено: {count} правок в очереди…", false);
         try
         {
+            // Reserve synchronously before the queue's first-edit debounce.
             var receipt = await _cellSaveQueue.Enqueue(
-                new ContractCellSaveQueue.Edit(rowId, field, input));
+                new ContractCellSaveQueue.Edit(rowId, field, input), _writeLock.Reserve());
             if (!receipt.Saved)
             {
                 _serverConflict = true;

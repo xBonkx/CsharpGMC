@@ -222,16 +222,22 @@ public partial class EstimateView
         if (_serverConflict) { SetStatus("Сначала обнови смету: данные на сервере изменились.", true); return; }
         if (_estimate is null || _estimate.SmrMode is not ("sum" or "pos")) return;
         var mode = _estimate.SmrMode == "pos" ? "sum" : "pos";
+        var expected = _serverRevision;
+        if (!CanAppendImport(expected)) { SetStatus("Заверши сохранение и обнови смету.", true); return; }
 
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var pending = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Сохранение… ({pending})", false);
         string? successText = null;
         await _writeLock.WaitAsync();
         try
         {
+            if (_serverConflict || _detached || _saveError is not null || expected != _serverRevision ||
+                _estimate?.Locked != false)
+                throw new DBConcurrencyException("Смета изменилась до переключения режима СМР.");
             var saved = await Task.Run(() => SqlServerSmrMode.SetSmrMode(
-                _sqlConnectionString, _contractId, mode, _serverRevision));
+                _sqlConnectionString, _contractId, mode, expected));
             if (!saved.Saved)
             {
                 _saveError = saved.Error ?? "Режим СМР не изменён";
@@ -240,6 +246,7 @@ public partial class EstimateView
             else
             {
                 _serverRevision = saved.Revision;
+                _saveAwaitingReadback = true;
                 successText = mode == "pos"
                     ? "СМР «по позициям»: цены работ перенесены из сводной"
                     : "СМР «сумма»: работы сохранены как введённая сумма";
@@ -252,6 +259,8 @@ public partial class EstimateView
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally
