@@ -244,7 +244,7 @@
                                 </ItemsControl>
                             </ScrollViewer>
                             <TextBlock Text="Если ничего не выбрано — видны все системы."
-                                       FontSize="{StaticResource UiCaptionSize}" Foreground="#64748B"
+                                       FontSize="{StaticResource UiCaptionSize}" Foreground="{StaticResource UiMutedTextBrush}"
                                        TextWrapping="Wrap" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
@@ -258,7 +258,7 @@
                     <TextBox x:Name="ProcurementSearchBox" AutomationProperties.Name="Поиск позиций закупок" Style="{StaticResource PythonIconSearch}" VerticalContentAlignment="Center" TextChanged="ProcurementFilter_Changed"
                              ToolTip="Поиск по названию, системе, поставщику, заявке и счёту"/>
                     <Viewbox Style="{StaticResource LayoutSmallSearchIcon}" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="9,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#94A3B8"/></Canvas></Viewbox>
-                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="30,0,32,0"
+                    <TextBlock Text="Найти позицию…" Foreground="{StaticResource UiMutedTextBrush}" Margin="30,0,32,0"
                                VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style><Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -586,14 +586,14 @@
                     </DataGrid.Columns>
                 </DataGrid>
                 <TextBlock Text="Движения, связанные с ведомостями, удаляются только через вкладку «Выдача»."
-                           Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"
+                           Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"
                            Margin="0,5,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="6,0,0,0">
                     <TextBlock Text="Замена (на что заменили)" Style="{StaticResource PythonTileLabel}" Margin="0,0,0,6"/>
                     <Grid Margin="0,0,0,6">
                         <TextBox x:Name="ReplacementDetail" IsEnabled="False"/>
-                        <TextBlock Text="например: ф280 → ф315" Foreground="#94A3B8" Margin="10,0"
+                        <TextBlock Text="например: ф280 → ф315" Foreground="{StaticResource UiMutedTextBrush}" Margin="10,0"
                                    VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -614,11 +614,11 @@
                             HorizontalAlignment="Left" Style="{StaticResource PythonToolbarButton}" Click="ProcurementSaveDetails_Click"/>
                     <TextBlock x:Name="MovementDetailsText"
                                Text="Выберите одну строку закупки для просмотра истории."
-                               Foreground="#64748B" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                               Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
                 </StackPanel>
             </Grid>
         </Expander>
-        <TextBlock x:Name="FooterText" Grid.Row="4" Foreground="#64748B" Margin="2,4,0,0" TextWrapping="Wrap">
+        <TextBlock x:Name="FooterText" Grid.Row="4" Foreground="{StaticResource UiMutedTextBrush}" Margin="2,4,0,0" TextWrapping="Wrap">
             <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource UiCaption}"><Setter Property="Visibility" Value="Visible"/>
                 <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
             </Style></TextBlock.Style>
