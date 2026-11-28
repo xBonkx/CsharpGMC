@@ -486,6 +486,10 @@ public static partial class SqlServerCostSummary
     /// создаётся при отсутствии; журнал procurement/update; источник «закуп»).
     /// </summary>
     public static void SetSupplier(string connectionString, int contractId, long positionId,
+        string supplierName, string expectedRevision) =>
+        _ = SetSupplierWithRevision(connectionString, contractId, positionId, supplierName, expectedRevision);
+
+    public static string SetSupplierWithRevision(string connectionString, int contractId, long positionId,
         string supplierName, string expectedRevision)
     {
         RequirePilotWrite(connectionString);
@@ -520,6 +524,7 @@ public static partial class SqlServerCostSummary
         }
 
         long? procurementId = null;
+        var unchanged = false;
         using (var find = new SqlCommand(
             "SELECT id, supplier_id FROM dbo.procurement WHERE position_id=@id", conn, tx))
         {
@@ -529,12 +534,13 @@ public static partial class SqlServerCostSummary
             {
                 procurementId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 var currentSupplier = r.IsDBNull(1) ? (long?)null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
-                if (currentSupplier == supplierId)
-                {
-                    tx.Commit();
-                    return;
-                }
+                unchanged = currentSupplier == supplierId;
             }
+        }
+        if (unchanged)
+        {
+            tx.Commit(); // reader disposed before COMMIT
+            return expectedRevision;
         }
         if (procurementId is null)
         {
@@ -568,7 +574,8 @@ public static partial class SqlServerCostSummary
             log.Parameters.AddWithValue("@details", $"поставщик → {supplierName.Trim()}");
             log.ExecuteNonQuery();
         }
-        SqlServerWorkspace.BumpRevision(conn, tx);
+        var committedRevision = SqlServerDatabase.BumpPositionRevision(conn, tx);
         tx.Commit();
+        return committedRevision;
     }
 }

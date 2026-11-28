@@ -12,7 +12,7 @@ public static partial class SqlServerCostSummary
     private const string SummarySystemsSql =
         "SELECT id,name,parent_id FROM dbo.systems WHERE contract_id=@id ORDER BY [order],id";
 
-    private const string SummaryPositionsSql =
+    private const string SummaryPositionsSelectSql =
         "SELECT p.id, p.system_id, p.name, p.unit, p.qty, p.price, p.purchase_price, " +
         "p.work_cost, p.work_sell, p.out_of_kp, p.parent_id, " +
         "pr.cost_price, sup.name, " +
@@ -23,17 +23,20 @@ public static partial class SqlServerCostSummary
         "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id " +
         "LEFT JOIN dbo.suppliers sup ON sup.id=pr.supplier_id " +
         "WHERE sy.contract_id=@id AND p.parent_id IS NULL " +
-        "AND ISNULL(p.out_of_kp,0)=0 ORDER BY sy.[order], sy.id, p.[order], p.id";
+        "AND ISNULL(p.out_of_kp,0)=0";
+    private const string SummaryPositionsOrderSql = " ORDER BY sy.[order], sy.id, p.[order], p.id";
+    private const string SummaryPositionsSql = SummaryPositionsSelectSql + SummaryPositionsOrderSql;
 
-    private const string SummaryComponentsSql =
+    private const string SummaryComponentsSelectSql =
         "SELECT p.parent_id, p.system_id, p.qty, p.price, p.purchase_price, p.out_of_kp, pr.cost_price " +
         "FROM dbo.positions p " +
         "JOIN dbo.systems sy ON sy.id=p.system_id " +
         "JOIN dbo.contracts c ON c.id=sy.contract_id " +
         "LEFT JOIN dbo.procurement pr ON pr.position_id=p.id " +
         "WHERE sy.contract_id=@id " +
-        "AND (p.parent_id IS NOT NULL OR ISNULL(p.out_of_kp,0)=1) " +
-        "ORDER BY p.[order], p.id";
+        "AND (p.parent_id IS NOT NULL OR ISNULL(p.out_of_kp,0)=1)";
+    private const string SummaryComponentsOrderSql = " ORDER BY p.[order], p.id";
+    private const string SummaryComponentsSql = SummaryComponentsSelectSql + SummaryComponentsOrderSql;
 
     private const string SummaryExpensesSql =
         "SELECT ISNULL(SUM(amount),0) FROM dbo.smr_costs WHERE contract_id=@id";
@@ -44,6 +47,32 @@ public static partial class SqlServerCostSummary
     private const string CostSummaryReadBatchSql =
         SummarySystemsSql + ";" + SummaryPositionsSql + ";" +
         SummaryComponentsSql + ";" + SummaryExpensesSql + ";" + SummaryTransportSql + ";";
+
+    private static CostSummaryRow MapSummaryPosition(SqlDataReader r)
+    {
+        string Text(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
+        decimal? Dec(int i) => r.IsDBNull(i)
+            ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(i), CultureInfo.InvariantCulture));
+        return new CostSummaryRow(
+            Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+            Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+            Text(2), Text(3),
+            r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)),
+            Text(12),
+            0m, 0m, 0m, 0m,
+            false, false, false, false,
+            EffectiveUnitCost(Dec(11), Dec(6)),
+            r.IsDBNull(5) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
+            Dec(7), Dec(8),
+            !r.IsDBNull(11),
+            r.IsDBNull(6) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(6), CultureInfo.InvariantCulture)),
+            false,
+            EstimateStatistics.IsWorkName(Text(2)), Text(14), Text(15),
+            Dec(11));
+    }
+
+    private static CostSummaryRow FoldSummaryComponent(CostSummaryRow owner, decimal qty, decimal cost) =>
+        owner with { MCost = decimal.Round(owner.MCost + qty * cost, 2), Kids = true };
 
     public static CostSummaryData Summary(SqlConnection conn, int contractId) =>
         Summary(conn, contractId, out _, out _);
@@ -87,28 +116,10 @@ public static partial class SqlServerCostSummary
         var rows = new List<CostSummaryRow>();
         Next();
         {
-            string Text(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
-            decimal? Dec(int i) => r.IsDBNull(i)
-                ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(i), CultureInfo.InvariantCulture));
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                rows.Add(new CostSummaryRow(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                    Text(2), Text(3),
-                    r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)),
-                    Text(12),
-                    0m, 0m, 0m, 0m,
-                    false, false, false, false,
-                    EffectiveUnitCost(Dec(11), Dec(6)),
-                    r.IsDBNull(5) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
-                    Dec(7), Dec(8),
-                    !r.IsDBNull(11),
-                    r.IsDBNull(6) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(6), CultureInfo.InvariantCulture)),
-                    false,
-                    EstimateStatistics.IsWorkName(Text(2)), Text(14), Text(15),
-                    Dec(11)));
+                rows.Add(MapSummaryPosition(r));
             }
         }
 
@@ -135,11 +146,7 @@ public static partial class SqlServerCostSummary
                 var parentId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 if (!rowIndex.TryGetValue(parentId, out var index)) continue;
                 var owner = rows[index];
-                rows[index] = owner with
-                {
-                    MCost = decimal.Round(owner.MCost + qty * cost.Value, 2),
-                    Kids = true
-                };
+                rows[index] = FoldSummaryComponent(owner, qty, cost.Value);
             }
         }
 

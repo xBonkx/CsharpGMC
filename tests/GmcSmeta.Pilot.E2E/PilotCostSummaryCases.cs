@@ -155,6 +155,47 @@ internal static class PilotCostSummaryCases
         }
         catch (OperationCanceledException) { }
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled totals read changed revision");
+        // Narrow readback must equal a full recomputation of every money field,
+        // including component rounding, actual zero, missing flags and totals.
+        var prior = SqlServerCostSummary.Summary(conn, contractId);
+        var priorRev = p.Revision();
+        foreach (var (position, field, input) in new[]
+        {
+            (material, "purchase_price", "61.25"),
+            (zero, "purchase_price", "77"),
+            (work, "work_cost", "7.5"),
+            (work, "work_sell", "12.5"),
+            (missing, "supplier", "QA DELTA SUPPLIER"),
+            (missing, "supplier", "QA DELTA SUPPLIER"),
+        })
+        {
+            string revision;
+            if (field == "supplier")
+                revision = SqlServerCostSummary.SetSupplierWithRevision(p.PilotConnection, contractId, position, input, priorRev);
+            else
+            {
+                var result = SqlServerCostSummary.SaveSummaryCell(p.PilotConnection, contractId, position, field, input, priorRev);
+                PilotRunner.Check(result.Saved, "Cannot prepare narrow cost write");
+                revision = result.Revision;
+            }
+            var delta = SqlServerCostSummary.ReadChangedCostRow(conn, contractId, prior, position, field, revision);
+            var full = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
+            PilotRunner.Check(delta is not null && delta.Rows.SequenceEqual(full.Summary.Rows) &&
+                delta.Extra.SequenceEqual(full.Summary.Extra) && delta.Notes.SequenceEqual(full.Summary.Notes) &&
+                delta.TotalCost == full.Summary.TotalCost && delta.TotalSell == full.Summary.TotalSell &&
+                delta.SmrContract == full.Summary.SmrContract, "Targeted cost readback differs from full summary");
+            var patchedTotals = SqlServerCostTotals.Totals(conn, contractId, delta!);
+            PilotRunner.Check(patchedTotals.Lines.SequenceEqual(full.Totals.Lines) &&
+                (patchedTotals with { Lines = full.Totals.Lines }) == full.Totals,
+                "Targeted cost row changed financial totals");
+            if (revision != priorRev)
+                PilotRunner.Check(SqlServerCostSummary.ReadChangedCostRow(conn, contractId, prior, position, field, priorRev) is null,
+                    "Old committed revision accepted");
+            prior = full.Summary;
+            priorRev = revision;
+        }
+        PilotRunner.Check(SqlServerCostSummary.ReadChangedCostRow(conn, contractId, prior, material, "price", priorRev) is null,
+            "Linked customer price must use full readback");
         var missingDoc = SqlServerCostSummary.Summary(conn, int.MaxValue);
         PilotRunner.Check(missingDoc.Rows.Count == 0 && missingDoc.Systems.Count == 0 &&
             missingDoc.Extra.SequenceEqual(new[] { ("Транспорт", 0m, 0m, "trans") }) &&
