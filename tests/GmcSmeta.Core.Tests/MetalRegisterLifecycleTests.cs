@@ -20,7 +20,7 @@ public sealed class MetalRegisterLifecycleTests
         Assert.Contains("first = new MetalRegisterSheet(prepared.Sheets[0], MarkDirty)", code);
         Assert.Contains("if (tab.Content is not MetalRegisterSheet page)", code);
         Assert.Contains("if (_busy || !CommitEditor())", code);
-        Assert.Contains("if (_busy || !CommitEditor() || !ConfirmDiscard()) e.Cancel = true;", code);
+        Assert.Contains("if ((_busy && _registerRead is null) || !CommitEditor() || !ConfirmDiscard()) e.Cancel = true;", code);
     }
 
     [Fact]
@@ -35,6 +35,19 @@ public sealed class MetalRegisterLifecycleTests
         Assert.Contains("_header.IsEnabled = !busy && _warehouse is not null;", code);
         Assert.Contains("_tabs.IsEnabled = !busy;", code);
         Assert.Contains("finally { SetBusy(false); }", code);
+    }
+
+    [Fact]
+    public void FailedReadOrSaveRequiresRefreshAndCancelledBookIsDisposed()
+    {
+        var code = Source();
+        Assert.Contains("_registerRead?.Cancel();", code);
+        Assert.Contains("store.ReadRegister(token)", code);
+        Assert.Contains("data.Book?.Book.Dispose();", code);
+        Assert.Contains("_registerReady = true;", code);
+        Assert.Contains("if (!_registerReady)", code);
+        Assert.Contains("_registerReady = false;", code);
+        Assert.Contains("await Task.Run(() => ExportFilePublication.WriteBytes(path, bytes))", code);
     }
 
     [Fact]

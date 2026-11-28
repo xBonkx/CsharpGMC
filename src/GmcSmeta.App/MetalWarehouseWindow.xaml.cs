@@ -37,6 +37,7 @@ public partial class MetalWarehouseWindow : Window
     private int _reloadVersion;
     private int _journalVersion;
     private CancellationTokenSource? _journalRead;
+    private CancellationTokenSource? _snapshotRead;
     private bool _closed;
     private bool _journalLoading, _journalDirty = true, _journalHasNext, _publishingStock;
     private string _journalSearch = "";
@@ -66,12 +67,13 @@ public partial class MetalWarehouseWindow : Window
         Closed += (_, _) =>
         {
             _closed = true;
+            _snapshotRead?.Cancel();
             InvalidateJournal();
         };
         UpdateJournalControls();
         Closing += (_, args) =>
         {
-            if (_busy)
+            if (_busy && (_snapshotRead is null || _store is null))
             {
                 args.Cancel = true;
                 StatusText.Text = "Дождитесь завершения операции или загрузки.";
@@ -81,9 +83,12 @@ public partial class MetalWarehouseWindow : Window
 
     private async Task Reload()
     {
-        if (_busy) return;
+        if (_closed || _busy) return;
         _busy = true;
         var version = ++_reloadVersion;
+        using var request = new CancellationTokenSource();
+        _snapshotRead = request;
+        var token = request.Token;
         InvalidateJournal();
         _snapshot = null; // An unsuccessful read must not leave a writable stale dashboard.
         _stockSearch = null;
@@ -94,16 +99,20 @@ public partial class MetalWarehouseWindow : Window
         StatusText.Text = "Обновление склада…";
         try
         {
+            // The constructor can initialize schema; do not allow closing until it returns.
+            var store = _store ?? await Task.Run(() => new SqlServerMetalWarehouse(_connection));
+            if (_closed || token.IsCancellationRequested) return;
+            _store = store;
             var data = await Task.Run(() =>
             {
-                var store = _store ?? new SqlServerMetalWarehouse(_connection);
-                var snapshot = store.ReadSnapshot();
+                var snapshot = store.ReadSnapshot(token);
+                token.ThrowIfCancellationRequested();
                 return (Store: store, Snapshot: snapshot,
                     Places: snapshot.Places.Where(x => x.Area != 0 || x.Pieces != 0).ToLookup(x => x.MaterialId),
                     Objects: snapshot.Objects.ToLookup(x => x.MaterialId),
                     Search: new MetalStockSearch(snapshot.Stock));
-            });
-            if (version != _reloadVersion) return;
+            }, token);
+            if (_closed || token.IsCancellationRequested || version != _reloadVersion) return;
             _store = data.Store;
             _snapshot = data.Snapshot;
             _placesByMaterial = data.Places;
@@ -121,6 +130,7 @@ public partial class MetalWarehouseWindow : Window
         }
         catch (Exception ex)
         {
+            if (_closed || token.IsCancellationRequested) return;
             _snapshot = null;
             _stockSearch = null;
             _placesByMaterial = null;
@@ -139,9 +149,13 @@ public partial class MetalWarehouseWindow : Window
         }
         finally
         {
+            if (ReferenceEquals(_snapshotRead, request)) _snapshotRead = null;
             _busy = false;
-            UpdateJournalControls();
-            if (_snapshot is not null && JournalVisible) _ = LoadJournal();
+            if (!_closed)
+            {
+                UpdateJournalControls();
+                if (_snapshot is not null && JournalVisible) _ = LoadJournal();
+            }
         }
     }
 

@@ -66,6 +66,22 @@ public sealed class MetalWarehouseReadPerformanceTests
     }
 
     [Fact]
+    public void AggregateSnapshotUsesCancellableGuardedReadAndCloseFence()
+    {
+        var sql = Source("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Reads.cs");
+        Assert.Contains("public MetalSnapshot ReadSnapshot() => ReadSnapshot(CancellationToken.None);", sql);
+        Assert.Contains("SqlServerWorkspace.RequirePilotDatabase(_connectionString)", sql);
+        Assert.Contains("SqlReadCancellation.Open(_connectionString, token)", sql);
+        Assert.Contains("SqlReadCancellation.Scalar(rev, token)", sql);
+        Assert.Contains("SqlReadCancellation.ExecuteReader(cmd, token)", sql);
+        var code = Source("GmcSmeta.App/MetalWarehouseWindow.xaml.cs");
+        Assert.Contains("_snapshotRead?.Cancel();", code);
+        Assert.Contains("store.ReadSnapshot(token)", code);
+        Assert.Contains("_busy && (_snapshotRead is null || _store is null)", code);
+        Assert.Contains("_closed || token.IsCancellationRequested || version != _reloadVersion", code);
+    }
+
+    [Fact]
     public void EmptyRevisionCannotPublishWritableWarehouseSnapshot()
     {
         var sql = Source("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Reads.cs");
