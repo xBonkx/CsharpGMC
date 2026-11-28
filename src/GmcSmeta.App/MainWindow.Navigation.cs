@@ -368,7 +368,7 @@ public partial class MainWindow
     // navigation generation still invalidates a stale manual F5 snapshot.
     private async Task ReloadNavigationDataAsync()
     {
-        ++_navigationDataGeneration;
+        var generation = ++_navigationDataGeneration;
         CancelNavigationRefresh();
         var connection = _sqlConnectionString
             ?? throw new InvalidOperationException("Нет открытого подключения к SQL Server.");
@@ -380,6 +380,9 @@ public partial class MainWindow
             return Workspace.ReadConsistentNavigation(read, token);
         }, token).ConfigureAwait(true);
         if (_startupClosed) return;
+        if (!WorkspaceNavigationPolicy.CanPublishData(generation, _navigationDataGeneration,
+                connection, _sqlConnectionString, _startupClosed))
+            throw new OperationCanceledException("Обновление списка устарело. Повторите F5.");
         ApplyNavigationData(loaded.Objects, loaded.Documents);
     }
 
@@ -427,13 +430,8 @@ public partial class MainWindow
 
     private void SelectObjectFromNavigation(ObjectRow obj, bool preserveSearch = false, bool rebuildTree = true)
     {
-        var docsHere = _docs.Where(d => d.ObjectId == obj.Id).ToList();
-        var hasKp = docsHere.Any(d => d.Kind == "kp");
-        var hasContract = docsHere.Any(d => d.Kind is "main" or "dop");
-        var mode = obj.Archived ? NavigationMode.Archive
-            : CurrentMode == NavigationMode.Kp && hasKp ? NavigationMode.Kp
-            : CurrentMode == NavigationMode.Contracts && hasContract ? NavigationMode.Contracts
-            : hasKp || docsHere.Count == 0 ? NavigationMode.Kp : NavigationMode.Contracts;
+        var mode = WorkspaceNavigationPolicy.ForObject(obj.Archived, CurrentMode,
+            _docs.Where(d => d.ObjectId == obj.Id).Select(d => d.Kind));
         _ready = false;
         (mode == NavigationMode.Archive ? ArchiveMode : mode == NavigationMode.Kp ? KpMode : ContractsMode).IsChecked = true;
         if (!preserveSearch) ObjectSearch.Clear();

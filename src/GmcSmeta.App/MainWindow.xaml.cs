@@ -1312,6 +1312,11 @@ public partial class MainWindow : Window
                     if (cached.CacheReadOrWriteInProgress || cached.HasUnsettledCacheWrites)
                         continue;
                     StartupTrace.Mark("estimate_cache_validation_end");
+                    // Navigation metadata may have been refreshed during the revision probe.
+                    var latest = _docs.FirstOrDefault(d => d.Id == contractId);
+                    if (latest is null || !_objects.Any(o => o.Id == latest.ObjectId))
+                        throw new InvalidOperationException("Документ больше недоступен. Обновите список.");
+                    doc = latest;
                     if (cached.MatchesDocumentMetadata(doc) && cached.CanReuseCacheRevision(revision))
                     {
                         _estimateCacheOrder.Remove(contractId);
@@ -1326,6 +1331,9 @@ public partial class MainWindow : Window
                 }
                 // The cached snapshot is obsolete. Keep existing revision/undo
                 // guards: only a new authoritative load may replace its rows.
+                if (!WorkspaceNavigationPolicy.CanReplaceCachedEstimate(cached.CanTransferDocument,
+                        cached.HasUnsettledCacheWrites, cached.CacheReadOrWriteInProgress))
+                    throw new InvalidOperationException("Смета содержит незавершённые операции. Повторите открытие после сверки.");
                 _estimateCache.Remove(contractId);
                 _estimateCacheOrder.Remove(contractId);
             }
@@ -1437,7 +1445,7 @@ public partial class MainWindow : Window
         try
         {
             var obj = _objects.First(o => o.Id == doc.ObjectId);
-            var mode = obj.Archived ? NavigationMode.Archive : doc.Kind == "kp" ? NavigationMode.Kp : NavigationMode.Contracts;
+            var mode = WorkspaceNavigationPolicy.ForDocument(obj.Archived, doc.Kind);
             if (mode != CurrentMode)
             {
                 _ready = false;
