@@ -62,6 +62,32 @@ internal static class SummaryColumnFitChecks
         var beforeFont = cache.GetMinimums(1.25, 1.25);
         grid.FontSize = 16;
         Require(!ReferenceEquals(beforeFont, cache.GetMinimums(1.25, 1.25)), "Font change must invalidate measurements.");
+        var beforeFamily = cache.GetMinimums(1.25, 1.25);
+        grid.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+        Require(!ReferenceEquals(beforeFamily, cache.GetMinimums(1.25, 1.25)), "Font family change must invalidate measurements.");
+        var beforeStyle = cache.GetMinimums(1.25, 1.25);
+        grid.FontStyle = FontStyles.Italic;
+        Require(!ReferenceEquals(beforeStyle, cache.GetMinimums(1.25, 1.25)), "Font style change must invalidate measurements.");
+        var beforeStretch = cache.GetMinimums(1.25, 1.25);
+        grid.FontStretch = FontStretches.Expanded;
+        Require(!ReferenceEquals(beforeStretch, cache.GetMinimums(1.25, 1.25)), "Font stretch change must invalidate measurements.");
+        var beforePixels = cache.GetMinimums(1.25, 1.25);
+        Require(!ReferenceEquals(beforePixels, cache.GetMinimums(1.25, 1.5)), "Pixels-per-DIP change must invalidate measurements.");
+        var previousHeader = cache.GetMinimums(1.25, 1.25);
+        ((TextBlock)money.Header).Text = "Длинноенеразрывноеназваниеколонки";
+        var changedHeader = cache.GetMinimums(1.25, 1.25);
+        Require(!ReferenceEquals(previousHeader, changedHeader) && changedHeader[money] > previousHeader[money],
+            "A changed header must expand the measured minimum.");
+        var additional = new DataGridTextColumn { SortMemberPath = "t_sell", Header = "Длинноенеразрывноеназваниеколонки" };
+        grid.Columns.Add(additional);
+        var added = cache.GetMinimums(1.25, 1.25);
+        Require(added.ContainsKey(additional) && added[additional] > 64, "Added column with string header must be measured.");
+        grid.Columns.Remove(additional);
+        Require(!cache.GetMinimums(1.25, 1.25).ContainsKey(additional), "Removed column must not stay in width cache.");
+        money.Header = new TextBlock { Text = "Закупка ∑" };
+        grid.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
+        grid.FontStyle = FontStyles.Normal;
+        grid.FontStretch = FontStretches.Normal;
         // A bounded text cache must not lose the maximum even after saturation,
         // nor change the result when identical displayed strings repeat.
         var values = Enumerable.Range(0, 25000).Select(i =>
