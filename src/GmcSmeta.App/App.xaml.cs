@@ -60,19 +60,7 @@ public partial class App : Application
     {
         var demo = GmcSmeta.Core.Demo.DemoMode.IsRequested(e.Args);
         var demoSmoke = demo && e.Args.Contains("--smoke-test");
-        if (demo)
-        {
-            if (demoSmoke) GmcSmeta.Core.Demo.DemoMode.ResetSmokeReport();
-            try { GmcSmeta.Core.Demo.DemoMode.ConfigureProcess(e.Args); }
-            catch (Exception ex)
-            {
-                if (demoSmoke) GmcSmeta.Core.Demo.DemoMode.ReportSmokeFailure("configure-demo", ex);
-                if (!demoSmoke)
-                    MessageBox.Show(ex.Message, "ГМЦ-Смета — ТЕСТ", MessageBoxButton.OK, MessageBoxImage.Warning);
-                Shutdown(1);
-                return;
-            }
-        }
+        // DEMO process isolation is already established by StartupEntryPoint.
         StartupTrace.Mark("app_startup_enter");
         StartupTrace.MarkBuild();
         StartupTrace.Mark("app_previous_process_wait_begin");

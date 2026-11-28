@@ -57,6 +57,39 @@ public static class DemoMode
         return items[1];
     }
 
+    // A versioned EXE in the dedicated test installation is never an office
+    // entry point, even when Explorer supplies inherited office SQL settings.
+    public static void RequireExplicitLaunch(IEnumerable<string> args, string? localData, string? executable)
+    {
+        var items = args.ToArray();
+        if (IsRequested(items))
+        {
+            DatabaseFromArgs(items);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(localData) || string.IsNullOrWhiteSpace(executable) ||
+            !Path.IsPathFullyQualified(localData) || !Path.IsPathFullyQualified(executable)) return;
+        var root = Path.Combine(Path.GetFullPath(localData), "GMC-Smeta-Demo", "CSharp");
+        if (IsWithin(root, executable))
+            throw new InvalidOperationException("Откройте тестовую программу отдельным ярлыком --demo.");
+    }
+
+    public static bool IsWithin(string root, string? candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || !Path.IsPathFullyQualified(candidate)) return false;
+        try
+        {
+            var parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            var path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate));
+            return path.Equals(parent, StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or IOException)
+        {
+            return false;
+        }
+    }
+
     private static string CurrentDatabase => DatabaseFromArgs(Environment.GetCommandLineArgs().Skip(1));
 
     // Capture the real Windows root once, before overriding process environment.
@@ -68,7 +101,8 @@ public static class DemoMode
     public static string ResolveProfileRoot(string localData, string database)
     {
         DatabaseFromArgs(["--demo", database]);
-        if (string.IsNullOrWhiteSpace(localData) || !Path.IsPathFullyQualified(localData))
+        if (string.IsNullOrWhiteSpace(localData) || !Path.IsPathFullyQualified(localData) ||
+            localData.StartsWith(@"\\", StringComparison.Ordinal) || localData.StartsWith("//", StringComparison.Ordinal))
             throw new InvalidOperationException("Не найден локальный профиль Windows для тестового режима.");
         return Path.Combine(Path.GetFullPath(localData), "GMC-Smeta-Demo", "CSharp", database);
     }
@@ -99,6 +133,8 @@ public static class DemoMode
     public static void ConfigureProcess(string[] args)
     {
         var database = DatabaseFromArgs(args);
+        // Before the first startup trace or WPF resource is initialized.
+        Environment.SetEnvironmentVariable("GMC_SMETA_STARTUP_TRACE_DIR", null);
         var profile = ProfileRoot;
         Directory.CreateDirectory(ApplicationData);
         Directory.CreateDirectory(LocalData);

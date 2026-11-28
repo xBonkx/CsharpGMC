@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — DEMO-01.01 CODE READY / DEMO-05.01 PARTIAL: изоляция до WPF/trace, отказ прямого тестового EXE без аргументов, безопасные пути настроек. 3 test methods added, not run; [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.
+
 - 29.11.2026 — DEMO-02.01 PARTIAL: generator preflight + metal and catalog price fixture, 2 tests added (not run), Python main a76b032a. [Evidence](docs/DEMO_MODE_TODO_20261128.md). Бронь снята.
 
 - 29.11.2026 — PERF-047.02 PARTIAL: единый согласованный снимок допуска, отказ без ревизии, ограниченные повторы; source/unit tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.

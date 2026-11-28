@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+DEMO-01.01 CODE READY, DEMO-05.01 PARTIAL: [early isolated startup](DEMO_MODE_TODO_20261128.md); полная приёмка отдельно.
+
 DEMO-02.01 PARTIAL: [fixture coverage and generator preflight](DEMO_MODE_TODO_20261128.md).
 
 DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery, directory and integrity hardening](DEMO_MODE_TODO_20261128.md).
