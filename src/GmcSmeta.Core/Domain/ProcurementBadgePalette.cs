@@ -21,7 +21,8 @@ public static class ProcurementBadgePalette
         ["late"] = Look("#FEE2E2", "#B91C1C"),
         ["soon"] = Look("#FEF3C7", "#B45309"),
         ["ok"] = Look("#EEF2F7", "#334155"),
-        ["done"] = Look("#F4F4F5", "#94A3B8")
+        // Preserve completed-state grey background, but keep the caption readable.
+        ["done"] = Look("#F4F4F5", "#526174")
     };
 
     private static readonly ProcurementBadgeLook Empty = new("#00000000", "#0F172A", "#00000000");
