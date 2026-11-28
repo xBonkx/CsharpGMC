@@ -8,38 +8,47 @@ namespace GmcSmeta.App;
 internal sealed class ActDiscountDialog : Window
 {
     internal sealed record Input(string Mode,decimal? Value);
-    private readonly ComboBox _mode=new(){MinHeight=34};
-    private readonly TextBox _percent=new(){MinHeight=34,Padding=new Thickness(8,4,8,4)};
-    private readonly TextBox _amount=new(){MinHeight=34,Padding=new Thickness(8,4,8,4)};
-    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,10,0,14)};
-    private readonly Button _save=new(){Content="Сохранить",MinWidth=110,MinHeight=34,IsDefault=true};
+    private readonly ComboBox _mode=new();
+    private readonly TextBox _percent=new(){HorizontalContentAlignment=HorizontalAlignment.Right};
+    private readonly TextBox _amount=new(){HorizontalContentAlignment=HorizontalAlignment.Right};
+    private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap};
+    private readonly Button _save=new(){Content="Сохранить",IsDefault=true};
     private readonly decimal _gross,_contractRate;
     private readonly DiscountPolicy.ActDiscount _original;
     public Input? Result{get;private set;}
     public ActDiscountDialog(decimal gross,decimal payable,decimal contractRate,DiscountPolicy.ActDiscount original)
     {
         _gross=gross;_contractRate=contractRate;_original=original;
-        Title="Корректировка акта КС-2";Width=560;SizeToContent=SizeToContent.Height;
-        ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+        Title="Корректировка акта КС-2";Width=560;MinWidth=340;SizeToContent=SizeToContent.Height;
+        ResizeMode=ResizeMode.CanResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         DynamicFormLayout.Apply(this);
+        DynamicFormLayout.Field(_mode);
+        DynamicFormLayout.Field(_percent);
+        DynamicFormLayout.Field(_amount);
+        _preview.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogListGap");
         var panel=new StackPanel();
         var heading=WorkspaceWindowUi.Heading("До скидки с НДС: "+Fmt(gross)+" ₽");
         heading.SetResourceReference(TextBlock.FontSizeProperty, "UiValueSize");
-        heading.Margin=new Thickness(0,0,0,12);
+        heading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         panel.Children.Add(heading);
         foreach(var label in new[]{"Скидка по договору","Индивидуальная скидка, %","Установить итоговую сумму вручную"})_mode.Items.Add(label);
         panel.Children.Add(_mode);
         void Field(string title,TextBox input)
         {
-            panel.Children.Add(new TextBlock{Text=title,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,9,0,4)});
+            var caption=new TextBlock{Text=title,TextWrapping=TextWrapping.Wrap};
+            caption.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormLabelFieldGap");
+            input.SetResourceReference(FrameworkElement.MarginProperty,"LayoutFormStackedFieldGap");
+            System.Windows.Automation.AutomationProperties.SetName(input,title);
+            panel.Children.Add(caption);
             panel.Children.Add(input);
         }
         _percent.Text=original.Percent.ToString("0.#########",CultureInfo.GetCultureInfo("ru-RU"));
         _amount.Text=Fmt(payable);
         Field("Скидка, %",_percent);Field("Итог с НДС, ₽",_amount);
         panel.Children.Add(_preview);
-        var buttons=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        var cancel=new Button{Content="Отмена",MinWidth=100,MinHeight=34,IsCancel=true,Margin=new Thickness(0,0,8,0)};
+        var buttons=new WrapPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
+        var cancel=new Button{Content="Отмена",IsCancel=true};
+        cancel.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogActionGap");
         DynamicFormLayout.StyleActions(_save,cancel);
         buttons.Children.Add(cancel);
         buttons.Children.Add(_save);Content=DynamicFormLayout.WithFooter(panel,buttons);
