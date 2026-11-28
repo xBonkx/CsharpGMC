@@ -120,7 +120,7 @@ internal static class SqlDiagnostics
         using (var reader = command.ExecuteReader())
         {
             while (reader.Read())
-                expected.Add(new MovementFields(reader.GetInt64(0), Amount(reader, 1),
+                expected.Add(new MovementFields(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture), Amount(reader, 1),
                     Amount(reader, 2), Date(reader, 3)));
         }
         var actual = new List<MovementFields>();
@@ -224,7 +224,9 @@ internal static class SqlDiagnostics
             while (reader.Read())
             {
                 if (reader.FieldCount != 1 || reader.IsDBNull(0)) continue;
-                var xml = Convert.ToString(reader.GetValue(0), CultureInfo.InvariantCulture);
+                var value = reader.GetValue(0);
+                var xml = value is System.Data.SqlTypes.SqlXml sqlXml ? sqlXml.Value :
+                    Convert.ToString(value, CultureInfo.InvariantCulture);
                 if (xml is not null && xml.Contains("<ShowPlanXML", StringComparison.Ordinal))
                     plan = xml;
             }
