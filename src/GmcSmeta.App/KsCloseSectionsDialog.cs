@@ -9,7 +9,7 @@ namespace GmcSmeta.App;
 internal static class KsCloseSectionsDialog
 {
     internal static HashSet<long>? Show(FrameworkElement owner, string actNumber,
-        IEnumerable<(long SystemId, string Label, decimal Rest)> sections)
+        IEnumerable<(long SystemId, string Label, decimal Remainder)> sections)
     {
         var dialog = new Window
         {
@@ -28,7 +28,7 @@ internal static class KsCloseSectionsDialog
         list.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogListGap");
         foreach (var top in sections)
         {
-            var rest = top.Rest;
+            var rest = top.Remainder;
             var text = rest > 0.005m
                 ? $"{top.Label}   —   остаток {Money.Format(rest)} ₽"
                 : $"{top.Label}   —   уже сдан";
