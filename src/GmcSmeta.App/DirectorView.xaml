@@ -241,9 +241,9 @@
             <DockPanel x:Name="LoadStatusPanel" Visibility="Collapsed" Margin="0,0,0,6">
                 <Button x:Name="RetryButton" DockPanel.Dock="Right" Content="Повторить загрузку" ContentTemplate="{StaticResource IconLabelRefresh}"
                         Visibility="Collapsed" Style="{StaticResource PythonToolbarButton}" Click="Retry_Click"/>
-                <TextBlock x:Name="LoadStatus" Foreground="#64748B" TextWrapping="Wrap"/>
+                <TextBlock x:Name="LoadStatus" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
             </DockPanel>
-            <TextBlock Foreground="#64748B" TextWrapping="Wrap" FontSize="{StaticResource UiBodySize}"
+            <TextBlock Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" FontSize="{StaticResource UiBodySize}"
                        Text="Двойной щелчок — открыть карточку. ⚠ — данные неполные: закуп известен не по всем позициям или не внесены затраты на монтаж (вкладка «Себестоимость» в КП). Суммы с НДС."/>
         </StackPanel>
     </Grid>
