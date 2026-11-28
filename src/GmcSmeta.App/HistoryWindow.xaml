@@ -86,7 +86,7 @@
                 </Style>
             </DataGrid.RowStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Когда" Binding="{Binding When}" Width="125" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="When" Header="Когда" Binding="{Binding When}" Width="125" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                 <DataGridTextColumn Header="Кто" Binding="{Binding Who}" Width="110" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Что" Binding="{Binding What}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Действие" Binding="{Binding Action}" Width="150" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>

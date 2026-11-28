@@ -42,8 +42,8 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Система" Width="125" Binding="{Binding System}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                     <DataGridTextColumn Header="Назначение" Width="*" Binding="{Binding Purpose}" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                    <DataGridTextColumn Header="Точек" Width="70" Binding="{Binding PointsCount}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="Измерения" Width="140" Binding="{Binding MeasurementStatus}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="PointsCount" Header="Точек" Width="70" Binding="{Binding PointsCount}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="MeasurementStatus" Header="Измерения" Width="140" Binding="{Binding MeasurementStatus}" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                 </DataGrid.Columns>
             </DataGrid>
             <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#CFD6E3"

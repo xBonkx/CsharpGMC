@@ -31,9 +31,9 @@
                 <DataGridTextColumn Header="Что" Binding="{Binding KindText}" Width="90" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Название" Binding="{Binding Title}" Width="*" MinWidth="150" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Карточка" Binding="{Binding ObjectName}" Width="200" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Строк" Binding="{Binding RowsText}" Width="60" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Удалено" Binding="{Binding DeletedText}" Width="170" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Осталось" Binding="{Binding DaysLeftText}" Width="80" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="RowsText" Header="Строк" Binding="{Binding RowsText}" Width="60" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="DeletedText" Header="Удалено" Binding="{Binding DeletedText}" Width="170" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="DaysLeftText" Header="Осталось" Binding="{Binding DaysLeftText}" Width="80" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
             </DataGrid.Columns>
         </DataGrid>
         <TextBlock x:Name="EmptyText" Grid.Row="3" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,10,0,0" TextWrapping="Wrap"

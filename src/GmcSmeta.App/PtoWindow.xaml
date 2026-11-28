@@ -63,9 +63,9 @@
       <DataGrid.Columns>
         <DataGridTextColumn Header="Объект / договор" Binding="{Binding ObjectLabel}" Width="3*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
         <DataGridTextColumn Header="Раздел" Binding="{Binding Section}" Width="1.3*" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-        <DataGridTextColumn Header="Акт №" Binding="{Binding Number}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-        <DataGridTextColumn Header="Дата" Binding="{Binding Date}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-        <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="115" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Number" Header="Акт №" Binding="{Binding Number}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Date" Header="Дата" Binding="{Binding Date}" Width="100" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Status" Header="Статус" Binding="{Binding Status}" Width="115" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
         <DataGridTextColumn Header="Замечания" Binding="{Binding Findings}" Width="215" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
       </DataGrid.Columns>
     </DataGrid>

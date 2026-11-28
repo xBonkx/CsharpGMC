@@ -24,7 +24,7 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Система" Binding="{Binding Name}"
                                     Width="*" MinWidth="150" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="СМР, ₽"
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="AmountText" Header="СМР, ₽"
                     Binding="{Binding AmountText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                     Width="180" MinWidth="100" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"/>
             </DataGrid.Columns>

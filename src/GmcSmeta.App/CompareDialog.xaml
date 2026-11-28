@@ -81,12 +81,12 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Система" Binding="{Binding Sys}" Width="120" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="160" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="60" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Кол-во" Binding="{Binding Qty}" Width="70" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="150" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                <DataGridTextColumn Header="Сумма было" Binding="{Binding SumA}" Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridBeforeHeader}"/>
-                <DataGridTextColumn Header="Сумма стало" Binding="{Binding SumB}" Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridAfterHeader}"/>
-                <DataGridTextColumn Header="Разница" Binding="{Binding Diff}" Width="120" ElementStyle="{StaticResource CompactCostStrongMoney}" HeaderStyle="{StaticResource ReportGridTotalsHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="60" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Qty" Header="Кол-во" Binding="{Binding Qty}" Width="70" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Price" Header="Цена" Binding="{Binding Price}" Width="150" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="SumA" Header="Сумма было" Binding="{Binding SumA}" Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridBeforeHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="SumB" Header="Сумма стало" Binding="{Binding SumB}" Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridAfterHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Diff" Header="Разница" Binding="{Binding Diff}" Width="120" ElementStyle="{StaticResource CompactCostStrongMoney}" HeaderStyle="{StaticResource ReportGridTotalsHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}">
