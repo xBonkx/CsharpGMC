@@ -245,6 +245,7 @@ internal static class Program
         CheckNumericPastePlanning();
         CheckKsFormulaReferenceHighlight();
         ColumnMenuChecks.Run();
+        MenuBehaviorChecks.Run();
         LegacySummaryChecks.Run();
         SummaryRowSequenceChecks.Run();
         SummaryExcelChecks.Run();

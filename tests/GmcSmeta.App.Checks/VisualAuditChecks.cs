@@ -40,6 +40,7 @@ internal static class VisualAuditChecks
         Directory.CreateDirectory(output);
         RunLayoutChecks();
         VisualDifferenceChecks.SelfCheck();
+        ExportMenuFixtures(output);
         // These are simulated DIP viewports, not changes to Windows display settings.
         foreach (var (width, height) in new[] { (1366, 768), (1920, 1080), (2560, 1440) })
         {
@@ -66,6 +67,19 @@ internal static class VisualAuditChecks
 
         Console.WriteLine("Visual audit written to " + output);
         Console.WriteLine("Synthetic offscreen layout only; actual monitor DPI and interactive states still require Windows acceptance.");
+    }
+
+    private static void ExportMenuFixtures(string output)
+    {
+        foreach (var scale in new[] { 1.0, 1.1, 1.2 })
+        {
+            var menu = MenuBehaviorChecks.CreateFixture();
+            menu.LayoutTransform = new ScaleTransform(scale, scale);
+            var border = new Border { Background = Brushes.White, Child = menu };
+            Layout(border, 640, 480);
+            foreach (var dpi in new[] { 96, 120, 144, 192 })
+                Capture(border, output, $"menu-scale{scale * 100:0}-raster{dpi}dpi", dpi);
+        }
     }
 
     private static FrameworkElement CreateTotalsFixture()
