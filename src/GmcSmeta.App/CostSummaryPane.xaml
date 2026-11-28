@@ -67,7 +67,7 @@
                              AutomationProperties.Name="Найти позицию…" TextChanged="MaterialsSearch_Changed" ToolTip="Найти позицию…"/>
                     <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center"
                              Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                    <TextBlock Text="Найти позицию…" Foreground="#94A3B8" Margin="32,0,32,0"
+                    <TextBlock Text="Найти позицию…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0"
                                VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -139,7 +139,7 @@
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить закуп" ContentTemplate="{StaticResource IconLabelX}" Click="WorkClearCost_Click" Margin="{StaticResource LayoutCostToolbarItemGap}"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Очистить розницу" ContentTemplate="{StaticResource IconLabelX}" Click="WorkClearSell_Click" Margin="0,0,12,0"/>
                     <Button Style="{StaticResource PythonToolbarMain}" Content="Экспорт СМР Excel" ContentTemplate="{StaticResource IconLabelDownload}" Click="SmrExport_Click" Margin="0,0,12,0"/>
-                    <TextBlock x:Name="SmrModeCaption" VerticalAlignment="Center" Foreground="#64748B"/>
+                    <TextBlock x:Name="SmrModeCaption" VerticalAlignment="Center" Foreground="{StaticResource UiMutedTextBrush}"/>
                     <ComboBox x:Name="SmrModePicker" Width="160" Margin="10,0,5,0">
                         <ComboBoxItem Tag="sum" Content="Сумма"/>
                         <ComboBoxItem Tag="pos" Content="По позициям"/>
@@ -203,7 +203,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <WrapPanel Margin="0,0,0,8">
-            <TextBlock Text="Без закупочных цен: " Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBlock Text="Без закупочных цен: " Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
             <CheckBox x:Name="FilterNoPrice" Style="{StaticResource PythonFilterChip}" Content="Мат: без цены" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
             <CheckBox x:Name="FilterNoCost" Style="{StaticResource PythonFilterChip}" Content="Мат: без закупа" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
             <CheckBox x:Name="FilterNowSell" Style="{StaticResource PythonFilterChip}" Content="Работы: без розницы" Checked="Filter_Changed" Unchecked="Filter_Changed" Margin="0,0,10,0" VerticalAlignment="Center"/>
@@ -280,7 +280,7 @@
                 </UniformGrid>
                 <Border Grid.Row="1" Margin="0,12,0,0" Style="{StaticResource PythonTile}" Padding="1,1,1,6" MinHeight="0">
                     <DataGrid local:TableColumnMenu.Key="cost-totals" x:Name="TotalsGrid" CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsArticleRow}"
-                              ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="34" FontSize="14" ColumnHeaderHeight="36"
+                              ColumnHeaderStyle="{StaticResource TotalsArticleHeader}" MinRowHeight="34" FontSize="{StaticResource UiTotalsTableSize}" ColumnHeaderHeight="36"
                               EnableRowVirtualization="True" EnableColumnVirtualization="True" Background="White" BorderThickness="0"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                               CanUserReorderColumns="False" HeadersVisibility="Column" GridLinesVisibility="None" RowHeaderWidth="0"
@@ -303,7 +303,7 @@
             <Button x:Name="RetryCostButton" DockPanel.Dock="Right" Content="Повторить загрузку"
                     Style="{StaticResource PythonToolbarButton}" ContentTemplate="{StaticResource IconLabelRefresh}" Click="RetryCost_Click"
                     Visibility="Collapsed" Margin="8,0,0,0"/>
-            <TextBlock x:Name="FooterText" Foreground="#64748B" TextWrapping="Wrap"/>
+            <TextBlock x:Name="FooterText" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
         </DockPanel>
     </Grid>
 </UserControl>
