@@ -41,6 +41,7 @@ var databaseStable = false;
 var failure = "";
 var schemaVersion = "";
 var sqlServerVersion = "";
+IReadOnlyList<SqlDiagnosticResult> diagnostics = Array.Empty<SqlDiagnosticResult>();
 try
 {
     using var conn = SqlServerDatabase.Open(cs);
@@ -118,8 +119,12 @@ try
         Skip("switch_contract_a_to_b", "only_one_contract");
         Skip("document_compare", "only_one_contract");
     }
+    // Diagnostic instrumentation is deliberately outside timed iterations.
+    if (options.Diagnostics)
+        diagnostics = SqlDiagnostics.Collect(cs, doc.Id, directory);
     databaseStable = revision == SqlServerDatabase.Revision(conn);
     if (!databaseStable) exitCode = 4;
+    else if (diagnostics.Any(d => d.Status != "OK")) exitCode = 6;
 }
 catch (Exception ex)
 {
@@ -144,6 +149,7 @@ var evidence = new
 #endif
     RevisionStable = databaseStable, ExitCode = exitCode, FailureType = failure,
     CacheMode = "warm process; one warmup per case; existing server cache; no cache clearing",
+    DiagnosticsRequested = options.Diagnostics, Diagnostics = diagnostics,
     Cases = cases
 };
 File.WriteAllText(Path.Combine(directory, "evidence.json"),

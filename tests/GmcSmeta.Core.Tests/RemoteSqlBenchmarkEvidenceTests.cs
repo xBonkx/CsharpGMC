@@ -62,4 +62,53 @@ public sealed class RemoteSqlBenchmarkEvidenceTests
         Assert.Equal("test-output", options.OutputDirectory);
         Assert.Throws<ArgumentException>(() => BenchmarkOptions.Parse(new[] { "--runs", "30", "--runs", "40" }));
     }
+
+    [Fact]
+    public void DiagnosticsAreExplicitlyOptIn()
+    {
+        Assert.False(BenchmarkOptions.Parse(Array.Empty<string>()).Diagnostics);
+        Assert.True(BenchmarkOptions.Parse(new[] { "--diagnostics", "yes" }).Diagnostics);
+        Assert.False(BenchmarkOptions.Parse(new[] { "--diagnostics", "no" }).Diagnostics);
+        Assert.Throws<ArgumentException>(() => BenchmarkOptions.Parse(new[] { "--diagnostics", "true" }));
+    }
+
+    [Fact]
+    public void DiagnosticsRejectUnsafeDatabaseBeforeOpeningSql()
+    {
+        Assert.ThrowsAny<Exception>(() => SqlDiagnostics.Collect(
+            "Server=localhost;Database=master;Integrated Security=true", 1, "unused"));
+    }
+
+    [Fact]
+    public void MetadataQueriesAreScopedAndReferenceUsesAllFourMovementKinds()
+    {
+        foreach (var table in new[] { "systems", "positions", "contracts", "movements",
+            "procurement", "acts", "act_lines", "shipment_lines", "spec_revisions" })
+        {
+            Assert.Contains("N'" + table + "'", SqlDiagnostics.IndexInventorySql);
+            Assert.Contains("N'" + table + "'", SqlDiagnostics.StatisticsInventorySql);
+        }
+        Assert.Contains("WHERE sy.contract_id=@id", SqlDiagnostics.MovementReferenceSql);
+        foreach (var kind in new[] { "in", "out", "back", "back_supplier" })
+            Assert.Contains("N'" + kind + "'", SqlDiagnostics.MovementReferenceSql);
+    }
+
+    [Fact]
+    public void MovementParityRequiresExactMappedValuesAndPositionIdentity()
+    {
+        var item = new SqlDiagnostics.MovementFields(17, 7m, 2m, new DateTime(2026, 11, 28));
+        Assert.True(SqlDiagnostics.SameMovement(item, item with { }));
+        Assert.False(SqlDiagnostics.SameMovement(item, item with { PositionId = 18 }));
+        Assert.False(SqlDiagnostics.SameMovement(item, item with { Received = 7.000001m }));
+        Assert.False(SqlDiagnostics.SameMovement(item, item with { Issued = 1m }));
+        Assert.False(SqlDiagnostics.SameMovement(item, item with { LastIssue = null }));
+    }
+
+    [Theory]
+    [InlineData("Table 'positions'. Scan count 1, logical reads 10", true)]
+    [InlineData("SQL Server Execution Times: CPU time = 0 ms, elapsed time = 2 ms.", true)]
+    [InlineData("Changed database context to 'private'.", false)]
+    [InlineData("Unrelated logical reads message", false)]
+    public void InfoMessageFilterKeepsOnlyStatistics(string message, bool expected) =>
+        Assert.Equal(expected, SqlDiagnostics.IsStatisticsMessage(message));
 }

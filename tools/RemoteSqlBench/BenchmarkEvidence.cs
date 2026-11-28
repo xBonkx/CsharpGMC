@@ -3,7 +3,7 @@ using System.Globalization;
 namespace GmcSmeta.RemoteSqlBench;
 
 internal sealed record BenchmarkOptions(int Runs, int? ContractId, string OutputDirectory,
-    string SourceSha, string Topology)
+    string SourceSha, string Topology, bool Diagnostics)
 {
     internal static BenchmarkOptions Parse(string[] args)
     {
@@ -12,6 +12,7 @@ internal sealed record BenchmarkOptions(int Runs, int? ContractId, string Output
         var output = Path.Combine("tools", "RemoteSqlBench", "out");
         var sha = "UNSPECIFIED";
         var topology = "UNSPECIFIED";
+        var diagnostics = false;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Length; i += 2)
         {
@@ -27,10 +28,11 @@ internal sealed record BenchmarkOptions(int Runs, int? ContractId, string Output
                 case "--out" when !string.IsNullOrWhiteSpace(value): output = value; break;
                 case "--sha" when value.Length is >= 7 and <= 64 && value.All(Uri.IsHexDigit): sha = value; break;
                 case "--topology" when value is "LAN" or "WIFI" or "LOCAL" or "VPN" or "OTHER": topology = value; break;
+                case "--diagnostics" when value is "yes" or "no": diagnostics = value == "yes"; break;
                 default: throw new ArgumentException("Invalid benchmark option.");
             }
         }
-        return new BenchmarkOptions(runs, contract, output, sha, topology);
+        return new BenchmarkOptions(runs, contract, output, sha, topology, diagnostics);
     }
 }
 
