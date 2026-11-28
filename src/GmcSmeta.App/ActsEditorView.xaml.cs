@@ -1883,103 +1883,9 @@ public partial class ActsEditorView : UserControl
         var target = CaptureActCommand();
         var details = _details;
         if (target is null || details is null) return;
-        var dialog = new Window
-        {
-            Title = "Свойства акта",
-            Width = 480,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner = Window.GetWindow(this),
-        };
-        var grid = new Grid { Margin = new Thickness(16) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var row = 0;
-        TextBox Field(string caption, string text)
-        {
-            var label = new Label { Content = caption, VerticalAlignment = VerticalAlignment.Center };
-            var box = new TextBox { Text = text, Margin = new Thickness(0, 4, 0, 0) };
-            Grid.SetRow(label, row);
-            Grid.SetColumn(label, 0);
-            Grid.SetRow(box, row);
-            Grid.SetColumn(box, 1);
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.Children.Add(label);
-            grid.Children.Add(box);
-            row += 1;
-            return box;
-        }
-        var num = Field("Номер КС-2", details.Number);
-        var dt = Field("Дата акта", details.Date.ToString("dd.MM.yyyy"));
-        var fr = Field("Период с", details.PeriodFrom.ToString("dd.MM.yyyy"));
-        var to = Field("по", details.PeriodTo.ToString("dd.MM.yyyy"));
-        TextBox? dsNo = null, dsDate = null, dsExtra = null;
-        if (_isContract && _dsPerAct)
-        {
-            dsNo = Field("Доп. соглашение №", details.DsNo);
-            dsDate = Field("от", details.DsDate);
-            dsExtra = Field("Другие ДС (если есть)", details.DsExtra);
-            dsExtra.AcceptsReturn = true;
-            dsExtra.Height = 64;
-        }
-        var buttons = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 12, 0, 0),
-        };
-        var ok = new Button
-        {
-            Content = "Сохранить",
-            Style = (Style)FindResource("PythonToolbarPrimary"),
-            Padding = new Thickness(14, 5, 14, 5),
-        };
-        var cancel = new Button { Content = "Отмена", Style = (Style)FindResource("PythonToolbarButton"),
-            Margin = new Thickness(8, 0, 0, 0) };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
-        Grid.SetRow(buttons, row);
-        Grid.SetColumnSpan(buttons, 2);
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.Children.Add(buttons);
-        dialog.Content = grid;
-
-        SqlServerActs.ActDraftEdit? edit = null;
-        string message = "";
-        ok.Click += (_, _) =>
-        {
-            try
-            {
-                var date = ParseRuDate(dt.Text);
-                var from = ParseRuDate(fr.Text);
-                var to2 = ParseRuDate(to.Text);
-                message = "";
-                if (to2 > date)
-                {
-                    to2 = date;
-                    message = "Конец периода не может быть позже даты акта — поставлен по дату акта";
-                }
-                if (from > to2)
-                {
-                    from = to2;
-                    message = "Начало периода было позже конца — исправлено";
-                }
-                edit = new SqlServerActs.ActDraftEdit(
-                    num.Text.Trim().Length == 0 ? details.Number : num.Text.Trim(),
-                    date, from, to2, details.Smr, details.Transport, details.Pnr, details.SmrBySystem,
-                    dsNo?.Text.Trim() ?? details.DsNo,
-                    dsDate?.Text.Trim() ?? details.DsDate,
-                    dsExtra?.Text.Trim() ?? details.DsExtra);
-                dialog.DialogResult = true;
-            }
-            catch (FormatException ex)
-            {
-                MessageBox.Show(dialog, ex.Message, "Дата", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        };
-        cancel.Click += (_, _) => dialog.Close();
-        if (dialog.ShowDialog() == true && edit is not null)
-            _ = SavePropsAsync(target, edit, message);
+        var result = KsActPropertiesDialog.Show(this, details, _isContract && _dsPerAct);
+        if (result is { } accepted)
+            _ = SavePropsAsync(target, accepted.Edit, accepted.Message);
     }
 
     private async Task SavePropsAsync(ActCommandTarget target, SqlServerActs.ActDraftEdit edit, string message)
@@ -2009,25 +1915,6 @@ public partial class ActsEditorView : UserControl
         {
             _revision = "";
             SetStatus("Исход сохранения неизвестен: " + ex.Message + " Обновите КС перед новой правкой.", true);
-        }
-    }
-
-    /// <summary>Строка «дд.мм.гггг» с сообщениями Python (FullDateLineEdit.parsed_date).</summary>
-    private static DateTime ParseRuDate(string text)
-    {
-        var parts = text.Trim().Split(new[] { '.', ',', '/', ' ', '-' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 3 || parts[2].Length != 4)
-            throw new FormatException("Введите дату целиком, например 10.10.2026");
-        if (!int.TryParse(parts[2], out var y) || !int.TryParse(parts[1], out var m) ||
-            !int.TryParse(parts[0], out var d))
-            throw new FormatException("Проверьте дату: такого дня нет");
-        try
-        {
-            return new DateTime(y, m, d);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            throw new FormatException("Проверьте дату: такого дня нет");
         }
     }
 

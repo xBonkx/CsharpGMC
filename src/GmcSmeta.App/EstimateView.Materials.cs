@@ -197,7 +197,7 @@ public partial class EstimateView
     {
         var data = _materialsData;
         if (data is null || MaterialsGrid is null) return;
-        var counts = MaterialsCountTotals();
+        var counts = GmcSmeta.Core.Domain.MaterialsTileTotals.Count(data.Positions);
         _materialsBuilt = _materialsMode == "kp" && _materialsSort == "kp"
             ? MaterialsBuildKp(data)
             : MaterialsBuildView(data);
@@ -207,30 +207,6 @@ public partial class EstimateView
         MaterialsFillSystemFilter();
         MaterialsApplyViewFilter();
         MaterialsSyncViewButtons();
-    }
-
-    /// <summary>Σ плиток (cost_view._money): rev — верхние не-работы; cost — все строки с закупом
-    /// (включая комплектующие); cov — верхние с закупом и ценой; пропуски для фильтров.</summary>
-    private (decimal Rev, decimal Cost, decimal Cov, int Missing, int NoPrice) MaterialsCountTotals()
-    {
-        decimal rev = 0m, cost = 0m, cov = 0m;
-        int missing = 0, noprice = 0;
-        foreach (var p in _materialsData!.Positions)
-        {
-            var sub = p.ParentId is not null;
-            var cu = p.UnitCost;
-            if (!sub && !p.Work)
-                rev += p.Qty * p.Price;
-            if (cu is decimal unit)
-                cost += unit * p.Qty;
-            if (!sub && cu is not null && p.Price != 0m)
-                cov += p.Qty * p.Price;
-            if (!sub && cu is null && p.Price != 0m && !p.Work)
-                missing++;
-            if (!sub && p.Price == 0m)
-                noprice++;
-        }
-        return (rev, cost, cov, missing, noprice);
     }
 
     private Dictionary<long, string> _materialsLabels = new();
@@ -540,20 +516,9 @@ public partial class EstimateView
     private void MaterialsFillTiles((decimal Rev, decimal Cost, decimal Cov, int Missing, int NoPrice) counts)
     {
         var data = _materialsData!;
-        var rev = counts.Rev;
-        var cost = counts.Cost;
-        var cov = counts.Cov;
         var tAmount = data.TransportAmount;
         var tCost = data.TransportCost;
-        if (tAmount != 0m)
-        {
-            rev += tAmount;
-            if (tCost is decimal tc)
-            {
-                cost += tc;
-                cov += tAmount;
-            }
-        }
+        var (rev, cost, cov) = GmcSmeta.Core.Domain.MaterialsTileTotals.IncludeTransport(counts, tAmount, tCost);
         MatTileRevCaption.Text = tAmount != 0m ? "Цена клиенту (материалы + транспорт)" : "Цена клиенту (материалы)";
         MatTileRevValue.Text = MatMoney(rev);
         MatTileCostValue.Text = cost != 0m ? MatMoney(cost) : "не внесена";
