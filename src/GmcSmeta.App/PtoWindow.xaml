@@ -7,7 +7,7 @@
     Background="#F4F6FA" FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
   <DockPanel x:Name="PtoContent" Margin="14">
     <StackPanel DockPanel.Dock="Top">
-      <TextBlock x:Name="ArchiveLabel" Margin="0,0,0,10" Foreground="#64748B" TextWrapping="Wrap"/>
+      <TextBlock x:Name="ArchiveLabel" Margin="0,0,0,10" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
       <WrapPanel Margin="0,0,0,6">
         <Button Style="{StaticResource PythonToolbarButton}" Content="Создать комплект" ContentTemplate="{StaticResource IconLabelPlus}" Click="Create_Click" Padding="14,6" Margin="0,0,6,6"/>
         <Button Style="{StaticResource PythonToolbarButton}" Content="Открыть" ContentTemplate="{StaticResource IconLabelOpen}" Click="Edit_Click" Padding="14,6" Margin="0,0,6,6"/>
@@ -34,7 +34,7 @@
             ToolTip="Поиск объекта, договора, акта или замечаний" TextChanged="Filter_Changed"/>
           <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
                     <TextBlock Text="Найти комплект по объекту, договору или номеру акта"
-            Foreground="#94A3B8" Margin="32,0,10,0" VerticalAlignment="Center"
+            Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,10,0" VerticalAlignment="Center"
             IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
             <TextBlock.Style>
               <Style TargetType="TextBlock">
