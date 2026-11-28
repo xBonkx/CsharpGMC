@@ -1,7 +1,5 @@
 using System.IO;
 using System.Reflection;
-using System.Text.Json;
-using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -1501,97 +1499,6 @@ public partial class MainWindow : Window
         {
             _pendingEstimateFocus = null;
             page.FocusPositionFromSearch(position);
-        }
-    }
-
-    /// <summary>Открытие документа по ссылке .gmcs (links.read_link / find_contract).</summary>
-    private void OpenGmcsLink(string path)
-    {
-        try
-        {
-            using var jd = JsonDocument.Parse(File.ReadAllText(path));
-            var root = jd.RootElement;
-            if (root.TryGetProperty("type", out var t) && t.GetString() != "gmc-smeta-link") return;
-            var contractId = root.TryGetProperty("contract_id", out var cid) && cid.ValueKind == JsonValueKind.Number ? cid.GetInt32() : 0;
-            var objectId = root.TryGetProperty("object_id", out var oid) && oid.ValueKind == JsonValueKind.Number ? oid.GetInt32() : 0;
-            var objectName = root.TryGetProperty("object", out var on) ? on.GetString() ?? "" : "";
-            var title = root.TryGetProperty("title", out var tt) ? tt.GetString() ?? "" : "";
-            var kind = root.TryGetProperty("kind", out var kk) ? kk.GetString() ?? "" : "";
-            var number = root.TryGetProperty("number", out var nn) ? nn.GetString() ?? "" : "";
-            var date = root.TryGetProperty("date", out var dd) ? dd.GetString() ?? "" : "";
-
-            int? targetId = null;
-            if (contractId > 0 && _docs.Any(d => d.Id == contractId))
-            {
-                var d0 = _docs.First(d => d.Id == contractId);
-                if (objectId == 0 || d0.ObjectId == objectId ||
-                    _objects.FirstOrDefault(o => o.Id == d0.ObjectId)?.Name == objectName)
-                    targetId = contractId;
-            }
-            if (targetId is null)
-            {
-                var obj = _objects.FirstOrDefault(o => o.Name == objectName);
-                if (obj is not null)
-                {
-                    foreach (var x in _docs.Where(d => d.ObjectId == obj.Id))
-                    {
-                        if (!string.IsNullOrEmpty(title) && x.Title == title) { targetId = x.Id; break; }
-                    }
-                    if (targetId is null)
-                    {
-                        foreach (var x in _docs.Where(d => d.ObjectId == obj.Id))
-                        {
-                            if (x.Kind == kind && x.Number == number && x.Date == date) { targetId = x.Id; break; }
-                        }
-                    }
-                }
-            }
-            if (targetId is int id && id > 0) OpenEstimate(id);
-            else MessageBox.Show(this, "Документ из ссылки не найден в текущей базе.", "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
-
-    internal void CreateGmcsLink(DocRow doc)
-    {
-        try
-        {
-            var dlg = new SaveFileDialog
-            {
-                Title = "Создать ссылку .gmcs",
-                FileName = doc.Title + ".gmcs",
-                Filter = "Ссылка GMC-Smeta (*.gmcs)|*.gmcs",
-            };
-            if (dlg.ShowDialog(this) != true) return;
-            var path = dlg.FileName;
-            if (!path.EndsWith(".gmcs", StringComparison.OrdinalIgnoreCase)) path += ".gmcs";
-            var obj = _objects.FirstOrDefault(o => o.Id == doc.ObjectId);
-            var data = new
-            {
-                type = "gmc-smeta-link",
-                version = 1,
-                // Links open against the active connection; never embed SQL credentials.
-                db = "",
-                contract_id = doc.Id,
-                object_id = doc.ObjectId,
-                @object = obj?.Name ?? "",
-                title = doc.Title,
-                kind = doc.Kind,
-                number = doc.Number,
-                date = doc.Date,
-                saved_by = Environment.UserName,
-                saved_at = DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
-                hint = "Двойной клик открывает этот документ в GMC-Smeta.",
-            };
-            File.WriteAllText(path, JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true }), System.Text.Encoding.UTF8);
-            MessageBox.Show(this, "Ссылка создана:\n" + path, "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

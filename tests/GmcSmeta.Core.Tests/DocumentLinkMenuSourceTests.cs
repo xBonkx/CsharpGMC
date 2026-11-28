@@ -26,8 +26,12 @@ public sealed class DocumentLinkMenuSourceTests
         Assert.Contains("main.CreateGmcsLink(_doc);", header);
         var main = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));
         Assert.Contains("link.Click += (_, _) => CreateGmcsLink(doc);", main);
-        Assert.Contains("internal void CreateGmcsLink(DocRow doc)", main);
-        Assert.Contains("db = \"\",", main);
-        Assert.DoesNotContain("db = _sqlConnectionString", main);
+        var links = File.ReadAllText(Path.Combine(app, "MainWindow.DocumentLinks.cs"));
+        var codec = File.ReadAllText(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Domain", "GmcsDocumentLink.cs"));
+        Assert.Contains("internal void CreateGmcsLink(DocRow doc)", links);
+        Assert.Contains("GmcsDocumentLink.Serialize(doc,", links);
+        Assert.Contains("db = \"\",", codec);
+        Assert.DoesNotContain("_sqlConnectionString", links);
+        Assert.DoesNotContain("_sqlConnectionString", codec);
     }
 }

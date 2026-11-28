@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base a5e61dd) — ARCH-SIZE-02/04 PARTIAL: MainWindow.xaml.cs 1744→1651 lines, new MainWindow.DocumentLinks.cs 51 lines (partial wiring only) and independent Core GmcsDocumentLink.cs 57 lines (v1 serialization and exact original ID/title/tuple fallback, no connection strings). ActsEditorView.xaml.cs 2101→2082 lines, independent Core KsBatchQuantities.cs 38 lines (selection fill-rest/issued/clear rules extracted verbatim; writes, signatures and selection order unchanged). Thirteen offline test cases and amended link source guard added, not run; build/WPF/SQL/Excel acceptance remains. Logical shell/editor still large; no DB/schema/financial/UI/icon/release changes.
+
 28.11.2026 ChatGPT/main (base 4cd1bd7) — AGR-08/11 PARTIAL: director rows retain existing object-level monetary scope and formulas; on legal schema in contract mode a same-object active agreement LEFT JOIN in existing metadata batch identifies distinct contributing legal IDs and counts missing/archived links without dropping any documents. Existing warning glyph/text/tooltip and XLSX label now flag mixed legal scopes or unlinked documents; navigation stays object-level. KP/legacy scopes and financial totals unchanged. Five offline policy cases, legacy Pilot assertions and dedicated Agreement Pilot scenario added, not run; real WPF/SQL/XLSX and multi-agreement numerical acceptance pending. No new icons, schema, DB or release changes. Independent legal financial regrouping deferred pending explicit acceptance.
 
 28.11.2026 ChatGPT/main (base ead4ac8) — AGR-08/11 / trash safety PARTIAL: preserve existing independent open-KP-only restore policy and legal-file/history rejection. Reject contradictory legal links/annex numbers on KP, archived legal cards and restore of nonempty legal snapshots into incompatible schema before INSERT; require exact complete nonduplicate legal-card column set, excluding server rowversion via existing metadata. Permanent Forget refuses independent legal cards even without annexes; ordinary KP trash unchanged. Seven offline cases and dedicated Agreement Pilot two-card empty-object delete/restore/Forget rejection roundtrip added, not run; schema 28/32 Windows/SQL acceptance remains. Signed files and signed/linked annex/DS restoration require separate reviewed procedure; no schema/DB/finance/release changes.
@@ -797,7 +799,7 @@ PARITY-KS-FORMULA-01 закрыт после сверки вычислений �
 | ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | NOT STARTED |
 | ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | PARTIAL |
 | ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | NOT STARTED |
-| ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | NOT STARTED |
+| ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | PARTIAL |
 | ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | PARTIAL |
 | ARCH-SIZE-06 | P2 | App.xaml — тематические словари ресурсов | NOT STARTED |
 | ARCH-SIZE-07 | P2 | SqlServerStages/Acts/Workspace — аудит границ ответственности | NOT STARTED |

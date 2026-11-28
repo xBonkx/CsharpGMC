@@ -1,5 +1,7 @@
 # Аудит размера исходников и декомпозиции — 26.11.2026
 
+28.11.2026 ChatGPT/main (base a5e61dd) — ARCH-SIZE-02/04 PARTIAL: MainWindow.xaml.cs 1744→1651 lines, new MainWindow.DocumentLinks.cs 51 lines (partial wiring only) and independent Core GmcsDocumentLink.cs 57 lines (v1 serialization and exact original ID/title/tuple fallback, no connection strings). ActsEditorView.xaml.cs 2101→2082 lines, independent Core KsBatchQuantities.cs 38 lines (selection fill-rest/issued/clear rules extracted verbatim; writes, signatures and selection order unchanged). Thirteen offline test cases and amended link source guard added, not run; build/WPF/SQL/Excel acceptance remains. Logical shell/editor still large; no DB/schema/financial/UI/icon/release changes.
+
 28.11.2026 ChatGPT/main (base 5f00f46) — ARCH-SIZE-02 PARTIAL: ActsEditorView.xaml.cs 2279→2101 physical lines; export handlers moved verbatim into ActsEditorView.Export.cs (179 lines; organization only, same partial class/state). Independent Core KsSelectionQuantity.cs (37 lines) extracts selection-only unit normalization, first-seen group ordering and formatting, retains 3-decimal midpoint-to-even after sum and current culture. Five domain tests + one source guard, existing async export guard updated to relocated source. No SQL, finance, UI design, icon, DB/schema or release changes. Build/tests not executed; actual WPF and export acceptance pending. Logical editor remains large.
 
 28.11.2026 ChatGPT/main (base 532b5e9) — ARCH-SIZE-05 PARTIAL: EstimateView.Materials.cs 1697→1512 physical lines; independent MaterialsMarkupDialog.cs 134 lines, Core MaterialsOrder.cs 77 lines. Dialog body moved verbatim; frozen-sort ownership extracted, original comparisons, palette order, effective unit cost, null handling, per-view reset and current row values retained. Nine domain test cases and existing source guard updated; static review only, no .NET/WPF execution. Logical EstimateView still large; no SQL, financial formulas, icons, DB/schema or release changes.
@@ -38,7 +40,7 @@ ActsEditorView.xaml.cs: инвентаризировать обработчик�
 ### ARCH-SIZE-03 (P1) — NOT STARTED
 EstimateView.xaml и семейство EstimateView: проверить визуальные области, ресурсы, binding/имена элементов и границы состояния. Выделить логически цельные UserControl/ResourceDictionary/команды там, где это безопасно; оценить общий partial-класс, зависимости и разделение UI, расчётов, импорта, сохранения. Приёмка: сборка, WPF GUI 100/125/150% DPI, таблицы и выделение, меню, скрытие столбцов, редактирование, отмена, очереди, паритет Python.
 
-### ARCH-SIZE-04 (P1) — NOT STARTED
+### ARCH-SIZE-04 (P1) — PARTIAL
 MainWindow.xaml.cs: оценить навигацию, загрузку, команды, жизненный цикл, подписки и работу с окнами; выносить самостоятельные координаторы/сервисы, не менять время жизни ресурсов и порядок инициализации. Приёмка: запуск, переключение договоров/объектов, импорт, закрытие, отсутствие утечек/дублирования обработчиков.
 
 ### ARCH-SIZE-05 (P1) — PARTIAL

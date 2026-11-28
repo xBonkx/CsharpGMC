@@ -989,12 +989,9 @@ public partial class ActsEditorView : UserControl
 
     // -------------------------------------------------------------- заполнение акта
 
-    private sealed record PosState(long PositionId, decimal QtyByKp, decimal ClosedByOthers,
-        decimal LineQty, decimal Price, bool OutOfKp, bool Linked);
-
-    private List<PosState> SelectedPositionStates()
+    private List<KsBatchPosition> SelectedPositionStates()
     {
-        if (_sheet is null || _rows is null) return new List<PosState>();
+        if (_sheet is null || _rows is null) return new List<KsBatchPosition>();
         var byId = _sheet.Positions.ToDictionary(p => p.PositionId);
         var linked = _sheet.Positions
             .Where(p => (p.LineFormula ?? "").Contains('@'))
@@ -1008,11 +1005,11 @@ public partial class ActsEditorView : UserControl
             else
                 chosen.Add(vm.PositionId);
         }
-        var states = new List<PosState>();
+        var states = new List<KsBatchPosition>();
         foreach (var pid in chosen.Distinct())
         {
             if (!byId.TryGetValue(pid, out var p)) continue;
-            states.Add(new PosState(p.PositionId, p.QtyByKp, p.ClosedByOthers, p.LineQty, p.Price,
+            states.Add(new KsBatchPosition(p.PositionId, p.QtyByKp, p.ClosedByOthers, p.LineQty, p.Price,
                 p.OutOfKp, linked.Contains(p.PositionId)));
         }
         return states;
@@ -1029,13 +1026,7 @@ public partial class ActsEditorView : UserControl
             SetStatus("Выделите строки или систему", true);
             return;
         }
-        var byId = states.ToDictionary(s => s.PositionId);
-        var edits = states
-            .Where(s => !s.OutOfKp && !s.Linked)
-            .Select(s => (s.PositionId, Qty: ActQuantityPolicy.Remaining(s.QtyByKp, s.ClosedByOthers)))
-            .Where(s => Math.Abs(s.Qty - byId[s.PositionId].LineQty) > 0.000001m)
-            .Select(s => (s.PositionId, s.Qty))
-            .ToList();
+        var edits = KsBatchQuantities.FillRemaining(states);
         if (edits.Count == 0)
         {
             SetStatus("Нечего добавлять: всё уже сдано или не выдано");
@@ -1050,8 +1041,7 @@ public partial class ActsEditorView : UserControl
         var current = Current;
         if (current is null || current.Signed) return;
         var states = SelectedPositionStates();
-        var edits = states.Where(s => s.LineQty != 0m)
-            .Select(s => (s.PositionId, Qty: 0m)).ToList();
+        var edits = KsBatchQuantities.Clear(states);
         if (edits.Count == 0)
         {
             SetStatus("В выделенных строках нет объёмов");
@@ -1073,16 +1063,7 @@ public partial class ActsEditorView : UserControl
         }
         var issued = _sheet?.Positions.ToDictionary(p => p.PositionId, p => p.Issued)
                      ?? new Dictionary<long, decimal>();
-        var edits = new List<(long PositionId, decimal Qty)>();
-        foreach (var s in states)
-        {
-            if (s.OutOfKp || s.Linked) continue;
-            var rem = ActQuantityPolicy.Remaining(s.QtyByKp, s.ClosedByOthers);
-            var closedOther = s.QtyByKp - rem;
-            var q = Math.Min(rem, Math.Max(0m, issued.GetValueOrDefault(s.PositionId) - closedOther));
-            if (Math.Abs(q - s.LineQty) > 0.000001m)
-                edits.Add((s.PositionId, q));
-        }
+        var edits = KsBatchQuantities.FillIssued(states, issued);
         if (edits.Count == 0)
         {
             SetStatus("Нечего добавлять: всё уже сдано или не выдано");
