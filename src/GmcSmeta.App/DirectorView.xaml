@@ -141,8 +141,8 @@
             <StackPanel VerticalAlignment="Top">
                 <TextBlock x:Name="DirectorCrumb" Text="Главная" Foreground="{StaticResource UiMutedTextBrush}"
                            FontSize="{StaticResource UiBodySize}" Margin="0,0,0,2" VerticalAlignment="Center"/>
-                <TextBlock x:Name="HeadingText" Text="Договоры и группы — в работе" FontWeight="Bold"
-                           FontSize="{StaticResource UiH1Size}" Style="{StaticResource UiWrappedHeading}"/>
+                <TextBlock x:Name="HeadingText" Text="Договоры и группы — в работе"
+                           FontSize="{StaticResource UiH1Size}" Style="{StaticResource UiPageHeading}"/>
             </StackPanel>
             <Button x:Name="ExportButton" Grid.Column="1" Content="Сохранить в Excel" Click="Export_Click"
                     VerticalAlignment="Bottom" Style="{StaticResource DirectorExportButton}" ContentTemplate="{StaticResource IconLabelDownload}" ToolTip="Сохранить сводку в Excel"/>
