@@ -99,6 +99,39 @@ internal static class SummaryColumnFitChecks
         grid.ItemsSource = new[] { values[^1] };
         var maximumOnly = SummaryColumnFit.ReadMinimums(grid, 1)[money];
         Require(all == maximumOnly, "Bounded measurement cache lost a late large value.");
+        // Compatibility cost tables use already formatted values, never SQL or
+        // live editor text, and keep the original preferred width as a floor.
+        var legacy = new DataGrid { FontSize = 13, AutoGenerateColumns = false };
+        var legacyMoney = new DataGridTextColumn { Header = "Закуп", Width = 88 };
+        var legacyQty = new DataGridTextColumn { Header = "Кол-во", Width = 66 };
+        legacy.Columns.Add(legacyMoney);
+        legacy.Columns.Add(legacyQty);
+        var legacyColumns = new (DataGridColumn Column, string Path, string Header, double Preferred)[]
+        {
+            (legacyMoney, "MCost", "Закуп", 88), (legacyQty, "Qty", "Кол-во", 66)
+        };
+        legacy.ItemsSource = new[] { new CostSummaryPreviewRow { MCost = "1,00", Qty = "1" } };
+        var shortLegacy = LegacyCostColumnFit.ReadWidths(legacy, legacyColumns);
+        legacy.ItemsSource = new[] { new CostSummaryPreviewRow { MCost = "−123 456 789 012 345,67", Qty = "1" } };
+        var wideLegacy = LegacyCostColumnFit.ReadWidths(legacy, legacyColumns);
+        Require(wideLegacy[0] > shortLegacy[0] && wideLegacy[1] == shortLegacy[1] &&
+            shortLegacy[0] >= 88 && shortLegacy[1] >= 66, "Large formatted cost must expand only its default column.");
+        Require(LegacyCostColumnFit.Value(new CostSummaryPreviewRow { IsWork = true, OriginalWorkUnitPrice = "123,45", UPrice = "999" },
+            "SummaryUnitPrice") == "123,45", "Legacy measurement must use the visible work-unit value.");
+        Require(LegacyCostColumnFit.Value(new CostSummaryPane.CostTotalsPreviewRow { Margin = "−1 000,00" },
+            "Margin") == "−1 000,00", "Totals measurement must preserve formatted minus and separators.");
+        Require(LegacyCostColumnFit.Value(new CostSummaryPane.SmrExpensePreviewRow { Amount = "19 000,00" },
+            "Amount") == "19 000,00", "SMR expense amount must use its displayed value.");
+        var display = new GridDisplayWidthMeasure(legacy);
+        Require(display.Cell("123.456", 22) == display.Cell("123.456") + 22,
+            "Expandable row must reserve its actual 22-DIP affordance.");
+        Require(display.Header("Наименование Длинноенеразрывноеслово") > display.Header("Ед."),
+            "Header measurements must include longest unbreakable word.");
+        var smallFontWidth = display.Cell("−123 456 789,00");
+        legacy.FontSize = 22;
+        Require(new GridDisplayWidthMeasure(legacy).Cell("−123 456 789,00") > smallFontWidth,
+            "Content-aware widths must grow with table font.");
+
         Console.WriteLine("Summary fit arithmetic and formatted-value checks passed (no SQL).");
     }
 
