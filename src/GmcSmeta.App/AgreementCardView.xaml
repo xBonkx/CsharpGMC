@@ -10,7 +10,7 @@
   <StackPanel Margin="0,0,0,16">
    <Button Content="К карточке договора" Style="{StaticResource PythonToolbarButton}" HorizontalAlignment="Left" ContentTemplate="{StaticResource IconLabelArrowBack}" Click="Back_Click" Margin="0,0,0,10"/>
    <TextBlock Text="Реквизиты договора" TextWrapping="Wrap" FontSize="{StaticResource UiH1Size}" FontWeight="Bold"/>
-   <TextBlock x:Name="TitleText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"/>
+   <TextBlock x:Name="TitleText" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
   </StackPanel>
   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel x:Name="Fields" IsEnabled="False" MaxWidth="1100" HorizontalAlignment="Stretch">
@@ -39,10 +39,10 @@
        <TextBlock Text="ФИО подписанта подрядчика"/><TextBox x:Name="LegalContractorNameBox" MinHeight="{StaticResource LayoutFieldMinHeight}" Margin="0,4,0,10"/>
        <TextBlock Text="Дата окончания работ (дд.мм.гггг)"/><TextBox x:Name="LegalWorksEndBox" Width="200" MinHeight="{StaticResource LayoutFieldMinHeight}" HorizontalAlignment="Left" Margin="0,4,0,10"/>
       </StackPanel>
-      <TextBlock x:Name="AgreementText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,8"/>
+      <TextBlock x:Name="AgreementText" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,8"/>
       <Expander x:Name="SourceExpander" Header="Реквизиты приложений и ДС">
        <StackPanel Margin="0,8,0,0">
-        <TextBlock Text="У ДС собственные номер и дата. Изменить можно только неподписанные документы, не являющиеся этапами." Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <TextBlock Text="У ДС собственные номер и дата. Изменить можно только неподписанные документы, не являющиеся этапами." Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
         <DataGrid local:TableColumnMenu.Key="agreement.sources" local:TableColumnMenu.Protect="Документ" local:TableColumnMenu.Exclude="Действия" x:Name="SourceGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" MaxHeight="240" HeadersVisibility="Column">
          <DataGrid.Columns>
           <DataGridTextColumn Header="Документ" Binding="{Binding Name}" Width="2*"/>
@@ -84,7 +84,7 @@
     <Border Style="{StaticResource PythonTile}" Padding="18" Margin="0,0,0,12">
      <StackPanel>
       <TextBlock Text="Реквизиты для КС-2 и КС-3" TextWrapping="Wrap" FontSize="{StaticResource UiValueSize}" FontWeight="SemiBold"/>
-      <TextBlock Text="Общие для всех приложений и ДС этой карточки. Используются при формировании новых выгрузок КС." Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,14"/>
+      <TextBlock Text="Общие для всех приложений и ДС этой карточки. Используются при формировании новых выгрузок КС." Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,14"/>
       <TextBlock Text="Полное наименование заказчика с адресом"/>
       <TextBox x:Name="CustomerFullBox" MinHeight="50" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,4,0,10"/>
       <TextBlock Text="Стройка / объект строительства (для печати)"/>
@@ -115,7 +115,7 @@
   </ScrollViewer>
   <DockPanel Grid.Row="2" Margin="0,12,0,0">
    <Button x:Name="SaveButton" DockPanel.Dock="Right" Content="Сохранить реквизиты" Style="{StaticResource PrimaryButton}" IsEnabled="False" ContentTemplate="{StaticResource IconLabelCheck}" Click="Save_Click" Margin="12,0,0,0"/>
-   <TextBlock x:Name="StatusText" Foreground="#64748B" VerticalAlignment="Center" TextWrapping="Wrap"/>
+   <TextBlock x:Name="StatusText" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
   </DockPanel>
  </Grid>
 </UserControl>
