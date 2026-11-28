@@ -970,12 +970,14 @@ public partial class MainWindow : Window
         menu.Items.Add(attachments);
         if (doc.Kind is "main" or "dop")
         {
-            var letters = ContextMenuIcons.Create("Письма документа…", "File", SqlWritesEnabled);
+            var writableFiles = SqlWritesEnabled && !doc.IsStage && !doc.StageRest &&
+                _objects.Any(o => o.Id == doc.ObjectId && !o.Archived);
+            var letters = ContextMenuIcons.Create("Письма документа…", "File", writableFiles);
             letters.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, false); };
             menu.Items.Add(letters);
             if (PtoUserSettings.Enabled)
             {
-                var pto = ContextMenuIcons.Create("АОСР документа…", "File", SqlWritesEnabled);
+                var pto = ContextMenuIcons.Create("АОСР документа…", "File", writableFiles);
                 pto.Click += (_, _) => { if (ValidTarget()) OpenContractDocuments(doc, true); };
                 menu.Items.Add(pto);
             }
@@ -988,7 +990,8 @@ public partial class MainWindow : Window
             (pto && !PtoUserSettings.Enabled)) return;
         var doc = _docs.FirstOrDefault(d => d.Id == target.Id && d.ObjectId == target.ObjectId &&
             d.Kind == target.Kind && (d.Kind is "main" or "dop"));
-        if (doc is null || _objects.FirstOrDefault(o => o.Id == doc.ObjectId) is not { } obj) return;
+        if (doc is null || !CanOpenContractWorkspace(doc) ||
+            _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } obj) return;
         RunNavigationAction(pto ? "АОСР документа" : "Письма документа", () =>
         {
             Window dialog = pto ? new PtoWindow(connection, obj.Id, doc.Id) :

@@ -2,6 +2,7 @@ using System.IO;
 using Microsoft.Win32;
 using System.Windows;
 using GmcSmeta.Core.Domain;
+using GmcSmeta.Core.Db;
 
 namespace GmcSmeta.App;
 
@@ -28,6 +29,17 @@ public partial class MainWindow
     {
         try
         {
+            if (_serverConn is not { } conn || !CanStartDocumentMutation(doc) ||
+                _objects.FirstOrDefault(o => o.Id == doc.ObjectId) is not { } obj) return;
+            var mode = CurrentMode;
+            var revision = SqlServerDatabase.Revision(conn);
+            bool CurrentTarget() => ReferenceEquals(conn, _serverConn) && mode == CurrentMode &&
+                DocumentLocallyCurrent(doc) && _objects.Any(o => Equals(o, obj)) &&
+                CanStartDocumentMutation(doc) && DocumentMatchesServer(doc, revision) &&
+                Workspace.Objects(conn).Any(o => Equals(o, obj)) &&
+                revision == SqlServerDatabase.Revision(conn);
+            if (!CurrentTarget())
+                throw new InvalidOperationException("Карточка или документ изменились. Обновите список.");
             var dlg = new SaveFileDialog
             {
                 Title = "Создать ссылку .gmcs",
@@ -35,10 +47,11 @@ public partial class MainWindow
                 Filter = "Ссылка GMC-Smeta (*.gmcs)|*.gmcs",
             };
             if (dlg.ShowDialog(this) != true) return;
+            if (!CurrentTarget())
+                throw new InvalidOperationException("Карточка или документ изменились. Ссылка не сохранена.");
             var path = dlg.FileName;
             if (!path.EndsWith(".gmcs", StringComparison.OrdinalIgnoreCase)) path += ".gmcs";
-            var obj = _objects.FirstOrDefault(o => o.Id == doc.ObjectId);
-            var data = GmcsDocumentLink.Serialize(doc, obj?.Name ?? "", Environment.UserName, DateTime.Now);
+            var data = GmcsDocumentLink.Serialize(doc, obj.Name, Environment.UserName, DateTime.Now);
             File.WriteAllText(path, data, System.Text.Encoding.UTF8);
             MessageBox.Show(this, "Ссылка создана:\n" + path, "Ссылка .gmcs", MessageBoxButton.OK, MessageBoxImage.Information);
         }

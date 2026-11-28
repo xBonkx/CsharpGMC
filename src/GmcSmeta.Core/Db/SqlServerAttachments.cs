@@ -8,7 +8,10 @@ public static class SqlServerAttachments
 {
     public sealed record Entry(long Id, string Name, string Path, long Size, string AddedBy,
         DateTime AddedAt, string Note, string Role, bool IsPrimary);
-    public sealed record Snapshot(string Revision, string Folder, IReadOnlyList<Entry> Entries);
+    public sealed record Snapshot(string Revision, string Folder, IReadOnlyList<Entry> Entries)
+    {
+        public bool Archived { get; init; }
+    }
     public sealed record NewFile(string Name, string Path, long Size);
 
     public static Snapshot Read(string connectionString, long contractId, CancellationToken token = default)
@@ -21,7 +24,7 @@ public static class SqlServerAttachments
             ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
             : SqlServerDatabase.Revision(conn);
         var revision = Revision();
-        var folder = Folder(conn, null, contractId, token);
+        var context = ReadContext(conn, null, contractId, token);
         var entries = new List<Entry>();
         using (var cmd = new SqlCommand(
             "SELECT id,name,path,size,COALESCE(added_by,''),COALESCE(added_at,GETDATE()),COALESCE(note,'')," +
@@ -42,20 +45,23 @@ public static class SqlServerAttachments
         if (string.IsNullOrWhiteSpace(revision) || revision != Revision())
             throw new DBConcurrencyException("Вложения изменились при чтении. Обновите список.");
         token.ThrowIfCancellationRequested();
-        return new Snapshot(revision, folder, entries);
+        return new Snapshot(revision, context.Folder, entries) { Archived = context.Archived };
     }
 
-    private static string Folder(SqlConnection conn, SqlTransaction? tx, long contractId, CancellationToken token = default)
+    private static (string Folder, bool Archived) ReadContext(SqlConnection conn, SqlTransaction? tx,
+        long contractId, CancellationToken token = default)
     {
+        var hint = tx is null ? "" : " WITH (HOLDLOCK)";
         using var cmd = new SqlCommand(
-            "SELECT COALESCE(o.folder,N'') FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@c", conn, tx);
+            "SELECT COALESCE(o.folder,N''),o.archived FROM dbo.contracts c" + hint +
+            " JOIN dbo.objects o" + hint + " ON o.id=c.object_id WHERE c.id=@c", conn, tx);
         cmd.Parameters.Add("@c", SqlDbType.BigInt).Value = contractId;
         token.ThrowIfCancellationRequested();
-        var value = token.CanBeCanceled
-            ? cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult()
-            : cmd.ExecuteScalar();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
+        if (!reader.Read()) throw new InvalidOperationException("Документ не найден.");
         token.ThrowIfCancellationRequested();
-        return value as string ?? throw new InvalidOperationException("Документ не найден.");
+        return (reader.GetString(0), reader.IsDBNull(1) || Convert.ToBoolean(reader.GetValue(1)));
     }
 
     private static string Check(SqlConnection conn, SqlTransaction tx, long contractId, string expected)
@@ -63,7 +69,10 @@ public static class SqlServerAttachments
         var revision = SqlServerDatabase.LockRevision(conn, tx);
         if (string.IsNullOrWhiteSpace(revision) || revision != expected)
             throw new DBConcurrencyException("Данные изменились. Обновите вложения.");
-        return Folder(conn, tx, contractId);
+        var context = ReadContext(conn, tx, contractId);
+        if (context.Archived)
+            throw new InvalidOperationException("Вложения архивной карточки доступны только для просмотра.");
+        return context.Folder;
     }
 
     private static void Log(SqlConnection conn, SqlTransaction tx, long contractId, string action, string details)

@@ -49,9 +49,10 @@ public sealed class AttachmentWindow : Window
     private static readonly HashSet<Window> DirectOpenOwners = new();
     private string _revision = "";
     private string _objectFolder = "";
+    private bool _archived = true;
     private readonly List<(Button Button, Func<bool> Available)> _commands = new();
     private bool CanWrite => !_loading && !string.IsNullOrWhiteSpace(_revision) &&
-        SqlSchemaCompatibility.IsWritablePilot(new SqlConnectionStringBuilder(_connectionString).InitialCatalog,
+        !_archived && SqlSchemaCompatibility.IsWritablePilot(new SqlConnectionStringBuilder(_connectionString).InitialCatalog,
             new SqlConnectionStringBuilder(_connectionString).DataSource);
     private IReadOnlyList<AttachmentRow> _rows = Array.Empty<AttachmentRow>();
     private readonly DataGrid _grid = new()
@@ -185,6 +186,7 @@ public sealed class AttachmentWindow : Window
         _allowCloseDuringRead = allowClose;
         _revision = "";
         _objectFolder = "";
+        _archived = true;
         UpdateCommands();
         try
         {
@@ -197,7 +199,7 @@ public sealed class AttachmentWindow : Window
                     token.ThrowIfCancellationRequested();
                     if (!_signedOnly || entry.Role == "signed_contract") rows.Add(ToRow(entry));
                 }
-                return (Rows: rows.AsReadOnly(), data.Folder, data.Revision);
+                return (Rows: rows.AsReadOnly(), data.Folder, data.Revision, data.Archived);
             }, token);
             if (_closed || token.IsCancellationRequested) return;
             var selected = (_grid.SelectedItem as AttachmentRow)?.Id;
@@ -205,6 +207,7 @@ public sealed class AttachmentWindow : Window
             _grid.ItemsSource = _rows;
             _grid.SelectedItem = _rows.FirstOrDefault(row => row.Id == selected);
             _objectFolder = snapshot.Folder;
+            _archived = snapshot.Archived;
             _revision = snapshot.Revision;
         }
         catch (Exception ex)
@@ -371,6 +374,12 @@ public sealed class AttachmentWindow : Window
         {
             await Task.Run(() =>
             {
+                // Check the archived state and the original revision before
+                // touching the filesystem; Register repeats this under its transaction.
+                var confirmed = SqlServerAttachments.Read(_connectionString, _contractId);
+                if (confirmed.Archived || confirmed.Revision != revision ||
+                    !string.Equals(confirmed.Folder, objectFolder, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Карточка или вложения изменились. Обновите список.");
                 var folder = SqlServerAttachments.StorageFolder(_connectionString, _contractId, objectFolder);
                 if (!Directory.Exists(objectFolder)) throw new DirectoryNotFoundException("Общая папка объекта недоступна.");
                 // Validate all PDFs before copying anything.
