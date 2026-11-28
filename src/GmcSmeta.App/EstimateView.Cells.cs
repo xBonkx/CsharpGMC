@@ -328,43 +328,6 @@ public partial class EstimateView
             : null;
     }
 
-    private async void CopySection_Click(object sender, RoutedEventArgs e)
-    {
-        if (_estimate?.Locked != false || _serverConflict ||
-            Volatile.Read(ref _pendingWrites) != 0 || string.IsNullOrEmpty(_serverRevision)) return;
-        var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        var source = CopySourceSystem(selected);
-        if (source is null)
-        {
-            SetStatus("Выберите систему или её позицию.", true);
-            return;
-        }
-        var systemId = source.Source.SystemId;
-        var displayedRevision = _serverRevision;
-        var existing = _rows.Where(r => r.IsSystem).Select(r => r.Name).ToList();
-        var suggested = SqlServerSystemCopy.SuggestName(source.Name, existing);
-        var dialog = new PromptDialog("Копировать систему", "Название новой системы:", suggested)
-        {
-            Owner = Window.GetWindow(this)
-        };
-        if (dialog.ShowDialog() != true || dialog.Value.Trim().Length == 0) return;
-        if (_estimate?.Locked != false || _serverConflict ||
-            Volatile.Read(ref _pendingWrites) != 0 || _serverRevision != displayedRevision ||
-            !ReferenceEquals(EstimateGrid.SelectedItem, selected) ||
-            !ReferenceEquals(CopySourceSystem(selected), source))
-        {
-            SetStatus("Выбор или данные изменились. Откройте копирование заново.", true);
-            return;
-        }
-        var newName = dialog.Value.Trim();
-        await RunEstimateMutationAsync("Копирование системы…",
-            revision => revision != displayedRevision
-                ? SqlServerDatabase.SaveResult.Fail("Данные изменились. Откройте копирование заново.", revision)
-                : SqlServerSystemCopy.CopySystem(
-                    _sqlConnectionString, _contractId, systemId, newName, displayedRevision),
-            $"Система скопирована: «{newName}» ✓");
-    }
-
     private bool CanStartPriceLike() => PriceLikeBatchPlan.CanStart(
         _estimate?.Locked, _serverConflict, HasUnsettledCacheWrites, _detached, _serverRevision);
 

@@ -15,13 +15,7 @@ public static class SqlServerSystemCopy
 {
     private static readonly Regex NumberTail = new("^(.*?)(\\d+)(\\D*)$", RegexOptions.Compiled);
 
-    private static void RequirePilotWrite(string connectionString)
-    {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        if (!builder.InitialCatalog.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                "Запись C# разрешена только в отдельную тестовую базу GmcSmetaPilot_*. Рабочая база не изменена.");
-    }
+    public sealed record CopyResult(SqlServerDatabase.SaveResult Save, long? SystemId);
 
     /// <summary>«П1» → «П2» (первый свободный номер); иначе «имя (копия)».</summary>
     public static string SuggestName(string name, IReadOnlyList<string> existing)
@@ -29,12 +23,15 @@ public static class SqlServerSystemCopy
         var match = NumberTail.Match((name ?? "").Trim());
         if (!match.Success) return $"{name} (копия)";
         var used = existing.Select(x => x.Trim()).ToHashSet();
-        var n = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) + 1;
+        if (!int.TryParse(match.Groups[2].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var previous) ||
+            previous == int.MaxValue) return $"{name} (копия)";
+        var n = previous + 1;
         string candidate;
         do
         {
             candidate = $"{match.Groups[1].Value}{n}{match.Groups[3].Value}";
-            n++;
+            if (n == int.MaxValue && used.Contains(candidate)) return $"{name} (копия)";
+            if (n < int.MaxValue) n++;
         }
         while (used.Contains(candidate));
         return candidate;
@@ -42,66 +39,100 @@ public static class SqlServerSystemCopy
 
     /// <summary>Скопировать раздел со всеми позициями и подразделами (builder.copy_system).</summary>
     public static SqlServerDatabase.SaveResult CopySystem(string connectionString, long contractId,
-        long sourceSystemId, string newName, string expectedRevision)
+        long sourceSystemId, string newName, string expectedRevision) =>
+        CopySystemTo(connectionString, contractId, sourceSystemId, contractId, newName, expectedRevision).Save;
+
+    public static CopyResult CopySystemTo(string connectionString, long sourceContractId,
+        long sourceSystemId, long targetContractId, string newName, string expectedRevision)
     {
-        RequirePilotWrite(connectionString);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        newName = (newName ?? "").Trim();
+        if (sourceContractId <= 0 || targetContractId <= 0 || sourceSystemId <= 0 ||
+            newName.Length is < 1 or > 255 || string.IsNullOrWhiteSpace(expectedRevision))
+            return new(SqlServerDatabase.SaveResult.Fail("Некорректная система или название.", expectedRevision), null);
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = SqlServerDatabase.LockRevision(conn, tx);
-        if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
-        if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
-            return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови смету.", rev);
+        CopyResult Fail(string message) => new(SqlServerDatabase.SaveResult.Fail(message, rev ?? expectedRevision), null);
+        if (string.IsNullOrWhiteSpace(rev) || !string.Equals(rev, expectedRevision, StringComparison.Ordinal))
+            return Fail("Данные изменились. Обновите смету.");
 
-        // UI permissions are not authoritative: recheck the destination under the same transaction.
+        // One database and one object only. Destination stages are managed by
+        // their allocation editor, not by inserting unlinked copied positions.
         using (var document = new SqlCommand(
-            "SELECT c.locked,o.archived FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
-            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id WHERE c.id=@id", conn, tx))
+            "SELECT target.id FROM dbo.contracts target WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.contracts source WITH (HOLDLOCK) ON source.object_id=target.object_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=target.object_id " +
+            "WHERE target.id=@target AND source.id=@source AND ISNULL(o.archived,0)=0 " +
+            "AND ISNULL(target.locked,0)=0 AND target.stage_of IS NULL AND ISNULL(target.stage_rest,0)=0 " +
+            "AND ISNULL(source.stage_rest,0)=0 AND target.kind IN (N'kp',N'main',N'dop')", conn, tx))
         {
-            document.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var reader = document.ExecuteReader();
-            if (!reader.Read())
-                return SqlServerDatabase.SaveResult.Fail("Документ не найден.", rev);
-            if (Convert.ToBoolean(reader.GetValue(0), CultureInfo.InvariantCulture) ||
-                Convert.ToBoolean(reader.GetValue(1), CultureInfo.InvariantCulture))
-                return SqlServerDatabase.SaveResult.Fail("Подписанный или архивный документ нельзя менять.", rev);
+            document.Parameters.Add("@target", SqlDbType.BigInt).Value = targetContractId;
+            document.Parameters.Add("@source", SqlDbType.BigInt).Value = sourceContractId;
+            if (document.ExecuteScalar() is null)
+                return Fail("Назначение недоступно: другой объект, архив, подпись или этап.");
         }
 
-        var (srcId, srcParent, srcOrder, srcName, srcLabel, srcSmr) = ReadSystem(conn, tx, sourceSystemId, contractId);
-        if (srcId < 0) return SqlServerDatabase.SaveResult.Fail("Раздел не найден в этом документе.", rev);
-
-        long newId;
-        if (srcParent is not null)
+        var (srcId, srcParent, _, _, srcLabel, srcSmr) = ReadSystem(conn, tx, sourceSystemId, sourceContractId);
+        if (srcId < 0) return Fail("Исходный раздел не найден в выбранном документе.");
+        var same = sourceContractId == targetContractId;
+        var subsection = same && srcParent is not null;
+        var existing = ReadSectionOrder(conn, tx, targetContractId);
+        var children = srcParent is null ? SubsectionsOf(conn, tx, sourceSystemId, sourceContractId) : new();
+        var newId = InsertSystem(conn, tx, targetContractId, subsection ? srcParent : null,
+            newName, 0, srcSmr);
+        CopyPositions(conn, tx, sourceSystemId, newId);
+        var newChildren = new List<long>();
+        foreach (var (subId, _, subName, subSmr, _) in children)
         {
-            // Подраздел → новый подраздел той же системы, сразу после источника.
-            newId = InsertSystem(conn, tx, contractId, srcParent, newName, srcOrder + 1, srcSmr);
+            var subCopy = InsertSystem(conn, tx, targetContractId, newId, subName, 0, subSmr);
+            newChildren.Add(subCopy);
+            CopyPositions(conn, tx, subId, subCopy);
         }
-        else
+        var order = SystemCopySource.InsertCopyOrder(existing, same ? sourceSystemId : null,
+            newId, newChildren, subsection);
+        using (var update = new SqlCommand(
+            "UPDATE dbo.systems SET [order]=@order WHERE id=@id AND contract_id=@contract", conn, tx))
         {
-            // Верхний раздел → новый верхний раздел сразу после источника (с уплотнением).
-            ShiftOrders(conn, tx, contractId, srcOrder + 1, 1 + SubCount(conn, tx, sourceSystemId));
-            newId = InsertSystem(conn, tx, contractId, null, newName, srcOrder + 1, srcSmr);
-            foreach (var (subId, subOrder, subName, subSmr, _) in SubsectionsOf(conn, tx, sourceSystemId))
+            update.Parameters.Add("@contract", SqlDbType.BigInt).Value = targetContractId;
+            var orderParam = update.Parameters.Add("@order", SqlDbType.Int);
+            var idParam = update.Parameters.Add("@id", SqlDbType.BigInt);
+            for (var i = 0; i < order.Count; i++)
             {
-                var subCopy = InsertSystem(conn, tx, contractId, newId, subName, subOrder, subSmr);
-                CopyPositions(conn, tx, subId, subCopy);
+                orderParam.Value = i;
+                idParam.Value = order[i];
+                if (update.ExecuteNonQuery() != 1)
+                    throw new DBConcurrencyException("Раздел изменился при пересортировке.");
             }
         }
-        CopyPositions(conn, tx, sourceSystemId, newId);
 
         using (var log = new SqlCommand(
-            "INSERT INTO dbo.change_log (ts,[user],entity,entity_id,action,details,contract_id) " +
-            "VALUES (@ts,@user,N'system',@id,N'copy',@details,@contract)", conn, tx))
+            "INSERT INTO dbo.change_log (ts,[user],entity,entity_id,action,details,contract_id,object_id) " +
+            "VALUES (@ts,@user,N'system',@id,N'copy',@details,@contract,(SELECT object_id FROM dbo.contracts WHERE id=@contract))", conn, tx))
         {
             log.Parameters.AddWithValue("@ts", DateTime.Now);
             log.Parameters.AddWithValue("@user", ChangeLog.CurrentUser);
             log.Parameters.AddWithValue("@id", newId);
-            log.Parameters.AddWithValue("@details", $"«{srcLabel}» → «{newName}»");
-            log.Parameters.AddWithValue("@contract", contractId);
+            log.Parameters.AddWithValue("@details", $"«{srcLabel}» → «{newName}» (из документа #{sourceContractId})");
+            log.Parameters.AddWithValue("@contract", targetContractId);
             log.ExecuteNonQuery();
         }
         var updated = SqlServerDatabase.BumpPositionRevision(conn, tx);
         tx.Commit();
-        return new SqlServerDatabase.SaveResult(true, null, updated);
+        return new(new SqlServerDatabase.SaveResult(true, null, updated), newId);
+    }
+
+    private static List<SystemCopySource.Section> ReadSectionOrder(SqlConnection conn, SqlTransaction tx, long contractId)
+    {
+        var rows = new List<SystemCopySource.Section>();
+        using var cmd = new SqlCommand(
+            "SELECT id,parent_id FROM dbo.systems WITH (UPDLOCK,HOLDLOCK) WHERE contract_id=@id ORDER BY [order],id", conn, tx);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            rows.Add(new(Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
+                reader.IsDBNull(1) ? null : Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture)));
+        return rows;
     }
 
     // ---------------------------------------------------------------- внутреннее
@@ -130,12 +161,13 @@ public static class SqlServerSystemCopy
     }
 
     private static List<(long Id, int Order, string Name, decimal? Smr, string Label)> SubsectionsOf(
-        SqlConnection conn, SqlTransaction tx, long systemId)
+        SqlConnection conn, SqlTransaction tx, long systemId, long contractId)
     {
         var list = new List<(long, int, string, decimal?, string)>();
         using var cmd = new SqlCommand(
-            "SELECT id,[order],name,smr_amount FROM dbo.systems WHERE parent_id=@id ORDER BY [order],id", conn, tx);
+            "SELECT id,[order],name,smr_amount FROM dbo.systems WHERE parent_id=@id AND contract_id=@contract ORDER BY [order],id", conn, tx);
         cmd.Parameters.AddWithValue("@id", systemId);
+        cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         using var r = cmd.ExecuteReader();
         while (r.Read())
             list.Add((
@@ -145,26 +177,6 @@ public static class SqlServerSystemCopy
                 r.IsDBNull(3) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture)),
                 ""));
         return list;
-    }
-
-    private static int SubCount(SqlConnection conn, SqlTransaction tx, long systemId)
-    {
-        using var cmd = new SqlCommand(
-            "SELECT COUNT_BIG(*) FROM dbo.systems WHERE parent_id=@id", conn, tx);
-        cmd.Parameters.AddWithValue("@id", systemId);
-        return (int)Convert.ToInt64(cmd.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
-    }
-
-    private static void ShiftOrders(SqlConnection conn, SqlTransaction tx, long contractId,
-        int fromOrder, int count)
-    {
-        using var cmd = new SqlCommand(
-            "UPDATE dbo.systems SET [order]=[order]+@count " +
-            "WHERE contract_id=@cid AND parent_id IS NULL AND [order]>=@from", conn, tx);
-        cmd.Parameters.AddWithValue("@count", count);
-        cmd.Parameters.AddWithValue("@cid", contractId);
-        cmd.Parameters.AddWithValue("@from", fromOrder);
-        cmd.ExecuteNonQuery();
     }
 
     private static long InsertSystem(SqlConnection conn, SqlTransaction tx, long contractId,
@@ -184,45 +196,45 @@ public static class SqlServerSystemCopy
     /// <summary>Позиции и комплектующие источника → новый раздел (ссылки parent локальны).</summary>
     private static void CopyPositions(SqlConnection conn, SqlTransaction tx, long srcSystemId, long dstSystemId)
     {
-        var rows = new List<(long Id, long? ParentId, decimal? WorkCost, decimal? WorkSell, decimal? Purchase)>();
+        var rows = new List<(long Id, long? ParentId, bool Outside)>();
         using (var read = new SqlCommand(
-            "SELECT id, parent_id, qty, work_cost, work_sell, purchase_price FROM dbo.positions " +
-            "WHERE system_id=@sys ORDER BY [order], id", conn, tx))
+            "SELECT id,parent_id,ISNULL(out_of_kp,0) FROM dbo.positions " +
+            "WHERE system_id=@sys ORDER BY [order],id", conn, tx))
         {
-            read.Parameters.AddWithValue("@sys", srcSystemId);
+            read.Parameters.Add("@sys", SqlDbType.BigInt).Value = srcSystemId;
             using var r = read.ExecuteReader();
             while (r.Read())
-                rows.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                rows.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
                     r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                    r.IsDBNull(3) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture)),
-                    r.IsDBNull(4) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)),
-                    r.IsDBNull(5) ? null : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture))));
+                    Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture)));
         }
+        var roots = rows.Where(r => r.ParentId is null).ToDictionary(r => r.Id);
+        if (rows.Any(r => r.ParentId is long parent && !roots.ContainsKey(parent)))
+            throw new InvalidOperationException("Нарушена структура комплектующих исходной системы.");
         var made = new Dictionary<long, long>();
-        // Верхние строки, затем дети (двумя проходами: ссылки parent локальны).
-        foreach (var pass in new[] { 0, 1 })
-            foreach (var row in rows)
-            {
-                if (pass == 0 && row.ParentId is not null) continue;
-                if (pass == 1 && (row.ParentId is null || !made.ContainsKey(row.ParentId.Value))) continue;
-                using var insert = new SqlCommand(
-                    @"INSERT dbo.positions (system_id,parent_id,catalog_item_id,num,basis,name,unit,qty,price,
-                       purchase_price,note,extra_json,source_row,[order],out_of_kp,formulas,area_manual,
-                       work_price,cost_note,cost_color,work_sell,work_cost)
-                      SELECT @dst,
-                             CASE WHEN p.parent_id IS NULL THEN NULL ELSE @mappedParent END,
-                             p.catalog_item_id,p.num,p.basis,p.name,p.unit,p.qty,p.price,p.purchase_price,
-                             p.note,p.extra_json,NULL,p.[order],p.out_of_kp,p.formulas,p.area_manual,
-                             p.work_price,p.cost_note,p.cost_color,p.work_sell,p.work_cost
-                      FROM dbo.positions p WHERE p.id=@src
-                      OUTPUT INSERTED.id", conn, tx);
-                insert.Parameters.AddWithValue("@dst", dstSystemId);
-                insert.Parameters.AddWithValue("@src", row.Id);
-                insert.Parameters.AddWithValue("@mappedParent",
-                    pass == 0 ? DBNull.Value : made[row.ParentId!.Value]);
-                var newId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
-                made[row.Id] = newId;
-            }
+        // Copy only estimate rows, not purchase-only extras or their children.
+        // Preserve specification source_row, formulas and all Python copy fields.
+        foreach (var row in rows.Where(r => r.ParentId is null && !r.Outside)
+            .Concat(rows.Where(r => r.ParentId is long parent && !r.Outside && !roots[parent].Outside)))
+        {
+            using var insert = new SqlCommand(
+                @"INSERT dbo.positions (system_id,parent_id,catalog_item_id,num,basis,name,unit,qty,price,
+                   purchase_price,note,extra_json,source_row,[order],out_of_kp,formulas,area_manual,
+                   work_price,cost_note,cost_color,work_sell,work_cost)
+                  OUTPUT INSERTED.id
+                  SELECT @dst,@mappedParent,
+                         p.catalog_item_id,p.num,p.basis,p.name,p.unit,p.qty,p.price,p.purchase_price,
+                         p.note,p.extra_json,p.source_row,p.[order],0,p.formulas,p.area_manual,
+                         p.work_price,p.cost_note,p.cost_color,p.work_sell,p.work_cost
+                  FROM dbo.positions p WHERE p.id=@src AND p.system_id=@source", conn, tx);
+            insert.Parameters.Add("@dst", SqlDbType.BigInt).Value = dstSystemId;
+            insert.Parameters.Add("@src", SqlDbType.BigInt).Value = row.Id;
+            insert.Parameters.Add("@source", SqlDbType.BigInt).Value = srcSystemId;
+            insert.Parameters.Add("@mappedParent", SqlDbType.BigInt).Value =
+                row.ParentId is long parentId ? (object)made[parentId] : DBNull.Value;
+            var inserted = insert.ExecuteScalar();
+            if (inserted is null or DBNull) throw new DBConcurrencyException("Исходная позиция исчезла.");
+            made[row.Id] = Convert.ToInt64(inserted, CultureInfo.InvariantCulture);
+        }
     }
 }

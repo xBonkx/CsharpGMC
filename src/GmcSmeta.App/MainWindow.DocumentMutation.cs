@@ -42,6 +42,16 @@ public partial class MainWindow
         _objects.Any(o => o.Id == objectId && !o.Archived) &&
         _docs.Any(d => d.Id == documentId && d.ObjectId == objectId && !d.StageRest);
 
+    internal bool CanReceiveSystemCopy(DocRow target, int sourceId, int objectId) =>
+        CanEditEstimateHeader(sourceId, objectId) && SystemCopySource.CanReceive(target, objectId) &&
+        DocumentLocallyCurrent(target) && CanStartDocumentMutation(target);
+
+    internal void RefreshSystemCopyTarget(int targetId)
+    {
+        if (_estimateCache.TryGetValue(targetId, out var cached)) cached.RequestRefresh();
+        ReloadNavigationData();
+    }
+
     private bool CanStartDocumentMutation(DocRow expected) =>
         !_estimateCache.TryGetValue(expected.Id, out var cached) || cached.CanTransferDocument;
 }
