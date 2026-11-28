@@ -132,8 +132,40 @@ internal static class SummaryColumnFitChecks
         Require(new GridDisplayWidthMeasure(legacy).Cell("−123 456 789,00") > smallFontWidth,
             "Content-aware widths must grow with table font.");
 
+        var ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU");
+        Require(DocumentColumnFit.Display(123456789012345.67m, "N2", ru) ==
+            123456789012345.67m.ToString("N2", ru), "Document numeric display must match binding StringFormat.");
+        Require(DocumentColumnFit.Display(1234.125m, "{}{0:0.###}", ru) == 1234.125m.ToString("0.###", ru),
+            "Escaped composite WPF format must be preserved.");
+        Require(DocumentColumnFit.Display(new DateTime(2026, 11, 28), "dd.MM.yyyy", ru) == "28.11.2026",
+            "Date display must match WPF binding.");
+        Require(DocumentColumnFit.Display(null, "N2", ru) == "", "Null value must not become zero.");
+        var doc = new DataGrid { FontSize = 13, AutoGenerateColumns = false };
+        var amountColumn = new DataGridTextColumn { Header = "Сумма", Width = 90 };
+        var statusColumn = new DataGridTemplateColumn { Header = "Статус", Width = 100 };
+        doc.Columns.Add(amountColumn);
+        doc.Columns.Add(statusColumn);
+        DocumentColumnFit.Input[] documentColumns =
+        [
+            new(amountColumn, "Amount", "Сумма", 90, "N2", ru, 0),
+            new(statusColumn, "Status", "Статус", 100, null, ru, 20)
+        ];
+        doc.ItemsSource = new[] { new WidthFixture(1m, "Готово") };
+        var shortDocument = DocumentColumnFit.ReadWidths(doc, documentColumns);
+        doc.ItemsSource = new[] { new WidthFixture(-123456789012345.67m, "Готово") };
+        var wideDocument = DocumentColumnFit.ReadWidths(doc, documentColumns);
+        Require(wideDocument[0] > shortDocument[0] && wideDocument[1] == shortDocument[1],
+            "A large formatted value expands only the corresponding default column.");
+        doc.ItemsSource = new[] { new WidthFixture(1m, "Ожидается частичная поставка") };
+        Require(DocumentColumnFit.ReadWidths(doc, documentColumns)[1] > shortDocument[1],
+            "Template label measurement must include badge text.");
+        Require(amountColumn.Width.Value == 90 && statusColumn.Width.Value == 100,
+            "Measurement must not mutate column widths before application.");
+
         Console.WriteLine("Summary fit arithmetic and formatted-value checks passed (no SQL).");
     }
+
+    public sealed record WidthFixture(decimal Amount, string Status);
 
     private static void Require(bool condition, string message)
     {
