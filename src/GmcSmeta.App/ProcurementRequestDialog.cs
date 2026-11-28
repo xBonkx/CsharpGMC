@@ -174,6 +174,7 @@ public sealed class ProcurementRequestDialog : Window
                 "Закуп, ед." => TextAlignment.Right,
                 _ => TextAlignment.Left
             });
+        PreviewGridPaste.Install<PreviewLine>(_grid, nameof(PreviewLine.Name), nameof(PreviewLine.Unit), nameof(PreviewLine.Quantity), nameof(PreviewLine.UnitPrice), nameof(PreviewLine.Note));
         TableColumnMenu.SetProtect(_grid, "Наименование|Ед.|Кол-во|Закуп, ед.");
         TableColumnMenu.SetKey(_grid, "procurement-request-preview");
         Grid.SetRow(_grid, 3);
