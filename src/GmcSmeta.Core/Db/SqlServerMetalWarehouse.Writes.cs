@@ -23,11 +23,11 @@ WHERE e.material_id=@id ORDER BY e.id
         var result = new List<MetalMovement>();
         while (r.Read())
         {
-            long? obj = r.IsDBNull(10) ? null : r.GetInt64(10);
-            long? lot = r.IsDBNull(14) ? null : r.GetInt64(14);
+            long? obj = r.IsDBNull(10) ? null : SqlInteger.ReadInt64(r, 10);
+            long? lot = r.IsDBNull(14) ? null : SqlInteger.ReadInt64(r, 14);
             result.Add(new MetalMovement(
-                r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4),
-                r.GetInt64(5), SqlInteger.ReadInt32(r, 6), r.GetInt64(7), r.GetString(8), r.GetString(9),
+                SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2), r.GetString(3), r.GetString(4),
+                SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6), SqlInteger.ReadInt64(r, 7), r.GetString(8), r.GetString(9),
                 obj, r.GetString(11), r.GetString(12), r.GetString(13), lot,
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));
         }
@@ -206,7 +206,7 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = lotId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new ArgumentException("Партия не найдена.");
-            materialId = r.GetInt64(0); orderedArea = r.GetInt64(1); orderedPieces = SqlInteger.ReadInt32(r, 2);
+            materialId = SqlInteger.ReadInt64(r, 0); orderedArea = SqlInteger.ReadInt64(r, 1); orderedPieces = SqlInteger.ReadInt32(r, 2);
             supplier = r.GetString(3); invoice = r.GetString(4); materialCategory = r.GetString(5);
         }
         if (materialCategory != "Бухты") throw new ArgumentException("Партии доступны только для бухт.");
@@ -225,7 +225,7 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
                 if (kind == "Оплата партии") paid = true;
                 if (kind == "Получение партии")
                 {
-                    receivedArea += r.GetInt64(1);
+                    receivedArea += SqlInteger.ReadInt64(r, 1);
                     receivedPieces += SqlInteger.ReadInt32(r, 2);
                 }
             }
@@ -260,7 +260,7 @@ JOIN dbo.gmc_metal_materials m ON m.id=l.material_id WHERE l.id=@id
         using var cmd = new SqlCommand(
             "SELECT workbook,revision FROM dbo.gmc_metal_register WHERE id=1", conn);
         using var r = cmd.ExecuteReader();
-        return r.Read() ? new SharedWorkbook((byte[])r.GetValue(0), r.GetInt64(1)) : null;
+        return r.Read() ? new SharedWorkbook((byte[])r.GetValue(0), SqlInteger.ReadInt64(r, 1)) : null;
     }
 
     public long SaveRegister(byte[] workbook, long? expectedRevision, string expectedMainRevision)

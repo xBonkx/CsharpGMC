@@ -120,7 +120,7 @@ public static partial class SqlServerCostOperations
                 using var reader = read.ExecuteReader();
                 if (!reader.Read())
                     throw new DBConcurrencyException("Позиция не принадлежит смете; очистка отменена.");
-                locked = !reader.IsDBNull(0) && reader.GetBoolean(0);
+                locked = !reader.IsDBNull(0) && SqlFlag.Read(reader, 0);
                 sub = !reader.IsDBNull(1);
                 work = GmcSmeta.Core.Domain.EstimateStatistics.IsWorkName(reader.IsDBNull(2) ? "" : reader.GetString(2));
                 formulas = reader.IsDBNull(3) ? "" : reader.GetString(3);

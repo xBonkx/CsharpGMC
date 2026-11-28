@@ -140,7 +140,7 @@ END;
         if (!reader.Read()) return null;
         var data = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(0), LettersRules.Json)
             ?? throw new InvalidDataException("Повреждён JSON письма.");
-        data.Revision = reader.GetInt64(1);
+        data.Revision = SqlInteger.ReadInt64(reader, 1);
         return data;
     }
 
@@ -160,7 +160,7 @@ END;
         while (reader.Read())
         {
             var item = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(0), LettersRules.Json)!;
-            item.Revision = reader.GetInt64(1);
+            item.Revision = SqlInteger.ReadInt64(reader, 1);
             if (MatchesList(item, query, status)) list.Add(item);
         }
         return list;
@@ -182,7 +182,7 @@ END;
         {
             token.ThrowIfCancellationRequested();
             var item = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(0), LettersRules.Json)!;
-            item.Revision = reader.GetInt64(1);
+            item.Revision = SqlInteger.ReadInt64(reader, 1);
             if (MatchesList(item, query, status) && (belongs is null || belongs(item)))
                 list.Add(item);
         }
@@ -464,8 +464,8 @@ END;
         {
             var snapshot = JsonSerializer.Deserialize<LetterDocument>(reader.GetString(2), LettersRules.Json)
                 ?? throw new InvalidDataException("Повреждён снимок в истории письма.");
-            snapshot.Revision = reader.GetInt64(0);
-            list.Add(new HistoricalVersion(reader.GetInt64(0), reader.GetDateTime(1), snapshot));
+            snapshot.Revision = SqlInteger.ReadInt64(reader, 0);
+            list.Add(new HistoricalVersion(SqlInteger.ReadInt64(reader, 0), reader.GetDateTime(1), snapshot));
         }
         return list;
     }
@@ -478,7 +478,7 @@ END;
         cmd.Parameters.AddWithValue("@id", id);
         var result = new List<(long, DateTime)>();
         using var reader = cmd.ExecuteReader();
-        while (reader.Read()) result.Add((reader.GetInt64(0), reader.GetDateTime(1)));
+        while (reader.Read()) result.Add((SqlInteger.ReadInt64(reader, 0), reader.GetDateTime(1)));
         return result;
     }
 }

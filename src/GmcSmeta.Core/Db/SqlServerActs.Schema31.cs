@@ -37,7 +37,7 @@ public static partial class SqlServerActs
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new InvalidOperationException("Не удалось проверить схему 31.");
             SqlSchemaCompatibility.ValidateWriteTest(r.IsDBNull(0) ? null : r.GetString(0),
-                conn.Database, r.IsDBNull(1) ? null : r.GetString(1), r.GetInt32(2) == 1);
+                conn.Database, r.IsDBNull(1) ? null : r.GetString(1), SqlInteger.ReadInt32(r, 2) == 1);
             return conn;
         }
         catch { conn.Dispose(); throw; }

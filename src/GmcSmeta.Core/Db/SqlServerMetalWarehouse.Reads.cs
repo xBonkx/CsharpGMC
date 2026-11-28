@@ -68,7 +68,7 @@ public sealed partial class SqlServerMetalWarehouse
         using (var cmd = new SqlCommand(
             "SELECT id,category,material FROM dbo.gmc_metal_materials ORDER BY category,material", conn, tx))
         using (var r = cmd.ExecuteReader())
-            while (r.Read()) materials.Add(r.GetInt64(0), (r.GetString(1), r.GetString(2)));
+            while (r.Read()) materials.Add(SqlInteger.ReadInt64(r, 0), (r.GetString(1), r.GetString(2)));
 
         // Credit and debit stock legs are grouped in SQL, not projected from full ledger in UI.
         var places = new List<MetalPlaceView>();
@@ -86,7 +86,7 @@ GROUP BY material_id,place
 """, conn, tx))
         using (var r = cmd.ExecuteReader())
             while (r.Read())
-                places.Add(new MetalPlaceView(r.GetInt64(0), r.GetString(1),
+                places.Add(new MetalPlaceView(SqlInteger.ReadInt64(r, 0), r.GetString(1),
                     Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
                     Convert.ToInt64(r.GetValue(3), CultureInfo.InvariantCulture)));
 
@@ -104,17 +104,17 @@ GROUP BY material_id,object_id,object_name
         {
             while (r.Read())
             {
-                var materialId = r.GetInt64(0);
-                long? obj = r.IsDBNull(1) ? null : r.GetInt64(1);
+                var materialId = SqlInteger.ReadInt64(r, 0);
+                long? obj = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1);
                 var name = r.GetString(2);
                 var key = obj is long id ? "O:" + id.ToString(CultureInfo.InvariantCulture) : "N:" + name.ToUpperInvariant();
                 var tuple = (materialId, key);
                 objectAggregates.TryGetValue(tuple, out var previous);
                 objectAggregates[tuple] = (
                     obj, name.Length > 0 ? name : previous.Name ?? "",
-                    previous.Demand + r.GetInt64(3),
-                    previous.Issued + r.GetInt64(4),
-                    previous.Reserved + r.GetInt64(5));
+                    previous.Demand + SqlInteger.ReadInt64(r, 3),
+                    previous.Issued + SqlInteger.ReadInt64(r, 4),
+                    previous.Reserved + SqlInteger.ReadInt64(r, 5));
             }
         }
 
@@ -141,7 +141,7 @@ SELECT material_id,SUM(reservation_milli) FROM dbo.gmc_metal_movements
 WHERE reservation_milli<>0 GROUP BY material_id
 """, conn, tx))
         using (var r = cmd.ExecuteReader())
-            while (r.Read()) allReserved[r.GetInt64(0)] = r.GetInt64(1);
+            while (r.Read()) allReserved[SqlInteger.ReadInt64(r, 0)] = SqlInteger.ReadInt64(r, 1);
 
         var placeTotals = MetalPlaceTotals.Aggregate(places);
         var stock = new List<MetalStockView>();
@@ -178,9 +178,9 @@ ORDER BY l.created_utc DESC,l.id DESC
 """, conn, tx))
         using (var r = cmd.ExecuteReader())
             while (r.Read())
-                lots.Add(new MetalLotView(r.GetInt64(0), r.GetInt64(1), r.GetString(2),
-                    r.GetString(3), r.GetString(4), r.GetInt64(5), SqlInteger.ReadInt32(r, 6),
-                    r.GetInt32(7) != 0, r.GetInt64(8), checked((int)r.GetInt64(9)), r.GetDateTime(10)));
+                lots.Add(new MetalLotView(SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2),
+                    r.GetString(3), r.GetString(4), SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6),
+                    SqlFlag.Read(r, 7), SqlInteger.ReadInt64(r, 8), SqlInteger.ReadInt32(r, 9), r.GetDateTime(10)));
         tx.Commit();
         return new MetalSnapshot(revision, initialized, stock, places, objects, lots);
     }
@@ -228,10 +228,10 @@ ORDER BY e.id DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
         using var r = cmd.ExecuteReader();
         var result = new List<MetalMovement>();
         while (r.Read())
-            result.Add(new MetalMovement(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3),
-                r.GetString(4), r.GetInt64(5), SqlInteger.ReadInt32(r, 6), r.GetInt64(7), r.GetString(8),
-                r.GetString(9), r.IsDBNull(10) ? null : r.GetInt64(10), r.GetString(11),
-                r.GetString(12), r.GetString(13), r.IsDBNull(14) ? null : r.GetInt64(14),
+            result.Add(new MetalMovement(SqlInteger.ReadInt64(r, 0), SqlInteger.ReadInt64(r, 1), r.GetString(2), r.GetString(3),
+                r.GetString(4), SqlInteger.ReadInt64(r, 5), SqlInteger.ReadInt32(r, 6), SqlInteger.ReadInt64(r, 7), r.GetString(8),
+                r.GetString(9), r.IsDBNull(10) ? null : SqlInteger.ReadInt64(r, 10), r.GetString(11),
+                r.GetString(12), r.GetString(13), r.IsDBNull(14) ? null : SqlInteger.ReadInt64(r, 14),
                 r.GetString(15), r.GetString(16), r.GetDateTime(17)));
         return result;
     }

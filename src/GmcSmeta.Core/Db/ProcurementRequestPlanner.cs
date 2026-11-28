@@ -119,7 +119,7 @@ public static partial class ProcurementRequestPlanner
         cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
         using var reader = cmd.ExecuteReader();
         var ids = new HashSet<long>();
-        while (reader.Read()) ids.Add(reader.GetInt64(0));
+        while (reader.Read()) ids.Add(SqlInteger.ReadInt64(reader, 0));
         return ids;
     }
 

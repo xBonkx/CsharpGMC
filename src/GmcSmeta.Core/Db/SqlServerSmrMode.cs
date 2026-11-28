@@ -136,7 +136,7 @@ public static class SqlServerSmrMode
                     return SqlServerDatabase.SaveResult.Fail(
                         "COMMIT неизвестен: договор отсутствует при проверке.", now ?? previousRevision);
                 mode = r.IsDBNull(0) ? "sum" : r.GetString(0);
-                auditCount = r.IsDBNull(1) ? 0 : r.GetInt64(1);
+                auditCount = r.IsDBNull(1) ? 0 : SqlInteger.ReadInt64(r, 1);
             }
             tx.Commit();
             if (auditCount == 1 && mode == expectedMode && now is not null &&

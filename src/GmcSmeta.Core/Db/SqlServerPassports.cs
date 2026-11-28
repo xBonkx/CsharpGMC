@@ -136,7 +136,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         {
             var p = JsonSerializer.Deserialize<VentPassport>(reader.GetString(0), VentPassports.Json)
                 ?? throw new InvalidDataException("Повреждён JSON паспорта.");
-            p.Revision = reader.GetInt64(1);
+            p.Revision = SqlInteger.ReadInt64(reader, 1);
             if (p.ObjectId != objectId) throw new InvalidDataException("Паспорт в чужом объекте.");
             list.Add(p);
         }
@@ -154,7 +154,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
         using var reader = cmd.ExecuteReader();
         if (!reader.Read()) throw new KeyNotFoundException("Паспорт не найден в этом объекте.");
         var p = JsonSerializer.Deserialize<VentPassport>(reader.GetString(0), VentPassports.Json)!;
-        p.Revision = reader.GetInt64(1);
+        p.Revision = SqlInteger.ReadInt64(reader, 1);
         if (p.ObjectId != objectId) throw new InvalidDataException("Неверная область паспорта.");
         return p;
     }
@@ -201,7 +201,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'IX_gmc_passport_exports_obj
                 using var reader = check.ExecuteReader();
                 if (reader.Read())
                 {
-                    revision = reader.GetInt64(0);
+                    revision = SqlInteger.ReadInt64(reader, 0);
                     previousJson = reader.GetString(1);
                 }
             }

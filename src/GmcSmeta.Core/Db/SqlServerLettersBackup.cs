@@ -22,7 +22,7 @@ public static class SqlServerLettersBackup
             "FROM dbo.gmc_letter_history ORDER BY letter_id,revision,id", conn);
         var result = new List<HistoryRecord>();
         using var r = cmd.ExecuteReader();
-        while (r.Read()) result.Add(new HistoryRecord(r.GetGuid(0), r.GetInt64(1), r.GetString(2), r.GetDateTime(3)));
+        while (r.Read()) result.Add(new HistoryRecord(r.GetGuid(0), SqlInteger.ReadInt64(r, 1), r.GetString(2), r.GetDateTime(3)));
         return result;
     }
 

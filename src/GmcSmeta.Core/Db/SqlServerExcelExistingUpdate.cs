@@ -526,7 +526,7 @@ public static partial class SqlServerExcelExistingUpdate
         var addedIds = new List<long>();
         using (var ids = new SqlCommand("SELECT id FROM #excel_new_ids ORDER BY idx", conn, tx))
         using (var reader = ids.ExecuteReader())
-            while (reader.Read()) addedIds.Add(reader.GetInt64(0));
+            while (reader.Read()) addedIds.Add(SqlInteger.ReadInt64(reader, 0));
         if (addedIds.Count != adds.Length)
             throw new DBConcurrencyException("Не все ID новых Excel-позиций подтверждены.");
         string appliedRevision;

@@ -164,7 +164,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
             token.ThrowIfCancellationRequested();
             var p=JsonSerializer.Deserialize<PtoPackage>(reader.GetString(0),PtoRules.Json)
                 ?? throw new InvalidDataException("Повреждён JSON АОСР.");
-            p.Revision=reader.GetInt64(1);
+            p.Revision=SqlInteger.ReadInt64(reader, 1);
             if(objectId.HasValue && p.ObjectId!=objectId ||
                 contractId.HasValue && p.ContractId!=contractId)
                 throw new InvalidDataException("Неверная область документа.");
@@ -185,8 +185,8 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         using var reader=cmd.ExecuteReader();
         if(!reader.Read())throw new KeyNotFoundException("Комплект ПТО не найден.");
         var p=JsonSerializer.Deserialize<PtoPackage>(reader.GetString(0),PtoRules.Json)!;
-        if(p.ObjectId!=reader.GetInt64(2))throw new InvalidDataException("Повреждена привязка к объекту.");
-        p.Revision=reader.GetInt64(1);
+        if(p.ObjectId!=SqlInteger.ReadInt64(reader, 2))throw new InvalidDataException("Повреждена привязка к объекту.");
+        p.Revision=SqlInteger.ReadInt64(reader, 1);
         return p;
     }
 
@@ -330,8 +330,8 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         while(reader.Read())
         {
             var snapshot=JsonSerializer.Deserialize<PtoPackage>(reader.GetString(3),PtoRules.Json)!;
-            snapshot.Revision=reader.GetInt64(0);
-            rows.Add(new Version(reader.GetInt64(0),reader.GetString(1),reader.GetDateTime(2),snapshot));
+            snapshot.Revision=SqlInteger.ReadInt64(reader, 0);
+            rows.Add(new Version(SqlInteger.ReadInt64(reader, 0),reader.GetString(1),reader.GetDateTime(2),snapshot));
         }
         return rows;
     }
@@ -345,7 +345,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         while(reader.Read())
         {
             var c=JsonSerializer.Deserialize<PtoCertificate>(reader.GetString(0),PtoRules.Json)!;
-            c.Revision=reader.GetInt64(1);
+            c.Revision=SqlInteger.ReadInt64(reader, 1);
             if(string.IsNullOrWhiteSpace(query) ||
                 JsonSerializer.Serialize(c,PtoRules.Json).Contains(query,StringComparison.OrdinalIgnoreCase))
                 result.Add(c);
@@ -399,7 +399,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         using var reader=cmd.ExecuteReader();
         if(!reader.Read())return(new(),0);
         return(JsonSerializer.Deserialize<Dictionary<string,string>>(reader.GetString(0),PtoRules.Json)
-            ?? throw new InvalidDataException("Повреждена карточка ПТО."),reader.GetInt64(1));
+            ?? throw new InvalidDataException("Повреждена карточка ПТО."),SqlInteger.ReadInt64(reader, 1));
     }
 
     public void SaveObjectProfile(long id,Dictionary<string,string> profile,long expectedRevision)
@@ -466,7 +466,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('dbo.gmc_pto_r
         using var reader=cmd.ExecuteReader();
         var result=new List<PtoReleaseRecord>();
         while(reader.Read())
-            result.Add(new(reader.GetGuid(0),reader.GetGuid(1),reader.GetInt64(2),
+            result.Add(new(reader.GetGuid(0),reader.GetGuid(1),SqlInteger.ReadInt64(reader, 2),
                 reader.GetString(3),reader.GetString(4).TrimEnd(),reader.GetDateTime(5)));
         return result;
     }

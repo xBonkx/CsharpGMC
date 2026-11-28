@@ -44,28 +44,28 @@ public static class SqlServerPtoBackup
             "FROM dbo.gmc_pto_packages ORDER BY object_id,id",conn,tx))
         using(var r=cmd.ExecuteReader())
             while(r.Read())snapshot.Packages.Add(new(
-                r.GetGuid(0),r.GetInt64(1),r.IsDBNull(2)?null:r.GetInt64(2),
-                r.GetString(3),r.GetString(4),r.GetString(5),r.GetInt64(6),r.GetDateTime(7)));
+                r.GetGuid(0),SqlInteger.ReadInt64(r, 1),r.IsDBNull(2)?null:SqlInteger.ReadInt64(r, 2),
+                r.GetString(3),r.GetString(4),r.GetString(5),SqlInteger.ReadInt64(r, 6),r.GetDateTime(7)));
         using(var cmd=new SqlCommand(
             "SELECT package_id,object_id,revision,action,payload_json,created_utc "+
             "FROM dbo.gmc_pto_history ORDER BY id",conn,tx))
         using(var r=cmd.ExecuteReader())
             while(r.Read())snapshot.History.Add(new(
-                r.GetGuid(0),r.GetInt64(1),r.GetInt64(2),r.GetString(3),r.GetString(4),r.GetDateTime(5)));
+                r.GetGuid(0),SqlInteger.ReadInt64(r, 1),SqlInteger.ReadInt64(r, 2),r.GetString(3),r.GetString(4),r.GetDateTime(5)));
         using(var cmd=new SqlCommand(
             "SELECT id,sha256,payload_json,revision,updated_utc FROM dbo.gmc_pto_certificates ORDER BY id",conn,tx))
         using(var r=cmd.ExecuteReader())
             while(r.Read())snapshot.Certificates.Add(new(
-                r.GetGuid(0),r.GetString(1).TrimEnd(),r.GetString(2),r.GetInt64(3),r.GetDateTime(4)));
+                r.GetGuid(0),r.GetString(1).TrimEnd(),r.GetString(2),SqlInteger.ReadInt64(r, 3),r.GetDateTime(4)));
         using(var cmd=new SqlCommand(
             "SELECT object_id,payload_json,revision FROM dbo.gmc_pto_object_profiles ORDER BY object_id",conn,tx))
         using(var r=cmd.ExecuteReader())
-            while(r.Read())snapshot.Profiles.Add(new(r.GetInt64(0),r.GetString(1),r.GetInt64(2)));
+            while(r.Read())snapshot.Profiles.Add(new(SqlInteger.ReadInt64(r, 0),r.GetString(1),SqlInteger.ReadInt64(r, 2)));
         using(var cmd=new SqlCommand(
             "SELECT id,package_id,object_id,relative_path,manifest_sha256,created_utc "+
             "FROM dbo.gmc_pto_releases ORDER BY created_utc,id",conn,tx))
         using(var r=cmd.ExecuteReader())
-            while(r.Read())snapshot.Releases.Add(new(r.GetGuid(0),r.GetGuid(1),r.GetInt64(2),
+            while(r.Read())snapshot.Releases.Add(new(r.GetGuid(0),r.GetGuid(1),SqlInteger.ReadInt64(r, 2),
                 r.GetString(3),r.GetString(4).TrimEnd(),r.GetDateTime(5)));
         tx.Commit();
         return snapshot;

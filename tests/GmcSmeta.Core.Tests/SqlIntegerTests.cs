@@ -134,4 +134,27 @@ public sealed class SqlIntegerTests
         Assert.True(reader.Read());
         Assert.Throws<OverflowException>(() => SqlInteger.ReadInt32(reader, 0));
     }
+    [Theory]
+    [InlineData("GmcSmeta.Core/Db/SqlServerPtoBackup.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerPto.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerLettersBackup.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerLetters.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerPassports.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Reads.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerMetalWarehouse.Writes.cs")]
+    [InlineData("GmcSmeta.Core/Db/ProcurementRequestPlanner.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerExcelExistingUpdate.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerSmrMode.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerActs.Schema31.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerCostOperations.Batch.cs")]
+    public void RemainingSqlServerReadersUseWidthIndependentPolicy(string relative)
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", relative)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var source = File.ReadAllText(Path.Combine(root!.FullName, "src", relative));
+        Assert.True(source.Contains("SqlInteger.ReadInt") || source.Contains("SqlFlag.Read"));
+        Assert.DoesNotMatch(@"\b(?:r|reader)\.Get(?:Int32|Int64|Boolean)\(", source);
+    }
 }
