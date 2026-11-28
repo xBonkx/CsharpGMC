@@ -156,7 +156,7 @@ public static partial class SqlServerDatabase
             systems.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             using var r = systems.ExecuteReader();
             while (r.Read())
-                allSystems.Add(Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture));
+                allSystems.Add(SqlInteger.ReadInt64(r, 0));
         }
 
         var summaries = new List<(long Id, long SystemId, string Key)>();
@@ -170,12 +170,12 @@ public static partial class SqlServerDatabase
             using var r = read.ExecuteReader();
             while (r.Read())
             {
-                var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var id = SqlInteger.ReadInt64(r, 0);
                 if (onlySummaryId is not null && onlySummaryId != id) continue;
                 var key = AreaCollapsePlan.ExistingKey(r.IsDBNull(2) ? "" : r.GetString(2));
                 if (key.Length > 0)
                     summaries.Add((id,
-                        Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture), key));
+                        SqlInteger.ReadInt64(r, 1), key));
             }
         }
         if (onlySummaryId is not null && summaries.Count == 0)
@@ -202,7 +202,7 @@ public static partial class SqlServerDatabase
                 using var r = query.ExecuteReader();
                 while (r.Read())
                 {
-                    var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                    var id = SqlInteger.ReadInt64(r, 0);
                     var json = r.IsDBNull(1) ? "" : r.GetString(1);
                     var home = AreaCollapsePlan.OriginalLocation(json);
                     if (home is null || !allSystems.Contains(home.Value.System))
@@ -314,9 +314,9 @@ public static partial class SqlServerDatabase
             contract.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = contract.ExecuteReader();
             if (!r.Read()) return (0, "", "Документ уже удалён.");
-            objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 0);
             name = r.IsDBNull(1) ? "" : r.GetString(1);
-            if (!r.IsDBNull(3) && Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture))
+            if (!r.IsDBNull(3) && SqlFlag.Read(r, 3))
                 return (objectId, name, "Подписанный договор менять нельзя.");
             if (!r.IsDBNull(4))
                 return (objectId, name,
@@ -357,8 +357,8 @@ public static partial class SqlServerDatabase
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
-            var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            var sid = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+            var id = SqlInteger.ReadInt64(r, 0);
+            var sid = SqlInteger.ReadInt64(r, 1);
             decimal Dec(int i) => r.IsDBNull(i) ? 0m :
                 Convert.ToDecimal(r.GetValue(i), CultureInfo.InvariantCulture);
             string Str(int i) => r.IsDBNull(i) ? "" : r.GetString(i);
@@ -367,10 +367,10 @@ public static partial class SqlServerDatabase
                 r.IsDBNull(7) ? null : Dec(7),
                 r.IsDBNull(8) ? null :
                     Convert.ToDouble(r.GetValue(8), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(9), CultureInfo.InvariantCulture), Str(10),
-                !r.IsDBNull(11) && Convert.ToBoolean(r.GetValue(11), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(12), CultureInfo.InvariantCulture) != 0,
-                Convert.ToInt32(r.GetValue(13), CultureInfo.InvariantCulture) != 0));
+                SqlInteger.ReadInt32(r, 9), Str(10),
+                !r.IsDBNull(11) && SqlFlag.Read(r, 11),
+                SqlFlag.Read(r, 12),
+                SqlFlag.Read(r, 13)));
         }
         return rows;
     }
@@ -412,8 +412,8 @@ public static partial class SqlServerDatabase
         {
             var key = AreaCollapsePlan.ExistingKey(r.IsDBNull(2) ? "" : r.GetString(2));
             if (key.Length == 0) continue;
-            var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            var systemId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+            var id = SqlInteger.ReadInt64(r, 0);
+            var systemId = SqlInteger.ReadInt64(r, 1);
             var qty = r.IsDBNull(3) ? 0m :
                 Convert.ToDecimal(r.GetValue(3), CultureInfo.InvariantCulture);
             var price = r.IsDBNull(4) ? 0m :

@@ -87,22 +87,22 @@ public static class SqlServerDirector
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                objects.Add((Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture), r.GetString(1)));
+                objects.Add((SqlInteger.ReadInt64(r, 0), r.GetString(1)));
             }
             token.ThrowIfCancellationRequested();
             if (!r.NextResult()) throw new InvalidOperationException("Нет списка договоров сводки в ответе SQL.");
             while (r.Read())
             {
                 token.ThrowIfCancellationRequested();
-                var objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                var objectId = SqlInteger.ReadInt64(r, 1);
                 if (!contracts.TryGetValue(objectId, out var list))
                     contracts[objectId] = list = new List<(long, int, string, int?, long?)>();
                 list.Add((
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
+                    SqlInteger.ReadInt32(r, 2),
                     r.IsDBNull(3) ? "kp" : r.GetString(3),
-                    r.IsDBNull(4) ? null : Convert.ToInt32(r.GetValue(4), CultureInfo.InvariantCulture),
-                    r.IsDBNull(5) ? null : Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture)));
+                    r.IsDBNull(4) ? null : SqlInteger.ReadInt32(r, 4),
+                    r.IsDBNull(5) ? null : SqlInteger.ReadInt64(r, 5)));
             }
         }
 
@@ -196,7 +196,7 @@ public static class SqlServerDirector
             using var r = SqlReadCancellation.ExecuteReader(read, token);
             decimal Number(int index) => r.IsDBNull(index) ? 0m :
                 Money.FromDouble(Convert.ToDouble(r.GetValue(index), CultureInfo.InvariantCulture));
-            long Id(int index) => Convert.ToInt64(r.GetValue(index), CultureInfo.InvariantCulture);
+            long Id(int index) => SqlInteger.ReadInt64(r, index);
 
             // Keep the two original SQL SUMs separate: each is converted to
             // decimal before the original per-contract rounding.

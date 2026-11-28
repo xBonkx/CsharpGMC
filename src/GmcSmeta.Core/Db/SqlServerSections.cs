@@ -54,9 +54,9 @@ public static partial class SqlServerDatabase
             doc.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             using var r = doc.ExecuteReader();
             if (!r.Read()) return InsertSectionResult.Fail("Документ не найден.", currentRev);
-            if (Convert.ToBoolean(r.GetValue(0), CultureInfo.InvariantCulture))
+            if (SqlFlag.Read(r, 0))
                 return InsertSectionResult.Fail("Подписанную смету менять нельзя.", currentRev);
-            objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 1);
             title = Documents.ContractTitleText(
                 r.IsDBNull(2) ? "kp" : r.GetString(2),
                 r.IsDBNull(3) ? "" : r.GetString(3),
@@ -72,9 +72,9 @@ public static partial class SqlServerDatabase
             list.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             using var r = list.ExecuteReader();
             while (r.Read()) original.Add(new SectionEntry(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                Convert.ToInt32(r.GetValue(2), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
+                r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1),
+                SqlInteger.ReadInt32(r, 2),
                 r.IsDBNull(3) ? "" : r.GetString(3)));
         }
 
@@ -232,8 +232,8 @@ public static partial class SqlServerDatabase
             using var r = find.ExecuteReader();
             if (!r.Read()) return SaveResult.Fail("Раздел не найден в документе.", currentRev);
             previous = r.IsDBNull(0) ? "" : r.GetString(0);
-            objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
-            if (Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture))
+            objectId = SqlInteger.ReadInt64(r, 1);
+            if (SqlFlag.Read(r, 2))
                 return SaveResult.Fail("Подписанную смету менять нельзя.", currentRev);
         }
         if (string.Equals(previous, next, StringComparison.Ordinal))

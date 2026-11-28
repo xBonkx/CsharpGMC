@@ -81,10 +81,10 @@ public static partial class SqlServerExcelExistingUpdate
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) throw new ArgumentException("Договор не найден.");
-            objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            protection = Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture) ||
-                Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture) ||
-                Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 0);
+            protection = SqlFlag.Read(r, 1) ||
+                SqlFlag.Read(r, 2) ||
+                SqlFlag.Read(r, 3);
         }
 
         var systems = new List<string>();
@@ -135,7 +135,7 @@ public static partial class SqlServerExcelExistingUpdate
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var src = r.IsDBNull(15) ? (int?)null : Convert.ToInt32(r.GetValue(15), CultureInfo.InvariantCulture);
+                var src = r.IsDBNull(15) ? (int?)null : SqlInteger.ReadInt32(r, 15);
                 var extra = r.GetString(16);
                 var imported = src > 0;
                 if (!imported && extra.Length > 0)
@@ -154,17 +154,17 @@ public static partial class SqlServerExcelExistingUpdate
                 var parentName = r.GetString(3);
                 var path = parentName.Length == 0 ? systemName : parentName + " / " + systemName;
                 rows.Add(new ExcelExistingDbRow(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
-                    r.IsDBNull(2) ? null : Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
+                    SqlInteger.ReadInt64(r, 1),
+                    r.IsDBNull(2) ? null : SqlInteger.ReadInt64(r, 2),
                     path, r.GetString(5), r.GetString(6), r.GetString(7), r.GetString(8),
                     Convert.ToDecimal(r.GetValue(9), CultureInfo.InvariantCulture),
                     Convert.ToDecimal(r.GetValue(10), CultureInfo.InvariantCulture),
                     r.IsDBNull(11) ? null : Convert.ToDecimal(r.GetValue(11), CultureInfo.InvariantCulture),
                     r.IsDBNull(12) ? null : Convert.ToDecimal(r.GetValue(12), CultureInfo.InvariantCulture),
                     r.GetString(13), r.GetString(14), src, extra,
-                    Convert.ToBoolean(r.GetValue(17), CultureInfo.InvariantCulture),
-                    Convert.ToBoolean(r.GetValue(18), CultureInfo.InvariantCulture), imported));
+                    SqlFlag.Read(r, 17),
+                    SqlFlag.Read(r, 18), imported));
             }
         }
         tx.Commit();
@@ -277,10 +277,10 @@ public static partial class SqlServerExcelExistingUpdate
             check.Parameters.Add("@id", SqlDbType.BigInt).Value = plan.ContractId;
             using var r = check.ExecuteReader();
             if (!r.Read()) throw new DBConcurrencyException("Договор удалён.");
-            objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            if (Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture) ||
-                Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture) ||
-                Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture))
+            objectId = SqlInteger.ReadInt64(r, 0);
+            if (SqlFlag.Read(r, 1) ||
+                SqlFlag.Read(r, 2) ||
+                SqlFlag.Read(r, 3))
                 throw new InvalidOperationException("Договор заблокирован, архивирован либо связан с ДС/этапами.");
         }
 

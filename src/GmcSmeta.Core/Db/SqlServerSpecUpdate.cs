@@ -58,7 +58,7 @@ public static class SqlServerSpecUpdate
         using var r = cmd.ExecuteReader();
         while (r.Read())
             result.Add(new SpecSqlHistory(
-                Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                SqlInteger.ReadInt64(r, 0),
                 Convert.ToDateTime(r.GetValue(1), CultureInfo.InvariantCulture),
                 Text(r, 2), Text(r, 3), Text(r, 4), Decimal(r, 5),
                 Decimal(r, 6), Text(r, 7)));
@@ -83,7 +83,7 @@ public static class SqlServerSpecUpdate
         token.ThrowIfCancellationRequested();
         if (!found) return null;
         return new SpecRevisionHead(
-            Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+            SqlInteger.ReadInt64(r, 0),
             r.IsDBNull(1) ? null : r.GetString(1),
             r.IsDBNull(2) ? null : r.GetString(2));
     }
@@ -379,15 +379,15 @@ public static class SqlServerSpecUpdate
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
         using var r=cmd.ExecuteReader();
         if (!r.Read()) throw new InvalidOperationException("Документ отсутствует.");
-        var objectId=Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture);
+        var objectId=SqlInteger.ReadInt64(r, 0);
         string? blocker=null;
-        if (Convert.ToBoolean(r.GetValue(1),CultureInfo.InvariantCulture))
+        if (SqlFlag.Read(r, 1))
             blocker="Подписанный документ запрещено обновлять.";
-        else if (Convert.ToBoolean(r.GetValue(5),CultureInfo.InvariantCulture))
+        else if (SqlFlag.Read(r, 5))
             blocker="Архивный объект нельзя изменять.";
-        else if (!r.IsDBNull(4) || Convert.ToBoolean(r.GetValue(7),CultureInfo.InvariantCulture))
+        else if (!r.IsDBNull(4) || SqlFlag.Read(r, 7))
             blocker="Документ связан с этапами. Обновляй его через управление этапами.";
-        else if (Convert.ToBoolean(r.GetValue(8),CultureInfo.InvariantCulture))
+        else if (SqlFlag.Read(r, 8))
             blocker="У документа есть подписанные КС-2: обновление требует отдельной приёмки.";
         else if (Text(r,3) is "sys" or "all")
             blocker="Для КП со свёрткой м² обновление спецификации ещё не разрешено.";
@@ -408,9 +408,9 @@ public static class SqlServerSpecUpdate
             cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=contractId;
             using var r=cmd.ExecuteReader();
             while(r.Read())systems.Add(new SpecExistingSystem(
-                Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),
-                Text(r,1),Convert.ToInt32(r.GetValue(2),CultureInfo.InvariantCulture),
-                r.IsDBNull(3)?null:Convert.ToInt64(r.GetValue(3),CultureInfo.InvariantCulture)));
+                SqlInteger.ReadInt64(r, 0),
+                Text(r,1),SqlInteger.ReadInt32(r, 2),
+                r.IsDBNull(3)?null:SqlInteger.ReadInt64(r, 3)));
         }
         var rows=new List<SpecExistingPosition>();
         using(var cmd=new SqlCommand(@"
@@ -434,15 +434,15 @@ public static class SqlServerSpecUpdate
                 var extra=Text(r,9);
                 var source=SourceName(extra);
                 rows.Add(new SpecExistingPosition(
-                    Convert.ToInt64(r.GetValue(0),CultureInfo.InvariantCulture),
-                    Convert.ToInt64(r.GetValue(1),CultureInfo.InvariantCulture),
-                    r.IsDBNull(2)?null:Convert.ToInt64(r.GetValue(2),CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
+                    SqlInteger.ReadInt64(r, 1),
+                    r.IsDBNull(2)?null:SqlInteger.ReadInt64(r, 2),
                     Text(r,3),Text(r,4),Decimal(r,5),Decimal(r,6),
                     r.IsDBNull(7)?null:Decimal(r,7),Text(r,8),
                     !r.IsDBNull(10)||!string.IsNullOrWhiteSpace(source),source,
-                    Convert.ToBoolean(r.GetValue(12),CultureInfo.InvariantCulture),
-                    r.IsDBNull(10)?null:Convert.ToInt32(r.GetValue(10),CultureInfo.InvariantCulture),
-                    Convert.ToBoolean(r.GetValue(11),CultureInfo.InvariantCulture)));
+                    SqlFlag.Read(r, 12),
+                    r.IsDBNull(10)?null:SqlInteger.ReadInt32(r, 10),
+                    SqlFlag.Read(r, 11)));
             }
         }
         return new PositionSnapshot(systems,rows);
@@ -516,7 +516,7 @@ public static class SqlServerSpecUpdate
             using var r=cmd.ExecuteReader();
             while(r.Read())
             {
-                if(Convert.ToBoolean(r.GetValue(3),CultureInfo.InvariantCulture))continue;
+                if(SqlFlag.Read(r, 3))continue;
                 var qty=Decimal(r,0);
                 var amount=qty*Decimal(r,1);
                 materials+=roundRows?Money.Round2(amount):amount;

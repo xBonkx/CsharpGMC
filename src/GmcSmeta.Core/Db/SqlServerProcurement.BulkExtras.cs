@@ -65,7 +65,7 @@ public static partial class SqlServerProcurement
         if (!r.Read())
             return new ExtraDeleteDecision(positionId, "", failed,
                 ExtraDeletionBlocker(false, false, false, false, false, false, false, false, false)!);
-        bool IsTrue(int i) => Convert.ToInt32(r.GetValue(i), CultureInfo.InvariantCulture) != 0;
+        bool IsTrue(int i) => SqlFlag.Read(r, i);
         var reason = ExtraDeletionBlocker(true, IsTrue(1), IsTrue(2), IsTrue(3),
             IsTrue(4), IsTrue(5), IsTrue(6), IsTrue(7), IsTrue(8));
         return new ExtraDeleteDecision(positionId, r.GetString(0),

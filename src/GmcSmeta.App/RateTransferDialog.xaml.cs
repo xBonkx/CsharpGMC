@@ -91,8 +91,8 @@ public partial class RateTransferDialog : Window
                 read2.Parameters.AddWithValue("@id", _targetId);
                 using var r = read2.ExecuteReader();
                 while (r.Read())
-                    _docs.Add((Convert.ToInt32(r.GetValue(0)),
-                        Convert.ToInt32(r.GetValue(1)),
+                    _docs.Add((SqlInteger.ReadInt32(r, 0),
+                        SqlInteger.ReadInt32(r, 1),
                         $"{r.GetValue(2)} · {Documents.ContractTitleText("kp", ToString2(r, 3), ToString2(r, 4), ToString2(r, 5))}"));
             }
             _targetObject = targetObject;

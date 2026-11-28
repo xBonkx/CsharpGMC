@@ -193,11 +193,11 @@ public static partial class SqlServerProcurement
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 result.Add(new SheetCandidate(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
                     r.GetString(1), r.GetString(2), r.GetString(3),
                     decimal.Round(Convert.ToDecimal(r.GetValue(4), CultureInfo.InvariantCulture), 6),
-                    Convert.ToInt32(r.GetValue(14), CultureInfo.InvariantCulture) != 0,
-                    r.IsDBNull(5) ? null : Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture),
+                    SqlFlag.Read(r, 14),
+                    r.IsDBNull(5) ? null : SqlInteger.ReadInt64(r, 5),
                     r.GetString(6), r.GetString(7), r.GetString(8), r.GetString(9),
                     r.IsDBNull(10) ? null : Convert.ToDecimal(r.GetValue(10), CultureInfo.InvariantCulture),
                     r.IsDBNull(11) ? null : r.GetDateTime(11),
