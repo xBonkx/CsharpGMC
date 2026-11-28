@@ -12,6 +12,12 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual({r["dpi"] for r in rows}, {96, 120, 144})
         self.assertIn(("navigation", "deep-nesting", "1366x768", 144, 1), keys)
         self.assertIn(("estimate", "editing", "1920x1080", 120, 1.2), keys)
+        for page, state in (("navigation", "logo"), ("navigation", "three-stage-children"),
+                            ("navigation", "selected-deep-child"), ("estimate", "rectangular-selection"),
+                            ("totals", "smr-from-stages"), ("ks", "ks3"), ("pto-letters", "certificates"),
+                            ("cost-summary", "long-money")):
+            self.assertIn((page, state, "1366x768", 144, 1), keys)
+        self.assertNotIn(("totals", "three-stage-children", "1366x768", 144, 1), keys)
 
     def test_physical_geometry_not_raster_density(self):
         vc.validate_geometry((1366,768),120,(-1366,0,0,768),(-1360,0,-1,728),120)
