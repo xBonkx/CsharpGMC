@@ -36,6 +36,8 @@ public sealed class LettersWindowLifecycleTests
         Assert.Contains("if (_busy) e.Cancel = true;", code);
         Assert.Contains("await Task.Run(() => archive.Sql.Save(doc", code);
         Assert.Contains("await Task.Run(() => archive.Sql.Get(selected.Id))", code);
+        Assert.Contains("ItemsControl.ContainerFromElement(LetterList, source) is DataGridRow row", code);
+        Assert.Contains("ReferenceEquals(row.Item, Selected())", code);
         Assert.Contains("current.Revision != chosen.Revision || !LetterContext.CanAttach(current)", code);
         Assert.Contains("archive.Sql.Save(current, validateContext: true)", code);
         Assert.Contains("await Task.Run(() => archive.Backup(path))", code);
@@ -79,6 +81,9 @@ public sealed class LettersWindowLifecycleTests
             root = root.Parent;
         Assert.NotNull(root);
         var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerLetters.cs"));
+        Assert.Contains("await OpenReadAsync(token).ConfigureAwait(false)", code);
+        Assert.Contains("SqlServerDatabase.OpenAsync(_connectionString, token)", code);
+        Assert.Contains("RequirePilotConnection(await SqlServerDatabase.OpenAsync", code);
         Assert.Contains("await cmd.ExecuteReaderAsync(token)", code);
         Assert.Contains("await reader.ReadAsync(token)", code);
         Assert.Contains("token.ThrowIfCancellationRequested();", code);
