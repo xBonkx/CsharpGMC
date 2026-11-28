@@ -183,8 +183,12 @@ public partial class EstimateView : UserControl
             _detached = false;
             // Cached pages may be attached before shell selection is published.
             Dispatcher.BeginInvoke(new Action(UpdateAddToolbarVisibility), DispatcherPriority.Loaded);
-            _uiSettings.RefreshPurchasePreference();
+            _uiSettings.RefreshColumnPreferences();
+            RestoreEstimateColumnPreferences();
+            ConfigureSpecialColumns();
+            ApplyEstimateZoom();
             ApplyPurchaseVisibility(_estimate);
+            RequestEstimateColumnFit();
             if (_inlineStagesOn && (_inlineStagesData is null || _inlineStagesLoading))
                 _reloadAfterAttach = true;
             if (_searchPending) _estimateSearchTimer.Start();
@@ -1327,8 +1331,15 @@ public partial class EstimateView : UserControl
 
     private void RestoreEstimateUiSettings()
     {
+        RestoreEstimateColumnPreferences();
+        ApplyPurchaseVisibility(null);
+        SetTotalsHidden(_uiSettings.TotalsHidden);
+    }
+
+    private void RestoreEstimateColumnPreferences()
+    {
         if (EstimateGrid is null) return;
-        var columns = EstimateGrid.Columns.ToList();
+        var columns = _defaultEstimateColumns;
         var savedWidths = _uiSettings.ColumnWidths ?? new Dictionary<string, double>();
         foreach (var column in columns)
         {
@@ -1336,6 +1347,8 @@ public partial class EstimateView : UserControl
             if (savedWidths.TryGetValue(key, out var width) &&
                 double.IsFinite(width) && width >= 35 && width <= 1600)
                 column.Width = new DataGridLength(width);
+            else if (_defaultEstimateWidths.TryGetValue(column, out var defaultWidth))
+                column.Width = defaultWidth;
         }
         ApplyEstimateOrder(_uiSettings.ColumnOrder ?? new List<string>());
         var hidden = (_uiSettings.HiddenColumns ?? new List<string>())
