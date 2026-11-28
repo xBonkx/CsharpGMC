@@ -82,8 +82,13 @@ public sealed class SidebarAgreementSourceTests
         var doc = Key("DocumentNavigationTemplate");
         Assert.Contains(doc.Descendants(w + "TextBlock"), e => (string?)e.Attribute("Text") == "{Binding DisplayName}" &&
             (string?)e.Attribute("TextTrimming") == "CharacterEllipsis" && (string?)e.Attribute("Margin") == "6,0,4,0");
-        Assert.Equal("17", (string?)Named("PhaseBadge").Attribute("Width"));
-        Assert.Equal("17", (string?)Named("PhaseBadge").Attribute("Height"));
+        Assert.Equal("17", (string?)Named("PhaseBadge").Attribute("MinWidth"));
+        Assert.Equal("17", (string?)Named("PhaseBadge").Attribute("MinHeight"));
+        Assert.Null(Named("PhaseBadge").Attribute("Width"));
+        Assert.Null(Named("PhaseBadge").Attribute("Height"));
+        var date = Assert.Single(doc.Descendants(w + "TextBlock").Where(e => (string?)e.Attribute("Text") == "{Binding Document.NavigationDate}"));
+        Assert.Equal("76", (string?)date.Attribute("MaxWidth"));
+        Assert.Equal("{Binding Document.NavigationDate}", (string?)date.Attribute("ToolTip"));
         var source = File.ReadAllText(Path.Combine(app, "MainWindow.xaml.cs"));
         Assert.Contains("new(16 * Math.Max(0, depth), 7, 4, 7)", source);
         Assert.Contains("FontWeight = FontWeights.SemiBold", source);
