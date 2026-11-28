@@ -1231,21 +1231,22 @@ public sealed class SummaryMarkupDialog : Window
         });
         _percent = new TextBox
         {
-            Text = "50", MaxWidth = 240, HorizontalAlignment = HorizontalAlignment.Stretch,
+            Text = "50", HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Right,
         };
         DynamicFormLayout.Field(_percent);
+        System.Windows.Automation.AutomationProperties.SetName(_percent, "Наценка, %");
         root.Children.Add(_percent);
         var row = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0),
         };
-        var cancel = new Button { Content = "Отмена", IsCancel = true, Padding = new Thickness(12, 6, 12, 6) };
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         var ok = new Button
         {
-            Content = "OK", Padding = new Thickness(16, 6, 16, 6),
-            Margin = new Thickness(8, 0, 0, 0), IsDefault = true,
+            Content = "Применить", IsDefault = true,
         };
         ok.Click += (_, _) => Apply();
         row.Children.Add(cancel);
