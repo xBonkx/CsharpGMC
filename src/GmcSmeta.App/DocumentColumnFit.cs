@@ -15,7 +15,7 @@ namespace GmcSmeta.App;
 /// Manual widths and flex columns remain the user's responsibility.</summary>
 internal sealed class DocumentColumnFit
 {
-    internal sealed record Input(DataGridColumn Column, string Path, string Header,
+    internal readonly record struct Input(DataGridColumn Column, string Path, string Header,
         double Preferred, string? Format, CultureInfo Culture, double Extra,
         IValueConverter? Converter = null, object? Parameter = null);
     private readonly DataGrid _grid;
@@ -109,22 +109,20 @@ internal sealed class DocumentColumnFit
         Request();
     }
 
-    private bool Current(Input[] inputs) => _valid && _last.SequenceEqual(inputs) && _font.Equals(Font()) &&
+    private bool Current() => _valid && _font.Equals(Font()) &&
         (_grid.ItemsSource is { } source ? _source is not null && _source.TryGetTarget(out var prior) &&
-            ReferenceEquals(prior, source) : _source is null);
+            ReferenceEquals(prior, source) : _source is null) && _last.SequenceEqual(Columns());
 
     internal void Request()
     {
         if (!Ready()) return;
-        var inputs = Columns().ToArray();
-        if (Current(inputs)) return;
+        if (Current()) return;
         _queued = true;
         _grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
             _queued = false;
             if (!Ready()) return;
-            var current = Columns().ToArray();
-            if (!Current(current)) Apply(current);
+            if (!Current()) Apply(Columns().ToArray());
         }));
     }
 
