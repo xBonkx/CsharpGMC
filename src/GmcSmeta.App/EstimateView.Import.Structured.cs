@@ -66,16 +66,19 @@ public partial class EstimateView
         using var cancelWrite = new CancellationTokenSource();
         var progress = new Window
         {
-            Owner = Window.GetWindow(this), Title = "Импорт Excel", Width = 430, Height = 160,
+            Owner = Window.GetWindow(this), Title = "Импорт Excel", Width = 430, SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
         };
-        var content = new StackPanel { Margin = new Thickness(16) };
+        DynamicFormLayout.Apply(progress);
+        var content = new StackPanel();
+        content.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormDialogMargin");
         content.Children.Add(new TextBlock { Text = "Запись новых разделов и позиций в SQL Server…",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
         content.Children.Add(new ProgressBar { IsIndeterminate = true, Height = 8 });
         var cancelButton = new Button { Content = "Отмена", Width = 95,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        cancelButton.SetResourceReference(FrameworkElement.StyleProperty, "PythonToolbarButton");
         cancelButton.Click += (_, _) => { cancelWrite.Cancel(); cancelButton.IsEnabled = false; };
         content.Children.Add(cancelButton);
         progress.Content = content;
@@ -141,7 +144,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
     {
         Owner = owner;
         Title = "Добавить разделы из Excel — " + Path.GetFileName(result.FileName);
-        Width = 960; Height = 640; MinWidth = 750; MinHeight = 460;
+        Width = 960; Height = 640; MinWidth = 420; MinHeight = 360;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brushes.White;
 
@@ -153,12 +156,13 @@ internal sealed class ExcelAppendPreviewDialog : Window
             Text = "Отметь блоки Excel. Они будут добавлены в текущий КП отдельными разделами, " +
                 "с сохранением порядка, закупочных цен, СМР по позициям и комплектующих. " +
                 "Существующие позиции, суммы договора, НДС и транспорт не перезаписываются.",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
+            TextWrapping = TextWrapping.Wrap
         };
+        intro.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         DockPanel.SetDock(intro, Dock.Top); layout.Children.Add(intro);
 
-        var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 12, 0, 0) };
+        var bar = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        bar.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
         var cancel = new Button { Content = "Отмена", MinWidth = 105, MinHeight = 32, IsCancel = true };
         cancel.Click += (_, _) => { DialogResult = false; Close(); };
         bar.Children.Add(cancel);
@@ -216,11 +220,11 @@ internal sealed class ExcelAppendPreviewDialog : Window
                 Margin = new Thickness(20, 0, 0, 5)
             });
             foreach (var s in b.Sections.Take(12))
-                body.Children.Add(new TextBlock { Text = $"    {s.Name}: {s.Positions.Sum(p => 1 + p.Children.Count)} поз.",
-                    Margin = new Thickness(16, 0, 0, 1) });
+                body.Children.Add(new TextBlock { Text = $"{s.Name}: {s.Positions.Sum(p => 1 + p.Children.Count)} поз.",
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 0, 0, 1) });
             if (b.Sections.Count > 12)
-                body.Children.Add(new TextBlock { Text = $"    … ещё {b.Sections.Count - 12} разделов.",
-                    Margin = new Thickness(16, 0, 0, 1) });
+                body.Children.Add(new TextBlock { Text = $"… ещё {b.Sections.Count - 12} разделов.",
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 0, 0, 1) });
             foreach (var warning in b.Warnings.Take(6))
                 body.Children.Add(new TextBlock { Text = "⚠ " + warning,
                     TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20, 3, 0, 0),
@@ -233,7 +237,7 @@ internal sealed class ExcelAppendPreviewDialog : Window
             list.Children.Add(wrap);
         }
         var scroller = new ScrollViewer { Content = list,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         layout.Children.Add(scroller);
         Content = layout;
     }
