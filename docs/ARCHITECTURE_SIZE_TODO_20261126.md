@@ -1,5 +1,7 @@
 # Аудит размера исходников и декомпозиции — 26.11.2026
 
+28.11.2026 ChatGPT/main (base 5f00f46) — ARCH-SIZE-02 PARTIAL: ActsEditorView.xaml.cs 2279→2101 physical lines; export handlers moved verbatim into ActsEditorView.Export.cs (179 lines; organization only, same partial class/state). Independent Core KsSelectionQuantity.cs (37 lines) extracts selection-only unit normalization, first-seen group ordering and formatting, retains 3-decimal midpoint-to-even after sum and current culture. Five domain tests + one source guard, existing async export guard updated to relocated source. No SQL, finance, UI design, icon, DB/schema or release changes. Build/tests not executed; actual WPF and export acceptance pending. Logical editor remains large.
+
 28.11.2026 ChatGPT/main (base 532b5e9) — ARCH-SIZE-05 PARTIAL: EstimateView.Materials.cs 1697→1512 physical lines; independent MaterialsMarkupDialog.cs 134 lines, Core MaterialsOrder.cs 77 lines. Dialog body moved verbatim; frozen-sort ownership extracted, original comparisons, palette order, effective unit cost, null handling, per-view reset and current row values retained. Nine domain test cases and existing source guard updated; static review only, no .NET/WPF execution. Logical EstimateView still large; no SQL, financial formulas, icons, DB/schema or release changes.
 
 Цель: не повторять монолитные файлы Python; улучшить сопровождаемость и снизить конфликты параллельных агентов, не изменяя функциональность. Это самостоятельная архитектурная очередь, не замена приоритету переноса Python/SQL. Правило обязательно для всех агентов через [AGENTS.md](../AGENTS.md).
@@ -30,7 +32,7 @@ Python: smeta/ui/kp_editor.py — 3961, ks_view.py — 2356, proc_view.py — 17
 ### ARCH-SIZE-01 (P1) — NOT STARTED
 Полный инвентарь рукописных .cs/.xaml: количество, строки, топ-30, диапазоны, файлы >1000/1500/2000/4000, агрегирование по partial-типам (namespace + type), зависимости, длинные методы, смешение UI/расчётов/SQL. Отдельно src/tests, сохранить SHA, метод подсчёта, исключения и карту пересечений с действующими TODO. Приёмка: воспроизводимый отчёт с точными путями и планом рефакторинга.
 
-### ARCH-SIZE-02 (P1) — NOT STARTED
+### ARCH-SIZE-02 (P1) — PARTIAL
 ActsEditorView.xaml.cs: инвентаризировать обработчики, состояние, расчёты и операции подписания/экспорта; выделять независимые компоненты, а не просто partial. Приёмка: тесты КС-2/КС-3, скидки, ручные суммы, НДС, частичные закрытия, подпись, выбор актов и экспорт; прежнее поведение и суммы.
 
 ### ARCH-SIZE-03 (P1) — NOT STARTED

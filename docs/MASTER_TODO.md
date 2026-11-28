@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 5f00f46) — ARCH-SIZE-02 PARTIAL: ActsEditorView.xaml.cs 2279→2101 physical lines; export handlers moved verbatim into ActsEditorView.Export.cs (179 lines; organization only, same partial class/state). Independent Core KsSelectionQuantity.cs (37 lines) extracts selection-only unit normalization, first-seen group ordering and formatting, retains 3-decimal midpoint-to-even after sum and current culture. Five domain tests + one source guard, existing async export guard updated to relocated source. No SQL, finance, UI design, icon, DB/schema or release changes. Build/tests not executed; actual WPF and export acceptance pending. Logical editor remains large.
+
 28.11.2026 ChatGPT/main (base 532b5e9) — ARCH-SIZE-05 PARTIAL: EstimateView.Materials.cs 1697→1512 physical lines; independent MaterialsMarkupDialog.cs 134 lines, Core MaterialsOrder.cs 77 lines. Dialog body moved verbatim; frozen-sort ownership extracted, original comparisons, palette order, effective unit cost, null handling, per-view reset and current row values retained. Nine domain test cases and existing source guard updated; static review only, no .NET/WPF execution. Logical EstimateView still large; no SQL, financial formulas, icons, DB/schema or release changes.
 
 28.11.2026 ChatGPT/main (base b279b6d) — AGR-08/11 PARTIAL: order-specific legal context reads active same-object explicit annex/DS mapping, or single active agreement for object-level launch, under global revision fence; no automatic first-document/first-company selection on legal schema. Ambiguous/missing mapping or missing contractor/signer blocks issuing new orders, existing history remains accessible; selected legal company by ID, no hardcoded signer fallback on legal path; legacy selection preserved. Exact document ID passed from estimate and revalidated before generating DOCX; technical site fields, admission lists and ventilation passports remain object-level. Six domain test scenarios and amended lifecycle guard, not run; real schema 28/32 Windows/Pilot order export, history and mixed agreement cases pending. No schema, DB, finance or release changes.
@@ -785,7 +787,7 @@ PARITY-KS-FORMULA-01 закрыт после сверки вычислений �
 | ID | P | Задача | Статус |
 |---|---|---|---|
 | ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | NOT STARTED |
-| ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | NOT STARTED |
+| ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | PARTIAL |
 | ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | NOT STARTED |
 | ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | NOT STARTED |
 | ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | PARTIAL |

@@ -9,7 +9,7 @@ public sealed class KsAsyncExportSourceTests
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "ActsEditorView.xaml.cs")))
             root = root.Parent;
         Assert.NotNull(root);
-        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "ActsEditorView.xaml.cs"));
+        var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "ActsEditorView.Export.cs"));
         var start = code.IndexOf("private async void ExportAct_Click(", StringComparison.Ordinal);
         var end = code.IndexOf("private void ExportGroup_Click(", start, StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
