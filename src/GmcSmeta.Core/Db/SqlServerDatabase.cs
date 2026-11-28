@@ -164,6 +164,7 @@ public static partial class SqlServerDatabase
 
     private static SqlConnectionStringBuilder BuildGuardedConnectionString(string connectionString)
     {
+        GmcSmeta.Core.Demo.DemoMode.RejectSqlConnection(Environment.GetCommandLineArgs().Skip(1));
         var builder = new SqlConnectionStringBuilder(connectionString)
         {
             ApplicationName = "GMC-Smeta C# Pilot",

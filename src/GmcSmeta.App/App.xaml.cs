@@ -58,6 +58,15 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Until the offline provider is wired into the real views, fail closed.
+        // Never allow an explicit demo launch to redirect to the office launcher.
+        if (GmcSmeta.Core.Demo.DemoMode.IsRequested(e.Args))
+        {
+            MessageBox.Show("Автономный режим ещё не подключён к интерфейсу. Рабочая база не открывалась.",
+                "ГМЦ-Смета — ТЕСТ", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown(1);
+            return;
+        }
         StartupTrace.Mark("app_startup_enter");
         StartupTrace.Mark("app_previous_process_wait_begin");
         if (!UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
