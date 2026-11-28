@@ -33,9 +33,7 @@ internal sealed class MetalRegisterWindow : Window
         Title = "Учёт металла";
         Width = 1200; Height = 700; MinWidth = 820; MinHeight = 490;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WorkspaceWindowUi.ApplyChrome(this);
-        SetResourceReference(FontFamilyProperty,"UiFontFamily");
-        SetResourceReference(FontSizeProperty,"UiBodySize");
+        DynamicFormLayout.Apply(this);
         _tabs.SetResourceReference(FrameworkElement.StyleProperty,"PythonTabbedPane");
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         _connectionString = connectionString;
