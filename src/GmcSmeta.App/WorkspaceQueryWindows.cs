@@ -139,6 +139,8 @@ public sealed class GlobalSearchWindow : Window
     private readonly ListBox _results = new();
     private readonly DispatcherTimer _delay = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private CancellationTokenSource? _searchCancellation;
+    private readonly SemaphoreSlim _searchGate = new(1, 1);
+    private bool _closed;
     private int _request;
 
     public SqlServerWorkspaceNavigation.SearchHit? SelectedResult { get; private set; }
@@ -199,7 +201,13 @@ public sealed class GlobalSearchWindow : Window
             }
             else if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; }
         };
-        _results.MouseDoubleClick += (_, _) => OpenSelected();
+        _results.MouseDoubleClick += (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source &&
+                ItemsControl.ContainerFromElement(_results, source) is ListBoxItem item &&
+                ReferenceEquals(item.Content, _results.SelectedItem))
+                OpenSelected();
+        };
         _results.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; }
@@ -211,26 +219,34 @@ public sealed class GlobalSearchWindow : Window
         Loaded += async (_, _) => { _input.Focus(); await SearchAsync(); };
         Closed += (_, _) =>
         {
+            _closed = true;
             _delay.Stop();
             ++_request;
             _searchCancellation?.Cancel();
-            _searchCancellation?.Dispose();
         };
     }
 
     private async Task SearchAsync()
     {
+        if (_closed) return;
         var request = ++_request;
         _searchCancellation?.Cancel();
-        _searchCancellation?.Dispose();
-        _searchCancellation = new CancellationTokenSource();
-        var ct = _searchCancellation.Token;
+        using var cancellation = new CancellationTokenSource();
+        _searchCancellation = cancellation;
+        var ct = cancellation.Token;
         var query = _input.Text;
         _status.Text = "Поиск в SQL Server…";
         try
         {
-            var hits = await SqlServerWorkspaceNavigation.SearchAsync(_connectionString, query, ct);
-            if (request != _request || ct.IsCancellationRequested) return;
+            IReadOnlyList<SqlServerWorkspaceNavigation.SearchHit> hits;
+            await _searchGate.WaitAsync(ct);
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                hits = await SqlServerWorkspaceNavigation.SearchAsync(_connectionString, query, ct);
+            }
+            finally { _searchGate.Release(); }
+            if (_closed || request != _request || ct.IsCancellationRequested) return;
             _results.ItemsSource = hits;
             var view = CollectionViewSource.GetDefaultView(_results.ItemsSource);
             view.GroupDescriptions.Add(new PropertyGroupDescription("KindTitle"));
@@ -243,13 +259,19 @@ public sealed class GlobalSearchWindow : Window
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            if (request == _request) _status.Text = "Ошибка поиска: " + ex.Message;
+            if (!_closed && request == _request && !ct.IsCancellationRequested)
+                _status.Text = "Ошибка поиска: " + ex.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(_searchCancellation, cancellation)) _searchCancellation = null;
         }
     }
 
     private void OpenSelected()
     {
-        if (_results.SelectedItem is not SqlServerWorkspaceNavigation.SearchHit hit) return;
+        if (_closed || _searchCancellation is not null || _delay.IsEnabled ||
+            _results.SelectedItem is not SqlServerWorkspaceNavigation.SearchHit hit) return;
         SelectedResult = hit;
         DialogResult = true;
     }

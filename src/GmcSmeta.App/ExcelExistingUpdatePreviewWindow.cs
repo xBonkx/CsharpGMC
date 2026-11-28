@@ -51,6 +51,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     };
     private bool _busy;
     private bool _closed;
+    private CancellationTokenSource? _previewCancellation;
     private readonly DataGrid _grid = new()
     {
         AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false,
@@ -221,20 +222,25 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             ResetPlan();
             SetBusy(true);
             _summary.Text = "Сравнение…";
+            using var cancellation = new CancellationTokenSource();
+            _previewCancellation = cancellation;
+            var token = cancellation.Token;
             try
             {
                 var result = await Task.Run(() =>
                 {
                     var plan = SqlServerExcelExistingUpdate.Prepare(
-                        _connectionString, contract.Id, _filePath, new[] { block.Block });
+                        _connectionString, contract.Id, _filePath, new[] { block.Block }, token);
                     if (!string.Equals(plan.FileSha256, _parsedFingerprint, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("Файл Excel изменён после первоначального разбора.");
                     var groups = plan.Differences.GroupBy(x => x.Kind)
                         .Select(g => g.Key + ": " + g.Count());
                     return (Plan: plan, Summary: string.Join("  |  ", groups),
                         HasSafe: plan.Differences.Any(x => x.SafeToApply));
-                });
-                if (_closed) return;
+                }, token);
+                if (_closed || token.IsCancellationRequested ||
+                    !ReferenceEquals(_contracts.SelectedItem, contract) ||
+                    !ReferenceEquals(_blocks.SelectedItem, block)) return;
                 PublishPlan(result.Plan, result.HasSafe);
                 _summary.Text = result.Summary +
                     ". Отсутствующие в Excel строки останутся на месте. " +
@@ -244,13 +250,14 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             }
             catch (Exception ex)
             {
-                if (_closed) return;
+                if (_closed || token.IsCancellationRequested) return;
                 MessageBox.Show(this, ex.Message, "Не удалось сравнить смету",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 _summary.Text = "Сравнение не выполнено. SQL не изменён.";
             }
             finally
             {
+                if (ReferenceEquals(_previewCancellation, cancellation)) _previewCancellation = null;
                 if (!_closed) SetBusy(false);
             }
         };
@@ -296,6 +303,7 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        _previewCancellation?.Cancel();
         base.OnClosed(e);
     }
 
@@ -313,20 +321,24 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         if (!CommitGrid()) return;
         var source = target.Source;
         SetBusy(true);
+        using var cancellation = new CancellationTokenSource();
+        _previewCancellation = cancellation;
+        var token = cancellation.Token;
         try
         {
-            var candidates = await Task.Run(() => plan.MappingCandidates(source.Ordinal));
-            if (_closed || !ReferenceEquals(Plan, plan)) return;
+            var candidates = await Task.Run(() => plan.MappingCandidates(source.Ordinal, token), token);
+            if (_closed || token.IsCancellationRequested || !ReferenceEquals(Plan, plan)) return;
             ShowMappingDialog(plan, source, candidates);
         }
         catch (Exception error)
         {
-            if (!_closed)
+            if (!_closed && !token.IsCancellationRequested)
                 MessageBox.Show(this, error.Message, "Соответствие отклонено",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
+            if (ReferenceEquals(_previewCancellation, cancellation)) _previewCancellation = null;
             if (!_closed) SetBusy(false);
         }
     }
@@ -396,7 +408,12 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
         panel.Children.Add(choices);
         bool dialogClosed = false;
         bool mapping = false;
-        dialog.Closed += (_, _) => dialogClosed = true;
+        CancellationTokenSource? mappingCancellation = null;
+        dialog.Closed += (_, _) =>
+        {
+            dialogClosed = true;
+            mappingCancellation?.Cancel();
+        };
         accept.Click += async (_, _) =>
         {
             if (mapping || dialogClosed || _closed || choices.SelectedItem is not MappingChoice chosen) return;
@@ -409,15 +426,18 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
                     "Ручное соответствие", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) !=
                 MessageBoxResult.Yes) return;
             mapping = true;
+            using var cancellation = new CancellationTokenSource();
+            mappingCancellation = cancellation;
+            var token = cancellation.Token;
             accept.IsEnabled = choices.IsEnabled = false;
             try
             {
                 var result = await Task.Run(() =>
                 {
-                    var mapped = plan.WithExplicitMapping(source.Ordinal, old.Id);
+                    var mapped = plan.WithExplicitMapping(source.Ordinal, old.Id, token);
                     return (Plan: mapped, HasSafe: mapped.Differences.Any(x => x.SafeToApply));
-                });
-                if (dialogClosed || _closed || !ReferenceEquals(Plan, plan)) return;
+                }, token);
+                if (dialogClosed || _closed || token.IsCancellationRequested || !ReferenceEquals(Plan, plan)) return;
                 PublishPlan(result.Plan, result.HasSafe);
                 _summary.Text = "Ручное 1:1 сопоставление сохранено только в плане предпросмотра. " +
                     "Выбор изменений сброшен: отметь нужную строку отдельно. " +
@@ -426,12 +446,13 @@ internal sealed class ExcelExistingUpdatePreviewWindow : Window
             }
             catch (Exception error)
             {
-                if (!dialogClosed && !_closed)
+                if (!dialogClosed && !_closed && !token.IsCancellationRequested)
                     MessageBox.Show(dialog, error.Message, "Соответствие отклонено",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             finally
             {
+                mappingCancellation = null;
                 mapping = false;
                 if (!dialogClosed && !_closed) accept.IsEnabled = choices.IsEnabled = true;
             }

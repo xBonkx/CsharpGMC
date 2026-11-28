@@ -135,37 +135,46 @@ public sealed class ExcelExistingUpdatePlan
     /// Candidates have the same contract-scoped section, parent, source name and unit.
     /// Changed identities, invented IDs and m:n mappings remain blocked.
     /// </summary>
-    public IReadOnlyList<ExcelExistingDbRow> MappingCandidates(int sourceOrdinal)
+    public IReadOnlyList<ExcelExistingDbRow> MappingCandidates(int sourceOrdinal, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var source = _sourceRows.SingleOrDefault(r => r.Ordinal == sourceOrdinal);
         if (source is null || source.ParentOrdinal is not null) return Array.Empty<ExcelExistingDbRow>();
         var key = Key(source.SectionPath, source.ParentName, source.Name, source.Unit);
         var reserved = _manualMappings.Where(m => m.Key != sourceOrdinal)
             .Select(m => m.Value).ToHashSet();
-        return _originalRows.Where(old =>
-                Key(old.SectionPath, old.ParentName, MatchName(old), old.Unit) == key &&
-                (source.StableId is null || source.StableId == old.Id) &&
-                !reserved.Contains(old.Id))
-            .OrderBy(old => old.Id).ToArray();
+        var result = _originalRows.Where(old =>
+            {
+                token.ThrowIfCancellationRequested();
+                return Key(old.SectionPath, old.ParentName, MatchName(old), old.Unit) == key &&
+                    (source.StableId is null || source.StableId == old.Id) &&
+                    !reserved.Contains(old.Id);
+            }).OrderBy(old => old.Id).ToArray();
+        token.ThrowIfCancellationRequested();
+        return result;
     }
 
     /// <summary>
     /// Explicit one-to-one assignment. Replanning discards checkbox selections.
     /// </summary>
-    public ExcelExistingUpdatePlan WithExplicitMapping(int sourceOrdinal, long existingId)
+    public ExcelExistingUpdatePlan WithExplicitMapping(int sourceOrdinal, long existingId,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (!Differences.Any(d => d.Source?.Ordinal == sourceOrdinal &&
                 d.Kind == ExcelExistingChangeKind.Ambiguous))
             throw new InvalidOperationException("Ручное сопоставление разрешено только для неоднозначных строк.");
-        if (!MappingCandidates(sourceOrdinal).Any(row => row.Id == existingId))
+        if (!MappingCandidates(sourceOrdinal, token).Any(row => row.Id == existingId))
             throw new InvalidOperationException("ID не является безопасным кандидатом этого договора.");
         var mappings = new Dictionary<int, long>(_manualMappings) { [sourceOrdinal] = existingId };
         return Build(ContractId, Revision, FileSha256, _originalRows,
-            _sourceRows, _availableSystems, _contractLocked, _originalScope, mappings);
+            _sourceRows, _availableSystems, _contractLocked, _originalScope, mappings, token);
     }
 
-    public static IReadOnlyList<ExcelExistingSourceRow> Flatten(IReadOnlyList<ExcelImportBlock> blocks)
+    public static IReadOnlyList<ExcelExistingSourceRow> Flatten(IReadOnlyList<ExcelImportBlock> blocks,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var result = new List<ExcelExistingSourceRow>();
         var ordinal = 0;
         foreach (var block in blocks)
@@ -175,10 +184,14 @@ public sealed class ExcelExistingUpdatePlan
                 ? section.Name : section.Parent + " / " + section.Name;
             foreach (var position in section.Positions)
             {
+                token.ThrowIfCancellationRequested();
                 var top = ++ordinal;
                 result.Add(NewRow(position, top, null, path, ""));
                 foreach (var child in position.Children)
+                {
+                    token.ThrowIfCancellationRequested();
                     result.Add(NewRow(child, ++ordinal, top, path, position.Name));
+                }
             }
         }
         return result;
@@ -207,8 +220,10 @@ public sealed class ExcelExistingUpdatePlan
         IReadOnlyList<ExcelExistingDbRow> existing,
         IReadOnlyList<ExcelExistingSourceRow> incoming,
         IReadOnlyCollection<string> availableSystems, bool contractLocked = false,
-        string scopeKey = "", IReadOnlyDictionary<int, long>? explicitMappings = null)
+        string scopeKey = "", IReadOnlyDictionary<int, long>? explicitMappings = null,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (contractId <= 0 || string.IsNullOrWhiteSpace(revision) ||
             fileSha256.Length != 64 || !fileSha256.All(Uri.IsHexDigit))
             throw new ArgumentException("Нет корректного договора, ревизии или SHA-256 Excel.");
@@ -216,8 +231,11 @@ public sealed class ExcelExistingUpdatePlan
             throw new ArgumentException("Выбери непустой Excel до 100 000 позиций.");
         var sourceByOrdinal = new Dictionary<int, ExcelExistingSourceRow>(incoming.Count);
         foreach (var source in incoming)
+        {
+            token.ThrowIfCancellationRequested();
             if (!sourceByOrdinal.TryAdd(source.Ordinal, source))
                 throw new ArgumentException("Повторяющиеся идентификаторы исходных строк.");
+        }
         var mappings = explicitMappings is null
             ? new Dictionary<int, long>() : new Dictionary<int, long>(explicitMappings);
         if (mappings.Values.Distinct().Count() != mappings.Count)
@@ -225,6 +243,7 @@ public sealed class ExcelExistingUpdatePlan
         var byId = existing.ToDictionary(r => r.Id);
         foreach (var mapping in mappings)
         {
+            token.ThrowIfCancellationRequested();
             var source = sourceByOrdinal.GetValueOrDefault(mapping.Key);
             if (source is null || source.ParentOrdinal is not null ||
                 !byId.TryGetValue(mapping.Value, out var current) ||
@@ -246,11 +265,13 @@ public sealed class ExcelExistingUpdatePlan
         var incomingGroups = incoming.GroupBy(r => Key(r.SectionPath, r.ParentName, r.Name, r.Unit))
             .ToDictionary(g => g.Key, g => g.Count());
         var available = new HashSet<string>(availableSystems.Select(x => Normalize(x)), StringComparer.Ordinal);
+        token.ThrowIfCancellationRequested();
         var matched = new HashSet<long>();
         var diffs = new List<ExcelExistingDifference>(incoming.Count + existing.Count);
 
         foreach (var source in incoming.OrderBy(x => x.Ordinal))
         {
+            token.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(source.Name) || source.Name.Length > 2000 ||
                 source.Unit.Length > 32 || source.Number.Length > 32 ||
                 source.Note.Length > 10_000 || source.Basis.Length > 64 ||
@@ -341,12 +362,15 @@ public sealed class ExcelExistingUpdatePlan
         }
 
         foreach (var old in existing)
+        {
+            token.ThrowIfCancellationRequested();
             if (!matched.Contains(old.Id))
                 diffs.Add(new ExcelExistingDifference
                 {
                     Kind = ExcelExistingChangeKind.DeletedInSource, Source = null,
                     Existing = old, Explanation = "Нет в Excel. Позиция будет сохранена; автоматическое удаление запрещено."
                 });
+        }
 
         // PlanId binds one reviewed source to one revision and the exact read snapshot.
         var serial = new StringBuilder();
@@ -354,11 +378,21 @@ public sealed class ExcelExistingUpdatePlan
         serial.Append(contractId).Append('|').Append(revision).Append('|')
             .Append(fileSha256.ToLowerInvariant()).Append('|').Append(scopeHash);
         foreach (var old in existing.OrderBy(x => x.Id))
+        {
+            token.ThrowIfCancellationRequested();
             serial.Append('|').Append(JsonSerializer.Serialize(old));
+        }
         foreach (var row in incoming.OrderBy(x => x.Ordinal))
+        {
+            token.ThrowIfCancellationRequested();
             serial.Append('|').Append(JsonSerializer.Serialize(row));
+        }
         foreach (var mapping in mappings.OrderBy(m => m.Key))
+        {
+            token.ThrowIfCancellationRequested();
             serial.Append("|manual:").Append(mapping.Key).Append("->").Append(mapping.Value);
+        }
+        token.ThrowIfCancellationRequested();
         var id = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(serial.ToString())));
         var plan = new ExcelExistingUpdatePlan(contractId, revision, fileSha256.ToLowerInvariant(),
             scopeHash, id, diffs)
@@ -370,6 +404,7 @@ public sealed class ExcelExistingUpdatePlan
             _originalScope = scopeKey,
             _manualMappings = mappings
         };
+        token.ThrowIfCancellationRequested();
         return plan;
     }
 

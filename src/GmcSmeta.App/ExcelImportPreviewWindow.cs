@@ -297,17 +297,48 @@ internal sealed class ExcelImportPreviewWindow : Window
 
     private PreviewRow? _reportRow;
     private string _reportBody = "";
+    private CancellationTokenSource? _reportCancellation;
+    private readonly SemaphoreSlim _reportGate = new(1, 1);
+    private bool _reportClosed;
 
-    private void ShowReport()
+    private async void ShowReport()
     {
-        if (_table.SelectedItem is not PreviewRow row) return;
+        if (_reportClosed) return;
+        _reportCancellation?.Cancel();
+        if (_table.SelectedItem is not PreviewRow row)
+        {
+            _report.Text = "";
+            return;
+        }
         var b = row.Block;
-        // Changing only the target changes the duplicate warning, not the
-        // immutable parsed workbook's reconciliation and section totals.
+        // Target changes reuse the report for the immutable parsed block.
         if (!ReferenceEquals(_reportRow, row))
         {
-            _reportBody = BuildReport(row);
-            _reportRow = row;
+            using var cancellation = new CancellationTokenSource();
+            _reportCancellation = cancellation;
+            var token = cancellation.Token;
+            _report.Text = "Расчёт отчёта…";
+            try
+            {
+                await _reportGate.WaitAsync(token);
+                string body;
+                try { body = await Task.Run(() => BuildReport(row, token), token); }
+                finally { _reportGate.Release(); }
+                if (_reportClosed || token.IsCancellationRequested ||
+                    !ReferenceEquals(_table.SelectedItem, row)) return;
+                _reportBody = body;
+                _reportRow = row;
+            }
+            catch (Exception error)
+            {
+                if (!_reportClosed && !token.IsCancellationRequested)
+                    _report.Text = "Не удалось сформировать отчёт: " + error.Message;
+                return;
+            }
+            finally
+            {
+                if (ReferenceEquals(_reportCancellation, cancellation)) _reportCancellation = null;
+            }
         }
         var duplicate = ObjectId is long id && _alreadyLoaded.TryGetValue(id, out var sheets) &&
             sheets.Contains(Path.GetFileName(_result.FileName) + "|" + b.Sheet);
@@ -318,8 +349,16 @@ internal sealed class ExcelImportPreviewWindow : Window
         if (_report.Text != text) _report.Text = text;
     }
 
-    private string BuildReport(PreviewRow row)
+    protected override void OnClosed(EventArgs e)
     {
+        _reportClosed = true;
+        _reportCancellation?.Cancel();
+        base.OnClosed(e);
+    }
+
+    private string BuildReport(PreviewRow row, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
         var b = row.Block;
         var info = new List<string>
         {
@@ -328,7 +367,10 @@ internal sealed class ExcelImportPreviewWindow : Window
             "Разделы и системы:"
         };
         foreach (var s in b.Sections)
-            info.Add($"  {s.Name} — {s.Positions.Sum(p => 1 + p.Children.Count)} поз., {s.MaterialSum:N2} ₽");
+        {
+            token.ThrowIfCancellationRequested();
+            info.Add($"  {s.Name} — {s.Positions.Sum(p => { token.ThrowIfCancellationRequested(); return 1 + p.Children.Count; })} поз., {s.MaterialSum:N2} ₽");
+        }
         info.Add("");
         info.Add($"Материалы {b.MaterialSum:N2} · СМР {row.Smr} · Транспорт {b.Transport ?? 0m:N2}");
         info.Add($"Итого расчётное {b.CalculatedTotal:N2} · в файле {b.DeclaredTotal?.ToString("N2") ?? "не указано"}");
@@ -343,6 +385,7 @@ internal sealed class ExcelImportPreviewWindow : Window
             info.Add(""); info.Add("По файлу:");
             info.AddRange(_result.Notes);
         }
+        token.ThrowIfCancellationRequested();
         return string.Join(Environment.NewLine, info);
     }
 

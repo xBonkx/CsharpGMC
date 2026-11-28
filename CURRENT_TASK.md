@@ -1,5 +1,6 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.07 CODE READY: перенесён подготовленный патч, отменяемые поиск/этапы/Excel preview, ручное сопоставление и отчёт на worker. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Тесты не запускались, бронь снята.
 - 29.11.2026 — PERF-044.02 PARTIAL: integrated prepared summary header geometry and width invalidation patch; 12 prior static checks, 3 source test cases (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — PERF-047.02 PARTIAL: поиск людей и авто без повторной склейки строк, точный ID истории после экспорта, отказ без ревизии; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.

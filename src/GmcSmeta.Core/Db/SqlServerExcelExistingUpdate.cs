@@ -28,21 +28,30 @@ public sealed class ExcelExistingCommitUncertainException : Exception
 /// </summary>
 public static partial class SqlServerExcelExistingUpdate
 {
-    public static string FileFingerprint(string filePath)
+    public static string FileFingerprint(string filePath) => FileFingerprint(filePath, default);
+
+    private static string FileFingerprint(string filePath, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+        var hash = token.CanBeCanceled
+            ? SHA256.HashDataAsync(stream, token).GetAwaiter().GetResult()
+            : SHA256.HashData(stream);
+        token.ThrowIfCancellationRequested();
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     // Verify the SQL Server-selected database, not merely the caller-supplied
     // connection string. SQL Server aliases may differ from @@SERVERNAME, so
     // enforce the actual database and report the server for audit.
-    private static void VerifyConnectedPilotTarget(SqlConnection conn, string connectionString)
+    private static void VerifyConnectedPilotTarget(SqlConnection conn, string connectionString,
+        CancellationToken token = default)
     {
         var expected = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
         using var cmd = new SqlCommand(
             "SELECT DB_NAME(), CONVERT(nvarchar(256),SERVERPROPERTY('ServerName'))", conn);
-        using var reader = cmd.ExecuteReader();
+        using var registration = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         if (!reader.Read() || reader.IsDBNull(0))
             throw new InvalidOperationException("SQL Server не подтвердил выбранную базу данных.");
         var actual = reader.GetString(0);
@@ -54,18 +63,23 @@ public static partial class SqlServerExcelExistingUpdate
                 "; ожидалась " + expected + ". Запись запрещена.");
     }
 
-    public static ExcelExistingSnapshot Read(string connectionString, long contractId)
+    public static ExcelExistingSnapshot Read(string connectionString, long contractId,
+        CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         if (contractId <= 0) throw new ArgumentOutOfRangeException(nameof(contractId));
-        using var conn = SqlServerDatabase.Open(connectionString);
-        VerifyConnectedPilotTarget(conn, connectionString);
+        using var conn = SqlReadCancellation.Open(connectionString, token);
+        VerifyConnectedPilotTarget(conn, connectionString, token);
+        token.ThrowIfCancellationRequested();
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         string revision;
         using (var cmd = new SqlCommand(
             "SELECT [value] FROM dbo.meta WITH (HOLDLOCK) WHERE [key]=N'rev'", conn, tx))
-            revision = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) ??
+            revision = Convert.ToString(SqlReadCancellation.Scalar(cmd, token), CultureInfo.InvariantCulture) ??
                 throw new InvalidOperationException("Не найдена meta.rev.");
+        if (string.IsNullOrWhiteSpace(revision))
+            throw new InvalidOperationException("Не найдена meta.rev.");
 
         long objectId;
         bool protection;
@@ -79,7 +93,8 @@ public static partial class SqlServerExcelExistingUpdate
               JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id", conn, tx))
         {
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var r = cmd.ExecuteReader();
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
             if (!r.Read()) throw new ArgumentException("Договор не найден.");
             objectId = SqlInteger.ReadInt64(r, 0);
             protection = SqlFlag.Read(r, 1) ||
@@ -94,9 +109,11 @@ public static partial class SqlServerExcelExistingUpdate
               WHERE s.contract_id=@contract", conn, tx))
         {
             cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
-            using var r = cmd.ExecuteReader();
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var name = r.GetString(0);
                 var parent = r.GetString(1);
                 systems.Add(parent.Length == 0 ? name : parent + " / " + name);
@@ -132,9 +149,11 @@ public static partial class SqlServerExcelExistingUpdate
         {
             cmd.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             cmd.CommandTimeout = 180;
-            using var r = cmd.ExecuteReader();
+            using var registration = SqlReadCancellation.Register(cmd, token);
+            using var r = SqlReadCancellation.ExecuteReader(cmd, token);
             while (r.Read())
             {
+                token.ThrowIfCancellationRequested();
                 var src = r.IsDBNull(15) ? (int?)null : SqlInteger.ReadInt32(r, 15);
                 var extra = r.GetString(16);
                 var imported = src > 0;
@@ -167,19 +186,22 @@ public static partial class SqlServerExcelExistingUpdate
                     SqlFlag.Read(r, 18), imported));
             }
         }
+        token.ThrowIfCancellationRequested();
         tx.Commit();
+        token.ThrowIfCancellationRequested();
         return new ExcelExistingSnapshot(contractId, objectId, revision, protection, rows, unique);
     }
 
     public static ExcelExistingUpdatePlan Prepare(string connectionString, long contractId,
-        string filePath, IReadOnlyList<ExcelImportBlock> blocks)
+        string filePath, IReadOnlyList<ExcelImportBlock> blocks, CancellationToken token = default)
     {
-        var snapshot = Read(connectionString, contractId);
+        token.ThrowIfCancellationRequested();
+        var snapshot = Read(connectionString, contractId, token);
         return ExcelExistingUpdatePlan.Build(contractId, snapshot.Revision,
-            FileFingerprint(filePath), snapshot.Rows,
-            ExcelExistingUpdatePlan.Flatten(blocks), snapshot.UniqueSystems,
+            FileFingerprint(filePath, token), snapshot.Rows,
+            ExcelExistingUpdatePlan.Flatten(blocks, token), snapshot.UniqueSystems,
             snapshot.Protected, string.Join(";", blocks.Select(x =>
-                x.Sheet + ":" + x.FirstRow + "-" + x.LastRow)));
+                x.Sheet + ":" + x.FirstRow + "-" + x.LastRow)), token: token);
     }
 
     public static bool WasCommitted(string connectionString, long contractId, string operationId)
