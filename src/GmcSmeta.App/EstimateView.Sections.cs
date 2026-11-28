@@ -938,7 +938,7 @@ public partial class EstimateView
         body.Children.Add(new TextBlock
         {
             Text = source is null ? "Из буфера обмена" : source,
-            Foreground = ExcelPasteBrush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("UiMutedTextBrush"), TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 4, 0, 16)
         });
         var preview = new StackPanel();
@@ -963,7 +963,7 @@ public partial class EstimateView
             preview.Children.Add(new TextBlock
             {
                 Text = $"…и ещё {rows.Count - 5}", Margin = new Thickness(0, 6, 0, 0),
-                Foreground = ExcelPasteBrush("#64748B")
+                Foreground = (Brush)FindResource("UiMutedTextBrush")
             });
         body.Children.Add(new Border
         {
@@ -974,7 +974,7 @@ public partial class EstimateView
         body.Children.Add(new TextBlock
         {
             Text = "Колонки: название · ед. · количество · цена · закупка · примечание",
-            Foreground = ExcelPasteBrush("#64748B"), TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("UiMutedTextBrush"), TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 13, 0, 8)
         });
         body.Children.Add(new TextBlock
