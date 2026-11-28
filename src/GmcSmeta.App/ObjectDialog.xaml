@@ -8,8 +8,8 @@
     <Grid Margin="{StaticResource LayoutFormDialogMargin}">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="{StaticResource LayoutFormFieldMargin}">
-            <TextBlock x:Name="Heading" Text="Новый договор" TextWrapping="Wrap" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"/>
-            <TextBlock x:Name="AgreementInfoText" Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            <TextBlock x:Name="Heading" Text="Новый договор" FontSize="{StaticResource UiH2Size}" Style="{StaticResource UiHeadingText}"/>
+            <TextBlock x:Name="AgreementInfoText" Style="{StaticResource UiSecondaryText}" Margin="{StaticResource LayoutFormLabelFieldGap}"/>
         </StackPanel>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid>
@@ -46,9 +46,9 @@
                     </Style>
                 </TextBlock.Style>
         </TextBlock>
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="122" MinHeight="34" Margin="0,0,8,0"/>
+        <WrapPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SaveButton" Content="Сохранить" IsDefault="True" Click="Save_Click" Style="{StaticResource PrimaryButton}" MinWidth="122" MinHeight="34" Margin="{StaticResource LayoutDialogActionGap}"/>
             <Button Style="{StaticResource PythonToolbarButton}" Content="Отмена" IsCancel="True" MinWidth="122" MinHeight="34"/>
-        </StackPanel>
+        </WrapPanel>
     </Grid>
 </Window>
