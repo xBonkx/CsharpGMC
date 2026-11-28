@@ -12,10 +12,12 @@ public sealed class CostMissingPriceIndex
     private readonly Dictionary<long, CostMissingPrice> _byId = new();
     private readonly int[] _histogram = new int[16];
 
-    public CostMissingPriceIndex(IEnumerable<CostSummaryRow> rows)
+    public CostMissingPriceIndex(IEnumerable<CostSummaryRow> rows, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         foreach (var row in rows)
         {
+            token.ThrowIfCancellationRequested();
             var flags = FlagsOf(row);
             _byId[row.Id] = _byId.GetValueOrDefault(row.Id) | flags;
             _histogram[(int)flags]++;

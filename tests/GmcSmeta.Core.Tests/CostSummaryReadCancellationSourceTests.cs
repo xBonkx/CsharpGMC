@@ -11,7 +11,7 @@ public sealed class CostSummaryReadCancellationSourceTests
         Assert.NotNull(root);
         var code = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "CostSummaryPane.xaml.cs"));
         Assert.Equal(2, code.Split("_costReadCancellation?.Cancel();", StringSplitOptions.None).Length - 1);
-        Assert.Contains("ReadCostSnapshot(_connectionString, _contractId, token), token", code);
+        Assert.Contains("ReadCostSnapshot(_connectionString, _contractId, materialOptions, token), token", code);
         var read = code.IndexOf("private static CostLoadSnapshot ReadCostSnapshot", StringComparison.Ordinal);
         var load = code.IndexOf("private async Task ReloadAsync()", StringComparison.Ordinal);
         Assert.True(read >= 0 && load > read);
@@ -19,5 +19,27 @@ public sealed class CostSummaryReadCancellationSourceTests
         Assert.Contains("if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;", code);
         Assert.Contains("if (ReferenceEquals(_costReadCancellation, cancellation)) _costReadCancellation = null;", code);
         Assert.Contains("owner.ReloadAsync(); // includes failed/unknown COMMIT; never replay the write", code);
+    }
+
+    [Theory]
+    [InlineData("CostSummaryPane.xaml.cs", "SqlServerDatabase.OpenAsync(connectionString, token)")]
+    [InlineData("CostSummaryPane.xaml.cs", "SqlServerCostTotals.SummaryAndTotals(conn, contractId, token)")]
+    [InlineData("CostSummaryPane.xaml.cs", "SqlServerSmrExpenses.List(conn, contractId, token)")]
+    [InlineData("CostSummaryPane.xaml.cs", "cmd.ExecuteScalarAsync(token)")]
+    [InlineData("CostSummaryPane.xaml.cs", "BuildMaterialRows(summary, rows, materialOptions, token)")]
+    [InlineData("CostSummaryPane.xaml.cs", "data.MaterialOptions == CaptureMaterialOptions()")]
+    [InlineData("CostSummaryPane.ViewState.cs", "duplicates.Add(key)")]
+    [InlineData("CostSummaryPane.ViewState.cs", "group.MemberIds.OrderBy(id => id)")]
+    [InlineData("CostSummaryPane.ViewState.cs", "generation != _loadGeneration")]
+    [InlineData("CostSummaryPane.ViewState.cs", "ReferenceEquals(grid.ItemsSource, source)")]
+    [InlineData("CostSummaryPane.ViewState.cs", "target.ScrollToVerticalOffset(vertical)")]
+    [InlineData("CostSummaryPane.Materials.cs", "ReplaceCostRows(MaterialsGrid, result)")]
+    public void SummaryUsesCancellableProjectionAndIdentityRestore(string file, string expected)
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", file)))
+            root = root.Parent;
+        Assert.NotNull(root);
+        Assert.Contains(expected, File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.App", file)));
     }
 }

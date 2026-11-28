@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,18 +29,32 @@ public partial class CostSummaryPane
         if (_summaryData is null || MaterialsGrid is null ||
             CostViewMode is null || CostSortMode is null)
             return;
-        var mode = ViewTag(CostViewMode, "kp");
-        var sort = ViewTag(CostSortMode, "kp");
-        var groups = CostSummaryGrouping.Build(_summaryData, mode, sort);
-        var all = _allRows.Where(x => x.Id > 0).ToDictionary(x => x.Id);
-        var result = new ObservableCollection<CostSummaryPreviewRow>();
-        var search = MaterialSearch?.Text?.Trim() ?? "";
-        var noCost = MaterialMissingCost?.IsChecked == true;
-        var noPrice = MaterialMissingPrice?.IsChecked == true;
+        var result = BuildMaterialRows(_summaryData, _allRows, CaptureMaterialOptions(), CancellationToken.None);
+        ReplaceCostRows(MaterialsGrid, result);
+    }
+
+    private sealed record MaterialOptions(string Mode, string Sort, string Search, bool NoCost, bool NoPrice);
+
+    private MaterialOptions CaptureMaterialOptions() => new(
+        ViewTag(CostViewMode, "kp"), ViewTag(CostSortMode, "kp"),
+        MaterialSearch?.Text?.Trim() ?? "", MaterialMissingCost?.IsChecked == true,
+        MaterialMissingPrice?.IsChecked == true);
+
+    // Plain DTOs only: may run on a worker for a fresh SQL snapshot.
+    private static List<CostSummaryPreviewRow> BuildMaterialRows(CostSummaryData data,
+        IEnumerable<CostSummaryPreviewRow> allRows, MaterialOptions options, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var groups = CostSummaryGrouping.Build(data, options.Mode, options.Sort);
+        token.ThrowIfCancellationRequested();
+        var all = allRows.Where(x => x.Id > 0).ToDictionary(x => x.Id);
+        var result = new List<CostSummaryPreviewRow>();
+        var (search, noCost, noPrice) = (options.Search, options.NoCost, options.NoPrice);
         var anyFilter = noCost || noPrice || search.Length != 0;
         string MoneyValue(decimal value) => value == 0m ? "—" : Money.Format(value);
         foreach (var group in groups)
         {
+            token.ThrowIfCancellationRequested();
             var members = group.Rows
                 .Where(r => (!noCost && !noPrice) ||
                     (noCost && r.NoCost) || (noPrice && r.NoPrice))
@@ -67,13 +82,16 @@ public partial class CostSummaryPane
                 RowBackground = "#EAF2FD",
             });
             foreach (var row in members)
-                if (all.TryGetValue(row.Id, out var preview))
-                    result.Add(preview);
+            {
+                token.ThrowIfCancellationRequested();
+                if (all.TryGetValue(row.Id, out var preview)) result.Add(preview);
+            }
         }
         if (!anyFilter)
-            foreach (var extra in _allRows.Where(r => r.IsTransport))
+            foreach (var extra in allRows.Where(r => r.IsTransport))
                 result.Add(extra);
-        MaterialsGrid.ItemsSource = result;
+        token.ThrowIfCancellationRequested();
+        return result;
     }
 
     private IReadOnlyList<long> SelectedMaterials()

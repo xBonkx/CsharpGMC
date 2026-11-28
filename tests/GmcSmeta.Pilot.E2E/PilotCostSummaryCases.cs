@@ -104,6 +104,20 @@ internal static class PilotCostSummaryCases
         PilotRunner.Check(SqlServerDatabase.Revision(conn) == before, "Cancelled materials read changed revision");
         var standaloneTotals = SqlServerCostTotals.Totals(conn, contractId, data);
         var combined = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
+        using var combinedCancellation = new CancellationTokenSource();
+        var cancellableCombined = SqlServerCostTotals.SummaryAndTotals(conn, contractId, combinedCancellation.Token);
+        PilotRunner.Check(cancellableCombined.Summary.Rows.SequenceEqual(combined.Summary.Rows) &&
+            cancellableCombined.Totals.Lines.SequenceEqual(combined.Totals.Lines) &&
+            cancellableCombined.Totals.Total == combined.Totals.Total &&
+            SqlServerSmrExpenses.List(conn, contractId, combinedCancellation.Token).SequenceEqual(SqlServerSmrExpenses.List(conn, contractId)),
+            "Cancellation-aware cost snapshot changed financial rows or expenses");
+        combinedCancellation.Cancel();
+        try
+        {
+            SqlServerSmrExpenses.List(conn, contractId, combinedCancellation.Token);
+            throw new InvalidOperationException("Cancelled SMR expense read did not throw.");
+        }
+        catch (OperationCanceledException) { }
         PilotRunner.Check(combined.Summary.Rows.SequenceEqual(data.Rows) &&
             combined.Summary.Extra.SequenceEqual(data.Extra) &&
             combined.Totals.Lines.SequenceEqual(standaloneTotals.Lines) &&

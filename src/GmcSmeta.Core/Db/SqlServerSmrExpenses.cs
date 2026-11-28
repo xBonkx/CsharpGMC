@@ -19,15 +19,22 @@ public static class SqlServerSmrExpenses
         return List(conn, contractId);
     }
 
-    public static IReadOnlyList<Expense> List(SqlConnection conn, long contractId)
+    public static IReadOnlyList<Expense> List(SqlConnection conn, long contractId) =>
+        List(conn, contractId, CancellationToken.None);
+
+    public static IReadOnlyList<Expense> List(SqlConnection conn, long contractId, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         using var cmd = new SqlCommand(
             "SELECT id,[date],kind,who,amount,note FROM dbo.smr_costs " +
             "WHERE contract_id=@id ORDER BY id", conn);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-        using var reader = cmd.ExecuteReader();
+        using var cancellation = SqlReadCancellation.Register(cmd, token);
+        using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
         var result = new List<Expense>();
         while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
             result.Add(new Expense(
                 Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
                 reader.IsDBNull(1) ? null : reader.GetDateTime(1),
@@ -35,6 +42,8 @@ public static class SqlServerSmrExpenses
                 reader.IsDBNull(3) ? "" : reader.GetString(3),
                 reader.IsDBNull(4) ? 0m : Convert.ToDecimal(reader.GetValue(4), CultureInfo.InvariantCulture),
                 reader.IsDBNull(5) ? "" : reader.GetString(5)));
+        }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 

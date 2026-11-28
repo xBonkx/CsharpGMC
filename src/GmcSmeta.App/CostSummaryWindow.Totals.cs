@@ -100,7 +100,7 @@ public partial class CostSummaryPane
                 IsTotalsRow = true,
             });
         }
-        TotalsGrid.ItemsSource = items;
+        ReplaceCostRows(TotalsGrid, items);
         TotCostValue.Text = Money.Format(costSum);
         TotSellCaption.Text = d.VatTop ? "Розница — всего с НДС" : "Розница — всего";
         TotSellValue.Text = Money.Format(d.VatTop ? d.Total : sellSum);

@@ -254,47 +254,64 @@ public partial class CostSummaryPane : UserControl
             _filteredRows.Add(selected, visible);
         }
         if (!ReferenceEquals(SummaryGrid.ItemsSource, visible))
-            SummaryGrid.ItemsSource = visible;
+            ReplaceCostRows(SummaryGrid, visible);
     }
 
     private void Filter_Changed(object sender, RoutedEventArgs e) => ApplyFilter();
 
     private sealed record CostLoadSnapshot(CostSummaryData Summary, CostTotalsData Totals,
         List<CostSummaryPreviewRow> Rows, List<SmrExpensePreviewRow> Expenses, string SmrMode, string Revision,
-        CostMissingPriceIndex MissingPrices);
+        CostMissingPriceIndex MissingPrices, List<CostSummaryPreviewRow> Materials,
+        List<CostSummaryPreviewRow> WorkRows, MaterialOptions MaterialOptions);
 
-    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId, CancellationToken token)
+    private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId, MaterialOptions materialOptions, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        using var conn = SqlServerDatabase.Open(connectionString);
+        using var conn = SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult();
+        string Revision() => SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult();
         for (var attempt = 0; attempt < 2; attempt++)
         {
             token.ThrowIfCancellationRequested();
-            var before = SqlServerDatabase.Revision(conn);
+            var before = Revision();
             token.ThrowIfCancellationRequested();
-            var (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId);
+            StartupTrace.Mark("cost_snapshot_financial_begin");
+            var (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId, token);
+            StartupTrace.Mark("cost_snapshot_financial_end");
             token.ThrowIfCancellationRequested();
-            var expenses = SqlServerSmrExpenses.List(conn, contractId).Select(x => new SmrExpensePreviewRow
+            StartupTrace.Mark("cost_snapshot_expenses_begin");
+            var expenses = SqlServerSmrExpenses.List(conn, contractId, token).Select(x =>
             {
-                Id = x.Id,
-                Date = x.Date?.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) ?? "",
-                Kind = x.Kind, Who = x.Who,
-                Amount = x.Amount.ToString("0.##", CultureInfo.CurrentCulture), Note = x.Note,
+                token.ThrowIfCancellationRequested();
+                return new SmrExpensePreviewRow
+                {
+                    Id = x.Id,
+                    Date = x.Date?.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture) ?? "",
+                    Kind = x.Kind, Who = x.Who,
+                    Amount = x.Amount.ToString("0.##", CultureInfo.CurrentCulture), Note = x.Note,
+                };
             }).ToList();
+            StartupTrace.Mark("cost_snapshot_expenses_end");
             token.ThrowIfCancellationRequested();
             using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
                 "SELECT smr_mode FROM dbo.contracts WHERE id=@id", conn);
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            var mode = Convert.ToString(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "sum";
+            var mode = Convert.ToString(cmd.ExecuteScalarAsync(token).GetAwaiter().GetResult(), CultureInfo.InvariantCulture) ?? "sum";
             token.ThrowIfCancellationRequested();
-            var after = SqlServerDatabase.Revision(conn);
+            var after = Revision();
             token.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(before) && before == after)
             {
-                var rows = BuildSummaryPreview(summary);
+                StartupTrace.Mark("cost_snapshot_format_begin");
+                var rows = BuildSummaryPreview(summary, token);
+                var missing = new CostMissingPriceIndex(summary.Rows, token);
+                var workRows = rows.Where(r => r.Id > 0).ToList();
+                StartupTrace.Mark("cost_snapshot_format_end");
+                StartupTrace.Mark("cost_snapshot_group_begin");
+                var materials = BuildMaterialRows(summary, rows, materialOptions, token);
+                StartupTrace.Mark("cost_snapshot_group_end");
                 token.ThrowIfCancellationRequested();
                 return new CostLoadSnapshot(summary, totals, rows, expenses, mode, after,
-                    new CostMissingPriceIndex(summary.Rows));
+                    missing, materials, workRows, materialOptions);
             }
         }
         throw new InvalidOperationException("Себестоимость изменилась во время чтения. Повторите загрузку.");
@@ -319,16 +336,19 @@ public partial class CostSummaryPane : UserControl
         var token = cancellation.Token;
         try
         {
-            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, token), token);
+            var materialOptions = CaptureMaterialOptions();
+            var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, materialOptions, token), token);
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
+            StartupTrace.Mark("cost_snapshot_bind_begin");
             _summaryRows = data.Summary.Rows.ToList();
             _summaryData = data.Summary;
             _allRows = new ObservableCollection<CostSummaryPreviewRow>(data.Rows);
             _missingPrices = data.MissingPrices;
             _filteredRows.Clear();
             ApplyFilter();
-            ReloadMaterialView();
-            ApplySmrTab(data.Expenses, data.SmrMode);
+            if (data.MaterialOptions == CaptureMaterialOptions()) ReplaceCostRows(MaterialsGrid, data.Materials);
+            else ReloadMaterialView();
+            ApplySmrTab(data.Expenses, data.SmrMode, data.WorkRows);
             ApplyTotalsTab(data.Totals);
             _revision = data.Revision;
             _needsReloadAfterAttach = false;
@@ -339,10 +359,11 @@ public partial class CostSummaryPane : UserControl
                 "   ·   Маржа: " + Money.Format(summary.TotalSell - summary.TotalCost) +
                 (summary.Notes.Count > 0 ? "   ·   " + string.Join("; ", summary.Notes) : ""));
             CostTabs.IsEnabled = true;
+            StartupTrace.Mark("cost_snapshot_bind_end");
         }
         catch (Exception ex)
         {
-            if (!_attached || generation != _loadGeneration) return;
+            if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             _revision = "";
             _summaryData = null;
             _totalsData = null;
@@ -357,7 +378,10 @@ public partial class CostSummaryPane : UserControl
         }
     }
 
-    internal static List<CostSummaryPreviewRow> BuildSummaryPreview(CostSummaryData data)
+    internal static List<CostSummaryPreviewRow> BuildSummaryPreview(CostSummaryData data) =>
+        BuildSummaryPreview(data, CancellationToken.None);
+
+    private static List<CostSummaryPreviewRow> BuildSummaryPreview(CostSummaryData data, CancellationToken token)
     {
         var items = new List<CostSummaryPreviewRow>();
         string M(decimal v) => v == 0m ? "—" : Money.Format(v);
@@ -369,6 +393,7 @@ public partial class CostSummaryPane : UserControl
         var systemLabels = data.Systems.ToDictionary(s => s.Id, s => s.Label);
         foreach (var row in data.Rows)
         {
+            token.ThrowIfCancellationRequested();
             var systemLabel = systemLabels.GetValueOrDefault(row.SystemId, "");
             items.Add(new CostSummaryPreviewRow
             {
@@ -404,6 +429,7 @@ public partial class CostSummaryPane : UserControl
         }
         foreach (var (name, cost, sell, kind) in data.Extra)
         {
+            token.ThrowIfCancellationRequested();
             bool works = string.Equals(kind, "works", StringComparison.OrdinalIgnoreCase);
             bool transport = string.Equals(kind, "trans", StringComparison.OrdinalIgnoreCase);
             items.Add(new CostSummaryPreviewRow

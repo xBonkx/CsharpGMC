@@ -24,11 +24,11 @@ public partial class CostSummaryPane
         public string Note { get; set; } = "";
     }
 
-    private void ApplySmrTab(List<SmrExpensePreviewRow> expenses, string mode)
+    private void ApplySmrTab(List<SmrExpensePreviewRow> expenses, string mode,
+        List<CostSummaryPreviewRow> workRows)
     {
-        SmrWorkGrid.ItemsSource = new ObservableCollection<CostSummaryPreviewRow>(
-            _allRows.Where(r => r.Id > 0));
-        SmrExpenseGrid.ItemsSource = new ObservableCollection<SmrExpensePreviewRow>(expenses);
+        ReplaceCostRows(SmrWorkGrid, new ObservableCollection<CostSummaryPreviewRow>(workRows));
+        ReplaceCostRows(SmrExpenseGrid, new ObservableCollection<SmrExpensePreviewRow>(expenses));
         SmrModeCaption.Text = "Режим СМР: " + mode;
         foreach (var item in SmrModePicker.Items.OfType<ComboBoxItem>())
             if ((string?)item.Tag == mode) SmrModePicker.SelectedItem = item;
