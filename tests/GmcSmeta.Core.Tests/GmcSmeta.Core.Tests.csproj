@@ -22,6 +22,9 @@
     <ProjectReference Include="..\..\src\GmcSmeta.Core\GmcSmeta.Core.csproj" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\InstallDirectoryPublisher.cs" Link="InstallDirectoryPublisher.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\AppVersion.cs" Link="LauncherAppVersion.cs" />
+    <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\InstalledApp.cs" Link="LauncherInstalledApp.cs" />
+    <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\PackageIntegrity.cs" Link="LauncherPackageIntegrity.cs" />
+    <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\AppPaths.cs" Link="LauncherAppPaths.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\DemoReleasePolicy.cs" Link="DemoReleasePolicy.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseDownloadTransfer.cs" Link="ReleaseDownloadTransfer.cs" />
     <Compile Include="..\..\tools\launcher\GmcSmeta.Launcher\ReleaseCheckCache.cs" Link="ReleaseCheckCache.cs" />

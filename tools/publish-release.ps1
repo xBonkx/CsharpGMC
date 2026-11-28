@@ -171,6 +171,11 @@ try {
         (Join-Path $work 'launcher\GmcSmeta.Launcher.exe')
     )
     Step '5/6  Упаковка архивов и контрольных сумм…'
+    # These are included inside both SHA-256-verified application archives.
+    foreach ($dir in 'app-sc', 'app-fx') {
+        Set-Content -Path (Join-Path $work "$dir\gmc-package-version.txt") -Value $Version -Encoding utf8
+        Set-Content -Path (Join-Path $work "$dir\gmc-package-schema.txt") -Value $schemaVersion -Encoding utf8
+    }
     Compress-Archive -Path (Join-Path $work 'app-sc\*') -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64.zip') -CompressionLevel Optimal
     Compress-Archive -Path (Join-Path $work 'app-fx\*') -DestinationPath (Join-Path $out 'GMC-Smeta-Next-win-x64-fx.zip') -CompressionLevel Optimal
     Copy-Item (Join-Path $work 'launcher\GmcSmeta.Launcher.exe') (Join-Path $out 'GmcSmeta.Launcher.exe')

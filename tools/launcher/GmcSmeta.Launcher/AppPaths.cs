@@ -10,6 +10,7 @@ internal sealed class AppPaths
     public string Apps { get; }
     public string Downloads { get; }
     public string StateFile { get; }
+    public string PreviousStateFile => Path.Combine(Root, "previous-installed.txt");
 
     private AppPaths(string root)
     {

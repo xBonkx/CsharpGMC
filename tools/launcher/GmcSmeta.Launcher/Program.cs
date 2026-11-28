@@ -32,6 +32,17 @@ try
     var installed = InstalledApp.Load(paths);
     StartupTrace.Mark("launcher_installed_state_read");
 
+    if (options.Rollback)
+    {
+        if (options.Dev || options.UpdateOnly || options.Check)
+            throw new InvalidOperationException("--rollback несовместим с --dev, --update-only и --check.");
+        using var rollbackLock = LauncherUpdateLock.TryAcquire();
+        if (rollbackLock is null) throw new InvalidOperationException("Обновление уже выполняется.");
+        var restored = InstalledApp.Rollback(paths.Apps, paths.StateFile, paths.PreviousStateFile);
+        ui.Done($"Возвращена версия {restored.Version}. Запустите программу с ярлыка. База данных не изменялась.");
+        return;
+    }
+
     if (options.Check)
     {
         Console.WriteLine("Запускающий EXE:      " + AppVersion.CurrentLauncher());
@@ -141,6 +152,14 @@ try
     {
         updateError = $"Версия выпуска {release.Version} некорректна или старше установленной версии {installed?.Version ?? "—"}. Установка отменена.";
         release = null;
+    }
+
+    if (options.BackgroundUpdate && release is not null && installed?.IsBlockedRelease(release.Version) == true)
+    {
+        // Explicit --update-only can retry; unattended checks wait for a newer release.
+        ReleaseCheckCache.Save(cachePath, Key(installed), responseEtag, DateTimeOffset.UtcNow);
+        ui.Info("Автообновление пропущено: ранее выполнен возврат версии.");
+        return;
     }
 
     if (options.UpdateOnly && release is null && updateError is not null)
@@ -266,6 +285,7 @@ internal sealed class LaunchOptions
     public bool Help { get; private init; }
     public bool UpdateOnly { get; private init; }
     public bool BackgroundUpdate { get; private init; }
+    public bool Rollback { get; private init; }
 
     public static LaunchOptions Parse(string[] args)
     {
@@ -275,6 +295,7 @@ internal sealed class LaunchOptions
         var help = false;
         var updateOnly = false;
         var backgroundUpdate = false;
+        var rollback = false;
         foreach (var argument in args)
         {
             switch (argument.Trim().ToLowerInvariant())
@@ -282,6 +303,9 @@ internal sealed class LaunchOptions
                 case "--no-update":
                 case "-n":
                     noUpdate = true;
+                    break;
+                case "--rollback":
+                    rollback = true;
                     break;
                 case "--update-only":
                     updateOnly = true;
@@ -303,7 +327,7 @@ internal sealed class LaunchOptions
                     break;
             }
         }
-        return new LaunchOptions { NoUpdate = noUpdate, Dev = dev, Check = check, Help = help, UpdateOnly = updateOnly, BackgroundUpdate = backgroundUpdate };
+        return new LaunchOptions { NoUpdate = noUpdate, Dev = dev, Check = check, Help = help, UpdateOnly = updateOnly, BackgroundUpdate = backgroundUpdate, Rollback = rollback };
     }
 
     public static void PrintHelp()
@@ -316,6 +340,7 @@ internal sealed class LaunchOptions
         Console.WriteLine("  --check       показать версии и ничего не запускать");
         Console.WriteLine("  --no-update   запустить уже установленную версию без обращения к GitHub");
         Console.WriteLine("  --update-only скачать/обновить версию и не запускать программу");
+        Console.WriteLine("  --rollback    вернуть предыдущую проверенную версию с той же схемой БД, без запуска");
         Console.WriteLine("  --dev         собрать локальный git-клон через .NET SDK вместо релиза");
         Console.WriteLine("  --help        эта справка");
         Console.WriteLine();

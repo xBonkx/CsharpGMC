@@ -5,73 +5,8 @@ using GmcSmeta.Core;
 namespace GmcSmeta.Launcher;
 
 /// <summary>Установленная рядом с пользователем копия WPF-программы.</summary>
-internal sealed class InstalledApp
+internal sealed partial record InstalledApp
 {
-    public required string Version { get; init; }
-    public required string Flavor { get; init; }
-    public required string Directory { get; init; }
-    public required string Exe { get; init; }
-    public string? Sha256 { get; init; }
-    public string InstalledUtc { get; init; } = "";
-
-    public static InstalledApp? Load(AppPaths paths)
-    {
-        try
-        {
-            if (!File.Exists(paths.StateFile)) return null;
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var raw in File.ReadAllLines(paths.StateFile))
-            {
-                var index = raw.IndexOf('=');
-                if (index <= 0) continue;
-                values[raw[..index].Trim()] = raw[(index + 1)..].Trim();
-            }
-            if (!values.TryGetValue("version", out var version) ||
-                !values.TryGetValue("flavor", out var flavor) ||
-                !values.TryGetValue("directory", out var directory) ||
-                !values.TryGetValue("exe", out var exe))
-                return null;
-            if (!File.Exists(exe)) return null;
-            return new InstalledApp
-            {
-                Version = version,
-                Flavor = flavor,
-                Directory = directory,
-                Exe = exe,
-                Sha256 = values.GetValueOrDefault("sha256"),
-                InstalledUtc = values.GetValueOrDefault("installedUtc") ?? "",
-            };
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    public void Save(AppPaths paths)
-    {
-        System.IO.Directory.CreateDirectory(paths.Root);
-        var lines = new[]
-        {
-            "version=" + Version,
-            "flavor=" + Flavor,
-            "directory=" + Directory,
-            "exe=" + Exe,
-            "sha256=" + (Sha256 ?? ""),
-            "installedUtc=" + InstalledUtc,
-        };
-        var temporary = paths.StateFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            File.WriteAllLines(temporary, lines);
-            File.Move(temporary, paths.StateFile, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temporary)) File.Delete(temporary);
-        }
-    }
-
     public void Launch(string? connectionString = null, bool autoRestart = false)
     {
         var start = new ProcessStartInfo(Exe)
@@ -83,8 +18,8 @@ internal sealed class InstalledApp
             start.Environment["GMC_SMETA_SQL_CONNECTION"] = connectionString;
         start.Environment["GMC_SMETA_AUTO_RESTART"] = autoRestart ? "1" : "0";
         StartupTrace.Mark(Flavor == "fx" ? "launcher_app_flavor_fx" : "launcher_app_flavor_sc");
-        using var child = Process.Start(start);
-        if (child is not null && StartupTrace.Enabled)
+        using var child = Process.Start(start) ?? throw new InvalidOperationException("Не удалось запустить установленный EXE.");
+        if (StartupTrace.Enabled)
             StartupTrace.Sample("launcher_child_pid", child.Id);
     }
 }
@@ -143,6 +78,8 @@ internal sealed class AppInstaller
 
     public InstalledApp Install(ReleaseInfo release, Action<string>? validateCandidate = null)
     {
+        if (!AppVersion.CanOfferRelease(null, release.Version))
+            throw new InvalidOperationException("Некорректная версия выпуска.");
         var preferred = PreferredFlavor;
         var asset = release.Assets.FirstOrDefault(a =>
             string.Equals(a.Name, AssetNameFor(preferred), StringComparison.OrdinalIgnoreCase));
@@ -162,7 +99,7 @@ internal sealed class AppInstaller
         using (StartupTrace.MeasureElapsed("launcher_checksum_manifest"))
             checksums = _releases.TryGetChecksums(release);
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
-        if ((OfficeLauncher.IsOfficeExecutable || validateCandidate is not null) && expected is null)
+        if (!PackageIntegrity.IsHash(expected))
             throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
         // Each attempt owns its files; a failed retry must not touch a live
         // installation or another attempt's temporary files.
@@ -199,6 +136,10 @@ internal sealed class AppInstaller
                 using (StartupTrace.MeasureElapsed("launcher_candidate_validation"))
                     validateCandidate(staging);
 
+            (int? Schema, string? ManifestHash) seal;
+            using (StartupTrace.MeasureElapsed("launcher_package_seal"))
+                seal = PackageIntegrity.Seal(staging, release.Version);
+
             // Move only to a previously unused folder, then publish the pointer.
             // Never recursively delete an installed version: even a failed
             // deletion can remove DLLs that a running process has not loaded yet.
@@ -211,6 +152,8 @@ internal sealed class AppInstaller
                 Directory = target,
                 Exe = Path.Combine(target, AppExeName),
                 Sha256 = hash,
+                PackageSchema = seal.Schema,
+                ManifestHash = seal.ManifestHash,
                 InstalledUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             };
             using (StartupTrace.Measure("launcher_install_pointer_publish"))
