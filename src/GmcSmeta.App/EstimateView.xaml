@@ -183,7 +183,7 @@
             </Setter>
         </Style>
         <!-- Python theme.py QLineEdit: rounded money input inside totals tiles. -->
-        <Style x:Key="PythonMoneyEdit" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Style x:Key="PythonMoneyEdit" TargetType="TextBox" BasedOn="{StaticResource UiMoneyTileEditor}">
             <Setter Property="MinHeight" Value="26"/>
             <Setter Property="FontSize" Value="{StaticResource UiMoneyInputSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>

@@ -21,6 +21,7 @@ internal static class WorkspaceWindowUi
         window.UseLayoutRounding = true;
         window.SnapsToDevicePixels = true;
         System.Windows.Media.TextOptions.SetTextFormattingMode(window, System.Windows.Media.TextFormattingMode.Display);
+        System.Windows.Media.TextOptions.SetTextRenderingMode(window, System.Windows.Media.TextRenderingMode.ClearType);
     }
 
     public static TextBlock Heading(string title)
@@ -30,6 +31,7 @@ internal static class WorkspaceWindowUi
             Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 7)
         };
+        heading.SetResourceReference(FrameworkElement.StyleProperty, "UiHeadingText");
         heading.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
         return heading;
     }
@@ -59,11 +61,12 @@ internal static class WorkspaceWindowUi
         if (icon is not null) button.SetResourceReference(ContentControl.ContentTemplateProperty, icon);
     }
 
-    public static TextBlock Hint(string text) => new()
+    public static TextBlock Hint(string text)
     {
-        Text = text, Foreground = System.Windows.Media.Brushes.SlateGray,
-        TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
-    };
+        var hint = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 12) };
+        hint.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
+        return hint;
+    }
 
     public static Button Button(string label, RoutedEventHandler action)
     {

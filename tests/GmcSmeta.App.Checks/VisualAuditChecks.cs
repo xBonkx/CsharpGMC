@@ -18,6 +18,7 @@ internal static class VisualAuditChecks
         RunNavigationGlyphChecks();
         RunSharedGlyphCatalogChecks();
         RunDirectorTextLayoutChecks();
+        RunSharedTypographyChecks();
         RunEstimateScrollLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
@@ -110,6 +111,41 @@ internal static class VisualAuditChecks
                 Require(view.Margin == new Thickness(0, 0, 6, 0), key + ": caption gap");
         }
         Console.WriteLine("Shared glyph geometry and all icon template metrics checked (no SQL).");
+    }
+
+    private static void RunSharedTypographyChecks()
+    {
+        double Size(string key) => (double)Application.Current.FindResource(key);
+        Require(Math.Abs(Size("UiBodySize") - 10 * 96d / 72) < .001, "Body pt conversion");
+        Require(Math.Abs(Size("UiCaptionSize") - 8.5 * 96d / 72) < .001, "Caption pt conversion");
+        Require(Math.Abs(Size("UiH1Size") - 18 * 96d / 72) < .001, "Heading pt conversion");
+        Require(Size("UiSummaryTitleSize") == 19 && Size("UiSummaryValueSize") == 22 &&
+                Size("UiSummaryCaptionSize") == 11, "Explicit pixel roles must not be scaled twice");
+        var heading = new TextBlock
+        {
+            Style = (Style)Application.Current.FindResource("UiHeadingText"),
+            FontSize = Size("UiH2Size"),
+            Text = "Длинное название договора с несколькими строками и дополнительным соглашением"
+        };
+        heading.Measure(new Size(140, double.PositiveInfinity));
+        Require(heading.DesiredSize.Height > heading.FontSize * 2 &&
+            heading.LineStackingStrategy == LineStackingStrategy.MaxHeight &&
+            heading.TextWrapping == TextWrapping.Wrap, "Wrapped heading must grow");
+        var money = new TextBox
+        {
+            Style = (Style)Application.Current.FindResource("UiMoneyTileEditor"),
+            Text = "123 456 789,01"
+        };
+        money.Measure(new Size(200, double.PositiveInfinity));
+        Require(money.FontSize == Size("UiMoneyInputSize") && money.FontWeight == FontWeights.SemiBold &&
+            money.TextAlignment == TextAlignment.Right && money.VerticalContentAlignment == VerticalAlignment.Center,
+            "Money input typography");
+        var tile = new TextBlock { Style = (Style)Application.Current.FindResource("PythonTileValue"), Text = "123 456 789,01 ₽" };
+        tile.Measure(new Size(100, double.PositiveInfinity));
+        Require(tile.FontSize == Size("UiValueSize") && tile.FontWeight == FontWeights.Bold &&
+            tile.TextWrapping == TextWrapping.Wrap && tile.DesiredSize.Height > tile.FontSize,
+            "Money tile text must grow rather than trim");
+        Console.WriteLine("Shared typography roles and natural line heights checked (no SQL).");
     }
 
     private static void RunDirectorTextLayoutChecks()

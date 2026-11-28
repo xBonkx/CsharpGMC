@@ -390,10 +390,10 @@
                 <!-- Python NavDelegate: 10pt body × 0.88 = 8.8pt (11.733 DIP). -->
                 <Border x:Name="PhaseBadge" Grid.Column="2" Background="{Binding Document.PhaseColor}" CornerRadius="9" Width="17" Height="17"
                         Padding="0" Margin="0,0,6,0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Document.PhaseNumber}" FontSize="11.733333333333333"
+                    <TextBlock Text="{Binding Document.PhaseNumber}" FontSize="{StaticResource UiNavigationDetailSize}"
                                Foreground="White" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Grid.Column="3" Text="{Binding Document.NavigationDate}" Foreground="#64748B" FontSize="11.733333333333333"
+                <TextBlock Grid.Column="3" Text="{Binding Document.NavigationDate}" Foreground="#64748B" FontSize="{StaticResource UiNavigationDetailSize}"
                            VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,4,0"/>
             </Grid>
             <DataTemplate.Triggers>
@@ -657,13 +657,13 @@
                                 <DockPanel HorizontalAlignment="Left" LastChildFill="True">
                                     <Button x:Name="ObjectRenameButton" Style="{StaticResource PythonToolbarButton}" DockPanel.Dock="Right" Content="Переименовать" ContentTemplate="{StaticResource IconOnlyEdit}" AutomationProperties.Name="Переименовать объект" ToolTip="Переименовать объект"
                                             Click="ObjectRename_Click" Visibility="Collapsed" Margin="4,0,0,0" Padding="4,2" MinHeight="26" MinWidth="26" Background="Transparent" BorderBrush="Transparent"/>
-                                    <TextBlock x:Name="ObjectTitle" FontSize="{StaticResource UiH1Size}" FontWeight="Bold" Text="Объекты" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                    <TextBlock x:Name="ObjectTitle" Style="{StaticResource UiWrappedHeading}" FontSize="{StaticResource UiH1Size}" FontWeight="Bold" Text="Объекты" TextTrimming="None" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                                Cursor="Hand" MouseLeftButtonDown="ObjectTitle_MouseDown"/>
                                 </DockPanel>
                                 <TextBox x:Name="ObjectRenameBox" Style="{StaticResource PythonSearch}" Visibility="Collapsed" FontSize="{StaticResource UiValueSize}" FontWeight="Bold"
                                          Padding="8,2" MinWidth="260" MaxWidth="640" Margin="0,2,0,0"
                                          KeyDown="ObjectRenameBox_KeyDown" LostFocus="ObjectRenameBox_LostFocus"/>
-                                <TextBlock x:Name="ObjectSubtitle" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="ObjectSubtitle" Style="{StaticResource UiSecondaryText}" Margin="0,4,0,0"/>
                             </StackPanel>
                             <Grid x:Name="ObjectTotals" Grid.Row="1" Visibility="Collapsed" Margin="0,0,12,14">
                                 <Border x:Name="ObjectTotalCard" Style="{StaticResource ObjectTileShadow}" MinHeight="78" CornerRadius="12" Padding="{StaticResource LayoutTilePadding}" Margin="0,0,10,0">

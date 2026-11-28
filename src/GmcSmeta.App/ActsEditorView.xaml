@@ -9,7 +9,7 @@
          grid with «В этом акте», footer line and the summary tiles. -->
     <UserControl.Resources>
         <Style x:Key="KsToolToggle" TargetType="ToggleButton" BasedOn="{StaticResource PythonToolToggle}"/>
-        <Style x:Key="KsTileInput" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Style x:Key="KsTileInput" TargetType="TextBox" BasedOn="{StaticResource UiMoneyTileEditor}">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="FontSize" Value="{StaticResource UiMoneyInputSize}"/>

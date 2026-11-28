@@ -102,15 +102,16 @@ public partial class MainWindow : Window
     private void ShowStartupMessage(string text)
     {
         StatusText.Text = text;
-        ShowPage(new TextBlock
+        var message = new TextBlock
         {
             Text = text,
-            TextWrapping = TextWrapping.Wrap,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(24),
-            FontSize = 16,
-        });
+        };
+        message.SetResourceReference(FrameworkElement.StyleProperty, "UiWrappedHeading");
+        message.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
+        ShowPage(message);
     }
 
     // No SQL in the constructor; the background reader must not touch WPF objects.

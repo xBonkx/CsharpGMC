@@ -20,4 +20,16 @@
     </Style>
     <SolidColorBrush x:Key="UiMutedTextBrush" Color="#64748B"/>
     <SolidColorBrush x:Key="UiDisabledTextBrush" Color="#94A3B8"/>
+    <!-- Python navigation: 8.8pt, not a second application-scale multiplier. -->
+    <sys:Double x:Key="UiNavigationDetailSize">11.733333333333333</sys:Double>
+    <sys:Double x:Key="UiTotalsTableSize">14</sys:Double>
+    <Style x:Key="UiHeadingText" TargetType="TextBlock" BasedOn="{StaticResource UiWrappedHeading}">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="UiSecondaryText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineStackingStrategy" Value="MaxHeight"/>
+    </Style>
 </ResourceDictionary>

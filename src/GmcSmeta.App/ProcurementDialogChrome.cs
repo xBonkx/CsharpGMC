@@ -18,6 +18,7 @@ internal static class ProcurementDialogChrome
         window.UseLayoutRounding = true;
         window.SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(window, TextFormattingMode.Display);
+        TextOptions.SetTextRenderingMode(window, TextRenderingMode.ClearType);
         window.ShowInTaskbar = false;
         window.MaxWidth = SystemParameters.WorkArea.Width;
         window.MaxHeight = SystemParameters.WorkArea.Height;
@@ -27,13 +28,15 @@ internal static class ProcurementDialogChrome
     {
         var label = new TextBlock { Text = text, FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap };
+        label.SetResourceReference(FrameworkElement.StyleProperty, "UiHeadingText");
         label.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
         return label;
     }
     public static TextBlock Hint(string text)
     {
-        return new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)new BrushConverter().ConvertFromString("#64748B")! };
+        var hint = new TextBlock { Text = text };
+        hint.SetResourceReference(FrameworkElement.StyleProperty, "UiSecondaryText");
+        return hint;
     }
     public static void Table(DataGrid grid)
     {

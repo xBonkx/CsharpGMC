@@ -28,7 +28,7 @@
         <sys:Double x:Key="UiH2Size">16</sys:Double>
         <sys:Double x:Key="UiValueSize">20</sys:Double>
         <sys:Double x:Key="UiAppTitleSize">17.333333333333332</sys:Double>
-        <Style x:Key="UiCaption" TargetType="TextBlock">
+        <Style x:Key="UiCaption" TargetType="TextBlock" BasedOn="{StaticResource UiSecondaryText}">
             <Setter Property="FontSize" Value="{StaticResource UiCaptionSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
@@ -1048,6 +1048,13 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </Style>
+        <!-- Shared money tile editor; local roles retain intentional padding and min height. -->
+        <Style x:Key="UiMoneyTileEditor" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="FontSize" Value="{StaticResource UiMoneyInputSize}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <Style x:Key="PythonTileValue" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
