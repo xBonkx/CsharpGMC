@@ -48,9 +48,26 @@ internal sealed class SummaryColumnFit
         var dpi = VisualTreeHelper.GetDpi(_grid);
         var metrics = (_grid.FontFamily, _grid.FontSize, _grid.FontStyle, _grid.FontStretch,
             dpi.DpiScaleX, dpi.PixelsPerDip);
-        if (_observedMetrics is { } previous && previous.Equals(metrics)) return;
+        if (_observedMetrics is { } previous && previous.Equals(metrics) &&
+            (_manual() || _minimums is null || HeadersUnchanged())) return;
         _observedMetrics = metrics;
         Request();
+    }
+
+    private static string HeaderText(DataGridColumn column) =>
+        column.Header is TextBlock text ? text.Text : column.Header?.ToString() ?? "";
+
+    private bool HeadersUnchanged()
+    {
+        if (_measuredColumns.Length != _grid.Columns.Count) return false;
+        for (int i = 0; i < _measuredColumns.Length; i++)
+        {
+            var column = _grid.Columns[i];
+            var measured = _measuredColumns[i];
+            if (!ReferenceEquals(measured.Column, column) || measured.Key != column.SortMemberPath ||
+                measured.Header != HeaderText(column)) return false;
+        }
+        return true;
     }
 
     private ScrollViewer? Viewer() =>
@@ -114,11 +131,21 @@ internal sealed class SummaryColumnFit
         // every cell. This cache lives only for the current measurement pass.
         const int maxCachedTexts = 4096;
         var measuredTexts = new Dictionary<string, double>(StringComparer.Ordinal);
+        double ShapedWidth(string value) => new FormattedText(value, CultureInfo.GetCultureInfo("ru-RU"),
+            FlowDirection.LeftToRight, typeface, grid.FontSize, Brushes.Black, dpi).WidthIncludingTrailingWhitespace;
         double Measure(string value)
         {
             if (value.Length == 0) return 0;
             if (measuredTexts.TryGetValue(value, out var cached)) return cached;
             double width = 0;
+            // Names/units need shaping (kerning, combining marks, fallback).
+            // Monetary strings stay cheap on the 25k-row hot path.
+            if (value.Any(ch => !char.IsAsciiDigit(ch) && ch is not (' ' or '\u00a0' or '\u202f' or ',' or '.' or '-' or '−' or '+' or '%' or '₽')))
+            {
+                width = ShapedWidth(value);
+                if (measuredTexts.Count < maxCachedTexts) measuredTexts.Add(value, width);
+                return width;
+            }
             foreach (var ch in value)
             {
                 if (!glyphs.TryGetValue(ch, out var glyph))
@@ -139,11 +166,8 @@ internal sealed class SummaryColumnFit
         var result = columns.ToDictionary(c => c, c => BaseMinimum(c.SortMemberPath));
         foreach (var column in columns)
         {
-        {
-            var header = column.Header is TextBlock text ? text.Text : column.Header?.ToString() ?? "";
-            foreach (var word in header.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
-                result[column] = Math.Max(result[column], Math.Ceiling(Measure(word) + 10));
-        }
+            foreach (var word in HeaderText(column).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                result[column] = Math.Max(result[column], Math.Ceiling(ShapedWidth(word) + 10));
         }
         if (grid.ItemsSource is IEnumerable<EstimateView.SummaryRow> rows)
         {
@@ -187,7 +211,7 @@ internal sealed class SummaryColumnFit
     {
         var source = _grid.ItemsSource;
         var columns = _grid.Columns.Select(c => (Column: c, Key: c.SortMemberPath,
-            Header: c.Header is TextBlock text ? text.Text : c.Header?.ToString() ?? "")).ToArray();
+            Header: HeaderText(c))).ToArray();
         if (_minimums is null || !IsMeasuredSource(source) ||
             _measuredFontSize != _grid.FontSize || _measuredDpi != dpi || _measuredPixelsPerDip != pixelsPerDip ||
             !Equals(_measuredFamily, _grid.FontFamily) || _measuredStyle != _grid.FontStyle ||
