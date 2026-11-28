@@ -54,6 +54,11 @@
         <Setter Property="Width" Value="17"/>
         <Setter Property="Height" Value="17"/>
     </Style>
+    <sys:Double x:Key="LayoutToolbarGlyphSize">18</sys:Double>
+    <sys:Double x:Key="LayoutBrandGlyphSize">28</sys:Double>
+    <sys:Double x:Key="LayoutMenuGlyphSize">20</sys:Double>
+    <sys:Double x:Key="LayoutHeaderActionMinHeight">34</sys:Double>
+    <Thickness x:Key="LayoutHeaderActionGap">0,0,6,0</Thickness>
     <sys:Double x:Key="LayoutObjectTileGap">10</sys:Double>
     <Thickness x:Key="LayoutToolbarPadding">10,4,10,4</Thickness>
     <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>

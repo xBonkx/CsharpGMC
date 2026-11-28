@@ -16,6 +16,7 @@ internal static class VisualAuditChecks
     internal static void RunLayoutChecks()
     {
         RunNavigationGlyphChecks();
+        RunSharedGlyphCatalogChecks();
         RunDirectorTextLayoutChecks();
         RunEstimateScrollLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
@@ -72,6 +73,43 @@ internal static class VisualAuditChecks
                     "Hamburger painted bounds differ from the original three lines.");
         }
         Console.WriteLine("Navigation glyph contour starts and stroked bounds checked (no SQL).");
+    }
+
+    private static void RunSharedGlyphCatalogChecks()
+    {
+        var pen = new Pen(Brushes.Black, 1.9)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+            LineJoin = PenLineJoin.Round
+        };
+        var keys = ResourceKeys(Application.Current.Resources).OfType<string>()
+            .Distinct(StringComparer.Ordinal).ToArray();
+        foreach (var key in keys.Where(k => k.StartsWith("Glyph", StringComparison.Ordinal)))
+        {
+            if (Application.Current.FindResource(key) is not Geometry geometry) continue;
+            var bounds = geometry.GetRenderBounds(pen);
+            Require(!bounds.IsEmpty && bounds.Left >= -0.02 && bounds.Top >= -0.02 &&
+                bounds.Right <= 24.02 && bounds.Bottom <= 24.02,
+                key + ": geometry outside 24x24: " + bounds);
+        }
+        foreach (var key in keys.Where(k => k.StartsWith("IconLabel", StringComparison.Ordinal) ||
+                     k.StartsWith("IconOnly", StringComparison.Ordinal)))
+        {
+            if (Application.Current.FindResource(key) is not DataTemplate template) continue;
+            var content = (FrameworkElement)template.LoadContent();
+            var view = content as Viewbox ?? (content as Panel)?.Children.OfType<Viewbox>().Single();
+            Require(view is not null, key + ": missing viewbox");
+            var expected = key == "IconLabelMenu" ? 20d : key == "IconOnlyX" ? 14d :
+                key == "IconOnlyChevronDown" ? 12d : 18d;
+            Require(view!.Width == expected && view.Height == expected &&
+                view.Stretch == Stretch.Uniform && !view.IsHitTestVisible, key + ": glyph role");
+            Require(view.Child is Canvas canvas && canvas.Width == 24 && canvas.Height == 24,
+                key + ": canvas size");
+            if (key.StartsWith("IconLabel", StringComparison.Ordinal))
+                Require(view.Margin == new Thickness(0, 0, 6, 0), key + ": caption gap");
+        }
+        Console.WriteLine("Shared glyph geometry and all icon template metrics checked (no SQL).");
     }
 
     private static void RunDirectorTextLayoutChecks()

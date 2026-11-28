@@ -471,13 +471,13 @@
                     </Border>
                 </StackPanel>
                 <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
-                    <Button x:Name="UndoButton" Style="{StaticResource PythonToolbarButton}" Content="Отменить" ContentTemplate="{StaticResource IconLabelUndo}" Click="Undo_Click" ToolTip="Отменить последнее действие (Ctrl+Z)" IsEnabled="False" Margin="0,0,3,0"/>
-                    <Button x:Name="RedoButton" Style="{StaticResource PythonToolbarButton}" Content="Вернуть" ContentTemplate="{StaticResource IconLabelRedo}" Click="Redo_Click" ToolTip="Вернуть отменённое (Ctrl+Y)" IsEnabled="False" Margin="0,0,8,0"/>
-                    <Button Content="Помощь" Style="{StaticResource PythonToolbarButton}" Click="Help_Click" Margin="0,0,6,0"/>
+                    <Button x:Name="UndoButton" Style="{StaticResource PythonToolbarButton}" Content="Отменить" ContentTemplate="{StaticResource IconLabelUndo}" Click="Undo_Click" ToolTip="Отменить последнее действие (Ctrl+Z)" IsEnabled="False" Margin="{StaticResource LayoutHeaderActionGap}" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
+                    <Button x:Name="RedoButton" Style="{StaticResource PythonToolbarButton}" Content="Вернуть" ContentTemplate="{StaticResource IconLabelRedo}" Click="Redo_Click" ToolTip="Вернуть отменённое (Ctrl+Y)" IsEnabled="False" Margin="{StaticResource LayoutHeaderActionGap}" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
+                    <Button Content="Помощь" Style="{StaticResource PythonToolbarButton}" Click="Help_Click" Margin="{StaticResource LayoutHeaderActionGap}" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
                     <Button x:Name="MoreActionsButton" Style="{StaticResource PythonToolbarButton}" Content="Действия" ContentTemplate="{StaticResource IconLabelMore}" Click="MoreActions_Click"
-                            ToolTip="Всё, что делается с документом целиком" Margin="0,0,8,0"/>
+                            ToolTip="Всё, что делается с документом целиком" Margin="{StaticResource LayoutHeaderActionGap}" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
                     <Button x:Name="ExportButton" Style="{StaticResource PythonToolbarPrimary}" Content="Сохранить в Excel / PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportExcelPdf_Click"
-                            ToolTip="Выгрузка сметы в Excel и PDF (Ctrl+E)"/>
+                            ToolTip="Выгрузка сметы в Excel и PDF (Ctrl+E)" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
                 </WrapPanel>
             </Grid>
         </Border>
