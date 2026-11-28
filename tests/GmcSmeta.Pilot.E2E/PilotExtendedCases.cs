@@ -277,7 +277,11 @@ internal static class PilotExtendedCases
         PilotRunner.Check(committed.Transport == 23m && committed.Pnr == 29m &&
             (charges.Smr is null || committed.Smr == charges.Smr.Value) && committed.Number == before.Number,
             "Combined batch did not preserve header and save charges");
-        var signed = SqlServerActs.ToggleSigned(p.PilotConnection, act, true, p.Revision());
+        var scopedRev = p.Revision();
+        PilotRunner.Check(!SqlServerActs.Delete(p.PilotConnection, act, scopedRev, p.SmallContract).Saved &&
+            !SqlServerActs.ToggleSigned(p.PilotConnection, act, true, scopedRev, p.SmallContract).Saved &&
+            p.Revision() == scopedRev, "Wrong-contract act operation was accepted or changed revision");
+        var signed = SqlServerActs.ToggleSigned(p.PilotConnection, act, true, p.Revision(), p.LargeContract);
         PilotRunner.Check(signed.Saved, "Public KS-2 signing failed");
         var rev = p.Revision();
         var rejected = SqlServerActs.SetQty(p.PilotConnection, act, src, 1.5m, rev);

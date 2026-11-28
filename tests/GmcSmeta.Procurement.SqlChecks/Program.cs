@@ -50,7 +50,8 @@ INSERT dbo.meta([key],[value]) VALUES(N'rev',N'test-first');
 CREATE TABLE dbo.objects (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     name NVARCHAR(255) NOT NULL,
-    address NVARCHAR(255) NOT NULL DEFAULT N'');
+    address NVARCHAR(255) NOT NULL DEFAULT N'',
+    archived BIT NOT NULL DEFAULT 0);
 INSERT dbo.objects(name,address) VALUES(N'Объект вентиляция',N'Тестовый адрес');
 CREATE TABLE dbo.companies (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -297,7 +298,17 @@ CREATE TABLE dbo.price_history (
             Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.movements WHERE id={strayId}") == 1,
             "Draft operation removed movement or changed revision");
         Execute(connection, $"DELETE dbo.movements WHERE id={strayId}");
-        Check(SqlServerShipments.DeleteList(connection, draftId, draftRev).Saved, "Clean draft deletion failed");
+        AssertCannotSave(SqlServerShipments.DeleteList(connection, draftId, draftRev, 999999), "Wrong-object draft deleted");
+        Check(Revision(connection) == draftRev &&
+            Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.shipments WHERE id={draftId}") == 1,
+            "Wrong-object delete modified the shipment or revision");
+        Execute(connection, "UPDATE dbo.objects SET archived=1 WHERE id=1");
+        AssertCannotSave(SqlServerShipments.DeleteList(connection, draftId, draftRev, 1), "Archived-object draft deleted");
+        Check(Revision(connection) == draftRev &&
+            Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.shipments WHERE id={draftId}") == 1,
+            "Archived-object delete changed data");
+        Execute(connection, "UPDATE dbo.objects SET archived=0 WHERE id=1");
+        Check(SqlServerShipments.DeleteList(connection, draftId, draftRev, 1).Saved, "Clean draft deletion failed");
         Check(Count(connection, $"SELECT COUNT_BIG(*) FROM dbo.change_log WHERE entity=N'shipment' AND entity_id={draftId} AND action=N'delete'") == 1,
             "Draft deletion missing audit");
 

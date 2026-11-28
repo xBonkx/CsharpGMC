@@ -289,6 +289,13 @@ public partial class StagesDialog : Window
         if (!_columnStages.TryGetValue(StagesGrid.Columns.IndexOf(e.Column), out var stageId)) return;
         if (e.Row.Item is not DataRowView row) return;
         var srcId = Convert.ToInt64(row.Row["SrcId"]);
+        var revision = ServerRevision();
+        var table = _table;
+        var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
+        if (table is null || !ReferenceEquals(row.Row.Table, table) || stage is null ||
+            stage.Locked || stage.Rest || stage.StageSum is not null)
+        { e.Cancel = true; return; }
+        var snapshotRest = (decimal)row.Row["__RestExact"];
         var editor = e.EditingElement as TextBox;
         var input = editor?.Text.Trim() ?? "";
         // A mistyped stage quantity must never silently become zero and
@@ -325,14 +332,21 @@ public partial class StagesDialog : Window
                 return;
             }
         }
-        var revision = ServerRevision();
+        if (!StageCommandCurrent(stage, revision) || !ReferenceEquals(table, _table) ||
+            !ReferenceEquals(row.Row.Table, _table) ||
+            !_columnStages.TryGetValue(StagesGrid.Columns.IndexOf(e.Column), out var currentStageId) ||
+            currentStageId != stageId)
+        {
+            e.Cancel = true;
+            SetStatus("Этап или снимок изменились. Повторите ввод.");
+            return;
+        }
         _quantityWriteBusy = true;
         SetStatus("Сохранение…");
         try
         {
             var snapshotStageQty = columnIndex >= 0 && columnIndex < allocations.Length
                 ? allocations[columnIndex] : (decimal?)null;
-            var snapshotRest = (decimal)row.Row["__RestExact"];
             var result = await Task.Run(() => SqlServerStages.SetStageQty(
                 _connectionString, stageId, srcId, value, revision,
                 snapshotStageQty, snapshotRest));
@@ -687,13 +701,20 @@ public partial class StagesDialog : Window
         finally { EndWrite(); }
     }
 
+    private bool StageCommandCurrent(SqlServerStages.StageInfo stage, string revision, bool allowTarget = false) =>
+        FullEditable && !_closed && !_building && !_quantityWriteBusy &&
+        !string.IsNullOrWhiteSpace(revision) && _revision == revision &&
+        !stage.Rest && !stage.Locked && (allowTarget || stage.StageSum is null) &&
+        _cachedStages.Any(item => ReferenceEquals(item, stage));
+
     private async void PutRest(long stageId)
     {
-        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
+        var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
+        if (stage is null || !StageCommandCurrent(stage, revision)) return;
         if (MessageBox.Show(this, "Перенести весь положительный остаток полного КП в этот этап?",
                 "Распределение этапов", MessageBoxButton.YesNo, MessageBoxImage.Question,
-                MessageBoxResult.No) != MessageBoxResult.Yes || revision != _revision) return;
+                MessageBoxResult.No) != MessageBoxResult.Yes || !StageCommandCurrent(stage, revision)) return;
         _quantityWriteBusy = true;
         try
         {
@@ -701,6 +722,7 @@ public partial class StagesDialog : Window
                 _connectionString, _fullId, stageId, revision));
             if (!saved.Saved)
             {
+                _revision = "";
                 SetStatus("Ошибка переноса остатка: " + saved.Error);
                 return;
             }
@@ -718,11 +740,12 @@ public partial class StagesDialog : Window
 
     private async void ClearStage(long stageId)
     {
-        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
+        var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
+        if (stage is null || !StageCommandCurrent(stage, revision)) return;
         if (MessageBox.Show(this, "Убрать из этапа все строки? Само КП этапа останется пустым.",
                 "Очистить этап", MessageBoxButton.YesNo, MessageBoxImage.Warning,
-                MessageBoxResult.No) != MessageBoxResult.Yes || revision != _revision) return;
+                MessageBoxResult.No) != MessageBoxResult.Yes || !StageCommandCurrent(stage, revision)) return;
         _quantityWriteBusy = true;
         try
         {
@@ -730,6 +753,7 @@ public partial class StagesDialog : Window
                 _connectionString, _fullId, stageId, revision));
             if (!saved.Saved)
             {
+                _revision = "";
                 SetStatus("Ошибка очистки этапа: " + saved.Error);
                 return;
             }
@@ -752,7 +776,8 @@ public partial class StagesDialog : Window
         if (stage is null || stage.Locked || stage.StageSum is not null) return;
         var revision = _revision;
         var dialog = new PromptDialog("Название этапа", "Название", stage.Name) { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Value.Trim().Length == 0 || revision != _revision) return;
+        if (dialog.ShowDialog() != true || dialog.Value.Trim().Length == 0 ||
+            !StageCommandCurrent(stage, revision)) return;
         _quantityWriteBusy = true;
         try
         {
@@ -775,9 +800,9 @@ public partial class StagesDialog : Window
         if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
         var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
-        if (stage is null) return;
+        if (stage is null || !StageCommandCurrent(stage, revision, allowTarget: true)) return;
         var dialog = new PromptDialog("Сумма по договору", "Сумма для сверки (пусто — убрать):", stage.StageSum?.ToString(CultureInfo.CurrentCulture) ?? "") { Owner = this };
-        if (dialog.ShowDialog() != true || _revision != revision) return;
+        if (dialog.ShowDialog() != true || !StageCommandCurrent(stage, revision, allowTarget: true)) return;
         decimal? sum = null;
         if (dialog.Value.Trim().Length > 0)
         {
@@ -793,7 +818,7 @@ public partial class StagesDialog : Window
         try
         {
             await Task.Run(() => SqlServerStages.SetStageTarget(
-                _connectionString, stageId, sum, revision));
+                _connectionString, stageId, sum, revision, _fullId));
             _revision = "";
             await ReloadAsync();
         }
@@ -807,15 +832,18 @@ public partial class StagesDialog : Window
 
     private async void DeleteStage(long stageId, string name)
     {
-        if (!FullEditable || _closed || _building || _quantityWriteBusy || string.IsNullOrWhiteSpace(_revision)) return;
         var revision = _revision;
-        if (MessageBox.Show(this, $"Удалить «{name}»? Копия сохранится в корзине (30 дней).",
-                "Удаление этапа", MessageBoxButton.YesNo, MessageBoxImage.Question,
-                MessageBoxResult.No) != MessageBoxResult.Yes || revision != _revision) return;
+        var stage = _cachedStages.FirstOrDefault(item => item.Id == stageId);
+        if (stage is null || stage.Name != name || !StageCommandCurrent(stage, revision)) return;
+        if (MessageBox.Show(this, $"Удалить «{stage.Name}»? Копия сохранится в корзине (30 дней).\n" +
+                "Распределение количеств и денег полного КП будет пересчитано. " +
+                "При наличии зависимых документов удаление запрещено.",
+                "Удаление этапа", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+                MessageBoxResult.No) != MessageBoxResult.Yes || !StageCommandCurrent(stage, revision)) return;
         _quantityWriteBusy = true;
         try
         {
-            await Task.Run(() => SqlServerStages.DeleteStage(_connectionString, stageId, revision));
+            await Task.Run(() => SqlServerStages.DeleteStage(_connectionString, stageId, revision, _fullId));
             _revision = "";
             await ReloadAsync();
         }

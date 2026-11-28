@@ -193,7 +193,8 @@ public partial class ShipmentsPane : UserControl
 
     // Revision belongs to the displayed snapshot, never refresh it just before a write.
     private string ServerRevision() => _revision;
-    private bool CanStartWrite => IsLoaded && !_building && !_quantityBusy && !string.IsNullOrEmpty(_revision);
+    private bool CanStartWrite => IsLoaded && IsEnabled && !_building && !_quantityBusy &&
+        !_needsReloadAfterAttach && !string.IsNullOrEmpty(_revision);
     internal bool HasCacheActivity => _quantityBusy || _building || HasHeaderDraft() ||
         (LinesGrid.ItemsSource is System.ComponentModel.IEditableCollectionView { IsEditingItem: true });
 
@@ -474,6 +475,8 @@ public partial class ShipmentsPane : UserControl
         if (sender is not Button button || !CanStartWrite || Current is not { } current) return;
         var id = current.Id;
         var revision = ServerRevision();
+        var attachment = _attachmentGeneration;
+        var load = _loadGeneration;
         var menu = new ContextMenu
         {
             PlacementTarget = button,
@@ -490,7 +493,8 @@ public partial class ShipmentsPane : UserControl
         delete.Click += (_, _) =>
         {
             if (CanStartWrite && Current is { Fixed: false } selected &&
-                selected.Id == id && ServerRevision() == revision)
+                selected.Id == id && ServerRevision() == revision &&
+                attachment == _attachmentGeneration && load == _loadGeneration && Equals(selected, current))
                 DeleteShipment_Click(sender, new RoutedEventArgs());
             else
                 SetStatus("Ведомость или данные изменились. Откройте меню заново.");
@@ -504,8 +508,11 @@ public partial class ShipmentsPane : UserControl
         if (!CanStartWrite || !RequireSavedHeader() || Current is not { Fixed: false } current) return;
         var revision = ServerRevision();
         await WriteQuantityAsync(() => SqlServerShipments.DeleteList(
-            _connectionString, current.Id, revision), "Ведомость удалена.",
-            confirm: () => Ask("Удаление ведомости", $"Удалить {SqlServerShipments.TitleOf(current.Number)}?"));
+            _connectionString, current.Id, revision, _objectId), "Ведомость удалена.",
+            confirm: () => Ask("Удаление ведомости",
+                $"Удалить черновик {SqlServerShipments.TitleOf(current.Number)} от {current.Date:dd.MM.yyyy}?\n" +
+                $"Строк в ведомости: {current.Lines}. Смета и складские движения не изменятся.\n" +
+                "Восстановление черновика не предусмотрено."));
     }
 
     // Compare with the loaded header, not a newly selected ListBox item.
@@ -552,7 +559,11 @@ public partial class ShipmentsPane : UserControl
     private async void EditFixed_Click(object sender, RoutedEventArgs e)
     {
         if (!CanStartWrite || Current is not { Fixed: true } current) return;
-        if (!Ask("Изменить выданную ведомость", "Изменения сразу отразятся в складских движениях. Продолжить?")) return;
+        var revision = _revision;
+        var attachment = _attachmentGeneration;
+        if (!Ask("Изменить выданную ведомость", "Изменения сразу отразятся в складских движениях. Продолжить?") ||
+            !CanStartWrite || attachment != _attachmentGeneration || _revision != revision ||
+            !Equals(Current, current)) return;
         _editingFixedId = current.Id;
         _requestedRowFilter = 0;
         await ReloadAsync(reuseObject: true, requiredReadback: false);
@@ -651,9 +662,14 @@ public partial class ShipmentsPane : UserControl
     private async void RemoveRows_Click(object sender, RoutedEventArgs e)
     {
         if (!CanStartWrite || !IsEditable || !RequireSavedHeader() || Current is not { } current) return;
-        var ids = LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>()
-            .Where(row => row.InShipment && row.CanChange && RowVisible(row))
-            .Select(row => row.PositionId).Distinct().ToArray();
+        var selected = LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>().ToArray();
+        if (!CurrentShipmentSelection(selected) ||
+            selected.Any(row => !row.InShipment || !row.CanChange))
+        {
+            SetStatus("Выделите только доступные строки текущей ведомости. Ничего не удалено.");
+            return;
+        }
+        var ids = selected.Select(row => row.PositionId).Distinct().ToArray();
         if (ids.Length == 0)
         {
             SetStatus("Выделите строки, которые нужно убрать из ведомости.");
@@ -661,18 +677,28 @@ public partial class ShipmentsPane : UserControl
         }
         var revision = ServerRevision();
         await WriteQuantityAsync(() => SqlServerShipments.RemoveRowsBatch(
-            _connectionString, current.Id, ids, revision, current.Fixed), $"Убрано {ids.Length} строк одной транзакцией.",
-            changedPositions: ids);
+            _connectionString, current.Id, ids, revision, current.Fixed, _objectId),
+            $"Убрано {ids.Length} строк одной транзакцией.",
+            confirm: () => Ask("Удаление строк",
+                $"Убрать {ids.Length} поз. из ведомости {SqlServerShipments.TitleOf(current.Number)}?" +
+                (current.Fixed ? "\nКоличество вернётся на склад, связанные движения изменятся." :
+                    "\nСмета и складские движения не изменятся.")),
+            changedPositions: ids, targetCurrent: () => CurrentShipmentSelection(selected));
     }
 
     private async Task AddVisibleRows(bool onlyStock)
     {
         if (!CanStartWrite || !IsEditable || !RequireSavedHeader() || Current is not { } current) return;
-        var selected = LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>().Where(RowVisible).ToList();
+        var selected = LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>().ToArray();
+        if (LinesGrid.SelectedItems.Count > 0 && !CurrentShipmentSelection(selected))
+        {
+            SetStatus("Выбор изменился или содержит скрытые строки. Выделите позиции заново.");
+            return;
+        }
         // Do not enumerate/copy the entire view when the user selected rows.
         // Recheck the live predicate on the all-visible path as well, because
         // a search change may have been deferred during an active edit.
-        IEnumerable<ShipmentPreviewRow> source = selected.Count > 0 ? selected :
+        IEnumerable<ShipmentPreviewRow> source = selected.Length > 0 ? selected :
             (LinesGrid.ItemsSource as ListCollectionView)?.OfType<ShipmentPreviewRow>().Where(RowVisible)
                 ?? Enumerable.Empty<ShipmentPreviewRow>();
         var entries = source.Where(r => r.CanChange && !r.InShipment)
@@ -687,9 +713,11 @@ public partial class ShipmentsPane : UserControl
         var revision = ServerRevision();
         await WriteQuantityAsync(() => SqlServerShipments.AddRowsBatch(
             _connectionString, current.Id, entries, revision, current.Fixed), $"Добавлено {entries.Count} строк одной транзакцией.",
-            confirm: () => selected.Count > 0 || Ask("Добавление в ведомость",
+            confirm: () => selected.Length > 0 || Ask("Добавление в ведомость",
                 $"Добавить {entries.Count} позиций из всех отфильтрованных строк?"),
-            changedPositions: entries.Select(entry => entry.PositionId).ToArray());
+            changedPositions: entries.Select(entry => entry.PositionId).ToArray(),
+            targetCurrent: () => selected.Length > 0 ? CurrentShipmentSelection(selected) :
+                LinesGrid.SelectedItems.Count == 0 && CurrentShipmentFilterEntries(onlyStock, entries));
     }
 
     private async void MarkRow_Click(object sender, RoutedEventArgs e)
@@ -697,7 +725,8 @@ public partial class ShipmentsPane : UserControl
         if (sender is not CheckBox check || check.DataContext is not ShipmentPreviewRow row) return;
         // The checkbox reflects committed state only. Reload it on success or failure.
         check.IsChecked = row.InShipment;
-        if (!CanStartWrite || !IsEditable || !RequireSavedHeader() || !row.CanChange || Current is not { } current) return;
+        if (!CanStartWrite || !IsEditable || !RequireSavedHeader() || !row.CanChange ||
+            !CurrentShipmentRow(row) || Current is not { } current) return;
         var qty = row.InShipment ? 0m : row.Suggested;
         if (!row.InShipment && qty <= 0.000001m)
         {
@@ -708,7 +737,7 @@ public partial class ShipmentsPane : UserControl
         await WriteQuantityAsync(() => SqlServerShipments.SetQty(
             _connectionString, current.Id, row.PositionId, qty, false, revision, current.Fixed),
             row.InShipment ? "Позиция убрана из ведомости." : "Позиция добавлена в ведомость.",
-            changedPositions: new[] { row.PositionId });
+            changedPositions: new[] { row.PositionId }, targetCurrent: () => CurrentShipmentRow(row));
     }
 
     private void LinesGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
@@ -725,7 +754,7 @@ public partial class ShipmentsPane : UserControl
         if (e.EditAction != DataGridEditAction.Commit || _building) return;
         if (!CanStartWrite || !IsEditable || !RequireSavedHeader()) { e.Cancel = true; return; }
         if (e.Row.Item is not ShipmentPreviewRow { CanChange: true } row ||
-            Current is not { } current) return;
+            !CurrentShipmentRow(row) || Current is not { } current) { e.Cancel = true; return; }
         // Do not dispatch by a translated header ("Кол-во" was renamed).
         if (!ReferenceEquals(e.Column, QtyColumn) || e.EditingElement is not TextBox editor) return;
         var input = editor.Text.Trim();
@@ -744,17 +773,49 @@ public partial class ShipmentsPane : UserControl
             "Количество сохранено.",
             confirm: () => !allowOver || Ask("Больше, чем по смете",
                 $"По смете осталось выдать {Num(row.Remaining)}.\nВыдать {Num(qty)} — больше сметы?"),
-            defer: true, changedPositions: new[] { row.PositionId });
+            defer: true, changedPositions: new[] { row.PositionId }, targetCurrent: () => CurrentShipmentRow(row));
     }
 
     private sealed record OperationOutcome(string Message, bool Reload = true);
 
+    private bool CurrentShipmentRow(ShipmentPreviewRow row) =>
+        RowVisible(row) && _rows.Contains(row);
+
+    private bool CurrentShipmentSelection(IReadOnlyList<ShipmentPreviewRow> selected)
+    {
+        if (selected.Count == 0 || selected.Count != LinesGrid.SelectedItems.Count ||
+            !LinesGrid.SelectedItems.OfType<ShipmentPreviewRow>()
+                .SequenceEqual(selected, ReferenceEqualityComparer.Instance)) return false;
+        if (selected.Count <= 32) return selected.All(CurrentShipmentRow);
+        var rows = _rows.ToHashSet(ReferenceEqualityComparer.Instance);
+        return selected.All(row => rows.Contains(row) && RowVisible(row));
+    }
+
+    private bool CurrentShipmentFilterEntries(bool onlyStock, IReadOnlyList<(long PositionId, decimal Qty)> expected) =>
+        LinesGrid.ItemsSource is ListCollectionView view &&
+        view.OfType<ShipmentPreviewRow>().Where(row => RowVisible(row) && row.CanChange && !row.InShipment)
+            .Select(row => (row.PositionId, Qty: onlyStock ? Math.Min(row.Stock, row.Remaining) : row.Suggested))
+            .Where(row => row.Qty > 0.000001m).SequenceEqual(expected);
+
     private Task WriteQuantityAsync(Func<SqlServerDatabase.SaveResult> write, string success,
-        Func<bool>? confirm = null, bool defer = false, IReadOnlyList<long>? changedPositions = null) =>
-        RunOperationAsync(async () =>
+        Func<bool>? confirm = null, bool defer = false, IReadOnlyList<long>? changedPositions = null,
+        Func<bool>? targetCurrent = null)
+    {
+        if (Current is not { } captured || !CanStartWrite) return Task.CompletedTask;
+        var revision = _revision;
+        var attachment = _attachmentGeneration;
+        var load = _loadGeneration;
+        var editingFixed = _editingFixedId;
+        bool CurrentTarget() => IsLoaded && !_building && !_needsReloadAfterAttach &&
+            attachment == _attachmentGeneration && load == _loadGeneration &&
+            _shipmentId == captured.Id && Equals(Current, captured) &&
+            _editingFixedId == editingFixed && _revision == revision &&
+            (targetCurrent is null || targetCurrent());
+        return RunOperationAsync(async () =>
         {
+            if (!CurrentTarget()) return new OperationOutcome("Ведомость или выбор изменились. Запись не начата.");
             if (confirm is not null && !confirm()) return new OperationOutcome("Операция отменена.");
-            if (!IsLoaded || _needsReloadAfterAttach) return new OperationOutcome("Раздел закрыт. Запись не начата.");
+            if (!CurrentTarget()) return new OperationOutcome("Ведомость или выбор изменились. Запись не начата.");
             var saved = await Task.Run(write);
             if (!saved.Saved) return new OperationOutcome("Ошибка: " + saved.Error);
             if (changedPositions is not null)
@@ -769,6 +830,7 @@ public partial class ShipmentsPane : UserControl
             }
             return new OperationOutcome(success);
         }, defer);
+    }
 
     private async Task RunOperationAsync(Func<Task<OperationOutcome>> operation, bool defer = false)
     {
@@ -796,11 +858,21 @@ public partial class ShipmentsPane : UserControl
             reload = outcome.Reload;
             SetStatus(outcome.Message);
         }
-        catch (Exception ex) { SetStatus("Ошибка: " + ex.Message); }
+        catch (Exception ex)
+        {
+            _revision = "";
+            _needsReloadAfterAttach = true;
+            SetStatus("Результат операции не подтверждён: " + ex.Message + ". Не повторяйте до сверки.");
+        }
         finally
         {
             try { if (IsLoaded && (reload || _needsReloadAfterAttach)) await ReloadAsync(preserveStatus: true); }
-            catch (Exception ex) { SetStatus("Не удалось перечитать ведомость: " + ex.Message); }
+            catch (Exception ex)
+            {
+                _revision = "";
+                _needsReloadAfterAttach = true;
+                SetStatus("Не удалось перечитать ведомость: " + ex.Message);
+            }
             finally
             {
                 _building = false;

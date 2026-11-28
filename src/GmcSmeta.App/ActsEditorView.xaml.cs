@@ -365,7 +365,7 @@ public partial class ActsEditorView : UserControl
             SignedCheck.IsChecked = _signed;
             PropsButton.IsEnabled = !_signed;
             ExtraMenuItem.IsEnabled = !_signed && !_contractLocked;
-            DeleteActMenuItem.IsEnabled = !_signed;
+            DeleteActMenuItem.IsEnabled = !_signed && !_contractLocked;
             FillRestButton.IsEnabled = !_signed;
             ClearButton.IsEnabled = !_signed;
             IssuedMenuItem.IsEnabled = !_signed && !_contractLocked;
@@ -1277,24 +1277,32 @@ public partial class ActsEditorView : UserControl
 
     private async void DeleteAct_Click(object sender, RoutedEventArgs e)
     {
-        if (ActWritePending) { SetStatus("Сначала завершите сохранение текущего акта.", true); return; }
+        if (ActWritePending || !ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) || ActWritePending)
+        { SetStatus("Сначала завершите сохранение текущего акта.", true); return; }
         var target = CaptureActCommand();
+        var sheet = _sheet;
         var current = Current;
-        if (target is null || current is null) return;
-        if (current.Signed)
+        if (target is null || current is null || sheet is null) return;
+        if (current.Signed || _contractLocked)
         {
-            MessageBox.Show(Window.GetWindow(this), "Акт подписан. Сначала снимите отметку «Подписан».",
+            MessageBox.Show(Window.GetWindow(this), "Акт подписан или договор заблокирован. Удаление недоступно.",
                 "Удаление", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (!Confirm("Удаление", $"Удалить КС-2 № {current.Number} от {current.Date:dd.MM.yyyy}? " +
-                "Строки акта вернутся в остаток."))
+                "Объёмы вернутся в остаток. Позиции вне сметы без других ссылок будут удалены. " +
+                "Восстановление акта не предусмотрено."))
             return;
         try
         {
             RequireCurrentActCommand(target);
+            if (!ReferenceEquals(sheet, _sheet) || !Equals(Current, current) || _contractLocked || current.Signed)
+                throw new InvalidOperationException("Снимок акта изменился. Повторите команду.");
             var saved = await RunActWriteAsync(() => SqlServerActs.Delete(
-                target.ConnectionString, target.ActId, target.Revision));
+                target.ConnectionString, target.ActId, target.Revision, target.ContractId));
+            if (_actId != target.ActId || _contractId != target.ContractId ||
+                _connectionString != target.ConnectionString || !IsLoaded) return;
             if (!saved.Saved)
             {
                 SetStatus("Ошибка удаления: " + saved.Error, true);
@@ -1310,9 +1318,12 @@ public partial class ActsEditorView : UserControl
         catch (Exception ex)
         {
             if (_actId == target.ActId && _contractId == target.ContractId &&
-                _connectionString == target.ConnectionString && _revision == target.Revision)
+                _connectionString == target.ConnectionString)
+            {
                 _revision = "";
-            SetStatus("Удаление не подтверждено: " + ex.Message, true);
+                SetStatus("Удаление не подтверждено: " + ex.Message + ". Не повторяйте до сверки.", true);
+                if (IsLoaded) Reload();
+            }
         }
     }
 
@@ -1327,7 +1338,15 @@ public partial class ActsEditorView : UserControl
             SetStatus("Дождитесь завершения сохранения объёмов КС-2.", true);
             return;
         }
-        var actId = _actId;
+        var target = CaptureActCommand();
+        var sheet = _sheet;
+        if (target is null || sheet is null || _contractLocked) { RevertSignedCheck(); return; }
+        var actId = target.ActId;
+        bool SameAct() => _actId == actId && _contractId == target.ContractId &&
+            _connectionString == target.ConnectionString;
+        bool CurrentSigningTarget() => SameAct() && IsLoaded && !_loadingAct && !_loadFailed &&
+            !_building && !_contractLocked && !_inSave && ReferenceEquals(sheet, _sheet) &&
+            _revision == target.Revision;
         _signingAct = true;
         SignedCheck.IsEnabled = false;
         try
@@ -1345,12 +1364,13 @@ public partial class ActsEditorView : UserControl
                 SetStatus("Дождитесь завершения записи объёмов КС-2.", true);
                 return;
             }
-            var expectedRevision = ServerRevision();
+            var expectedRevision = target.Revision;
+            if (!CurrentSigningTarget()) return;
             if (signed)
             {
                 // Audit fresh SQL data, not stale/optimistic WPF text.
-                var audit = await ReadPreSignAuditAsync(actId, _contractId);
-                if (_actId != actId) return;
+                var audit = await ReadPreSignAuditAsync(actId, target.ContractId);
+                if (!CurrentSigningTarget()) return;
                 if (!string.Equals(audit.Revision, expectedRevision, StringComparison.Ordinal))
                 {
                     _revision = "";
@@ -1365,10 +1385,10 @@ public partial class ActsEditorView : UserControl
             else if (!Confirm("Акт подписан", "Снять отметку «Подписан» и разрешить изменения?"))
                 return;
 
-            if (_actId != actId) return;
+            if (!CurrentSigningTarget()) return;
             var saved = await RunActWriteAsync(() => SqlServerActs.ToggleSigned(
-                _connectionString, actId, signed, expectedRevision));
-            if (_actId != actId) return;
+                target.ConnectionString, actId, signed, expectedRevision, target.ContractId));
+            if (!SameAct() || !IsLoaded) return;
             if (!saved.Saved)
             {
                 _revision = "";
@@ -1380,7 +1400,7 @@ public partial class ActsEditorView : UserControl
         }
         catch (Exception ex)
         {
-            if (_actId == actId)
+            if (SameAct())
             {
                 _revision = "";
                 SetStatus("Не удалось завершить проверку/подпись КС-2: " + ex.Message, true);
@@ -1390,7 +1410,7 @@ public partial class ActsEditorView : UserControl
         {
             _signingAct = false;
             SignedCheck.IsEnabled = true;
-            if (_actId == actId)
+            if (SameAct() && IsLoaded)
             {
                 // An in-flight cell save owns its own reload; never race it.
                 if (_inSave) RevertSignedCheck();
@@ -1916,7 +1936,7 @@ public partial class ActsEditorView : UserControl
         var manualSections = !string.IsNullOrEmpty(_details?.SectionAmountsJson);
         PreSignMenuItem.IsEnabled = ExportGroupMenuItem.IsEnabled = ready;
         VorMenuItem.IsEnabled = ExportAllMenuItem.IsEnabled = ready && !_exportInProgress;
-        DeleteActMenuItem.IsEnabled = unsigned;
+        DeleteActMenuItem.IsEnabled = editable;
         ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;
         RestAllMenuItem.IsEnabled = editable && !manualSections && _totals is not null;
         var adjustmentAvailable = ActDiscountMenuItem.Visibility == Visibility.Visible &&

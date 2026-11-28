@@ -890,7 +890,7 @@ public static partial class SqlServerStages
 
     /// <summary>«Сумма по договору» этапа — для сверки; включает синхронизацию денег полного КП.</summary>
     public static void SetStageTarget(string connectionString, long stageId,
-        decimal? sum, string expectedRevision)
+        decimal? sum, string expectedRevision, long? expectedFullId = null)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
@@ -899,6 +899,8 @@ public static partial class SqlServerStages
         if (sum is < 0m || sum > NumberText.MaxNumber)
             throw new ArgumentOutOfRangeException(nameof(sum), "Недопустимая сумма договора.");
         var fullId = ParentForStage(conn, tx, stageId);
+        if (expectedFullId is long expected && expected != fullId)
+            throw new DBConcurrencyException("Этап не принадлежит выбранному полному КП.");
         RequireEditableStage(conn, tx, fullId, stageId, StageMutationPolicy.Operation.Target);
         using (var update = new SqlCommand(
             "UPDATE dbo.contracts SET stage_sum=@sum WHERE id=@id", conn, tx))
@@ -915,13 +917,16 @@ public static partial class SqlServerStages
 
     /// <summary>Удалить этап: копия в корзину, защита и перечитывание денег полного КП
     /// (delete_contract + sync_parent_money).</summary>
-    public static void DeleteStage(string connectionString, long stageId, string expectedRevision)
+    public static void DeleteStage(string connectionString, long stageId, string expectedRevision,
+        long? expectedFullId = null)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         SqlServerWorkspace.CheckRevision(conn, tx, expectedRevision);
         var fullId = ParentForStage(conn, tx, stageId);
+        if (expectedFullId is long expected && expected != fullId)
+            throw new DBConcurrencyException("Этап не принадлежит выбранному полному КП.");
         RequireEditableStage(conn, tx, fullId, stageId, StageMutationPolicy.Operation.Delete);
         RequireNoDependentDocuments(conn, tx, stageId);
         var info = DescribeContract(conn, tx, stageId);

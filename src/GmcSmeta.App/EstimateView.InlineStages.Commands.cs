@@ -113,7 +113,7 @@ public partial class EstimateView
                 case "delete":
                     if (!ConfirmStageCommand($"Удалить «{stage.Name}»? Копия сохранится в корзине (30 дней).")) return;
                     await RunInlineStageCommandAsync(snapshot, "Документ этапа удалён", () =>
-                        SqlServerStages.DeleteStage(_sqlConnectionString, id, revision));
+                        SqlServerStages.DeleteStage(_sqlConnectionString, id, revision, _contractId));
                     break;
             }
         }

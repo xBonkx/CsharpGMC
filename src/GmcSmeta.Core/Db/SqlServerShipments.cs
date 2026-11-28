@@ -255,10 +255,12 @@ public static class SqlServerShipments
 
         string objectName, lastRecipient = "", lastIssuedBy = "";
         using (var read = new SqlCommand(
-            "SELECT name FROM dbo.objects WHERE id=@id", conn, tx))
+            "SELECT name FROM dbo.objects WITH (UPDLOCK,HOLDLOCK) WHERE id=@id AND ISNULL(archived,0)=0", conn, tx))
         {
             read.Parameters.AddWithValue("@id", objectId);
-            objectName = Convert.ToString(read.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "";
+            var value = read.ExecuteScalar();
+            if (value is null or DBNull) throw new InvalidOperationException("Действующий объект не найден.");
+            objectName = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
         using (var last = new SqlCommand(
             "SELECT TOP(1) recipient,issued_by FROM dbo.shipments WHERE object_id=@id ORDER BY id DESC", conn, tx))
@@ -324,6 +326,8 @@ public static class SqlServerShipments
         if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови ведомости.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, null))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
         bool fixedList;
         string number = "", objectName = "";
         long objectId;
@@ -424,6 +428,8 @@ public static class SqlServerShipments
             return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обновите выдачу.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, null))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
 
         long objectId;
         bool fixedList;
@@ -487,7 +493,7 @@ public static class SqlServerShipments
     /// Не затрагивает смету и движения; любое нарушение откатывает весь пакет.</summary>
     public static SqlServerDatabase.SaveResult RemoveRowsBatch(
         string connectionString, long shipmentId,
-        IReadOnlyList<long> positionIds, string expectedRevision, bool expectedFixed = false)
+        IReadOnlyList<long> positionIds, string expectedRevision, bool expectedFixed = false, long? expectedObjectId = null)
     {
         if (positionIds is null || positionIds.Count == 0 ||
             positionIds.Any(id => id <= 0) || positionIds.Distinct().Count() != positionIds.Count)
@@ -500,6 +506,8 @@ public static class SqlServerShipments
             return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обновите выдачу.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, expectedObjectId))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
 
         long objectId;
         bool fixedList;
@@ -566,6 +574,8 @@ public static class SqlServerShipments
         if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови ведомости.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, null))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
         bool alreadyFixed;
         string number = "", objectName = "", recipient = "";
         DateTime date = DateTime.Today;
@@ -675,6 +685,8 @@ public static class SqlServerShipments
         if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови ведомости.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, null))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
         string number = "", objectName = "";
         using (var read = new SqlCommand(
             "SELECT sh.number,o.name,sh.fixed FROM dbo.shipments sh JOIN dbo.objects o ON o.id=sh.object_id WHERE sh.id=@id", conn, tx))
@@ -746,6 +758,17 @@ public static class SqlServerShipments
         return Convert.ToInt64(count.ExecuteScalar(), CultureInfo.InvariantCulture) == 0 ? message : null;
     }
 
+    private static bool IsActiveShipment(SqlConnection conn, SqlTransaction tx, long shipmentId, long? expectedObjectId)
+    {
+        using var cmd = new SqlCommand(
+            "SELECT COUNT_BIG(*) FROM dbo.shipments sh WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=sh.object_id " +
+            "WHERE sh.id=@id AND ISNULL(o.archived,0)=0 AND (@object IS NULL OR sh.object_id=@object)", conn, tx);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = shipmentId;
+        cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = (object?)expectedObjectId ?? DBNull.Value;
+        return Convert.ToInt64(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) == 1;
+    }
+
     private static long ObjectIdOf(SqlConnection conn, SqlTransaction tx, long shipmentId)
     {
         using var cmd = new SqlCommand("SELECT object_id FROM dbo.shipments WHERE id=@id", conn, tx);
@@ -755,7 +778,7 @@ public static class SqlServerShipments
 
     /// <summary>Delete a clean draft only; unexpected linked movements require reconciliation.</summary>
     public static SqlServerDatabase.SaveResult DeleteList(string connectionString, long shipmentId,
-        string expectedRevision)
+        string expectedRevision, long? expectedObjectId = null)
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
@@ -764,6 +787,8 @@ public static class SqlServerShipments
         if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обнови ведомости.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, expectedObjectId))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
         bool fixedList;
         using (var read = new SqlCommand("SELECT fixed FROM dbo.shipments WHERE id=@id", conn, tx))
         {
@@ -834,6 +859,8 @@ public static class SqlServerShipments
         if (rev is null) return SqlServerDatabase.SaveResult.Fail("Отсутствует meta.rev.", expectedRevision);
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             return SqlServerDatabase.SaveResult.Fail("Данные изменены другим сотрудником. Обновите ведомость.", rev);
+        if (!IsActiveShipment(conn, tx, shipmentId, null))
+            return SqlServerDatabase.SaveResult.Fail("Ведомость не принадлежит действующему объекту.", rev);
         long objectId;
         using (var read = new SqlCommand("SELECT object_id,fixed FROM dbo.shipments WHERE id=@id", conn, tx))
         {

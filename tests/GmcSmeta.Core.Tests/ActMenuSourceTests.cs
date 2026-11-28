@@ -38,13 +38,13 @@ public sealed class ActMenuSourceTests
             Assert.Contains("ContextMenuIcons.Set(" + name + ", \"" + glyph + "\"", code);
         }
         Assert.Contains("ContextMenuIcons.Set(DeleteActMenuItem, \"Trash\", danger: true);", code);
-        Assert.Contains("DeleteActMenuItem.IsEnabled = !_signed;", code);
+        Assert.Contains("DeleteActMenuItem.IsEnabled = !_signed && !_contractLocked;", code);
         Assert.Contains("ExtraMenuItem.IsEnabled = !_signed && !_contractLocked;", code);
         Assert.Contains("IssuedMenuItem.IsEnabled = !_signed && !_contractLocked;", code);
         Assert.Equal(2, document.Descendants(wpf + "ContextMenu")
             .Count(e => (string?)e.Attribute("Opened") == "ActMoreMenu_Opened"));
         Assert.Contains("var ready = CaptureActCommand() is not null && current is not null && _sheet is not null;", code);
-        Assert.Contains("DeleteActMenuItem.IsEnabled = unsigned;", code);
+        Assert.Contains("DeleteActMenuItem.IsEnabled = editable;", code);
         Assert.Contains("ExtraMenuItem.IsEnabled = IssuedMenuItem.IsEnabled = editable;", code);
         Assert.Contains("RestAllMenuItem.IsEnabled = editable && !manualSections && _totals is not null;", code);
     }

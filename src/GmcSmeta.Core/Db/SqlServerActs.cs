@@ -336,7 +336,7 @@ public static partial class SqlServerActs
 
     /// <summary>Удалить акт (acts.delete_act): подписанный нельзя.</summary>
     public static SqlServerDatabase.SaveResult Delete(string connectionString, long actId,
-        string expectedRevision)
+        string expectedRevision, long? expectedContractId = null)
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
@@ -350,7 +350,9 @@ public static partial class SqlServerActs
         string number;
         using (var read = new SqlCommand(
             "SELECT a.signed,c.locked,a.contract_id,ISNULL(a.number,N'') " +
-            "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id WHERE a.id=@id", conn, tx))
+            "FROM dbo.acts a WITH (UPDLOCK,HOLDLOCK) JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=a.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE a.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             read.Parameters.Add("@id",SqlDbType.BigInt).Value=actId;
             using var r=read.ExecuteReader();
@@ -360,6 +362,8 @@ public static partial class SqlServerActs
             contractId=Convert.ToInt64(r.GetValue(2),CultureInfo.InvariantCulture);
             number=r.GetString(3);
         }
+        if (expectedContractId is long expected && expected != contractId)
+            return SqlServerDatabase.SaveResult.Fail("Акт не принадлежит выбранному договору.", rev);
         if (signed || locked)
             return SqlServerDatabase.SaveResult.Fail("Подписанный акт или заблокированный договор удалять нельзя.", rev);
         using (var log=new SqlCommand(
@@ -925,11 +929,11 @@ public static partial class SqlServerActs
 
     /// <summary>Подпись акта (ks_view): подписанный акт блокируется от правок.</summary>
     public static SqlServerDatabase.SaveResult ToggleSigned(string connectionString, long actId,
-        bool signed, string expectedRevision)
+        bool signed, string expectedRevision, long? expectedContractId = null)
     {
         RequirePilotWrite(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
-        return ToggleSignedCore(conn,actId,signed,expectedRevision,SqlSchemaCompatibility.HasPreviewColumns(conn));
+        return ToggleSignedCore(conn,actId,signed,expectedRevision,SqlSchemaCompatibility.HasPreviewColumns(conn), expectedContractId);
     }
 
     public static SqlServerDatabase.SaveResult ToggleSignedSchema31Test(string connectionString, long actId,
@@ -940,7 +944,7 @@ public static partial class SqlServerActs
     }
 
     private static SqlServerDatabase.SaveResult ToggleSignedCore(SqlConnection conn,long actId,
-        bool signed,string expectedRevision,bool schema31)
+        bool signed,string expectedRevision,bool schema31, long? expectedContractId = null)
     {
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = SqlServerDatabase.LockRevision(conn, tx);
@@ -953,7 +957,9 @@ public static partial class SqlServerActs
         string number;
         using (var read = new SqlCommand(
             "SELECT a.contract_id,a.signed,c.locked,ISNULL(a.number,N'') " +
-            "FROM dbo.acts a JOIN dbo.contracts c ON c.id=a.contract_id WHERE a.id=@id", conn, tx))
+            "FROM dbo.acts a WITH (UPDLOCK,HOLDLOCK) JOIN dbo.contracts c WITH (HOLDLOCK) ON c.id=a.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE a.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             read.Parameters.Add("@id", SqlDbType.BigInt).Value = actId;
             using var r = read.ExecuteReader();
@@ -963,6 +969,8 @@ public static partial class SqlServerActs
             locked = Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
             number = r.GetString(3);
         }
+        if (expectedContractId is long expected && expected != contractId)
+            return SqlServerDatabase.SaveResult.Fail("Акт не принадлежит выбранному договору.", rev);
         if (oldSigned == signed)
             return new SqlServerDatabase.SaveResult(true, null, rev); // idempotent no-op, no revision bump
         if (locked)
