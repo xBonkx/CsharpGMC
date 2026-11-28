@@ -12,7 +12,8 @@ public partial class EstimateView
 {
     private async Task ImportStructuredExcelFile(string sourcePath, string revision)
     {
-        if (!CanAppendImport(revision)) { SetStatus("Обнови КП перед импортом.", true); return; }
+        if (_estimate is not { } snapshot || !CanAppendImport(revision))
+        { SetStatus("Обнови КП перед импортом.", true); return; }
         ExcelImportResult parsed;
         try
         {
@@ -82,7 +83,7 @@ public partial class EstimateView
         progress.Show();
         try
         {
-            if (_serverConflict || _detached || revision != _serverRevision || _estimate?.Locked != false)
+            if (!CommandWriteCurrent(snapshot, revision))
                 throw new InvalidOperationException("КП изменилось до записи импорта.");
             SetStatus($"Импорт {blocks.Sum(b => b.PositionCount)} строк Excel в новые разделы…", false);
             var saved = await Task.Run(() => SqlServerExcelAppend.Append(

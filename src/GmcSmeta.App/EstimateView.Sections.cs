@@ -38,17 +38,18 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var revision = _serverRevision;
-        if (!CanAppendImport(revision) || HasUnsettledCacheWrites) return;
+        if (_estimate is not { } snapshot || !CanAppendImport(revision) || HasUnsettledCacheWrites) return;
         var primary = EstimateGrid.SelectedItem;
         var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        if (selected?.IsVirtual == true)
+        if (selection.Length > 1 || (selected is not null && !IsRealCommandRow(selected)))
         {
-            SetStatus("Выбери реальный раздел или позицию, а не временную группу.", true);
+            SetStatus("Выбери один реальный раздел или позицию, а не временную группу.", true);
             return;
         }
         // For a subsection a parent is required. Top-level sections may be added to an empty document.
-        selected ??= subsection ? _rows.FirstOrDefault(r => r.IsSystem && r.Level == 0) : null;
+        selected ??= subsection ? EstimateGrid.Items.OfType<EditableEstimateRow>()
+            .FirstOrDefault(r => r.IsSystem && r.Level == 0 && IsRealCommandRow(r)) : null;
         long? anchorId = selected?.Source.SystemId;
         if (subsection && anchorId is null)
         {
@@ -77,8 +78,11 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _detached || _estimate?.Locked != false || revision != _serverRevision)
-                throw new InvalidOperationException("Смета устарела; обнови её.");
+            if (!CommandWriteCurrent(snapshot, revision) ||
+                !ReferenceEquals(primary, EstimateGrid.SelectedItem) ||
+                !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) ||
+                (selected is not null && !IsRealCommandRow(selected)))
+                throw new InvalidOperationException("Смета или выделение изменились.");
             var result = await Task.Run(() => SqlServerDatabase.AddSection(
                 _sqlConnectionString, _contractId, name, subsection, anchorId, revision));
             if (!result.Saved)
@@ -93,6 +97,8 @@ public partial class EstimateView
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally
@@ -120,13 +126,13 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var revision = _serverRevision;
-        if (!CanAppendImport(revision) || HasUnsettledCacheWrites) return;
+        if (_estimate is not { } snapshot || !CanAppendImport(revision) || HasUnsettledCacheWrites) return;
         var primary = EstimateGrid.SelectedItem;
         var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         if (EstimateGrid.SelectedItem is not EditableEstimateRow selected ||
-            !selected.IsSystem || selected.IsVirtual)
+            !selected.IsSystem || !IsRealCommandRow(selected) || selection.Length != 1)
         {
-            SetStatus("Выбери строку заголовка раздела.", true);
+            SetStatus("Выбери один заголовок раздела.", true);
             return;
         }
         var systemId = selected.Source.SystemId;
@@ -152,8 +158,11 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _detached || _estimate?.Locked != false || revision != _serverRevision)
-                throw new InvalidOperationException("Смета устарела; обнови её.");
+            if (!CommandWriteCurrent(snapshot, revision) ||
+                !ReferenceEquals(primary, EstimateGrid.SelectedItem) ||
+                !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) ||
+                (selected is not null && !IsRealCommandRow(selected)))
+                throw new InvalidOperationException("Смета или выделение изменились.");
             var result = await Task.Run(() => SqlServerDatabase.RenameSection(
                 _sqlConnectionString, _contractId, systemId, name, revision));
             if (!result.Saved)
@@ -167,6 +176,8 @@ public partial class EstimateView
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally
@@ -194,7 +205,8 @@ public partial class EstimateView
     /// </summary>
     private async Task AddPositionAsync(bool component)
     {
-        if (_estimate?.Locked != false) return;
+        if (_estimate?.Locked != false || !ActiveEstimateWriter() || _refreshing ||
+            string.IsNullOrWhiteSpace(_publishedEstimateRevision) || _doc.StageRest) return;
         if (_serverConflict || _cellSaveQueue.Blocked || _saveError is not null)
         {
             SetStatus("Сначала обнови смету: есть неподтверждённые правки.", true);
@@ -203,8 +215,13 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        selected ??= _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected is { IsVirtual: true, IsPendingInsert: false })
+        if (EstimateGrid.SelectedItems.Count > 1)
+        {
+            SetStatus("Выбери одну строку для добавления.", true);
+            return;
+        }
+        selected ??= EstimateGrid.Items.OfType<EditableEstimateRow>().FirstOrDefault(r => r.IsSystem && IsRealCommandRow(r));
+        if (selected is not null && !selected.IsPendingInsert && !IsRealCommandRow(selected))
         {
             SetStatus("В режиме группировки сначала раскрой группу и выбери конкретную позицию.", true);
             return;
@@ -214,9 +231,9 @@ public partial class EstimateView
             SetStatus("В смете пока нет разделов. Нажми «+ Раздел».", true);
             return;
         }
-        if (component && selected.IsSystem)
+        if (component && (selected.IsSystem || selected.Source.OutOfKp))
         {
-            SetStatus("Для комплектующей сначала выбери обычную позицию.", true);
+            SetStatus("Для комплектующей сначала выбери обычную позицию КП.", true);
             return;
         }
 
@@ -252,7 +269,8 @@ public partial class EstimateView
             await previousInsert;
             await _writeLock.WaitAsync();
             acquired = true;
-            if (_serverConflict || _cellSaveQueue.Blocked)
+            if (_serverConflict || _cellSaveQueue.Blocked || _saveError is not null ||
+                _estimate?.Locked != false)
                 throw new InvalidOperationException("Серверная смета устарела, обнови её.");
             var realAfterId = anchorDraft is null ? afterId : ResolvePendingAnchor(anchorDraft);
             var realParentId = parentDraft is null ? parentId : ResolvePendingAnchor(parentDraft);
@@ -321,16 +339,16 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var revision = _serverRevision;
-        if (!CanAppendImport(revision))
+        if (_estimate is not { } snapshot || !CanAppendImport(revision))
         {
             SetStatus("Заверши сохранение и обнови смету.", true);
             return;
         }
         var selected = EstimateGrid.SelectedItem as EditableEstimateRow;
-        selected ??= _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected?.IsVirtual == true)
+        selected ??= EstimateGrid.Items.OfType<EditableEstimateRow>().FirstOrDefault(r => r.IsSystem && IsRealCommandRow(r));
+        if (EstimateGrid.SelectedItems.Count > 1 || (selected is not null && !IsRealCommandRow(selected)))
         {
-            SetStatus("В режиме группировки сначала раскрой группу и выбери конкретную позицию.", true);
+            SetStatus("Выбери одну реальную позицию или раздел.", true);
             return;
         }
         if (selected is null || selected.Source.SystemId <= 0)
@@ -339,8 +357,13 @@ public partial class EstimateView
             return;
         }
 
+        var primary = EstimateGrid.SelectedItem;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        bool TargetCurrent() => IsRealCommandRow(selected) &&
+            ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance);
         var systemId = selected.Source.SystemId;
-        long? afterId = selected.IsSystem ? null : selected.Id;
+        long? afterId = selected.IsSystem ? null : selected.Source.ParentPositionId ?? selected.Id;
         var targetName = _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == systemId)?.Name
             ?? "Без системы";
         var picker = new CatalogPickerWindow(_sqlConnectionString, targetName, revision)
@@ -348,7 +371,7 @@ public partial class EstimateView
             Owner = Window.GetWindow(this),
         };
         if (picker.ShowDialog() != true || picker.Picked.Count == 0) return;
-        if (!CanAppendImport(revision) || !_rows.Contains(selected))
+        if (!CanAppendImport(revision) || !ReferenceEquals(snapshot, _estimate) || !TargetCurrent())
         {
             SetStatus("Смета изменилась. Выбери позиции из справочника заново.", true);
             return;
@@ -363,8 +386,7 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _detached || revision != _serverRevision ||
-                _estimate?.Locked != false || !_rows.Contains(selected))
+            if (!CommandWriteCurrent(snapshot, revision) || !TargetCurrent())
                 throw new InvalidOperationException("Серверная смета устарела, обнови её.");
             var result = await Task.Run(() => SqlServerDatabase.InsertCopiedRows(
                 _sqlConnectionString, _contractId, systemId, afterId, rows, revision));
@@ -497,38 +519,41 @@ public partial class EstimateView
             return;
         }
         if (EstimateGrid.SelectedItem is not EditableEstimateRow row ||
-            row.IsVirtual || EstimateGrid.SelectedItems.Count != 1)
+            !IsRealCommandRow(row) || EstimateGrid.SelectedItems.Count != 1)
         {
             SetStatus("Выбери одну позицию или раздел.", true);
             return;
         }
-        if (_serverConflict)
-        {
-            SetStatus("Данные изменились на сервере. Сначала обнови смету.", true);
-            return;
-        }
+        var revision = _publishedEstimateRevision;
+        if (_estimate is not { } snapshot || !CanAppendImport(revision)) return;
         _reloadTimer.Stop();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"Перемещение… ({count})", false);
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict) throw new InvalidOperationException("Смета устарела.");
+            if (!CommandWriteCurrent(snapshot, revision) || !IsRealCommandRow(row) ||
+                EstimateGrid.SelectedItems.Count != 1 || !ReferenceEquals(EstimateGrid.SelectedItem, row))
+                throw new InvalidOperationException("Смета или выделение изменились.");
             var result = row.IsSystem
                 ? await MoveSelectedSystemAsync(row, direction)
                 : await Task.Run(() => SqlServerDatabase.MovePosition(
-                    _sqlConnectionString, _contractId, row.Source.SystemId, row.Id, direction, _serverRevision));
+                    _sqlConnectionString, _contractId, row.Source.SystemId, row.Id, direction, revision));
             if (!result.Saved)
             {
                 _serverConflict = true;
                 throw new InvalidOperationException(result.Error ?? "Перемещение отклонено.");
             }
             _serverRevision = result.Revision;
+            _saveAwaitingReadback = true;
             if (row.IsSystem) _focusSystemAfterReload = row.Source.SystemId;
             else _focusAfterReload = row.Id;
         }
         catch (Exception ex)
         {
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             _saveError = ex.Message;
         }
         finally
@@ -556,13 +581,12 @@ public partial class EstimateView
         // Delete and the context-menu command operate on the SAME Extended selection.
         // Never silently delete just SelectedItem when several rows are highlighted.
         var selected = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
-        if (selected.Length == 0 || selected.Any(row =>
-                row.IsSystem || row.IsVirtual || row.IsAreaSummary || row.Id <= 0))
+        if (!CommandSelectionCurrent(selected) || selected.Any(row => row.IsSystem))
         {
             ShowPositionDeleteError("Выдели только обычные позиции или комплектующие, без разделов и групп.");
             return;
         }
-        if (_serverConflict || HasUnsettledCacheWrites)
+        if (_estimate is not { } snapshot || !CanAppendImport(_publishedEstimateRevision))
         {
             ShowPositionDeleteError("Сохранение или сверка с SQL Server ещё не завершены. " +
                 "Дождись завершения или обнови смету.");
@@ -583,11 +607,8 @@ public partial class EstimateView
         };
         if (dialog.ShowDialog() != true) return;
 
-        if (_serverConflict || _estimate?.Locked != false || revision != _serverRevision ||
-            HasUnsettledCacheWrites ||
-            selected.Any(row => !_rows.Contains(row)) ||
-            !EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
-                .Select(row => (long)row.Id).ToHashSet().SetEquals(selectedIds))
+        if (!CanAppendImport(revision) || !ReferenceEquals(snapshot, _estimate) ||
+            !CommandSelectionCurrent(selected))
         {
             ShowPositionDeleteError("Выделение или данные изменились. Повтори удаление после обновления.");
             return;
@@ -605,24 +626,28 @@ public partial class EstimateView
             {
                 _focusAfterReload = null;
                 _focusSystemAfterReload = sectionToFocus;
-            }, showDeleteFailure: true);
+            }, showDeleteFailure: true, targetCurrent: () =>
+                CommandWriteCurrent(snapshot, revision) && CommandSelectionCurrent(selected));
     }
 
     /// <summary>Run every structural command behind the same save lock as cell editing.</summary>
     private async Task RunSectionCommandAsync(Func<string, SqlServerDatabase.SaveResult> operation,
-        string busy, string success, Action? onSuccess = null, bool showDeleteFailure = false)
+        string busy, string success, Action? onSuccess = null, bool showDeleteFailure = false,
+        Func<bool>? targetCurrent = null)
     {
         _reloadTimer.Stop();
-        if (showDeleteFailure) AttachSaveCloseGuard();
+        AttachSaveCloseGuard();
         var count = Interlocked.Increment(ref _pendingWrites);
         SetStatus($"{busy}… ({count})", false);
         string? deleteError = null;
         await _writeLock.WaitAsync();
         try
         {
-            _saveError = null;
-            if (_serverConflict) throw new InvalidOperationException("Смета устарела. Обнови её.");
-            var result = await Task.Run(() => operation(_serverRevision));
+            if (_serverConflict || _saveError is not null || !ActiveEstimateWriter() ||
+                _estimate?.Locked != false || (targetCurrent is not null && !targetCurrent()))
+                throw new InvalidOperationException("Смета или выделение изменились. Обнови её.");
+            var revision = _serverRevision;
+            var result = await Task.Run(() => operation(revision));
             if (!result.Saved)
             {
                 if (result.Revision != _serverRevision) _serverConflict = true;
@@ -630,12 +655,14 @@ public partial class EstimateView
                 throw new InvalidOperationException(result.Error ?? "Сервер отклонил команду.");
             }
             _serverRevision = result.Revision;
-            if (showDeleteFailure) _saveAwaitingReadback = true;
+            _saveAwaitingReadback = true;
             onSuccess?.Invoke();
         }
         catch (Exception ex)
         {
             _saveError = ex.Message;
+            _serverConflict = true;
+            _saveAwaitingReadback = true;
             if (showDeleteFailure && deleteError is null)
             {
                 _serverConflict = true;
@@ -671,16 +698,16 @@ public partial class EstimateView
     private async void DeleteSection_Click(object sender, RoutedEventArgs e)
     {
         if (_estimate?.Locked != false) return;
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         if (EstimateGrid.SelectedItem is not EditableEstimateRow selected ||
-            !selected.IsSystem || selected.IsVirtual)
+            !selected.IsSystem || !IsRealCommandRow(selected))
         {
             SetStatus("Выбери заголовок раздела или подраздела.", true);
             return;
         }
         var revision = _serverRevision;
-        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+        if (_estimate is not { } snapshot || !CanAppendImport(revision) || HasUnsettledCacheWrites ||
             EstimateGrid.SelectedItems.Count != 1 || !_rows.Contains(selected)) return;
         var sectionId = selected.Source.SystemId;
         if (MessageBox.Show(Window.GetWindow(this),
@@ -696,7 +723,9 @@ public partial class EstimateView
                 ? SqlServerDatabase.SaveResult.Fail("Смета изменилась. Повтори удаление.", rev)
                 : SqlServerDatabase.DeleteSection(_sqlConnectionString, _contractId, sectionId, revision),
             "Удаление раздела", "Раздел удалён",
-            () => { _focusAfterReload = null; _focusSystemAfterReload = null; }, showDeleteFailure: true);
+            () => { _focusAfterReload = null; _focusSystemAfterReload = null; }, showDeleteFailure: true,
+            targetCurrent: () => CommandWriteCurrent(snapshot, revision) && IsRealCommandRow(selected) &&
+                EstimateGrid.SelectedItems.Count == 1 && ReferenceEquals(EstimateGrid.SelectedItem, selected));
     }
 
     /// <summary>
@@ -707,8 +736,8 @@ public partial class EstimateView
     private async void MoveSection_Click(object sender, RoutedEventArgs e)
     {
         if (_estimate?.Locked != false) return;
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
+            !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         if (!CanPlaceEstimateRows)
         {
             SetStatus("Перенос доступен только в обычном порядке КП, без фильтра и незавершённых записей.", true);
@@ -725,8 +754,8 @@ public partial class EstimateView
             SetStatus("Выдели позиции для переноса в другой раздел.", true);
             return;
         }
-        if (EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
-            .Any(r => r.IsSystem || r.IsVirtual))
+        if (!CommandSelectionCurrent(EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray()) ||
+            selection.Any(r => r.IsSystem || !IsRealCommandRow(r)))
         {
             SetStatus("Не смешивай позиции и заголовки разделов в одном переносе.", true);
             return;
@@ -758,6 +787,7 @@ public partial class EstimateView
             return;
         }
         var revision = _serverRevision;
+        if (_estimate is not { } snapshot || !CanAppendImport(revision)) return;
         var selectedRows = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var picker = new SectionPickerDialog(targets) { Owner = Window.GetWindow(this) };
         if (picker.ShowDialog() != true || picker.SelectedSectionId is not long to) return;
@@ -779,7 +809,8 @@ public partial class EstimateView
             {
                 _focusAfterReload = checked((int)picked[0]);
                 if (!string.IsNullOrWhiteSpace(EstimateSearch.Text)) EstimateSearch.Clear();
-            });
+            }, targetCurrent: () => CommandWriteCurrent(snapshot, revision) &&
+                CommandSelectionCurrent(selectedRows) && roots.All(row => row is not null && IsRealCommandRow(row)));
     }
 
     private async void PasteExcel_Click(object sender, RoutedEventArgs e)
@@ -792,17 +823,23 @@ public partial class EstimateView
             return;
         }
         var revision = _serverRevision;
-        if (!CanAppendImport(revision) || HasUnsettledCacheWrites)
+        if (_estimate is not { } snapshot || !CanAppendImport(revision) || HasUnsettledCacheWrites)
         {
             SetStatus("Заверши сохранение и обнови смету перед вставкой.", true);
             return;
         }
-        var selected = EstimateGrid.SelectedItem as EditableEstimateRow ?? _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected is null || selected.IsVirtual || selected.IsAreaSummary || selected.Source.SystemId <= 0)
+        var selected = EstimateGrid.SelectedItem as EditableEstimateRow ??
+            EstimateGrid.Items.OfType<EditableEstimateRow>().FirstOrDefault(r => r.IsSystem && IsRealCommandRow(r));
+        if (selected is null || !IsRealCommandRow(selected) || EstimateGrid.SelectedItems.Count > 1)
         {
             SetStatus("Выбери конкретный раздел или позицию для вставки Excel.", true);
             return;
         }
+        var primary = EstimateGrid.SelectedItem;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        bool TargetCurrent() => IsRealCommandRow(selected) &&
+            ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance);
         IReadOnlyList<PastedPosition> parsed;
         try
         {
@@ -816,7 +853,8 @@ public partial class EstimateView
         long? after = selected.IsSystem ? null : selected.Source.ParentPositionId ?? selected.Id;
         var name = _rows.FirstOrDefault(r => r.IsSystem && r.Source.SystemId == section)?.Name ?? "Без названия";
         if (!ConfirmExcelPaste(parsed, name)) return;
-        if (!CanAppendImport(revision) || HasUnsettledCacheWrites || !_rows.Contains(selected))
+        if (!CanAppendImport(revision) || HasUnsettledCacheWrites ||
+            !ReferenceEquals(snapshot, _estimate) || !TargetCurrent())
         {
             ShowExcelPasteError("Смета или выбранная строка изменились. Обнови смету и повтори вставку.");
             return;
@@ -833,8 +871,8 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _detached || revision != _serverRevision || _estimate?.Locked != false)
-                throw new InvalidOperationException("Смета изменилась до записи.");
+            if (!CommandWriteCurrent(snapshot, revision) || !TargetCurrent())
+                throw new InvalidOperationException("Смета или выделение изменились до записи.");
             var result = await Task.Run(() => SqlServerDatabase.PastePositions(
                 _sqlConnectionString, _contractId, section, after, parsed, revision));
             if (!result.Saved)

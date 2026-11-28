@@ -31,6 +31,7 @@ public static partial class SqlServerDatabase
         if (subsection && anchorSystemId is null)
             return InsertSectionResult.Fail("Для подраздела выбери существующий раздел.", expectedRevision);
 
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
 
@@ -46,7 +47,9 @@ public static partial class SqlServerDatabase
         long objectId;
         string title;
         using (var doc = new SqlCommand(
-            "SELECT locked,object_id,kind,number,[date],name FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@contract", conn, tx))
+            "SELECT c.locked,c.object_id,c.kind,c.number,c.[date],c.name FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE c.id=@contract AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             doc.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
             using var r = doc.ExecuteReader();
@@ -204,6 +207,7 @@ public static partial class SqlServerDatabase
         if (contractId <= 0 || systemId <= 0)
             return SaveResult.Fail("Не выбран раздел сметы.", expectedRevision);
 
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         using var rev = new SqlCommand(
@@ -218,7 +222,9 @@ public static partial class SqlServerDatabase
         string previous;
         using (var find = new SqlCommand(
             "SELECT sy.name,c.object_id,c.locked FROM dbo.systems sy WITH (UPDLOCK,HOLDLOCK) " +
-            "JOIN dbo.contracts c ON c.id=sy.contract_id " +
+            "JOIN dbo.contracts c WITH (UPDLOCK,HOLDLOCK) ON c.id=sy.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id AND ISNULL(o.archived,0)=0 " +
+            "AND ISNULL(c.stage_rest,0)=0 " +
             "WHERE sy.id=@id AND c.id=@contract", conn, tx))
         {
             find.Parameters.Add("@id", SqlDbType.BigInt).Value = systemId;

@@ -90,8 +90,8 @@ public partial class EstimateView
             SetStatus("Документ закрыт или подписан — вставка недоступна.", true);
             return;
         }
-        if (_serverConflict || Volatile.Read(ref _pendingWrites) > 0 ||
-            _cellSaveQueue.PendingCount > 0 || _cellSaveQueue.Blocked)
+        var revision = _publishedEstimateRevision;
+        if (_estimate is not { } snapshot || !CanAppendImport(revision))
         {
             SetStatus("Дождитесь завершения сохранения или обновите смету после ошибки SQL.", true);
             return;
@@ -108,7 +108,7 @@ public partial class EstimateView
             return;
         }
         if (EstimateGrid.CurrentItem is not EditableEstimateRow current ||
-            current.IsSystem || current.IsVirtual)
+            current.IsSystem || current.IsVirtual || current.Id <= 0 || !_rows.Contains(current))
         {
             SetStatus("Выберите реальную строку сметы, с которой начинать вставку.", true);
             return;
@@ -128,6 +128,14 @@ public partial class EstimateView
                 "или скопируйте меньше чисел.", true);
             return;
         }
+        var anchor = EstimateGrid.CurrentCell;
+        bool TargetsCurrent()
+        {
+            if (!EstimateGrid.CurrentCell.Equals(anchor)) return false;
+            var rows = (EstimateGrid.ItemsSource as IEnumerable<EditableEstimateRow>)?.ToList() ?? _rows;
+            return PlanNumericPasteTargets(rows, rows.IndexOf(current), field, values.Count)
+                .SequenceEqual(targets, ReferenceEqualityComparer.Instance);
+        }
         var edits = targets.Select((row, index) =>
             new NumericPasteEdit(row.Id, values[index])).ToArray();
         if (SqlServerDatabase.ValidateNumericPaste(_contractId, field, edits) is { } invalid)
@@ -145,8 +153,13 @@ public partial class EstimateView
                 "SQL Server сохранит весь пакет одной транзакцией. " +
                 "При отклонении транзакции данные останутся без изменений.",
                 "ГМЦ-Смета — массовая вставка",
-                MessageBoxButton.YesNo, MessageBoxImage.Question);
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
             if (confirm != MessageBoxResult.Yes) return;
+        }
+        if (!CanAppendImport(revision) || !ReferenceEquals(snapshot, _estimate) || !TargetsCurrent())
+        {
+            SetStatus("Смета или диапазон вставки изменились. Повтори вставку.", true);
+            return;
         }
 
         _reloadTimer.Stop();
@@ -158,14 +171,15 @@ public partial class EstimateView
         {
             await _writeLock.WaitAsync();
             tookLock = true;
-            if (_serverConflict)
+            if (!CommandWriteCurrent(snapshot, revision) || !TargetsCurrent())
             {
-                _saveError = "Данные изменились во время ожидания. Обнови смету.";
+                _saveError = "Данные или диапазон изменились во время ожидания. Обнови смету.";
+                _serverConflict = true;
                 return;
             }
 
             var result = await Task.Run(() => SqlServerDatabase.SaveNumericPasteAtomic(
-                _sqlConnectionString, _contractId, field, edits, _serverRevision));
+                _sqlConnectionString, _contractId, field, edits, revision));
             if (!result.Saved)
             {
                 _serverConflict = true;

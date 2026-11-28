@@ -23,18 +23,22 @@ public partial class EstimateView
         if (!EstimateGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !EstimateGrid.CommitEdit(DataGridEditingUnit.Row, true)) return;
         var revision = _serverRevision;
-        if (!CanAppendImport(revision))
+        if (_estimate is not { } snapshot || !CanAppendImport(revision))
         {
             SetStatus("Заверши сохранение и обнови смету перед импортом.", true);
             return;
         }
-        var selected = EstimateGrid.SelectedItem as EditableEstimateRow ?? _rows.FirstOrDefault(r => r.IsSystem);
-        if (selected is null) { SetStatus("Сначала создай раздел для вставки.", true); return; }
-        if (selected.IsVirtual)
+        var selected = EstimateGrid.SelectedItem as EditableEstimateRow ??
+            EstimateGrid.Items.OfType<EditableEstimateRow>().FirstOrDefault(r => r.IsSystem && IsRealCommandRow(r));
+        if (selected is null || !IsRealCommandRow(selected) || EstimateGrid.SelectedItems.Count > 1)
         {
-            SetStatus("Раскрой группу и выбери реальную строку для импорта.", true);
+            SetStatus("Выбери один реальный раздел или позицию для импорта.", true);
             return;
         }
+        var primary = EstimateGrid.SelectedItem;
+        var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        bool TargetCurrent() => IsRealCommandRow(selected) && ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance);
 
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -107,7 +111,7 @@ public partial class EstimateView
         if (MessageBox.Show(Window.GetWindow(this), confirm, "Импорт из Excel",
             MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
 
-        if (!CanAppendImport(revision) || !_rows.Contains(selected))
+        if (!CanAppendImport(revision) || !ReferenceEquals(snapshot, _estimate) || !TargetCurrent())
         {
             SetStatus("Смета или выбранная строка изменились. Повтори импорт.", true);
             return;
@@ -119,8 +123,8 @@ public partial class EstimateView
         await _writeLock.WaitAsync();
         try
         {
-            if (_serverConflict || _detached || revision != _serverRevision || _estimate?.Locked != false)
-                throw new InvalidOperationException("Смета изменилась до записи импорта.");
+            if (!CommandWriteCurrent(snapshot, revision) || !TargetCurrent())
+                throw new InvalidOperationException("Смета или выделение изменились до записи импорта.");
             var afterId = selected.IsSystem ? (long?)null : selected.Source.ParentPositionId ?? selected.Id;
             var copied = parsed.Select(r => new CopiedRow(r.Name, r.Unit, r.Qty, r.Price,
                 r.PurchasePrice, r.Note, "", null)).ToList();
@@ -156,7 +160,7 @@ public partial class EstimateView
         }
     }
     private bool CanAppendImport(string revision) =>
-        !_detached && IsLoaded && !_refreshing && !_serverConflict &&
-        _estimate?.Locked == false && Volatile.Read(ref _pendingWrites) == 0 &&
-        !string.IsNullOrWhiteSpace(revision) && revision == _serverRevision;
+        _estimate is { } snapshot && CommandWriteCurrent(snapshot, revision) &&
+        !_refreshing && !HasUnsettledCacheWrites && _reloadCancellation is null &&
+        Volatile.Read(ref _pendingWrites) == 0;
 }

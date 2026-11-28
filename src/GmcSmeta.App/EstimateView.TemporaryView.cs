@@ -37,7 +37,7 @@ public partial class EstimateView
         var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var revision = _serverRevision;
         var document = _estimate;
-        bool SelectionCurrent() => !_detached && ReferenceEquals(document, _estimate) &&
+        bool SelectionCurrent() => !_detached && IsLoaded && IsEnabled && ReferenceEquals(document, _estimate) &&
             ReferenceEquals(primary, EstimateGrid.SelectedItem) &&
             EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
                 .SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
@@ -128,7 +128,7 @@ public partial class EstimateView
         menu.Items.Add(new Separator());
         if (realSelected)
             Add(nSel > 1 ? $"Копировать строки ({nSel})" : "Копировать", CopySelectedRows,
-                _estimate?.Locked == false && allReal, "Ctrl+C", write: false, needsAnchor: false, glyph: "Copy");
+                _estimate?.Locked == false && allReal && selection.All(row => !row.IsAreaSummary), "Ctrl+C", write: false, needsAnchor: false, glyph: "Copy");
         var excelClip = false;
         var ownClip = false;
         try

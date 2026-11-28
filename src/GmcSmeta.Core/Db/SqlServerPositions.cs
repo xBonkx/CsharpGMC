@@ -24,7 +24,9 @@ public static partial class SqlServerDatabase
         SqlConnection conn, SqlTransaction tx, long contractId)
     {
         using var cmd = new SqlCommand(
-            "SELECT object_id, name, locked FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) WHERE id=@id",
+            "SELECT c.object_id,c.name,c.locked FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE c.id=@id AND ISNULL(o.archived,0)=0 AND ISNULL(c.stage_rest,0)=0",
             conn, tx);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
         using var reader = cmd.ExecuteReader();
@@ -145,6 +147,7 @@ public static partial class SqlServerDatabase
     {
         if (contractId <= 0 || systemId <= 0 || positionId <= 0 || direction is not (-1 or 1))
             return SaveResult.Fail("Некорректная команда перемещения.", expectedRevision);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var revision = LockRevision(conn, tx);
@@ -213,6 +216,7 @@ public static partial class SqlServerDatabase
     {
         if (contractId <= 0 || systemId <= 0 || positionId <= 0)
             return SaveResult.Fail("Не выбрана позиция.", expectedRevision);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var revision = LockRevision(conn, tx);

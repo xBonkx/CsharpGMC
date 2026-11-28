@@ -47,6 +47,7 @@ public static partial class SqlServerDatabase
         if (total > PastedPositions.MaxRows)
             return SaveResult.Fail("Слишком много строк для вставки (лимит 5000).", expectedRevision);
 
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx);
@@ -215,6 +216,7 @@ public static partial class SqlServerDatabase
                 return SaveResult.Fail("Данные замены не прошли проверку.", expectedRevision);
         }
 
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx);
@@ -562,6 +564,7 @@ public static partial class SqlServerDatabase
                 Catalog.Key(r.Name, r.Unit).Length > 600)
                 return SaveResult.Fail("Данные вставки не прошли проверку. Проверь названия, единицы и цены.", expectedRevision);
         }
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx);

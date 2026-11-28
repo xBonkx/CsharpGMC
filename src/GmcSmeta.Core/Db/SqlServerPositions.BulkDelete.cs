@@ -22,6 +22,7 @@ public static partial class SqlServerDatabase
         if (selectedIds.Length > 10_000)
             return SaveResult.Fail("За один раз можно удалить не более 10 000 позиций.", expectedRevision);
 
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var revision = LockRevision(conn, tx);

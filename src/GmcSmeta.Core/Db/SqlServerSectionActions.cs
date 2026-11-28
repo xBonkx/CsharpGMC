@@ -100,6 +100,7 @@ public static partial class SqlServerDatabase
     {
         if (contractId <= 0 || sectionId <= 0)
             return SaveResult.Fail("Не выбран раздел.", expectedRevision);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx);
@@ -207,6 +208,7 @@ public static partial class SqlServerDatabase
             return SaveResult.Fail("Не выбран раздел или позиция.", expectedRevision);
         if (sourceSectionId == targetSectionId)
             return SaveResult.Fail("Выбери другой раздел.", expectedRevision);
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx);

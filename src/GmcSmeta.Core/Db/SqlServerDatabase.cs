@@ -653,6 +653,10 @@ public static partial class SqlServerDatabase
     public static InsertPositionResult AddPosition(string connectionString, long contractId, long systemId,
                                                    long? afterId, long? parentId, string expectedRevision)
     {
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        if (contractId <= 0 || systemId <= 0 || afterId is <= 0 || parentId is <= 0 ||
+            string.IsNullOrWhiteSpace(expectedRevision))
+            return InsertPositionResult.Fail("Некорректная цель вставки или ревизия.", expectedRevision);
         using var conn = Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
 
@@ -669,8 +673,10 @@ public static partial class SqlServerDatabase
         string documentName;
         using (var system = new SqlCommand(
             "SELECT c.locked, c.object_id, c.name FROM dbo.systems sy WITH (UPDLOCK, HOLDLOCK) " +
-            "JOIN dbo.contracts c ON c.id = sy.contract_id " +
-            "WHERE sy.id = @system AND c.id = @contract", conn, tx))
+            "JOIN dbo.contracts c WITH (UPDLOCK,HOLDLOCK) ON c.id = sy.contract_id " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE sy.id = @system AND c.id = @contract AND ISNULL(o.archived,0)=0 " +
+            "AND ISNULL(c.stage_rest,0)=0", conn, tx))
         {
             system.Parameters.Add("@system", SqlDbType.BigInt).Value = systemId;
             system.Parameters.Add("@contract", SqlDbType.BigInt).Value = contractId;
@@ -683,9 +689,9 @@ public static partial class SqlServerDatabase
             documentName = reader.IsDBNull(2) ? "" : reader.GetString(2);
         }
 
-        var positions = new List<(long Id, long? Parent, int Order)>();
+        var positions = new List<(long Id, long? Parent, int Order, bool OutOfKp)>();
         using (var list = new SqlCommand(
-            "SELECT id, parent_id, [order] FROM dbo.positions WITH (UPDLOCK, HOLDLOCK) " +
+            "SELECT id, parent_id, [order], out_of_kp FROM dbo.positions WITH (UPDLOCK, HOLDLOCK) " +
             "WHERE system_id = @system ORDER BY [order],id", conn, tx))
         {
             list.Parameters.Add("@system", SqlDbType.BigInt).Value = systemId;
@@ -693,14 +699,15 @@ public static partial class SqlServerDatabase
             while (reader.Read())
                 positions.Add((Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture),
                     reader.IsDBNull(1) ? null : Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
-                    Convert.ToInt32(reader.GetValue(2), CultureInfo.InvariantCulture)));
+                    Convert.ToInt32(reader.GetValue(2), CultureInfo.InvariantCulture),
+                    !reader.IsDBNull(3) && Convert.ToBoolean(reader.GetValue(3), CultureInfo.InvariantCulture)));
         }
 
         var nextOrder = positions.Count == 0 ? 0 : checked(positions[^1].Order + 1);
         if (parentId is long parent)
         {
             var parentRow = positions.FindIndex(p => p.Id == parent);
-            if (parentRow < 0 || positions[parentRow].Parent is not null)
+            if (parentRow < 0 || positions[parentRow].Parent is not null || positions[parentRow].OutOfKp)
                 return InsertPositionResult.Fail("Родительская позиция изменилась.", currentRev);
             var last = positions.Where(p => p.Id == parent || p.Parent == parent).Last();
             nextOrder = checked(last.Order + 1);
