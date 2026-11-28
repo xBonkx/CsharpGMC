@@ -23,6 +23,7 @@ public partial class CompareDialog : Window
     private CancellationTokenSource? _exportCancellation;
     private readonly SemaphoreSlim _readGate = new(1, 1);
     private bool _exportBusy;
+    private bool _publishingExport;
     private bool _initializing = true;
     private bool _closed;
 
@@ -44,6 +45,7 @@ public partial class CompareDialog : Window
         InfoText.Text = "Загрузка сравнения…";
         _initializing = false;
         Loaded += async (_, _) => await RefreshAsync();
+        Closing += (_, e) => { if (_publishingExport) e.Cancel = true; };
         Closed += (_, _) =>
         {
             _closed = true;
@@ -59,6 +61,7 @@ public partial class CompareDialog : Window
 
     private async void Swap_Click(object sender, RoutedEventArgs e)
     {
+        if (_publishingExport) return;
         _initializing = true;
         try
         {
@@ -70,7 +73,7 @@ public partial class CompareDialog : Window
 
     private async void Combo_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (!_initializing && IsLoaded) await RefreshAsync();
+        if (!_initializing && !_publishingExport && IsLoaded) await RefreshAsync();
     }
 
     private void Refresh_Changed(object sender, RoutedEventArgs e)
@@ -81,7 +84,7 @@ public partial class CompareDialog : Window
 
     private async Task RefreshAsync()
     {
-        if (_closed) return;
+        if (_closed || _publishingExport) return;
         _loadCancellation?.Cancel();
         _exportCancellation?.Cancel();
         _loadCancellation = null;
@@ -160,9 +163,10 @@ public partial class CompareDialog : Window
         using var cancellation = new CancellationTokenSource();
         _exportCancellation = cancellation;
         var token = cancellation.Token;
+        ExportFilePublication.PreparedExport? prepared = null;
         try
         {
-            using var prepared = await Task.Run(() => ExportFilePublication.Stage(path, stream =>
+            prepared = await Task.Run(() => ExportFilePublication.Stage(path, stream =>
             {
                 using var workbook = new XLWorkbook();
                 var sheet = workbook.Worksheets.Add("Лист1");
@@ -174,7 +178,11 @@ public partial class CompareDialog : Window
                 token.ThrowIfCancellationRequested();
             }), token);
             if (_closed || token.IsCancellationRequested || !ReferenceEquals(res, _result)) return;
-            prepared.Publish();
+            // Publication is the commit boundary. Keep the captured comparison
+            // and window alive until the potentially slow UNC rename completes.
+            _publishingExport = true;
+            ComboA.IsEnabled = ComboB.IsEnabled = SwapButton.IsEnabled = false;
+            await Task.Run(() => prepared.Publish());
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path)
@@ -189,9 +197,21 @@ public partial class CompareDialog : Window
         }
         finally
         {
-            _exportCancellation = null;
-            _exportBusy = false;
-            if (!_closed) ExportButton.IsEnabled = _result is not null;
+            try
+            {
+                if (prepared is not null) await Task.Run(prepared.Dispose);
+            }
+            finally
+            {
+                _publishingExport = false;
+                _exportCancellation = null;
+                _exportBusy = false;
+                if (!_closed)
+                {
+                    ComboA.IsEnabled = ComboB.IsEnabled = SwapButton.IsEnabled = true;
+                    ExportButton.IsEnabled = _result is not null;
+                }
+            }
         }
     }
 

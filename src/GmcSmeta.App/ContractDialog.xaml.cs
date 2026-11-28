@@ -51,7 +51,8 @@ public partial class ContractDialog : Window
     /// <summary>Свойства существующего документа (ContractDialog в Python).</summary>
     public ContractDialog(string objectName, ContractInfo info, IReadOnlyList<CompanyInfo> companies,
                           IReadOnlyList<ObjectTag> tags, IReadOnlyList<(long Id, string Title)> mainContracts,
-                          bool makeContract, AgreementPresentation.Requisites? agreement = null)
+                          bool makeContract, AgreementPresentation.Requisites? agreement = null,
+                          IReadOnlyDictionary<long, long?>? baseCompanies = null)
     {
         InitializeComponent();
         _isNew = false;
@@ -66,6 +67,8 @@ public partial class ContractDialog : Window
         FillCompanies(companies, info.CompanyId);
         FillTags(tags, info.Form);
         FillBase(mainContracts.Where(x => x.Id != info.Id), info.BaseContractId);
+        _baseCompanies = baseCompanies;
+        BaseCombo.SelectionChanged += (_, _) => ApplySelectedBaseCompany();
         NumberBox.Text = info.Number;
         DateBox.Text = info.Date;
         NameBox.Text = info.Name;

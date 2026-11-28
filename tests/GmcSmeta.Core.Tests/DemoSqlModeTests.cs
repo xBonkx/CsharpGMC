@@ -28,6 +28,41 @@ public sealed class DemoSqlModeTests
         Assert.Throws<InvalidOperationException>(() => DemoMode.DatabaseFromArgs(["--demo", Db, "--open", "1"]));
     }
 
+    [Theory]
+    [InlineData("--DEMO")]
+    [InlineData("--Demo")]
+    [InlineData("--demo-launch")]
+    public void MalformedDemoSwitchIsDetectedAndRejected(string flag)
+    {
+        Assert.True(DemoMode.IsRequested([flag, Db]));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.DatabaseFromArgs([flag, Db]));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ValidateConnection(
+            new SqlConnectionStringBuilder(DemoMode.CreateConnectionString(Db)), [flag, Db]));
+    }
+
+    [Fact]
+    public void DemoProfileRequiresAbsoluteLocalRoot()
+    {
+        var local = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "demo-local"));
+        Assert.Equal(Path.Combine(local, "GMC-Smeta-Demo", "CSharp", Db), DemoMode.ResolveProfileRoot(local, Db));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ResolveProfileRoot("", Db));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ResolveProfileRoot("relative", Db));
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ResolveProfileRoot(local, "master"));
+        Assert.NotEqual(DemoMode.ResolveProfileRoot(local, Db),
+            DemoMode.ResolveProfileRoot(local, DemoMode.Prefix + "abcdef123456"));
+    }
+
+    [Fact]
+    public void DemoCannotUseFailoverPartnerOrAttachedDatabase()
+    {
+        var builder = new SqlConnectionStringBuilder(DemoMode.CreateConnectionString(Db));
+        builder.FailoverPartner = "another-server";
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ValidateConnection(builder, ["--demo", Db]));
+        builder.FailoverPartner = "";
+        builder.AttachDBFilename = "foreign.mdf";
+        Assert.Throws<InvalidOperationException>(() => DemoMode.ValidateConnection(builder, ["--demo", Db]));
+    }
+
     [Fact]
     public void ConnectionCannotRedirectToAnotherDatabaseOrServer()
     {

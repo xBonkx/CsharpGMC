@@ -179,6 +179,9 @@ public static class SqlServerExcelImport
             orderCommand.Parameters.Add("@obj", SqlDbType.BigInt).Value = objectId;
             nextOrder = checked((int)SqlInteger.RequireInt64(orderCommand.ExecuteScalar()) + 1);
         }
+        // A batch with identical confirmed metadata and no pre-existing cards
+        // may create one first legal card, then reuse the exact returned ID.
+        long? createdDraftAgreementId = null;
         for (var choiceIndex = 0; choiceIndex < choices.Count; choiceIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -219,7 +222,11 @@ public static class SqlServerExcelImport
             contract.Parameters.Add("@form", SqlDbType.NVarChar, 32).Value = b.Form;
             contract.Parameters.Add("@pnr", SqlDbType.Float).Value = (double)(b.Pnr ?? 0m);
             var contractId = SqlInteger.RequireInt64(contract.ExecuteScalar());
-            SqlServerAgreements.AttachNewDocument(conn, tx, contractId, choice.AgreementId, validateNewAnnex: true);
+            var attached = SqlServerAgreements.AttachNewDocument(conn, tx, contractId,
+                choice.AgreementId ?? (choice.Kind == "main" ? createdDraftAgreementId : null),
+                validateNewAnnex: true);
+            if (choice.Kind == "main" && targetCards is { Length: 0 })
+                createdDraftAgreementId = attached;
             created.Add(contractId);
             var sections = new Dictionary<string, long>(StringComparer.Ordinal);
             for (var sIndex = 0; sIndex < b.Sections.Count; sIndex++)
@@ -310,8 +317,14 @@ public static class SqlServerExcelImport
         }
         cancellationToken.ThrowIfCancellationRequested();
         SqlServerWorkspace.BumpRevision(conn, tx);
-        tx.Commit();
-        var revision = SqlServerDatabase.Revision(conn);
+        var revision = SqlServerDatabase.LockRevision(conn, tx);
+        if (string.IsNullOrWhiteSpace(revision))
+            throw new DBConcurrencyException("Нет ревизии после импорта Excel.");
+        try { tx.Commit(); }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("COMMIT импорта не подтверждён. Перед повтором обновите объект и проверьте список документов.", ex);
+        }
         return new ExcelImportSaved(objectId, created, revision);
     }
 

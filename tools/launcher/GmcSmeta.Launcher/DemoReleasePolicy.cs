@@ -10,7 +10,8 @@ internal static class DemoReleasePolicy
 
     internal static bool IsDemoEntry(string[] args, string? exeName) =>
         string.Equals(exeName, ExecutableName, StringComparison.OrdinalIgnoreCase) ||
-        args.Any(a => a.Equals("--demo-launch", StringComparison.OrdinalIgnoreCase));
+        args.Any(a => a.Equals("--demo-launch", StringComparison.OrdinalIgnoreCase) ||
+                      a.Equals("--demo", StringComparison.OrdinalIgnoreCase));
 
     internal static void ValidateDatabase(string database)
     {
@@ -25,6 +26,17 @@ internal static class DemoReleasePolicy
             throw new InvalidOperationException("Запустите тестовый ярлык: --demo-launch <имя тестовой базы>.");
         ValidateDatabase(args[1]);
         return (args[1], args.Length == 3);
+    }
+
+    // The test child must not inherit office SQL, module roots or trace destinations.
+    internal static void PrepareChildEnvironment(IDictionary<string, string?> environment)
+    {
+        foreach (var name in new[] { "GMC_SMETA_SQL_CONNECTION", "GMC_SMETA_SQL_DATABASE",
+                     "GMC_SMETA_HOME", "GMC_SMETA_LAUNCHER", "GMC_SMETA_STARTUP_TRACE_DIR",
+                     "GMC_SMETA_PTO_ROOT", "GMC_SMETA_LETTERS_ROOT", "GMC_SMETA_PASSPORTS_ROOT" })
+            environment.Remove(name);
+        environment["GMC_SMETA_NO_UPDATE"] = "1";
+        environment["GMC_SMETA_AUTO_RESTART"] = "0";
     }
 
     // Matches gmcsmeta/tools/install-demo-shortcuts.ps1.

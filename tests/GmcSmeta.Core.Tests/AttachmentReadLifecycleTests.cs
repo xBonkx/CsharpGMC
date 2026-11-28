@@ -47,6 +47,11 @@ public sealed class AttachmentReadLifecycleTests
         Assert.Contains("if (CanPublish()) LaunchFile(row);", source);
         Assert.Contains("ReferenceEquals(_grid.SelectedItem, row) && _rows.Contains(row)", source);
         Assert.Contains("_openCancellation?.Cancel();", source);
+        var selection = source.IndexOf("_grid.SelectionChanged +=", StringComparison.Ordinal);
+        Assert.True(selection >= 0);
+        Assert.Contains("_openCancellation?.Cancel();", source.Substring(selection, Math.Min(400, source.Length - selection)));
+        Assert.Contains("ItemsControl.ContainerFromElement(_grid, source) is DataGridRow row", source);
+        Assert.Contains("ReferenceEquals(row.Item, _grid.SelectedItem)", source);
         Assert.Contains("!DirectOpenOwners.Add(owner)", source);
         Assert.Contains("DirectOpenOwners.Remove(owner);", source);
         Assert.Contains("owner.IsLoaded && validTarget()", source);

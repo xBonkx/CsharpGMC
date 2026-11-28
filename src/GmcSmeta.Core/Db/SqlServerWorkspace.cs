@@ -589,6 +589,8 @@ public static partial class SqlServerWorkspace
         if (properties.Kind is not ("kp" or "main" or "dop"))
             throw new ArgumentException("Недопустимый тип документа.");
         var value = properties.Normalize();
+        if (value.AgreementId is <= 0 || value.Kind != "main" && value.AgreementId.HasValue)
+            throw new ArgumentException("Юридический договор выбирается только для приложения.");
         if (value.BaseContractId == id || value.BaseContractId is <= 0)
             throw new ArgumentException("Некорректная привязка исходного договора.");
         if (!Documents.IsValidDocumentDate(value.Date) || value.Number.Length > 64 ||
@@ -653,7 +655,7 @@ public static partial class SqlServerWorkspace
                     ? SqlServerAgreements.DocumentAgreementId(conn, legalBase, tx) : null)
             : null;
         var legalChanged = legalEnabled && previousLegal != requestedLegal;
-        if (legalChanged || legalEnabled && old.Kind == "kp" && value.Kind == "main")
+        if (legalEnabled && (legalChanged || old.Kind != value.Kind))
         {
             using var children = new SqlCommand(
                 "SELECT TOP(1) id FROM dbo.contracts WITH (UPDLOCK,HOLDLOCK) " +
@@ -727,7 +729,9 @@ public static partial class SqlServerWorkspace
         }
         if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Документ был удалён.");
         if (legalEnabled && (linkChanged || legalChanged))
-            SqlServerAgreements.AttachNewDocument(conn, tx, id, requestedLegal);
+            SqlServerAgreements.AttachNewDocument(conn, tx, id, requestedLegal,
+                validateNewAnnex: old.Kind != "main" && value.Kind == "main" ||
+                    linkChanged && value.Kind == "dop");
         Log(conn, tx, "contract", id, "update", string.Join("; ", details), id, old.ObjectId);
         BumpRevision(conn, tx);
         tx.Commit();

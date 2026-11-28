@@ -1,5 +1,8 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.06 CODE READY: attachment selection cancellation and off-dispatcher comparison publication; .01 PARTIAL (history snapshot SQL fence pending). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Tests not run, reservations released.
+- 29.11.2026 — AGR-05.01–03 CODE READY: явная серверная привязка, проверка ДС и пакетный импорт; AGR-06.01 ранее реализован, AGR-07.02 PARTIAL. 3 новых CODE READY, 0 DONE, Windows/SQL не запускались. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-server-scope-20261129). Бронь снята.
+
 - 29.11.2026 — CTX-047.01–03/048.03 PARTIAL: file inventory and candidate coverage gate; 9 isolated assertions passed, full scan and mapping pending. Correction: preceding CTX-048.01 test count lacks execution evidence. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
 - 29.11.2026 — CTX-048.01 CODE READY: усилен валидатор реестра меню, вывод точных исходных ссылок; тесты добавлены, выполнение не подтверждено. CTX-048 остаётся PARTIAL. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
@@ -34,6 +37,8 @@
 - 29.11.2026 — PERF-проход (zcode-sess-perf714): **PERF-007.01–03 и PERF-014.01–03 → CODE READY**. Инвентарь: лишних чтений старта/карточек нет (доказано + независимые DTO-сверки); post-write навигация переведена с синхронного UI-чтения на worker с revision fence; sparse readback после ячеечных правок — whitelist=поля SaveCell, авторитетные итоги, равенство полному reload доказано тестом, 33 структурных маршрута → fallback. Build 0 ошибок, **3109/3109** (+13), App.Checks offline exit 0, SQL-режим exit 0 (2504 строки ×2 DPI, smoke OK), демо-БД только чтение. Попутно исправлена чужая регрессия `0174fa25` (13 удалённых живых стилей EstimateView → XamlParseException открытия сметы + 7 тестов) — коммит 6b58f891. A-приёмки .04 (часть 3) — **PARTIAL с точной недостачей**: live cold/warm старт и фазы (два клиента параллельно exit 0, rev демо неизменен), live sparse/full на изолированной копии демо — 2504 строки sparse 5.4 мс vs full 16.7 мс (p50), равенство итогов на живом SQL Server; недостача прямо: 10/50/200 документов и 10к/25к строк в демо нет (генерация — DEMO-02.01/отдельное разрешение). Родители PERF-007/PERF-014 — PARTIAL. [Отчёт](docs/PERF_007_014_SPARSE_PASS_20261129.md).
 
 - 29.11.2026 — chat-demo-1444: DEMO-05.02 CODE READY, DEMO-08.01 PARTIAL; исправлены seed fallback и проверка metadata до smoke; 9 xUnit случаев добавлены, не запускались. Остальные три брони освобождены без повышения. [Отчёт](docs/DEMO_MODE_TODO_20261128.md).
+
+- 29.11.2026 — chat-demo-next-1449: DEMO-01.01/05.01/08.01 PARTIAL; усилены guard ошибочных параметров, запрет failover, изоляция локального профиля и окружения child. 6 xUnit случаев добавлены, не запускались; новые CODE READY/DONE отсутствуют. [Доказательства](docs/DEMO_MODE_TODO_20261128.md).
 
 ## История до реорганизации
 

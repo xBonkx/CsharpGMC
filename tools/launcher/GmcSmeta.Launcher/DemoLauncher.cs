@@ -151,11 +151,7 @@ internal static class DemoLauncher
         start.ArgumentList.Add("--demo");
         start.ArgumentList.Add(database);
         if (smoke) start.ArgumentList.Add("--smoke-test");
-        foreach (var name in new[] { "GMC_SMETA_SQL_CONNECTION", "GMC_SMETA_SQL_DATABASE",
-                     "GMC_SMETA_HOME", "GMC_SMETA_LAUNCHER", "GMC_SMETA_STARTUP_TRACE_DIR" })
-            start.Environment.Remove(name);
-        start.Environment["GMC_SMETA_NO_UPDATE"] = "1";
-        start.Environment["GMC_SMETA_AUTO_RESTART"] = "0";
+        DemoReleasePolicy.PrepareChildEnvironment(start.Environment);
         return start;
     }
 }
