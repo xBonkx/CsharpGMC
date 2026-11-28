@@ -40,6 +40,8 @@ DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery](D
 
 29.11: AGR-01.01 аналитический CODE READY, AGR-03.01/06.02/08.03 PARTIAL; AGR-08.02 UNVERIFIED. Родители без изменения; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-map-transfer-20261129).
 
+29.11: PERF-047.04 PARTIAL — [PTO/passports scoped reads](PERFORMANCE_TODO_20261124.md#perf-pto-read-20261129).
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |

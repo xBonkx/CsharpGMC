@@ -17,6 +17,10 @@ public sealed class PassportWindowLifecycleTests
         var code = Source("GmcSmeta.App/PassportsWindow.xaml.cs");
         Assert.Contains("Loaded += InitializeAsync;", code);
         Assert.Contains("var data = await Task.Run", code);
+        Assert.Contains("_initialReadCancellation?.Cancel();", code);
+        Assert.Contains("sql.List(_objectId, token)", code);
+        Assert.Contains("sql.Catalogue(token)", code);
+        Assert.Contains("ItemsControl.ContainerFromElement(list, source)", code);
         Assert.Contains("if (_closed) return;", code);
         Assert.Contains("PassportList.ItemsSource = summaries;", code);
         Assert.DoesNotContain("_summaries.Add", code);

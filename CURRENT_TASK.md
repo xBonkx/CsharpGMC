@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.04 PARTIAL: cancellation initial passport list/catalogue, exact PDF click, scoped PTO SQL; tests not run, [evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-read-20261129), reservation released.
+
 - 29.11.2026 — PERF-047.05 CODE READY: cancellable metal snapshots/register and save-refresh fence; 15 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL: восстановление тестового указателя, контроль seal и защита пути рабочего лаунчера; 2 regression cases added, not run. [Evidence](docs/DEMO_MODE_TODO_20261128.md). 0 CODE READY/DONE; бронь снята.

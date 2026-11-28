@@ -9,24 +9,31 @@ namespace GmcSmeta.Core.Db;
 /// same-object active legal agreement, without modifying legacy data.</summary>
 public static class SqlServerPtoContractContext
 {
-    public static IReadOnlyList<PtoContractContext> Read(SqlConnection conn,long? objectId=null)
+    public static IReadOnlyList<PtoContractContext> Read(SqlConnection conn,long? objectId=null,
+        long? contractId=null,CancellationToken token=default)
     {
-        var legal=SqlServerAgreements.Enabled(conn);
+        token.ThrowIfCancellationRequested();
+        var legal=SqlServerAgreements.Enabled(conn,token:token);
         var sql="SELECT c.id,c.object_id,c.number,c.[date],c.name,c.kind,co.legal_full "+
             (legal?",c.annex_number,a.id,a.number,a.agreement_date,a.customer_full,a.cust_org,a.contractor_full,ac.legal_full,ac.name ":" ")+
             "FROM dbo.contracts c LEFT JOIN dbo.companies co ON co.id=c.company_id "+
             (legal?"LEFT JOIN dbo.agreements a ON a.id=c.agreement_id AND a.object_id=c.object_id AND a.archived=0 "+
                 "LEFT JOIN dbo.companies ac ON ac.id=a.company_id ":"")+
-            "WHERE c.kind IN(N'main',N'dop') AND (@obj IS NULL OR c.object_id=@obj) "+
+            "WHERE c.kind IN(N'main',N'dop') "+
+            (objectId.HasValue?"AND c.object_id=@obj ":"")+
+            (contractId.HasValue?"AND c.id=@contract ":"")+
             "ORDER BY c.object_id,c.id";
         using var cmd=new SqlCommand(sql,conn);
-        cmd.Parameters.Add("@obj",SqlDbType.BigInt).Value=objectId.HasValue?objectId.Value:DBNull.Value;
-        using var r=cmd.ExecuteReader();
+        if(objectId is long obj)cmd.Parameters.Add("@obj",SqlDbType.BigInt).Value=obj;
+        if(contractId is long id)cmd.Parameters.Add("@contract",SqlDbType.BigInt).Value=id;
+        using var registration=SqlReadCancellation.Register(cmd,token);
+        using var r=SqlReadCancellation.ExecuteReader(cmd,token);
         var result=new List<PtoContractContext>();
         string S(int i)=>r.IsDBNull(i)?"":Convert.ToString(r.GetValue(i),CultureInfo.InvariantCulture)??"";
         string First(params string[] values)=>values.FirstOrDefault(v=>!string.IsNullOrWhiteSpace(v))??"";
         while(r.Read())
         {
+            token.ThrowIfCancellationRequested();
             var row=new PtoContractContext(SqlInteger.ReadInt64(r,0),SqlInteger.ReadInt64(r,1),
                 S(2),S(3),S(4),S(5),S(6));
             if(legal)
@@ -39,6 +46,7 @@ public static class SqlServerPtoContractContext
             }
             result.Add(row);
         }
+        token.ThrowIfCancellationRequested();
         return result;
     }
 }
