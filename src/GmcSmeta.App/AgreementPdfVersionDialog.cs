@@ -11,7 +11,7 @@ internal static class AgreementPdfVersionDialog
         IReadOnlyList<SqlServerAgreementFiles.SignedFile> files)
     {
         var list = new ListBox { ItemsSource = files, DisplayMemberPath = "Caption",
-            SelectionMode = SelectionMode.Single, MinHeight = 120 };
+            SelectionMode = SelectionMode.Single, MinHeight = 120, TabIndex = 0 };
         var dialog = new Window
         {
             Title = "Подписанные PDF договора", Width = 620, Height = 350,
@@ -24,8 +24,8 @@ internal static class AgreementPdfVersionDialog
         var actions = new StackPanel { Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,10,0,0) };
         DockPanel.SetDock(actions, Dock.Bottom);
-        var cancel = new Button { Content = "Отмена", IsCancel = true, MinWidth = 90 };
-        var open = new Button { Content = "Открыть", IsEnabled = false, MinWidth = 90, Margin = new Thickness(8,0,0,0) };
+        var cancel = new Button { Content = "Отмена", IsCancel = true, MinWidth = 90, TabIndex = 2 };
+        var open = new Button { Content = "Открыть", IsEnabled = false, MinWidth = 90, TabIndex = 1, Margin = new Thickness(8,0,0,0) };
         WorkspaceWindowUi.StyleButton(cancel);
         WorkspaceWindowUi.StyleButton(open, primary: true);
         actions.Children.Add(cancel);
@@ -35,6 +35,7 @@ internal static class AgreementPdfVersionDialog
         dialog.Content = root;
         list.SelectionChanged += (_,_) => open.IsEnabled = list.SelectedItem is SqlServerAgreementFiles.SignedFile;
         open.Click += (_,_) => { if (list.SelectedItem is SqlServerAgreementFiles.SignedFile) dialog.DialogResult = true; };
+        dialog.Loaded += (_, _) => list.Focus();
         return dialog.ShowDialog() == true ? list.SelectedItem as SqlServerAgreementFiles.SignedFile : null;
     }
 }

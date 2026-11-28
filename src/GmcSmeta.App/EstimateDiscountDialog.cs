@@ -9,14 +9,14 @@ namespace GmcSmeta.App;
 internal sealed class EstimateDiscountDialog : Window
 {
     private readonly EstimateDiscountInput.State _state;
-    private readonly ComboBox _mode=new();
-    private readonly TextBox _percent=new(){HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
-    private readonly TextBox _target=new(){HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
-    private readonly CheckBox _smr=new(){Content="Скидка и на монтаж (СМР)",IsChecked=true};
-    private readonly CheckBox _whole=new(){Content="Округлять расценки до целых рублей"};
+    private readonly ComboBox _mode=new(){TabIndex=0};
+    private readonly TextBox _percent=new(){TabIndex=1,HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
+    private readonly TextBox _target=new(){TabIndex=2,HorizontalContentAlignment=HorizontalAlignment.Right,MaxLength=32};
+    private readonly CheckBox _smr=new(){TabIndex=3,Content="Скидка и на монтаж (СМР)",IsChecked=true};
+    private readonly CheckBox _whole=new(){TabIndex=4,Content="Округлять расценки до целых рублей"};
     private readonly TextBlock _description=new(){TextWrapping=TextWrapping.Wrap};
     private readonly TextBlock _preview=new(){TextWrapping=TextWrapping.Wrap,LineStackingStrategy=LineStackingStrategy.MaxHeight};
-    private readonly Button _apply=new(){Content="Применить скидку",IsDefault=true,IsEnabled=false};
+    private readonly Button _apply=new(){Content="Применить скидку",IsEnabled=false,TabIndex=5};
     private bool _busy;
     private bool _onTotal;
     public EstimateDiscountInput.Preview? Result {get;private set;}
@@ -65,7 +65,7 @@ internal sealed class EstimateDiscountDialog : Window
         card.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogListGap");
         root.Children.Add(card);
         var actions=new WrapPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        var cancel=new Button{Content="Отмена",IsCancel=true};
+        var cancel=new Button{Content="Отмена",IsCancel=true,TabIndex=6};
         cancel.SetResourceReference(FrameworkElement.MarginProperty,"LayoutDialogActionGap");
         DynamicFormLayout.StyleActions(_apply,cancel);
         actions.Children.Add(cancel);actions.Children.Add(_apply);
@@ -79,6 +79,7 @@ internal sealed class EstimateDiscountDialog : Window
         _whole.Unchecked+=(_,_)=>Refresh(_target.IsKeyboardFocused);
         _apply.Click+=(_,_)=>{if(Result?.Changed==true)DialogResult=true;};
         _mode.SelectedIndex=0;
+        Loaded+=(_,_)=>_mode.Focus();
     }
     private static string Rate(decimal value)=>value.ToString("0.#########",CultureInfo.GetCultureInfo("ru-RU"));
     private static string MoneyText(decimal value)=>value.ToString("N2",CultureInfo.GetCultureInfo("ru-RU"));

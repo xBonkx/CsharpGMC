@@ -153,7 +153,7 @@ public sealed class CostTransportDialog : Window
         var buttons = new WrapPanel {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
-        var cancel = new Button { Content = "Отмена" };
+        var cancel = new Button { Content = "Отмена", IsCancel = true };
         cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         cancel.Click += (_, _) => DialogResult = false;
         var save = new Button { Content = "Сохранить" };
@@ -182,6 +182,12 @@ public sealed class CostTransportDialog : Window
         buttons.Children.Add(save);
         Content = DynamicFormLayout.WithFooter(root, buttons, "LayoutCompareDialogMargin");
         Recalculate();
+        Loaded += (_, _) =>
+        {
+            var initial = locked ? _cost : _customer;
+            initial.Focus();
+            initial.SelectAll();
+        };
     }
 
     private void Recalculate()
