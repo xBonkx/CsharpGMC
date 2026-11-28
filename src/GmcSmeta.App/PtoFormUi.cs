@@ -12,11 +12,13 @@ internal static class PtoFormUi
 {
     internal static void AddRow(Panel host,string label,Control field,double labelWidth)
     {
-        var row=new Grid{Margin=new Thickness(0,0,0,8)};
-        row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(labelWidth)});
-        row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
-        row.Children.Add(new TextBlock{Text=label,TextWrapping=TextWrapping.Wrap,
-            Margin=new Thickness(0,5,12,0),VerticalAlignment=VerticalAlignment.Top});
+        var row=new Grid();
+        row.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+        row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star),MaxWidth=labelWidth});
+        row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(2,GridUnitType.Star)});
+        var caption=new TextBlock{Text=label,TextWrapping=TextWrapping.Wrap,VerticalAlignment=VerticalAlignment.Center};
+        caption.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormColumnGap");
+        row.Children.Add(caption);
         Grid.SetColumn(field,1);
         AutomationProperties.SetName(field,label);
         row.Children.Add(field);host.Children.Add(row);
@@ -24,12 +26,14 @@ internal static class PtoFormUi
 
     internal static Grid WithPlaceholder(TextBox field,string text)
     {
-        var grid=new Grid{Margin=new Thickness(0,0,0,8)};
+        var grid=new Grid();
+        grid.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
         grid.Children.Add(field);
         AutomationProperties.SetName(field,text);
-        var hint=new TextBlock{Text=text,Foreground=new SolidColorBrush(Color.FromRgb(0x94,0xA3,0xB8)),
+        var hint=new TextBlock{Text=text,
             Margin=new Thickness(10,0,10,0),VerticalAlignment=VerticalAlignment.Center,
             TextTrimming=TextTrimming.CharacterEllipsis,IsHitTestVisible=false};
+        hint.SetResourceReference(TextBlock.ForegroundProperty,"UiMutedTextBrush");
         var style=new Style(typeof(TextBlock));
         style.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Collapsed));
         var empty=new DataTrigger{Binding=new Binding(nameof(TextBox.Text)){Source=field},Value=""};
