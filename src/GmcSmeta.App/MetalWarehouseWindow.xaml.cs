@@ -403,7 +403,7 @@ public partial class MetalWarehouseWindow : Window
         if (!CanWrite || _snapshot is not { } snapshot || _store is not { } store ||
             LotsGrid.SelectedItem is not MetalLotView lot) return;
         if (MessageBox.Show(this, "Подтвердить оплату всей партии?", "Оплата",
-            MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         await Apply(snapshot, () => store.UpdateLot(lot.Id, snapshot.Revision));
     }
 

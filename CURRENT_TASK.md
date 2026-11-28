@@ -2,6 +2,7 @@
 
 **Начать с [рабочей очереди](docs/EXECUTION_TODO_20261128.md) или [приёмки старых CODE READY](docs/ACCEPTANCE_TODO.md), сверить обе очереди, забронировать ID и подтвердить коммит в main.** Не читать весь исторический журнал для выбора задач.
 
+- 29.11.2026 — CTX-009.04 PARTIAL: 7 consequential confirmation defaults corrected (Excel/PTO/metal/replace/archive), seven source-test cases added, not run; dynamic inventory and WPF/Pilot pending. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята, родитель PARTIAL.
 - 29.11.2026 — CTX-014.01 CODE READY: эксклюзивная индикация сохранённого масштаба шрифта, привязка команды к собственному подменю, два новых source-теста (не запускались). Родитель PARTIAL; фактическая Windows-приёмка и дизайн остаются. [Подробности](docs/CONTEXT_MENU_TODO_20261124.md).
 
 - 29.11.2026 — создана отдельная [очередь приёмки](docs/ACCEPTANCE_TODO.md): 380 старых CODE READY, 0 броней; взаимный контроль с EXECUTION_TODO, код/БД/релиз не менялись.

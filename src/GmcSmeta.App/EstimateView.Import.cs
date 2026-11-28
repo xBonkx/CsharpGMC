@@ -60,7 +60,7 @@ public partial class EstimateView
             "Нет — прежняя вставка обычных строк в выбранный раздел (без структуры).\n" +
             "Отмена — ничего не импортировать.",
             "Способ импорта Excel", MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question, MessageBoxResult.Yes);
+            MessageBoxImage.Question, MessageBoxResult.Cancel);
         if (mode == MessageBoxResult.Cancel) return;
         if (mode == MessageBoxResult.Yes)
         {
