@@ -22,6 +22,10 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("sourceIdForCompany = baseId ?? copyFrom", flow);
         Assert.Contains("makeContract && info.Kind == \"kp\" ? AgreementPresentation.Resolve(metadata) : null", flow);
         Assert.Contains("if (_isNew) ApplyCompanyVat();", dialog);
+        var legal = File.ReadAllText(Path.Combine(app, "ContractDialog.Legal.cs"));
+        Assert.Contains("else LegalAgreementCombo.SelectedIndex = -1;", legal);
+        Assert.DoesNotContain("cards.Count == 1", legal);
+        Assert.Contains("LegalAgreementCombo.SelectedValue is not long", dialog);
     }
 
     [Fact]

@@ -13,7 +13,7 @@ public static class SqlServerAgreements
         string ContractorPosition, string ContractorName, SqlServerKsRequisites.Values Print)
     {
         public string Caption => string.IsNullOrWhiteSpace(Number) ? $"Новый договор / реквизиты не заполнены (ID {Id})" :
-            "№ " + Number + (Date.Length == 0 ? "" : " от " + Date);
+            "№ " + Number + (Date.Length == 0 ? "" : " от " + Date) + $" (ID {Id})";
     }
     public sealed record Company(long Id, string Name, string FullName, string Position, string Signer);
 

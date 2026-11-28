@@ -30,6 +30,8 @@
 | [AGR-10](AGREEMENT_ANNEX_TODO_20261127.md#agr-10) | P0 | Решение по структуре данных и миграции (условный этап) | CODE READY |
 | [AGR-11](AGREEMENT_ANNEX_TODO_20261127.md#agr-11) | P0 | Интеграционная приёмка и выпуск | PARTIAL |
 
+29.11: AGR-04.01/02 CODE READY на уровне дочерних пакетов; AGR-05.01–03 PARTIAL. Родители и счётчики не изменены; [доказательства](AGREEMENT_ANNEX_TODO_20261127.md#agr-card-scope-20261129).
+
 ## Сводка по четырём основным спискам
 
 | Источник | Всего | UNVERIFIED | PARTIAL | CODE READY | DONE | NOT STARTED | BLOCKED | IN PROGRESS | DUPLICATE | N/A |

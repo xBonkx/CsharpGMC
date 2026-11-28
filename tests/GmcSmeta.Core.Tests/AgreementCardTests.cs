@@ -33,6 +33,14 @@ public sealed class AgreementCardTests
             connection, 12, new ObjectProperties("Договор"), Print(), "revision"));
 
     [Fact]
+    public void LegalCardsWithSameNumberAndDateHaveDistinctCaptions()
+    {
+        var first = new SqlServerAgreements.Values(1, 12, "7", "27.11.2026", 2,
+            "", "", "", "", "", "", Print());
+        Assert.NotEqual(first.Caption, (first with { Id = 2 }).Caption);
+    }
+
+    [Fact]
     public void EmbeddedPageAndKsReadTheSameSharedObjectFields()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
@@ -57,6 +65,10 @@ public sealed class AgreementCardTests
         Assert.Contains("CheckRevision(conn, tx, expectedRevision);", write);
         Assert.Contains("UPDATE dbo.objects SET", write);
         Assert.DoesNotContain("UPDATE dbo.contracts", write);
+        Assert.Contains("var legacyPrintFields = legal is null", write);
+        Assert.Contains("return savedLegalId;", write);
+        var page = File.ReadAllText(Path.Combine(app, "AgreementCardView.xaml.cs"));
+        Assert.Contains("await LoadCard(savedLegalId)", page);
         var read = File.ReadAllText(Path.Combine(db, "SqlServerKsRequisites.cs"));
         Assert.Contains("FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id", read);
         Assert.Contains("customer_full,site_full,cust_org,cust_post,cust_name", read);

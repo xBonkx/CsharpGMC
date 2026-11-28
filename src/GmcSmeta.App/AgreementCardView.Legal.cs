@@ -36,7 +36,7 @@ public partial class AgreementCardView
                 LegalContractorPostBox.Text = legal?.ContractorPosition ?? "";
                 LegalContractorNameBox.Text = legal?.ContractorName ?? "";
                 LegalWorksEndBox.Text = legal?.WorksEnd ?? "";
-                AgreementText.Text = "Реквизиты принадлежат выбранному договору. Его можно сохранить до создания первого приложения.";
+                AgreementText.Text = "Реквизиты и подписанты принадлежат выбранному договору. Название, адрес стройки, папка, тег и примечание общие для объекта.";
                 _legalBaseline = ReadLegal(snapshot.Print);
             }
             else _legalBaseline = null;
