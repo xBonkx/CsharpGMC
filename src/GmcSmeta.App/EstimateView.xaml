@@ -435,28 +435,28 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Top">
                     <DockPanel LastChildFill="True" HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <Border DockPanel.Dock="Right" x:Name="LockChip" Margin="6,0,0,0" Background="#FEF3E2"
-                            CornerRadius="9" Padding="9,2" VerticalAlignment="Center" Visibility="Collapsed"
+                        <Border DockPanel.Dock="Right" x:Name="LockChip" Margin="{StaticResource LayoutHeaderChipGap}" Background="#FEF3E2"
+                            CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center" Visibility="Collapsed"
                             ToolTip="Смета подписана и заблокирована">
-                        <TextBlock Text="🔒 Подписан" Foreground="#B45309"
+                        <TextBlock Text="🔒 Подписан" VerticalAlignment="Center" Foreground="#B45309"
                                    FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                     </Border>
-                        <Border DockPanel.Dock="Right" x:Name="CompanyChip" Margin="6,0,0,0" Background="#F1F4F9"
-                            CornerRadius="9" Padding="9,2" VerticalAlignment="Center">
-                        <TextBlock x:Name="CompanyText" Foreground="#64748B" MaxWidth="180" TextTrimming="CharacterEllipsis"
+                        <Border DockPanel.Dock="Right" x:Name="CompanyChip" Margin="{StaticResource LayoutHeaderChipGap}" Background="#F1F4F9"
+                            CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center">
+                        <TextBlock x:Name="CompanyText" VerticalAlignment="Center" Foreground="#64748B" MaxWidth="180" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    FontSize="{StaticResource UiCaptionSize}"/>
                     </Border>
-                        <Border DockPanel.Dock="Right" x:Name="DocumentKindChip" Margin="6,0,0,0" Background="#E8F0FE"
-                            CornerRadius="9" Padding="9,2" VerticalAlignment="Center">
-                        <TextBlock x:Name="DocumentKindText" Foreground="#1D4ED8"
+                        <Border DockPanel.Dock="Right" x:Name="DocumentKindChip" Margin="{StaticResource LayoutHeaderChipGap}" Background="#E8F0FE"
+                            CornerRadius="{StaticResource LayoutHeaderChipRadius}" Padding="{StaticResource LayoutHeaderChipPadding}" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" VerticalAlignment="Center">
+                        <TextBlock x:Name="DocumentKindText" VerticalAlignment="Center" Foreground="#1D4ED8"
                                    FontSize="{StaticResource UiCaptionSize}" FontWeight="SemiBold"/>
                     </Border>
                         <TextBlock x:Name="SubtitleText" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                Foreground="#64748B" FontSize="{StaticResource UiCaptionSize}"/>
                     </DockPanel>
-                    <DockPanel HorizontalAlignment="Left" LastChildFill="True" Margin="0,2,0,0">
+                    <DockPanel HorizontalAlignment="Left" LastChildFill="True" Margin="{StaticResource LayoutHeaderTitleGap}">
                         <Button x:Name="EditTitleButton" DockPanel.Dock="Right" Click="EditTitle_Click" Margin="4,0,0,0"
                                 ToolTip="Номер, дата и название документа. Двойной щелчок — изменить"
                                 Style="{StaticResource DocumentTitleEdit}" Content="Изменить" ContentTemplate="{StaticResource IconLabelEdit}" AutomationProperties.Name="Изменить реквизиты документа"/>
@@ -524,7 +524,7 @@
                     <RadioButton x:Name="ContractCostsTab" GroupName="ContractNavigation"
                                  Checked="ContractCosts_Checked" Style="{StaticResource DocumentMainTab}"
                                  ToolTip="Встроенная вкладка документа"
-                                  Content="Себестоимость" ContentTemplate="{StaticResource IconLabelBuilding}"/>
+                                  Content="Себестоимость" ContentTemplate="{StaticResource IconLabelCalculator}"/>
                     <RadioButton x:Name="ContractProcurementTab" GroupName="ContractNavigation"
                                  Checked="ContractProcurement_Checked" Style="{StaticResource DocumentMainTab}"
                                  ToolTip="Встроенная вкладка документа"
@@ -599,7 +599,7 @@
                         ToolTip="Вернуть исходный вид, порядок, фильтр и группировку"/>
             </WrapPanel>
             <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-                <CheckBox x:Name="PurchaseToggle" Style="{StaticResource PythonToolbarToggle}" Content="Закуп" ContentTemplate="{StaticResource IconLabelBuilding}" VerticalAlignment="Center" Margin="0,0,2,4"
+                <CheckBox x:Name="PurchaseToggle" Style="{StaticResource PythonToolbarToggle}" Content="Закуп" ContentTemplate="{StaticResource IconLabelCalculator}" VerticalAlignment="Center" Margin="0,0,2,4"
                 Checked="PurchaseToggle_Changed" Unchecked="PurchaseToggle_Changed"
                 ToolTip="Показать закупочную цену рядом с ценой заказчика. Видна только нам"/>
                 <Button x:Name="EstimateColumnsButton" Content="Столбцы" ContentTemplate="{StaticResource IconLabelList}" Style="{StaticResource DocumentEstimateTool}" Click="Columns_Click" ToolTip="Какие столбцы показывать" Margin="0,0,2,4"/>

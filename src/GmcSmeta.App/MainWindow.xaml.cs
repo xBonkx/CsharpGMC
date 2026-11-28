@@ -185,6 +185,10 @@ public partial class MainWindow : Window
                     ShowEmptyPage();
                     _ready = true;
                     RootLayout.IsEnabled = true;
+                    // Do not give the brand button initial keyboard focus. Preserve a user-selected control.
+                    if (ObjectSearch.IsVisible && (System.Windows.Input.Keyboard.FocusedElement is null ||
+                        ReferenceEquals(System.Windows.Input.Keyboard.FocusedElement, SidebarBrandButton)))
+                        ObjectSearch.Focus();
                     StartupTrace.Mark("main_workspace_data_ready");
                     // Dispatcher idle is a queue/layout milestone, not proof of a physical monitor frame.
                     if (StartupTrace.Enabled)

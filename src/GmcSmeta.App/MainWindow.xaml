@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:GmcSmeta.App"
-        Title="ГМЦ-Смета — C#"
+        Title="ГМЦ-Смета — C#" Icon="Assets/app.ico"
         Height="880" Width="1480" MinHeight="560" MinWidth="760"
         WindowStartupLocation="CenterScreen" Background="#F4F6FA"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}" Foreground="#0F172A"
@@ -485,7 +485,7 @@
                                     <MenuItem x:Name="PtoMenuItem" Header="Исполнительная документация (АОСР / ПТО)" Click="Pto_Click" Visibility="Collapsed"/>
                                 </MenuItem>
                             </Menu>
-                            <Button x:Name="SidebarBrandButton" Style="{StaticResource SidebarHomeButton}" VerticalAlignment="Center"
+                            <Button x:Name="SidebarBrandButton" Style="{StaticResource SidebarHomeButton}" VerticalAlignment="Center" AutomationProperties.Name="Главная"
                                     Click="Home_Click" ToolTip="На главную: сводка по договорам и группам">
                                 <StackPanel Orientation="Horizontal">
                                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -499,14 +499,14 @@
                         </DockPanel>
                         <Grid Margin="{StaticResource LayoutSidebarSectionGap}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="3*"/>
+                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="NewObjectButton" Content="Новый договор" ContentTemplate="{StaticResource IconLabelPlus}" Click="NewObject_Click" ToolTip="Создать карточку договора (Ctrl+N)"
-                                    Style="{StaticResource PrimaryButton}" Padding="5,4" MinHeight="32"/>
+                                    Style="{StaticResource PrimaryButton}" Padding="5,4" MinHeight="{StaticResource LayoutSidebarActionMinHeight}"/>
                             <Button x:Name="SidebarImportButton" Grid.Column="2" Style="{StaticResource PythonToolbarButton}"
-                                    BorderBrush="#D0D7E2" Padding="5,4"
+                                    BorderBrush="#D0D7E2" Padding="5,4" MinHeight="{StaticResource LayoutSidebarActionMinHeight}"
                                     Content="Из Excel" ContentTemplate="{StaticResource IconLabelUpload}"
                                     IsEnabled="{Binding IsEnabled, ElementName=NewObjectButton}"
                                     ToolTip="Загрузить КП из Excel (Ctrl+I)" Click="ImportExcelFromObject_Click"/>

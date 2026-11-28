@@ -482,7 +482,11 @@ public partial class EstimateView
         var headerRatio = (double)FindResource("UiEstimateHeaderZoomRatio");
         EstimateGrid.FontSize = baseSize * zoom;
         if (EstimateColumnsButton is not null)
+        {
             EstimateColumnsButton.ToolTip = $"Какие столбцы показывать\nМасштаб таблицы: {Math.Round(zoom * 100)} % · Ctrl+колесо, Ctrl+0 — сброс";
+            System.Windows.Automation.AutomationProperties.SetHelpText(EstimateColumnsButton,
+                $"Масштаб таблицы: {Math.Round(zoom * 100)} %. Ctrl+0 — сброс.");
+        }
         var baseHeader = TryFindResource(typeof(DataGridColumnHeader)) as Style;
         var header = new Style(typeof(DataGridColumnHeader))
         {

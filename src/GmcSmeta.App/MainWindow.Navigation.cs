@@ -78,7 +78,7 @@ public partial class MainWindow
             // SQL Server-specific backup information, not Python's SQLite file actions.
             var settings = ContextMenuIcons.Create("Настройки", "Settings");
             settings.Items.Add(PtoModeToggle);
-            var fontMenu = new MenuItem { Header = "Размер шрифта" };
+            var fontMenu = new MenuItem { Header = $"Размер шрифта · {Math.Round(_uiSettings.FontScale * 100)} %" };
             foreach (var (title, scale) in FontScaleOptions)
             {
                 var option = new MenuItem
@@ -129,6 +129,7 @@ public partial class MainWindow
         foreach (var option in fontMenu.Items.OfType<MenuItem>())
             option.IsChecked = ReferenceEquals(option, sender);
         ApplyFontScale(scale);
+        fontMenu.Header = $"Размер шрифта · {Math.Round(scale * 100)} %";
         _uiSettings.FontScale = scale;
         _uiSettings.Save();
         StatusText.Text = "Размер шрифта изменён";
