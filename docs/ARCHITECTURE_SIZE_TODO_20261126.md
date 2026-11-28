@@ -1,5 +1,7 @@
 # Аудит размера исходников и декомпозиции — 26.11.2026
 
+28.11.2026 ChatGPT/main (base b17fedd) — ARCH-SIZE-07 PARTIAL: SqlServerStages.cs 1423→1242 lines, new thematic SqlServerStages.MoneyRefresh.cs 186 lines (partial organization, identical SQL/transaction ownership); independent Core StageMoneyAllocation.cs 24 lines retains parent midpoint-to-even vs stage away-from-zero, share threshold and form-dependent line rounding. SqlServerActs.cs 1164→1142 lines, independent Core Ks3GrossCalculation.cs 40 lines extracts legacy gross-based report without changing public adapter, order, legal group/opening paths or formulas. Seven offline cases added, not run; build, SQL Pilot financial/rollback and KS export acceptance pending. Logical partial classes remain large; no DB/schema/UI/release changes.
+
 28.11.2026 ChatGPT/main (base 555ff52) — ARCH-SIZE-02/05 PARTIAL: ActsEditorView.xaml.cs 1969→1898 lines, independent KsCloseSectionsDialog.cs 89 lines (modal selection only; existing owner, resources, default threshold, selection order and batch save retained). EstimateView.Materials.cs 1477→1452, independent Core MaterialsMerge.cs 46 lines: grouping keys, first-seen ordering, per-line rounding, cost/coverage and mixed-value aggregates extracted unchanged. Four domain tests and one source guard added, not run; WPF/SQL/build acceptance pending. Logical classes remain large; no schema, DB, formulas, icon, UI design or release changes.
 
 28.11.2026 ChatGPT/main (base c1087ae) — ARCH-SIZE-02/05 PARTIAL: ActsEditorView.xaml.cs 2082→1969 physical lines, new independent KsActPropertiesDialog.cs 98 and Core KsDraftDates.cs 43 lines. Existing owner/resource lookup, signed/current-target guards, date parsing/correction order and draft fields retained. EstimateView.Materials.cs 1512→1477, independent Core MaterialsTileTotals.cs 49 lines; existing coverage/fact/component/work/transport rules moved unchanged. Fifteen offline cases added, not run; build, WPF date/dialog and materials financial acceptance pending. Logical classes still large. No SQL, DB/schema, icons, UI design or release changes.
@@ -55,7 +57,7 @@ EstimateView.Materials.cs: выделить независимые операц�
 ### ARCH-SIZE-06 (P2) — NOT STARTED
 App.xaml: тематические словари ресурсов для таблиц, меню, кнопок, диалогов и прочего после карты зависимостей StaticResource/DynamicResource; не менять ключи, порядок разрешения, исходные иконки и визуальные состояния. Приёмка: сборка, запуск и сравнение визуального паритета.
 
-### ARCH-SIZE-07 (P2) — NOT STARTED
+### ARCH-SIZE-07 (P2) — PARTIAL
 SqlServerStages.cs, SqlServerActs.cs, SqlServerWorkspace.cs: проверить разделение запросов, маппинга, валидации, транзакций, денежной логики. Выделять компоненты без изменения SQL-контрактов, схемы, границ транзакций и защит. Приёмка: тесты SQL только на GmcSmetaPilot_*, двухклиентные сценарии, rollback, прежние суммы/остатки и защита рабочей БД.
 
 ### ARCH-SIZE-08 (P2) — PARTIAL
