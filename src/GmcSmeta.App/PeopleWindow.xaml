@@ -14,11 +14,11 @@
                     <TextBlock x:Name="TitleText" Text="Люди и автомобили"
                                FontSize="{StaticResource UiH1Size}" FontWeight="SemiBold" Foreground="#1F2937" TextWrapping="Wrap"/>
                     <TextBlock x:Name="SubtitleText" Text="Общая база сотрудников и автомобилей"
-                               Foreground="#64748B" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                               Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
                 </StackPanel>
             </DockPanel>
             <WrapPanel x:Name="HistoryPanel" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,7">
-                <TextBlock Text="Галочки как в списке:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#64748B"/>
+                <TextBlock Text="Галочки как в списке:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource UiMutedTextBrush}"/>
                 <ComboBox x:Name="HistoryBox" MinWidth="240" MaxWidth="475" MinHeight="{StaticResource LayoutFieldMinHeight}" DisplayMemberPath="Label" ToolTip="{Binding SelectedItem.Label, RelativeSource={RelativeSource Self}}"
                           SelectionChanged="History_Changed"/>
                 <Button Content="Открыть файл" ContentTemplate="{StaticResource IconLabelOpen}" Style="{StaticResource PythonToolbarButton}" Click="OpenHistory_Click" Padding="10,6" Margin="8,0,0,0"/>
@@ -30,7 +30,7 @@
                     <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False">
                         <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas>
                     </Viewbox>
-                    <TextBlock Text="Поиск по фамилии, должности, госномеру…" Foreground="#94A3B8" Margin="32,0,32,0"
+                    <TextBlock Text="Поиск по фамилии, должности, госномеру…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -101,7 +101,7 @@
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6" VerticalAlignment="Center">
                     <TextBlock Text="ЛЮДИ" FontWeight="SemiBold" VerticalAlignment="Center"
                                Foreground="#475569" Margin="0,0,10,0"/>
-                    <TextBlock x:Name="PeopleCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="PeopleCount" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button x:Name="PeopleAll" Visibility="Collapsed" Content="Отметить всех" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarButton}"
                             Click="PeopleAll_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button x:Name="PeopleNone" Visibility="Collapsed" Content="Снять все" ContentTemplate="{StaticResource IconLabelX}" Style="{StaticResource PythonToolbarButton}"
@@ -145,7 +145,7 @@
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                     <TextBlock Text="АВТОМОБИЛИ" FontWeight="SemiBold" Foreground="#475569"
                                VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBlock x:Name="CarsCount" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock x:Name="CarsCount" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button x:Name="CarsAll" Visibility="Collapsed" Content="Отметить все" ContentTemplate="{StaticResource IconLabelCheck}" Style="{StaticResource PythonToolbarButton}"
                             Click="CarsAll_Click" Padding="8,4" Margin="0,0,5,0"/>
                     <Button x:Name="CarsNone" Visibility="Collapsed" Content="Снять все" ContentTemplate="{StaticResource IconLabelX}" Style="{StaticResource PythonToolbarButton}"
