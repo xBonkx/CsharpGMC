@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from menu_inventory import candidates, git, snapshot, validate_review, REVIEW_FIELDS, write_csv, resolve_review_sources
+from menu_inventory import candidates, git, snapshot, validate_review, REVIEW_FIELDS, write_csv, resolve_review_sources, coverage_report
 
 class MenuInventoryTests(unittest.TestCase):
     def test_candidate_routes_and_default_editors(self):
@@ -22,6 +22,7 @@ class MenuInventoryTests(unittest.TestCase):
             git(root, "config", "user.name", "test")
             git(root, "config", "user.email", "test@example.invalid")
             (root / "Меню с пробелами.cs").write_text("new ContextMenu();\n", encoding="utf-8")
+            (root / "no_menu.cs").write_text("class Empty {}\n", encoding="utf-8")
             (root / "skip.g.cs").write_text("new ContextMenu();\n", encoding="utf-8")
             (root / "test_menu.py").write_text("QMenu()\n", encoding="utf-8")
             git(root, "add", ".")
@@ -29,7 +30,9 @@ class MenuInventoryTests(unittest.TestCase):
             (root / "Меню с пробелами.cs").write_text("no menu", encoding="utf-8")
             cs = snapshot(root, "HEAD", {"cs", "xaml"})
             py = snapshot(root, "HEAD", {"py"})
-            self.assertEqual(1, cs["scanned_files"])
+            self.assertEqual(2, cs["scanned_files"])
+            self.assertEqual({"no_menu.cs": 0, "Меню с пробелами.cs": 1},
+                             {entry["path"]: entry["candidate_count"] for entry in cs["files"]})
             self.assertIn("skip.g.cs", cs["excluded"])
             self.assertEqual("Меню с пробелами.cs", cs["candidates"][0]["path"])
             self.assertEqual("test", py["candidates"][0]["scope"])
@@ -78,6 +81,24 @@ class MenuInventoryTests(unittest.TestCase):
         self.assertEqual(dict(candidate_id="p", scope="source", revision="py-sha", path="ui/menu.py", line=7),
                          resolved["python"][0])
         self.assertEqual(12, resolved["csharp"][0]["line"])
+
+    def test_coverage_requires_every_candidate_and_rejects_bad_exclusions(self):
+        rows = [{"candidate_id": item} for item in ("p", "c", "t")]
+        review = [{"python_candidate_ids": ["p"], "csharp_candidate_ids": ["c"]}]
+        partial = coverage_report(review, rows, [])
+        self.assertEqual(["t"], partial["unreviewed_candidate_ids"])
+        self.assertFalse(partial["complete"])
+        good = [{"candidate_id": "t", "reason": "test fixture only"}]
+        complete = coverage_report(review, rows, good)
+        self.assertTrue(complete["complete"])
+        self.assertEqual((3, 2, 1, 0), tuple(complete[k] for k in ("total", "mapped", "excluded", "remaining")))
+        self.assertEqual(3, coverage_report([], rows, [])["remaining"])
+        for bad in ([{"candidate_id": "c", "reason": "mapped"}],
+                    [{"candidate_id": "x", "reason": "absent"}],
+                    good + good, [{"candidate_id": "t", "reason": " TODO "}],
+                    {}, [{"candidate_id": "t", "reason": ""}]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                coverage_report(review, rows, bad)
 
     def test_csv_escapes_formula_candidate_without_overwrite(self):
         with tempfile.TemporaryDirectory() as folder:
