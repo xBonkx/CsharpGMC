@@ -162,10 +162,35 @@ internal static class SummaryColumnFitChecks
         Require(amountColumn.Width.Value == 90 && statusColumn.Width.Value == 100,
             "Measurement must not mutate column widths before application.");
 
+        var stageTable = new System.Data.DataTable();
+        stageTable.Columns.Add("S0", typeof(string));
+        stageTable.Rows.Add("1");
+        doc.ItemsSource = stageTable.DefaultView;
+        DocumentColumnFit.Input[] stageColumns = [new(amountColumn, "S0", "Этап", 90, null, ru, 0)];
+        var smallStage = DocumentColumnFit.ReadWidths(doc, stageColumns)[0];
+        stageTable.Rows.Add("123 456 789 012 345,678");
+        Require(DocumentColumnFit.ReadWidths(doc, stageColumns)[0] > smallStage,
+            "DataRowView dynamic stage column must read the actual schema field.");
+        doc.ItemsSource = new[] { new ConverterFixture(1L, new Dictionary<long, decimal> { [17] = 1m }) };
+        DocumentColumnFit.Input[] converted =
+        [
+            new(amountColumn, "Area", "Площадь", 90, null, ru, 0, new MetalAreaConverter()),
+            new(statusColumn, "PerAct", "КС", 90, null, ru, 0, new KsActValueConverter(), 17L)
+        ];
+        var smallConverted = DocumentColumnFit.ReadWidths(doc, converted);
+        doc.ItemsSource = new[] { new ConverterFixture(123456789012345678L,
+            new Dictionary<long, decimal> { [17] = 123456789012345.678m }) };
+        var largeConverted = DocumentColumnFit.ReadWidths(doc, converted);
+        Require(largeConverted[0] > smallConverted[0] && largeConverted[1] > smallConverted[1],
+            "Approved display converters must measure formatted metal and per-act quantities.");
+        Require(DocumentColumnFit.DefaultDisplayPath("TotalBefore") && !DocumentColumnFit.DefaultDisplayPath("Name") &&
+            !DocumentColumnFit.DefaultDisplayPath("Nested.Value"), "Common fit roles must exclude prose and nested paths.");
+
         Console.WriteLine("Summary fit arithmetic and formatted-value checks passed (no SQL).");
     }
 
     public sealed record WidthFixture(decimal Amount, string Status);
+    public sealed record ConverterFixture(long Area, IReadOnlyDictionary<long, decimal> PerAct);
 
     private static void Require(bool condition, string message)
     {

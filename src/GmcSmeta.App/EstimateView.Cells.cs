@@ -213,16 +213,6 @@ public partial class EstimateView
         }
     }
 
-    /// <summary>Себестоимость — сводная по строкам документа (cost_summary_view, read-only v1).</summary>
-    private void Summary_Click(object sender, RoutedEventArgs e)
-    {
-        if (_estimate is null) return;
-        var window = new CostSummaryWindow(_sqlConnectionString, _contractId, _estimate.Title)
-        {
-            Owner = Window.GetWindow(this),
-        };
-        window.Show();
-    }
 
 
     /// <summary>Скидка на всю смету (apply_discount): процент, СМР вместе, целые рубли.</summary>

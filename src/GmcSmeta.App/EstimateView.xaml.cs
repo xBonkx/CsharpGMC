@@ -1249,6 +1249,10 @@ public partial class EstimateView : UserControl
             _uiSettings.ColumnWidths = new();
             foreach (var (column, width) in _defaultEstimateWidths)
                 column.Width = width;
+            _inlineStageManualWidths.Clear();
+            foreach (var (column, width) in _inlineStageDefaultWidths)
+                column.Width = new DataGridLength(width);
+            _estimateMeasuredMinimums = null;
             RequestEstimateColumnFit();
             SaveEstimateUiSettings();
         };

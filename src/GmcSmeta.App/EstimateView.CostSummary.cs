@@ -509,7 +509,9 @@ public partial class EstimateView
         var currentKey = current.Item is SummaryRow row ? SummarySelectionKey(row) : null;
         var scroll = SummaryScroll(grid);
         SummaryViewportAnchor.Row? currentAnchor = null, topAnchor = null;
-        if (grid.IsVisible && SummaryViewport(scroll) is { } viewport)
+        if (grid.IsVisible && scroll is not null &&
+            (!scroll.CanContentScroll || VirtualizingPanel.GetScrollUnit(grid) == ScrollUnit.Pixel) &&
+            SummaryViewport(scroll) is { } viewport)
         {
             foreach (var container in SummaryRealizedRows(viewport))
             {
@@ -560,14 +562,16 @@ public partial class EstimateView
         {
             if (!IsCurrent() || SummaryScroll(grid) is not { } scroll) return;
             scroll.ScrollToHorizontalOffset(state.Horizontal);
-            if (anchor is not { } target || SummaryViewport(scroll) is not { } viewport)
+            if (anchor is not { } target ||
+                scroll.CanContentScroll && VirtualizingPanel.GetScrollUnit(grid) != ScrollUnit.Pixel ||
+                SummaryViewport(scroll) is not { } viewport)
             {
                 scroll.ScrollToVerticalOffset(state.Vertical);
                 return;
             }
             var item = byKey[target.Key];
             if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow container &&
-                SummaryRowY(container, viewport) is double y)
+                ReferenceEquals(container.Item, item) && SummaryRowY(container, viewport) is double y)
             {
                 scroll.ScrollToVerticalOffset(SummaryViewportAnchor.Offset(scroll.VerticalOffset, y,
                     target.Y, scroll.ScrollableHeight));

@@ -20,6 +20,22 @@ public sealed class SummaryViewSourceTests
     }
 
     [Fact]
+    public void EmbeddedSummaryHasOnlyTheActiveRouteAndPixelSafeAnchor()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "EstimateView.Cells.cs")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        var logic = File.ReadAllText(Path.Combine(app, "EstimateView.CostSummary.cs"));
+        Assert.Contains("VirtualizingPanel.GetScrollUnit(grid) == ScrollUnit.Pixel", logic);
+        Assert.Contains("ReferenceEquals(container.Item, item)", logic);
+        Assert.Contains("ReferenceEquals(grid.ItemsSource, source)", logic);
+        Assert.DoesNotContain("new CostSummaryWindow(", File.ReadAllText(Path.Combine(app, "EstimateView.Cells.cs")));
+        Assert.Contains("ContractCostsPanel.Visibility = Visibility.Collapsed", File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs")));
+    }
+
+    [Fact]
     public void MissingOptionsRefreshOnlyCaptionWhenFilterIsOff()
     {
         var source = SummarySource("EstimateView.CostSummary.cs");
