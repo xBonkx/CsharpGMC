@@ -2,6 +2,13 @@ using System.Diagnostics;
 using GmcSmeta.Launcher;
 using GmcSmeta.Core;
 
+// The test executable must never fall through into the ordinary launcher.
+if (DemoReleasePolicy.IsDemoEntry(args, Path.GetFileName(Environment.ProcessPath)))
+{
+    Environment.ExitCode = DemoLauncher.Run(args);
+    return;
+}
+
 StartupTrace.Mark("launcher_start");
 
 // Скачивает готовую WPF-сборку из GitHub Releases и запускает её.

@@ -29,6 +29,18 @@ internal sealed class AppPaths
         return paths;
     }
 
+    public static AppPaths CreateDemo(string database)
+    {
+        DemoReleasePolicy.ValidateDatabase(database);
+        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(baseDir))
+            throw new InvalidOperationException("Не найден локальный профиль Windows.");
+        var paths = new AppPaths(Path.Combine(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher"));
+        Directory.CreateDirectory(paths.Apps);
+        Directory.CreateDirectory(paths.Downloads);
+        return paths;
+    }
+
     /// <summary>Файл с токеном GitHub, если пользователь не хочет полагаться на git credential manager.</summary>
     public static string TokenFile
     {

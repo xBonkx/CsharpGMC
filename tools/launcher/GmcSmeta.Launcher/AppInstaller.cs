@@ -137,7 +137,7 @@ internal sealed class AppInstaller
 
     public string PreferredFlavor => RuntimeProbe.HasDesktopRuntime10() ? "fx" : "sc";
 
-    public InstalledApp Install(ReleaseInfo release)
+    public InstalledApp Install(ReleaseInfo release, Action<string>? validateCandidate = null)
     {
         var preferred = PreferredFlavor;
         var asset = release.Assets.FirstOrDefault(a =>
@@ -156,7 +156,7 @@ internal sealed class AppInstaller
 
         var checksums = _releases.TryGetChecksums(release);
         var expected = GitHubReleases.FindChecksum(checksums, asset.Name);
-        if (OfficeLauncher.IsOfficeExecutable && expected is null)
+        if ((OfficeLauncher.IsOfficeExecutable || validateCandidate is not null) && expected is null)
             throw new InvalidOperationException("В выпуске нет SHA-256 для " + asset.Name + ".");
         // Each attempt owns its files; a failed retry must not touch a live
         // installation or another attempt's temporary files.
@@ -183,6 +183,10 @@ internal sealed class AppInstaller
 
             if (!File.Exists(Path.Combine(staging, AppExeName)))
                 throw new InvalidOperationException($"в архиве нет {AppExeName}.");
+
+            // Demo mode checks its capability marker before execution and smoke-tests
+            // the candidate before the installed pointer can change.
+            validateCandidate?.Invoke(staging);
 
             // Move only to a previously unused folder, then publish the pointer.
             // Never recursively delete an installed version: even a failed
