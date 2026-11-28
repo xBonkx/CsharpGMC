@@ -41,8 +41,8 @@ public static class SqlServerEditorOps
             using var r = read.ExecuteReader();
             if (!r.Read()) return SqlServerDatabase.SaveResult.Fail("Документ не найден.", rev);
             smrMode = r.IsDBNull(0) ? "sum" : r.GetString(0);
-            locked = !r.IsDBNull(1) && Convert.ToBoolean(r.GetValue(1), CultureInfo.InvariantCulture);
-            objectId = Convert.ToInt64(r.GetValue(2), CultureInfo.InvariantCulture);
+            locked = !r.IsDBNull(1) && SqlFlag.Read(r, 1);
+            objectId = SqlInteger.ReadInt64(r, 2);
             title = r.IsDBNull(3) ? "" : r.GetString(3);
         }
         if (locked)
@@ -140,7 +140,7 @@ public static class SqlServerEditorOps
             using var r = read.ExecuteReader();
             while (r.Read())
             {
-                var id = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                var id = SqlInteger.ReadInt64(r, 0);
                 var json = r.GetString(1);
                 if (!json.Contains("\"" + field + "\"")) continue;
                 try
@@ -236,7 +236,7 @@ public static class SqlServerEditorOps
                 using var r = read.ExecuteReader();
                 if (!r.Read()) continue;
                 name = r.IsDBNull(0) ? "" : r.GetString(0);
-                parentId = r.IsDBNull(1) ? null : Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+                parentId = r.IsDBNull(1) ? null : SqlInteger.ReadInt64(r, 1);
                 if (parentId is not null) continue;   // только верхние строки
             }
             // Новая система после текущего раздела; позиция переезжает в неё верхом.

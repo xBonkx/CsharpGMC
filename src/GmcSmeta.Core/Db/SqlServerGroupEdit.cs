@@ -79,9 +79,9 @@ public static partial class SqlServerDatabase
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return GroupSaveResult.Fail("Документ не найден.", revision);
-            objectId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+            objectId = SqlInteger.ReadInt64(r, 0);
             docTitle = r.IsDBNull(1) ? "" : r.GetString(1);
-            locked = !r.IsDBNull(2) && Convert.ToBoolean(r.GetValue(2), CultureInfo.InvariantCulture);
+            locked = !r.IsDBNull(2) && SqlFlag.Read(r, 2);
             smrMode = r.IsDBNull(3) ? "" : r.GetString(3);
         }
         if (locked && field != "purchase_price")

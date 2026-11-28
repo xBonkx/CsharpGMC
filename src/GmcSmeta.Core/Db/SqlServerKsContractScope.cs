@@ -107,10 +107,10 @@ public static class SqlServerKsContractScope
             {
                 token.ThrowIfCancellationRequested();
                 documents.Add(new Document(
-                    Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture),
-                    Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture),
+                    SqlInteger.ReadInt64(r, 0),
+                    SqlInteger.ReadInt64(r, 1),
                     S(2), S(3), S(4),
-                    r.IsDBNull(5) ? null : Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture),
+                    r.IsDBNull(5) ? null : SqlInteger.ReadInt64(r, 5),
                     S(6),
                     r.IsDBNull(7) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(7), CultureInfo.InvariantCulture)),
                     S(8), S(9)));

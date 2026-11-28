@@ -169,6 +169,11 @@ public sealed class SqlIntegerTests
     [InlineData("GmcSmeta.Core/Db/SqlServerCostTotals.cs")]
     [InlineData("GmcSmeta.Core/Db/SqlServerCostSummary.cs")]
     [InlineData("GmcSmeta.Core/Db/SqlServerHistory.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerKsContractScope.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerEditorOps.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerDatabase.SpecialColumns.cs")]
+    [InlineData("GmcSmeta.Core/Db/SqlServerGroupEdit.cs")]
+    [InlineData("GmcSmeta.Cli/Bench.cs")]
     public void TransactionAndNavigationReadersUseStrictSqlTypes(string relative)
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
@@ -178,5 +183,6 @@ public sealed class SqlIntegerTests
         var source = File.ReadAllText(Path.Combine(root!.FullName, "src", relative));
         Assert.True(source.Contains("SqlInteger.ReadInt") || source.Contains("SqlFlag.Read"));
         Assert.DoesNotMatch(@"Convert\.To(?:Int32|Int64|Boolean)\(r\.GetValue\(", source);
+        Assert.DoesNotContain("reader.GetInt64(0)", source);
     }
 }

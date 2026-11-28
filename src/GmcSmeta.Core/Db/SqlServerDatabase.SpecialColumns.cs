@@ -60,10 +60,10 @@ public static partial class SqlServerDatabase
             cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = positionId;
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return SaveResult.Fail("Позиция не найдена.", current);
-            contractId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
-            objectId = Convert.ToInt64(r.GetValue(1), CultureInfo.InvariantCulture);
+            contractId = SqlInteger.ReadInt64(r, 0);
+            objectId = SqlInteger.ReadInt64(r, 1);
             contractName = r.IsDBNull(2) ? "" : r.GetString(2);
-            locked = !r.IsDBNull(3) && Convert.ToBoolean(r.GetValue(3), CultureInfo.InvariantCulture);
+            locked = !r.IsDBNull(3) && SqlFlag.Read(r, 3);
             form = r.IsDBNull(4) ? "" : r.GetString(4);
             tagRules = r.IsDBNull(5) ? "" : r.GetString(5);
             systemName = r.IsDBNull(6) ? "" : r.GetString(6);
@@ -159,7 +159,7 @@ public static partial class SqlServerDatabase
             using var r = select.ExecuteReader();
             if (r.Read())
             {
-                parentId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
+                parentId = SqlInteger.ReadInt64(r, 0);
                 parentExtra = r.IsDBNull(1) ? null : r.GetString(1);
                 oldQty = r.IsDBNull(2) ? 0m :
                     Convert.ToDecimal(r.GetValue(2), CultureInfo.InvariantCulture);

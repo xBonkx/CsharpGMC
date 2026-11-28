@@ -152,7 +152,7 @@ public static class Bench
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                var posId = reader.GetInt64(0);
+                var posId = SqlInteger.ReadInt64(reader, 0);
                 topIds.Add(posId);
                 originalQty[posId] = (decimal)reader.GetDouble(1);
             }
