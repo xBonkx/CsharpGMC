@@ -45,6 +45,8 @@ internal static class SqlRouteAcceptanceChecks
         var contractId = ContractWithPositions(cs);
         var objectId = ObjectIdOf(cs, contractId);
 
+        CheckPeopleDirectoryRoutes(cs, objectId);
+
         // 1. Справочники: страница каталога и поиск — десятичные цены, строгие ID.
         var catalog = SqlServerWorkspaceNavigation.CatalogSnapshot(cs, null, 0, 200);
         var price = catalog.Rows.Where(r => r.Price != 0m).Select(r => r.Price).FirstOrDefault();
@@ -165,6 +167,95 @@ internal static class SqlRouteAcceptanceChecks
         Console.WriteLine("Undo: консистентный снимок договора прочитан без исключений.");
         RejectChanges(cs, "Корзина/undo (отказ)",
             () => SqlServerTrash.Restore(cs, -1, "stale-revision"));
+    }
+
+    // Read-only coverage of the directory/history SQL used by the actual dialogs.
+    // The dedicated People.Checks pilot exercises writes on a separate disposable DB;
+    // this route compares production projections against rows already in the demo.
+    private static void CheckPeopleDirectoryRoutes(string cs, long fallbackObjectId)
+    {
+        SqlServerWorkspace.RequirePilotDatabase(cs);
+        var before = Rev(cs);
+        var store = new SqlServerPeopleAccess(cs);
+        var all = store.Load(true);
+        var active = store.Load(false);
+        var companies = SqlServerWorkspaceNavigation.Companies(cs);
+        using var conn = SqlServerDatabase.Open(cs);
+
+        CheckPairs(conn, "BUG-F52 people/all",
+            "SELECT id, sort_order FROM dbo.people",
+            all.People.Select(p => (p.Id, p.SortOrder)));
+        CheckPairs(conn, "BUG-F52 people/active",
+            "SELECT id, sort_order FROM dbo.people WHERE active=1",
+            active.People.Select(p => (p.Id, p.SortOrder)));
+        CheckPairs(conn, "BUG-F52 cars/all",
+            "SELECT id, sort_order FROM dbo.cars",
+            all.Cars.Select(c => (c.Id, c.SortOrder)));
+        CheckPairs(conn, "BUG-F52 cars/active",
+            "SELECT id, sort_order FROM dbo.cars WHERE active=1",
+            active.Cars.Select(c => (c.Id, c.SortOrder)));
+        CheckPairs(conn, "BUG-F53 companies",
+            "SELECT id, COALESCE([order],0) FROM dbo.companies",
+            companies.Select(c => (c.Id, c.Order)));
+
+        foreach (var kind in new[] { "list", "order" })
+        {
+            long objectId;
+            using (var pick = conn.CreateCommand())
+            {
+                pick.CommandText = "SELECT TOP(1) a.object_id FROM dbo.access_lists a " +
+                    "INNER JOIN dbo.objects o ON o.id=a.object_id WHERE a.kind=@kind ORDER BY a.id";
+                pick.Parameters.Add("@kind", SqlDbType.NVarChar, 16).Value = kind;
+                var value = pick.ExecuteScalar();
+                objectId = value is null or DBNull ? fallbackObjectId : Convert.ToInt64(value);
+            }
+
+            var expected = new List<(long Id, long ObjectId, string Kind, string File, string Data)>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT a.id,a.object_id,a.kind,a.[file],a.[data] " +
+                    "FROM dbo.access_lists a INNER JOIN dbo.objects o ON o.id=a.object_id " +
+                    "WHERE a.object_id=@oid AND a.kind=@kind ORDER BY a.id DESC";
+                cmd.Parameters.Add("@oid", SqlDbType.BigInt).Value = objectId;
+                cmd.Parameters.Add("@kind", SqlDbType.NVarChar, 16).Value = kind;
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    expected.Add((Convert.ToInt64(reader.GetValue(0)),
+                        Convert.ToInt64(reader.GetValue(1)), reader.GetString(2),
+                        reader.GetString(3), reader.GetString(4)));
+            }
+
+            var actual = store.History(objectId, kind)
+                .Select(h => (h.Id, h.ObjectId, h.Kind, h.File, h.Data)).ToArray();
+            if (!expected.SequenceEqual(actual))
+                throw new Exception($"BUG-F58 {kind}: history differs from SQL rows.");
+            Console.WriteLine(expected.Count == 0
+                ? $"PARTIAL BUG-F58 {kind}: SQL query passed; no existing history rows for roundtrip."
+                : $"PASS BUG-F58 {kind}: {expected.Count} rows, file and JSON match SQL.");
+        }
+
+        if (all.Revision != before || active.Revision != before || Rev(cs) != before)
+            throw new Exception("BUG-F52/F53/F58: database changed during read-only comparison; retry on isolated pilot.");
+    }
+
+    private static void CheckPairs(SqlConnection conn, string route, string query,
+        IEnumerable<(long Id, int Order)> actualRows)
+    {
+        // Queries are fixed test literals; the baseline is independent of the production mappers.
+        var expected = new List<(long Id, int Order)>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = query;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                expected.Add((Convert.ToInt64(reader.GetValue(0)), Convert.ToInt32(reader.GetValue(1))));
+        }
+        var actual = actualRows.OrderBy(r => r.Id).ToArray();
+        if (!expected.OrderBy(r => r.Id).SequenceEqual(actual))
+            throw new Exception($"{route}: identifiers/order differ from SQL rows.");
+        Console.WriteLine(expected.Count == 0
+            ? $"PARTIAL {route}: query passed; no existing rows to exercise numeric mapping."
+            : $"PASS {route}: {expected.Count} rows, identifiers/order match SQL.");
     }
 
     private static int ContractWithPositions(string cs)

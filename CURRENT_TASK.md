@@ -3,6 +3,7 @@
 **Начать с [рабочей очереди](docs/EXECUTION_TODO_20261128.md) или [приёмки старых CODE READY](docs/ACCEPTANCE_TODO.md), сверить обе очереди, забронировать ID и подтвердить коммит в main.** Не читать весь исторический журнал для выбора задач.
 
 - 29.11.2026 — создана отдельная [очередь приёмки](docs/ACCEPTANCE_TODO.md): 380 старых CODE READY, 0 броней; взаимный контроль с EXECUTION_TODO, код/БД/релиз не менялись.
+- 29.11.2026 — приёмка BUG-F52/F53/F58: новая read-only SQL-сверка в App.Checks, 3 CODE READY сохранены, 0 DONE, Windows/SQL не запускались. [Отчёт](docs/ACCEPTANCE_PEOPLE_SQL_20261129.md).
 - Основной реестр: [MASTER_TODO](docs/MASTER_TODO.md), на момент реорганизации 380/418 CODE READY, 36 PARTIAL, 2 BLOCKED. Дочерние статусы и занятость — в рабочей очереди; не суммировать.
 - Приоритет: [перенос Python](docs/PYTHON_0664_TO_0679_PARITY.md), [SQL/релиз](docs/SQL_MIGRATION_RELEASE_TODO.md), [договоры/приложения](docs/AGREEMENT_ANNEX_TODO_20261127.md). Схема 32 применена по отдельному разрешению; релиз не подтверждён данным проходом.
 - Последний функциональный блок BUG-F54: **DONE** (28.11 scalar-проход + повторная приёмка маршрутов, см. ниже), ранее — [коммит 7a222c2](https://github.com/xBonkx/CsharpGMC/commit/7a222c2790d3781abe67a9f361a993b51dd5fc77).
