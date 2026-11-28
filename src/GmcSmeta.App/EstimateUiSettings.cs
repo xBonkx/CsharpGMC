@@ -32,7 +32,7 @@ internal sealed class EstimateUiSettings
     public List<string> HiddenColumns { get; set; } = new();
 
     private static string FilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        GmcSmeta.Core.Demo.DemoMode.ApplicationData,
         "GMC-Smeta-Next", "estimate-ui.json");
 
     /// <summary>Путь к настройкам — для «О программе» (config.settings_path() в Python).</summary>

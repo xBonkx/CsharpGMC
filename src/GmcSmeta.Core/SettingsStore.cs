@@ -77,7 +77,7 @@ public sealed class WpfSettingsStore
     public WpfSettingsStore(string? filePath = null)
     {
         FilePath = filePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            GmcSmeta.Core.Demo.DemoMode.ApplicationData,
             "GMC-Smeta-Next", "settings.json");
         if (string.IsNullOrWhiteSpace(FilePath))
             throw new ArgumentException("Путь настроек не задан.", nameof(filePath));

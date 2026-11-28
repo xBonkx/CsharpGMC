@@ -41,6 +41,8 @@ public static class SqlSchemaCompatibility
     public static bool IsLocalServer(string? dataSource)
     {
         var source = (dataSource ?? "").Trim();
+        if (source.Equals(GmcSmeta.Core.Demo.DemoMode.LocalServer, StringComparison.OrdinalIgnoreCase))
+            return true;
         if (source.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
             source = source[4..];
         var comma = source.IndexOf(',');

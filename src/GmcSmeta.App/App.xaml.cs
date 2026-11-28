@@ -16,11 +16,11 @@ public partial class App : Application
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
 
-    private static void InstallWindowBranding()
+    private static void InstallWindowBranding(string appId = ShellAppId)
     {
         if (OperatingSystem.IsWindows())
         {
-            try { _ = SetCurrentProcessExplicitAppUserModelID(ShellAppId); }
+            try { _ = SetCurrentProcessExplicitAppUserModelID(appId); }
             catch (DllNotFoundException) { }
             catch (EntryPointNotFoundException) { }
         }
@@ -58,18 +58,22 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // Until the offline provider is wired into the real views, fail closed.
-        // Never allow an explicit demo launch to redirect to the office launcher.
-        if (GmcSmeta.Core.Demo.DemoMode.IsRequested(e.Args))
+        var demo = GmcSmeta.Core.Demo.DemoMode.IsRequested(e.Args);
+        var demoSmoke = demo && e.Args.Contains("--smoke-test");
+        if (demo)
         {
-            MessageBox.Show("Автономный режим ещё не подключён к интерфейсу. Рабочая база не открывалась.",
-                "ГМЦ-Смета — ТЕСТ", MessageBoxButton.OK, MessageBoxImage.Information);
-            Shutdown(1);
-            return;
+            try { GmcSmeta.Core.Demo.DemoMode.ConfigureProcess(e.Args); }
+            catch (Exception ex)
+            {
+                if (!demoSmoke)
+                    MessageBox.Show(ex.Message, "ГМЦ-Смета — ТЕСТ", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Shutdown(1);
+                return;
+            }
         }
         StartupTrace.Mark("app_startup_enter");
         StartupTrace.Mark("app_previous_process_wait_begin");
-        if (!UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
+        if (!demo && !UpdateRestartCoordinator.WaitForPreviousProcess(e.Args))
         {
             StartupTrace.Mark("app_previous_process_wait_failed");
             MessageBox.Show("Предыдущий процесс не завершился. Откройте программу с ярлыка после его закрытия.",
@@ -79,7 +83,7 @@ public partial class App : Application
         }
         StartupTrace.Mark("app_previous_process_wait_end");
         StartupTrace.Mark("app_branding_begin");
-        InstallWindowBranding();
+        InstallWindowBranding(demo ? ShellAppId + ".Demo" : ShellAppId);
         StartupTrace.Mark("app_branding_end");
         StartupTrace.Mark("app_interaction_setup_begin");
         ContextMenuIcons.InstallSeparatorNormalization();
@@ -117,7 +121,7 @@ public partial class App : Application
             StartupTrace.Mark("app_sql_connection_missing");
             // A legacy taskbar pin may start a versioned office EXE directly.
             // Recover only the known installed office launcher, never guess SQL credentials.
-            if (OfficeTaskbarLaunch.TryRedirect())
+            if (!demo && OfficeTaskbarLaunch.TryRedirect())
             {
                 Shutdown(0);
                 return;
@@ -134,18 +138,19 @@ public partial class App : Application
         window.InitializeWorkspaceNavigation();
         StartupTrace.Mark("app_workspace_navigation_attached");
         MainWindow = window;
-        OfficeTaskbarLaunch.Attach(window);
+        if (!demo) OfficeTaskbarLaunch.Attach(window);
         EventHandler? rendered = null;
         rendered = async (_, _) =>
         {
             window.ContentRendered -= rendered;
             StartupTrace.Mark("app_main_content_rendered");
-            await window.InitializeWorkspaceAsync();
+            var ready = await window.InitializeWorkspaceAsync(offerRetry: !demoSmoke);
+            if (demoSmoke) Shutdown(ready ? 0 : 1);
         };
         window.ContentRendered += rendered;
         window.Show();
         StartupTrace.Mark("app_main_show_returned");
         ShutdownMode = ShutdownMode.OnMainWindowClose;
-        UpdateRestartCoordinator.Attach(window);
+        if (!demo) UpdateRestartCoordinator.Attach(window);
     }
 }

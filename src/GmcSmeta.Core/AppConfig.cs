@@ -38,7 +38,7 @@ public static class AppConfig
     {
         var root = Environment.GetEnvironmentVariable("APPDATA");
         if (string.IsNullOrWhiteSpace(root))
-            root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            root = GmcSmeta.Core.Demo.DemoMode.ApplicationData;
         var dir = Path.Combine(root!, AppId);
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, "settings.json");
@@ -69,7 +69,13 @@ public static class AppConfig
         var docs = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents");
 
-        if (!data.ContainsKey("db_path"))
+        if (GmcSmeta.Core.Demo.DemoMode.Active)
+        {
+            var workspace = Path.Combine(GmcSmeta.Core.Demo.DemoMode.ProfileRoot, "workspace");
+            Directory.CreateDirectory(workspace);
+            data["db_path"] = ToElement(Path.Combine(workspace, "workspace.marker"));
+        }
+        else if (!data.ContainsKey("db_path"))
             data["db_path"] = ToElement(DefaultDbPath());
 
         foreach (var key in new[] { "last_import_dir", "last_export_dir", "last_attach_dir" })

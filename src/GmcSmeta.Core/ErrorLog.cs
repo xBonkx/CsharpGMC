@@ -30,7 +30,7 @@ public sealed class ErrorLog
     public ErrorLog(string? filePath = null)
     {
         FilePath = Path.GetFullPath(filePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            GmcSmeta.Core.Demo.DemoMode.ApplicationData,
             "GMC-Smeta-Next", "logs", "errors.jsonl"));
     }
 

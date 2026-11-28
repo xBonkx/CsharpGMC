@@ -37,6 +37,7 @@ public static partial class SqlServerDatabase
             // Open itself may throw (login, timeout, network). Own the connection
             // until all validation has succeeded and ownership passes to the caller.
             conn.Open();
+            GmcSmeta.Core.Demo.DemoMode.VerifyDatabase(conn);
             SqlSchemaCompatibility.RejectProduction(conn.Database, builder.DataSource);
             if (SqlSchemaCompatibility.IsLocalTestCutover(conn.Database, builder.DataSource))
             {
@@ -111,6 +112,7 @@ public static partial class SqlServerDatabase
             // Open itself may throw (login, timeout, network). Own the connection
             // until all validation has succeeded and ownership passes to the caller.
             await conn.OpenAsync(token).ConfigureAwait(false);
+            await GmcSmeta.Core.Demo.DemoMode.VerifyDatabaseAsync(conn, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             SqlSchemaCompatibility.RejectProduction(conn.Database, builder.DataSource);
             if (SqlSchemaCompatibility.IsLocalTestCutover(conn.Database, builder.DataSource))
@@ -164,12 +166,12 @@ public static partial class SqlServerDatabase
 
     private static SqlConnectionStringBuilder BuildGuardedConnectionString(string connectionString)
     {
-        GmcSmeta.Core.Demo.DemoMode.RejectSqlConnection(Environment.GetCommandLineArgs().Skip(1));
         var builder = new SqlConnectionStringBuilder(connectionString)
         {
             ApplicationName = "GMC-Smeta C# Pilot",
             ConnectTimeout = 5,
         };
+        GmcSmeta.Core.Demo.DemoMode.ValidateConnection(builder, Environment.GetCommandLineArgs().Skip(1));
         if (string.IsNullOrWhiteSpace(builder.InitialCatalog) ||
             builder.InitialCatalog.Equals("master", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Выбери конкретную тестовую базу SQL Server, не master.");

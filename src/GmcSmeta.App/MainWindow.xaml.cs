@@ -169,11 +169,14 @@ public partial class MainWindow : Window
                         id => SqlServerUndo.ReadConsistent(_sqlConnectionString!, id),
                         (id, target, expected, undo) => SqlServerUndo.Apply(_sqlConnectionString!, id, target, expected, undo));
                     var schema31Preview = SqlSchemaCompatibility.IsPreviewDatabase(_serverConn.Database);
-                    Title = schema31Preview
-                        ? WindowTitle + " — C# · схема 31 · ТОЛЬКО ЧТЕНИЕ · суммы не проверены"
-                        : WindowTitle + " — C# · SQL Server";
+                    Title = GmcSmeta.Core.Demo.DemoMode.Active
+                        ? WindowTitle + " — C# · ТЕСТОВЫЙ РЕЖИМ"
+                        : schema31Preview
+                            ? WindowTitle + " — C# · схема 31 · ТОЛЬКО ЧТЕНИЕ · суммы не проверены"
+                            : WindowTitle + " — C# · SQL Server";
                     DatabaseLabel.Text = SqlServerWorkspace.DescribeConnection(_sqlConnectionString!)
-                        + (schema31Preview ? " · ПРОСМОТР v31 (не для расчётов и экспорта)" : "");
+                        + (GmcSmeta.Core.Demo.DemoMode.Active ? " · ТЕСТОВЫЙ РЕЖИМ" :
+                            schema31Preview ? " · ПРОСМОТР v31 (не для расчётов и экспорта)" : "");
                     NewObjectButton.IsEnabled = SqlWritesEnabled;
                     ObjectNewKpButton.IsEnabled = SqlWritesEnabled;
                     ObjectPropertiesButton.IsEnabled = SqlWritesEnabled;
