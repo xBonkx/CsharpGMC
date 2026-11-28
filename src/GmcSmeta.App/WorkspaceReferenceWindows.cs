@@ -90,7 +90,7 @@ public sealed class CompanyWindow : Window
         form.Children.Add(logoCaption);
         var logoControls = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
         logoControls.Children.Add(ReferenceWindowUi.LogoPreview(_logoView));
-        var chooseLogo=WorkspaceWindowUi.Button("Выбрать…", (_,_)=>PickLogo());
+        var chooseLogo=WorkspaceWindowUi.Button("Выбрать…", async (_,_)=>await PickLogoAsync());
         WorkspaceWindowUi.StyleButton(chooseLogo,icon:"IconLabelUpload");
         var clearLogo=WorkspaceWindowUi.Button("Убрать", (_,_)=>
         {
@@ -225,8 +225,10 @@ public sealed class CompanyWindow : Window
         }
     }
 
-    private void PickLogo()
+    private async Task PickLogoAsync()
     {
+        using var operation = _operation.TryEnter(this);
+        if (operation is null) return;
         var dialog = new OpenFileDialog
         {
             Title = "Логотип для КП",
@@ -235,17 +237,23 @@ public sealed class CompanyWindow : Window
         if (dialog.ShowDialog(this) != true) return;
         try
         {
-            var bytes = File.ReadAllBytes(dialog.FileName);
-            if (bytes.Length > 5_000_000)
-                throw new ArgumentException("Выберите изображение размером не более 5 МБ.");
-            using (var stream = new MemoryStream(bytes, writable: false))
+            var path = dialog.FileName;
+            var imported = await Task.Run(() =>
             {
+                using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (file.Length > 5_000_000)
+                    throw new ArgumentException("Выберите изображение размером не более 5 МБ.");
+                var bytes = new byte[checked((int)file.Length)];
+                file.ReadExactly(bytes);
+                using var stream = new MemoryStream(bytes, writable: false);
                 var bitmap = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
                 if (bitmap.PixelWidth == 0 || bitmap.PixelHeight == 0)
                     throw new ArgumentException("Файл не является корректным изображением.");
-            }
-            _logo = bytes;
-            RenderLogo();
+                bitmap.Freeze();
+                return (Bytes: bytes, Bitmap: bitmap);
+            });
+            _logo = imported.Bytes;
+            _logoView.Source = imported.Bitmap;
             _dirty = true;
         }
         catch (Exception ex) { WorkspaceWindowUi.Error(this, ex, "Логотип"); }

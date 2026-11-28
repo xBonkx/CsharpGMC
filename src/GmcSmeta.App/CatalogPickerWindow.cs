@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -48,10 +47,11 @@ public sealed class CatalogPickerWindow : Window
     private readonly TextBlock _count = WorkspaceWindowUi.Hint("");
     private readonly DataGrid _items = WorkspaceWindowUi.Table();
     private readonly DispatcherTimer _delay = new() { Interval = TimeSpan.FromMilliseconds(220) };
-    private readonly ObservableCollection<CatalogPickRow> _rows = new();
+    private IReadOnlyList<CatalogPickRow> _rows = Array.Empty<CatalogPickRow>();
     private readonly Dictionary<long, CatalogPickRow> _chosen = new();
     private readonly Button _prev;
     private readonly Button _next;
+    private readonly Button _add;
     private int _page;
     private int _request;
     private CancellationTokenSource? _pageCancellation;
@@ -104,11 +104,12 @@ public sealed class CatalogPickerWindow : Window
         DockPanel.SetDock(pageSelection, Dock.Top);
         root.Children.Add(pageSelection);
 
-        var add = WorkspaceWindowUi.Button("Добавить в КП", (_, _) => Accept());
-        WorkspaceWindowUi.StyleButton(add, primary: true, icon: "IconLabelPlus");
-        add.IsDefault = true;
+        _add = WorkspaceWindowUi.Button("Добавить в КП", (_, _) => Accept());
+        WorkspaceWindowUi.StyleButton(_add, primary: true, icon: "IconLabelPlus");
+        _add.IsDefault = true;
+        _add.IsEnabled = false;
         var footer = WorkspaceWindowUi.Buttons(
-            WorkspaceWindowUi.Button("Отмена", (_, _) => DialogResult = false),add);
+            WorkspaceWindowUi.Button("Отмена", (_, _) => DialogResult = false),_add);
         footer.Margin = new Thickness(0, 8, 0, 0);
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
 
@@ -176,6 +177,7 @@ public sealed class CatalogPickerWindow : Window
         ++_request;
         _pageCancellation?.Cancel();
         _pageReady = false;
+        _add.IsEnabled = false;
         _prev.IsEnabled = _next.IsEnabled = false;
     }
 
@@ -190,7 +192,8 @@ public sealed class CatalogPickerWindow : Window
     private void ReleasePage()
     {
         foreach (var row in _rows) row.PropertyChanged -= SelectedRowChanged;
-        _rows.Clear();
+        _rows = Array.Empty<CatalogPickRow>();
+        _items.ItemsSource = _rows;
     }
 
     private void Navigate(int step)
@@ -223,6 +226,7 @@ public sealed class CatalogPickerWindow : Window
                 includeUsageCount: false, token: token), token);
             if (_closed || token.IsCancellationRequested || generation != _request) return;
             var rows = snapshot.Rows;
+            var page = new List<CatalogPickRow>(Math.Min(rows.Count, PageSize));
             foreach (var entry in rows.Take(PageSize))
             {
                 var row = _chosen.TryGetValue(entry.Id, out var kept) ? kept : new CatalogPickRow
@@ -233,9 +237,12 @@ public sealed class CatalogPickerWindow : Window
                 // Reused selections can return from other pages; avoid duplicate subscriptions.
                 row.PropertyChanged -= SelectedRowChanged;
                 row.PropertyChanged += SelectedRowChanged;
-                _rows.Add(row);
+                page.Add(row);
             }
+            _rows = page;
+            _items.ItemsSource = _rows;
             _pageReady = true;
+            _add.IsEnabled = true;
             _prev.IsEnabled = _page > 0;
             _next.IsEnabled = rows.Count > PageSize;
             RefreshSelectionCount();

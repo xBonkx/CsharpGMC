@@ -24,7 +24,7 @@ public sealed class ReferenceWriteSafetyTests
         Assert.True(start >= 0);
         var end = all.IndexOf("public sealed class ", start + 1, StringComparison.Ordinal);
         var source = end < 0 ? all[start..] : all[start..end];
-        Assert.Equal(3, source.Split("_operation.TryEnter(this)").Length - 1);
+        Assert.Equal(window == "CompanyWindow" ? 4 : 3, source.Split("_operation.TryEnter(this)").Length - 1);
         Assert.Contains("if (_operation.IsBusy) { e.Cancel = true; return; }", source);
         Assert.Contains("var revision = _revision;", source);
         Assert.Contains(save + "(_connectionString,", source);
@@ -34,6 +34,26 @@ public sealed class ReferenceWriteSafetyTests
         Assert.Contains("string.IsNullOrWhiteSpace(before)", source);
         Assert.DoesNotContain("MessageBoxButton.YesNo, MessageBoxImage.Warning)", source);
         Assert.Contains("Запись не подтверждена.", source);
+    }
+
+    [Fact]
+    public void LogoImportUsesExclusiveWorkerAndPublishesOnlyValidatedFrozenBitmap()
+    {
+        var source = Source("GmcSmeta.App/WorkspaceReferenceWindows.cs");
+        var start = source.IndexOf("private async Task PickLogoAsync()", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var end = source.IndexOf("private async Task SaveAsync()", start, StringComparison.Ordinal);
+        Assert.True(end > start);
+        var import = source[start..end];
+        var lease = import.IndexOf("_operation.TryEnter(this)", StringComparison.Ordinal);
+        var worker = import.IndexOf("await Task.Run", StringComparison.Ordinal);
+        var size = import.IndexOf("file.Length > 5_000_000", StringComparison.Ordinal);
+        var allocation = import.IndexOf("new byte[checked", StringComparison.Ordinal);
+        var freeze = import.IndexOf("bitmap.Freeze()", StringComparison.Ordinal);
+        var publish = import.IndexOf("_logo = imported.Bytes", StringComparison.Ordinal);
+        Assert.True(lease >= 0 && worker > lease && size > worker && allocation > size && freeze > allocation && publish > freeze);
+        Assert.Contains("_logoView.Source = imported.Bitmap;", import);
+        Assert.DoesNotContain("File.ReadAllBytes", import);
     }
 
     [Fact]

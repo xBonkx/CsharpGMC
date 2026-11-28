@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — PERF-047.02 PARTIAL: пакетная публикация страницы справочника и импорт логотипа в фоне; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — CTX-027.01/.02 PARTIAL: точная область наценки, повторная проверка после диалога, снимок Excel до диалога сохранения; 4 source tests added, not run. [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). 0 CODE READY/DONE; бронь снята.
 
 - 29.11.2026 — CTX-022.02 CODE READY: общая таблица при повторной загрузке применяет актуальный профиль, независимые сбросы сохранены; .01 PARTIAL — исправлен недопустимый ключ agreement.sources. 12 key cases + 1 source test добавлены, не запускались. [Доказательства](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
