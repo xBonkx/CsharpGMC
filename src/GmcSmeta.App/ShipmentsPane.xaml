@@ -29,7 +29,7 @@
                                         <ControlTemplate TargetType="DatePickerTextBox">
                                             <Grid Background="Transparent">
                                                 <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False"/>
-                                                <ContentControl x:Name="PART_Watermark" Foreground="#94A3B8"
+                                                <ContentControl x:Name="PART_Watermark" Foreground="{StaticResource UiMutedTextBrush}"
                                                                 VerticalAlignment="Center" IsHitTestVisible="False"
                                                                 Visibility="Collapsed"/>
                                             </Grid>
@@ -71,7 +71,7 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="DateChrome" Property="Background" Value="#F7F9FC"/>
                                 <Setter TargetName="DateChrome" Property="BorderBrush" Value="#E4E8EF"/>
-                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                                 <Setter TargetName="PART_Button" Property="Opacity" Value="0.5"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -80,7 +80,7 @@
             </Setter>
         </Style>
         <Style x:Key="ShipmentStep" TargetType="ContentControl">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -301,7 +301,7 @@
                                    ToolTip="{Binding RecipientCaption}">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="#64748B"/>
+                                    <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding HasRecipient}" Value="False">
                                             <Setter Property="Foreground" Value="#B45309"/>
