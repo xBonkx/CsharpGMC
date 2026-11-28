@@ -24,9 +24,9 @@ internal static class DemoLauncher
             {
                 journal = new DemoUpdateJournal(paths.Root);
                 journal.Write("Запуск", $"База: {database}");
-                var installed = Load(paths);
+                var installed = Load(paths, journal, out var recovered);
                 journal.Write("Текущая версия", installed?.Version ?? "не установлена");
-                if (!noUpdate && Environment.GetEnvironmentVariable("GMC_SMETA_NO_UPDATE") != "1")
+                if (!recovered && !noUpdate && Environment.GetEnvironmentVariable("GMC_SMETA_NO_UPDATE") != "1")
                 {
                     try
                     {
@@ -68,13 +68,24 @@ internal static class DemoLauncher
                         ui.FinishUpdate("Запускаем предыдущую тестовую версию");
                     }
                 }
-                else journal.Write("Автообновление отключено", "Запуск установленной сборки");
-                installed ??= Load(paths);
+                else journal.Write("Автообновление отключено", recovered ? "Восстановлена предыдущая сборка" : "Запуск установленной сборки");
                 if (installed is null)
                     throw new InvalidOperationException("Нет проверенной тестовой сборки. Запустите установочный скрипт DEMO.");
                 var start = StartInfo(installed.Exe, database, smoke: false);
-                using var process = Process.Start(start) ??
-                    throw new InvalidOperationException("Не удалось запустить тестовую программу.");
+                try
+                {
+                    using var process = Process.Start(start) ??
+                        throw new InvalidOperationException("Не удалось запустить тестовую программу.");
+                }
+                catch (Exception ex) when (!recovered &&
+                    (ex is System.ComponentModel.Win32Exception or InvalidOperationException))
+                {
+                    journal.Write("Ошибка запуска текущей версии", ex.Message);
+                    installed = InstalledApp.RecoverDemoPrevious(paths.Apps, paths.StateFile, paths.PreviousStateFile);
+                    using var previousProcess = Process.Start(StartInfo(installed.Exe, database, smoke: false)) ??
+                        throw new InvalidOperationException("Не удалось запустить предыдущую тестовую сборку.");
+                    journal.Write("Восстановление указателя", installed.Version);
+                }
                 journal.Write("Программа запущена", installed.Version);
                 return 0;
             }
@@ -88,17 +99,28 @@ internal static class DemoLauncher
         }
     }
 
-    private static InstalledApp? Load(AppPaths paths)
+    private static InstalledApp? Load(AppPaths paths, DemoUpdateJournal journal, out bool recovered)
     {
-        var installed = InstalledApp.Load(paths);
-        if (installed is null) return null;
-        if (!DemoReleasePolicy.IsInside(paths.Apps, installed.Directory) ||
-            !string.Equals(Path.GetFullPath(installed.Exe),
-                Path.GetFullPath(Path.Combine(installed.Directory, AppInstaller.AppExeName)),
-                StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Путь тестовой сборки выходит за пределы её каталога.");
-        RequireCapability(installed.Directory);
-        return installed;
+        recovered = false;
+        try
+        {
+            var installed = InstalledApp.Load(paths);
+            if (installed is null)
+            {
+                if (!File.Exists(paths.StateFile) && !File.Exists(paths.PreviousStateFile)) return null;
+                throw new InvalidOperationException("Повреждён указатель тестовой установки.");
+            }
+            DemoReleasePolicy.RequireInstalledIntegrity(installed, verifyFiles: false);
+            return installed;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            journal.Write("Ошибка установленной сборки", ex.Message);
+            var previous = InstalledApp.RecoverDemoPrevious(paths.Apps, paths.StateFile, paths.PreviousStateFile);
+            recovered = true;
+            journal.Write("Восстановление указателя", previous.Version);
+            return previous;
+        }
     }
 
     private static void RequireCapability(string directory)
@@ -122,7 +144,12 @@ internal static class DemoLauncher
             throw new InvalidOperationException("Не удалось запустить тест кандидата.");
         if (!process.WaitForExit(180000))
         {
-            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(10000);
+            }
+            catch (InvalidOperationException) { }
             journal.Write("Проверка сметы: таймаут", "180 секунд");
             journal.IncludeSmokeReport(report, freshReport);
             throw new InvalidOperationException("Проверка новой тестовой сборки не завершилась." +

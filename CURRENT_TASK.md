@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL: восстановление тестового указателя, контроль seal и защита пути рабочего лаунчера; 2 regression cases added, not run. [Evidence](docs/DEMO_MODE_TODO_20261128.md). 0 CODE READY/DONE; бронь снята.
+
 - 29.11.2026 — AGR: карта модели AGR-01.01 CODE READY (аналитика), явный выбор при нескольких карточках и запрет неполного/подписанного переноса; 3 PARTIAL, AGR-08.02 UNVERIFIED. [Доказательства](docs/AGREEMENT_ANNEX_TODO_20261127.md#agr-map-transfer-20261129). Windows/SQL не запускались, бронь снята.
 - 29.11.2026 — PERF-047.05 PARTIAL: cancellation/fence for warehouse journal, reject empty snapshot revision; 11 static checks, 2 source tests added (not run). [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 

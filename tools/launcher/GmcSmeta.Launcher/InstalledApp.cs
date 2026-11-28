@@ -98,6 +98,17 @@ internal sealed partial record InstalledApp
         Write(stateFile);
     }
 
+    // DEMO recovery is confined to the same apps root and schema. Never publish
+    // a damaged current pointer over the verified previous pointer.
+    internal static InstalledApp RecoverDemoPrevious(string apps, string stateFile, string previousStateFile)
+    {
+        var previous = Read(apps, previousStateFile, allowDemoSeed: true)
+            ?? throw new InvalidOperationException("Нет предыдущей тестовой сборки для восстановления.");
+        DemoReleasePolicy.RequireInstalledIntegrity(previous, verifyFiles: true);
+        previous.Write(stateFile);
+        return previous;
+    }
+
     internal static InstalledApp Rollback(string apps, string stateFile, string previousStateFile)
     {
         // The current EXE may have disappeared, but its recorded schema must

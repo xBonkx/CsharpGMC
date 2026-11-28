@@ -1,5 +1,7 @@
 # Тестовый режим на настоящем SQL Server — 28.11.2026
 
+29.11.2026 — DEMO-08.01 / OFFICE-UPDATE-01.01 PARTIAL (base c3ba0c9d): DEMO verifies installed capability/schema/seal metadata and restores the previous pointer after invalid state or immediate Process.Start failure, checking previous release file hashes before restoring; local seed remains the documented unsealed exception. Previous pointer is not overwritten; no update in a recovered-state invocation. Smoke timeout waits for killed process; office launcher rejects reparse root/target and compares canonical executable paths. Two regression cases added (not run). Full Windows restart/redirect, original smoke v1.11.0, SQL and build remain unverified. No DB, release or production config changes.
+
 По уточнению владельца прекращаем разработку имитатора хранилища. Самый простой полноценный способ — две синтетические базы на локальном SQLEXPRESS. Генератор в xBonkx/gmcsmeta tools/create_demo_databases.py строит схему 31 из ORM-моделей и отдельно схему 32 через штатную expand_v32.sql. Исходная база владельца 28 не читается и не изменяется.
 
 - DEMO-01 PARTIAL: --demo <строгое имя> запускает обычный MainWindow, без штатного лаунчера и автообновления; центральный Open/OpenAsync проверяет имя, локальный физический сервер, Shared Memory, метку готовности и схему 32. Тесты добавлены, не запускались.
