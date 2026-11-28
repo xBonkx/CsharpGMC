@@ -261,15 +261,24 @@ internal static class Program
     private static void CheckSettingsMenu(MainWindow window)
     {
         var top = (MenuItem)window.FindName("MainMenuItem")!;
-        var service = top.Items.OfType<MenuItem>().First(m => (m.Header as string) == "Сервис");
-        var settings = service.Items.OfType<MenuItem>().First(m => (m.Header as string) == "Настройки");
+        var settings = top.Items.OfType<MenuItem>().Single(m => (m.Header as string) == "Настройки");
+        var names = top.Items.OfType<MenuItem>().Select(m => m.Header as string).ToArray();
+        if (names.Contains("Сервис") || Array.IndexOf(names, "Письма") >= Array.IndexOf(names, "Склад металла") ||
+            Array.IndexOf(names, "Склад металла") >= Array.IndexOf(names, "Учёт металла"))
+            throw new Exception("Main menu order does not match the Python reference plus metal register.");
+        if (!top.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Найти везде…" && m.InputGestureText == "Ctrl+P") ||
+            !top.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Как работать" && m.InputGestureText == "F1"))
+            throw new Exception("Global search/help shortcuts are missing.");
+        if (!settings.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Сведения о подключении SQL Server") ||
+            !settings.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Резервные копии SQL Server"))
+            throw new Exception("SQL Server settings entries are missing.");
         var font = settings.Items.OfType<MenuItem>().First(m => (m.Header as string) == "Размер шрифта");
         var scales = font.Items.OfType<MenuItem>().Select(m => (double)m.Tag!).ToList();
         if (!scales.SequenceEqual(new[] { 1.0, 1.1, 1.2 }))
             throw new Exception("Font scale options do not match Python FONT_SCALES.");
         if (!settings.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "Показать подсказки снова"))
             throw new Exception("Missing 'Показать подсказки снова'.");
-        if (!service.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "О программе"))
+        if (!top.Items.OfType<MenuItem>().Any(m => (m.Header as string) == "О программе"))
             throw new Exception("Missing 'О программе'.");
 
         window.ApplyFontScale(1.2);

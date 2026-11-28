@@ -563,38 +563,52 @@ public partial class EstimateView : UserControl
 
     private void AddOptions_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || _estimate?.Locked != false) return;
+        if (sender is not Button button || _estimate is not { Locked: false } snapshot) return;
         var row = EstimateGrid.SelectedItem as EditableEstimateRow;
-        var writable = !_serverConflict && Volatile.Read(ref _pendingWrites) == 0;
+        var selected = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
+        var revision = _serverRevision;
+        bool Current() => ReferenceEquals(snapshot, _estimate) && CanAppendImport(revision) &&
+            !HasUnsettledCacheWrites && !HasActiveEstimateEdit() && !HasNestedCacheActivity &&
+            ReferenceEquals(row, EstimateGrid.SelectedItem) &&
+            EstimateGrid.SelectedItems.OfType<EditableEstimateRow>()
+                .SequenceEqual(selected, ReferenceEqualityComparer.Instance) &&
+            (row is null || (!row.IsVirtual && _rows.Contains(row))) &&
+            Window.GetWindow(this) is MainWindow main && main.CanEditEstimateHeader(_contractId, _objectId);
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
 
-        void Add(string title, RoutedEventHandler handler, bool available = true, string shortcut = "", string glyph = "Plus")
+        void Group(string title)
         {
-            var item = ContextMenuIcons.Create(title, glyph, writable && available, shortcut);
-            item.Click += handler;
+            if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = title, IsEnabled = false });
+        }
+        void Add(string title, RoutedEventHandler handler, bool available = true, string shortcut = "", string glyph = "RowPlus")
+        {
+            var item = ContextMenuIcons.Create(title, glyph, Current() && available, shortcut);
+            item.Click += (s, args) =>
+            {
+                if (!item.IsEnabled || !Current())
+                {
+                    SetStatus("Выбор или данные изменились. Откройте меню снова.", true);
+                    return;
+                }
+                handler(s, args);
+            };
             menu.Items.Add(item);
         }
 
+        Group("Строки");
         Add("Строку", AddRow_Click, shortcut: "Insert");
         Add("Комплектующее к строке (без цены)", AddComponent_Click,
-            row is { IsSystem: false, IsVirtual: false }, "Shift+Insert");
+            row is { IsSystem: false, IsVirtual: false }, "Shift+Insert", "Stage");
+        Group("Системы");
+        Add("Систему (П1, В3, К1…)", AddSection_Click, shortcut: "Ctrl+Shift+Insert", glyph: "Layers");
+        Add("Подраздел в систему («отм. +0,000», «1 этаж»)", AddSubsection_Click,
+            row?.IsVirtual != true, "Ctrl+Alt+Insert", "Indent");
+        Add("Копию системы («П2 как П1»)…", CopySection_Click,
+            CopySourceSystem(row) is not null, glyph: "Copy");
+        Group("Готовые позиции");
         Add("Из справочника…", AddFromCatalog_Click, shortcut: "Ctrl+K", glyph: "Book");
-        menu.Items.Add(new Separator());
-        Add("Систему (П1, В3, К1…)", AddSection_Click, shortcut: "Ctrl+Shift+Insert", glyph: "FolderPlus");
-        Add("Подраздел в систему", AddSubsection_Click,
-            row?.IsVirtual != true, "Ctrl+Alt+Insert", "FolderPlus");
-        var copyRevision = _serverRevision;
-        Add("Копию системы («П2 как П1»)…", (s, args) =>
-        {
-            if (copyRevision != _serverRevision || !ReferenceEquals(row, EstimateGrid.SelectedItem))
-            {
-                SetStatus("Выбор или данные изменились. Откройте меню снова.", true);
-                return;
-            }
-            CopySection_Click(s, args);
-        }, CopySourceSystem(row) is not null, glyph: "Duplicate");
-        menu.Items.Add(new Separator());
-        Add("Строки из Excel (скопированные)", PasteRows_Click, shortcut: "Ctrl+V", glyph: "Upload");
+        Add("Строки из Excel (скопированные)", PasteRows_Click, shortcut: "Ctrl+V", glyph: "Download");
         Add("Загрузить строки из файла Excel…", ImportFile_Click, glyph: "Upload");
         menu.IsOpen = true;
     }

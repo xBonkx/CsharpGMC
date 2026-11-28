@@ -22,20 +22,25 @@ public partial class MainWindow
         var top = MainMenuItem;
         if (top is not null)
         {
-            MenuItem Item(string title, Action action, string? glyph = null, string gesture = "")
+            MenuItem Item(string title, Action action, string? glyph = null, string gesture = "",
+                bool local = false, bool writes = false)
             {
                 var item = glyph is null
                     ? new MenuItem { Header = title, InputGestureText = gesture }
                     : ContextMenuIcons.Create(title, glyph, shortcut: gesture);
-                item.Click += (_, _) => RunNavigationAction(title, action);
+                item.Click += (_, _) =>
+                {
+                    if (writes && !SqlWritesEnabled) return;
+                    if (local) RunLocalNavigationAction(title, action);
+                    else RunNavigationAction(title, action);
+                };
+                if (writes)
+                    top.SubmenuOpened += (_, _) => item.IsEnabled = SqlWritesEnabled;
                 return item;
             }
 
             // Preserve the existing XAML handlers and Pto visibility binding,
             // but use the same top-level order as Python's _build_main_menu.
-            var tools = top.Items.OfType<MenuItem>()
-                .Where(item => !ReferenceEquals(item, PtoModeToggle) && !ReferenceEquals(item, PtoMenuItem))
-                .ToArray();
             top.Items.Clear();
             top.Items.Add(Item("Найти везде…", OpenGlobalSearch, "Search", "Ctrl+P"));
             top.Items.Add(new Separator());
@@ -46,24 +51,30 @@ public partial class MainWindow
             }, "Building"));
             top.Items.Add(Item("Себестоимость и маржа (сводка)", ShowHome, "Building"));
             top.Items.Add(Item("Справочник номенклатуры…", () =>
-                new CatalogWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Book"));
+                new CatalogWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Book", writes: true));
             top.Items.Add(Item("Наши организации…", () =>
-                new CompanyWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "File"));
+                new CompanyWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "File", writes: true));
             top.Items.Add(Item("Теги заказчиков (правила)…", () =>
-                new TagsWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Layers"));
-            top.Items.Add(Item("Люди и автомобили (для допуска)…", OpenPeopleWorkspace, "Users"));
+                new TagsWindow(_sqlConnectionString!) { Owner = this }.ShowDialog(), "Layers", writes: true));
+            top.Items.Add(Item("Люди и автомобили (для допуска)…", OpenPeopleWorkspace, "Users", writes: true));
             top.Items.Add(Item("Журнал изменений…", () => OpenHistory(null), "History"));
-            top.Items.Add(Item("Корзина (удалённые карточки и документы)…", OpenTrash, "Trash"));
+            top.Items.Add(Item("Корзина (удалённые карточки и документы)…", OpenTrash, "Trash", writes: true));
             top.Items.Add(new Separator());
-            top.Items.Add(Item("Как работать", OpenWorkspaceHelp, "Book", "F1"));
+            top.Items.Add(Item("Как работать", OpenWorkspaceHelp, "Book", "F1", local: true));
             top.Items.Add(new Separator());
             ContextMenuIcons.Set(PtoMenuItem, "File");
             top.Items.Add(PtoMenuItem);
-            foreach (var tool in tools)
+            // Exact Python order, with the C# metal register retained after warehouse.
+            foreach (var tool in new[] { LettersMenuItem, MetalWarehouseMenuItem, MetalRegisterMenuItem })
             {
                 ContextMenuIcons.Set(tool, "File");
                 top.Items.Add(tool);
             }
+            top.SubmenuOpened += (_, _) =>
+            {
+                foreach (var tool in new[] { PtoMenuItem, LettersMenuItem, MetalWarehouseMenuItem, MetalRegisterMenuItem })
+                    tool.IsEnabled = SqlWritesEnabled;
+            };
             // SQL Server-specific backup information, not Python's SQLite file actions.
             var settings = ContextMenuIcons.Create("Настройки", "Settings");
             settings.Items.Add(PtoModeToggle);
@@ -81,18 +92,18 @@ public partial class MainWindow
                 fontMenu.Items.Add(option);
             }
             settings.Items.Add(fontMenu);
-            settings.Items.Add(Item("Показать подсказки снова", ShowHintsAgain));
+            settings.Items.Add(Item("Показать подсказки снова", ShowHintsAgain, local: true));
             settings.Items.Add(new Separator());
-            settings.Items.Add(Item("Сведения о подключении SQL Server", ShowConnectionDetails, "Database"));
+            settings.Items.Add(Item("Сведения о подключении SQL Server", ShowConnectionDetails, "Database", local: true));
             settings.Items.Add(Item("Последнее сообщение программы", () =>
-                MessageBox.Show(this, StatusText.Text, "Сообщение программы", MessageBoxButton.OK, MessageBoxImage.Information)));
+                MessageBox.Show(this, StatusText.Text, "Сообщение программы", MessageBoxButton.OK, MessageBoxImage.Information), local: true));
             settings.Items.Add(Item("Обновить", RefreshWorkspaceNavigation, "Refresh", "F5"));
             settings.Items.Add(new Separator());
-            settings.Items.Add(Item("Резервные копии SQL Server", ShowServerBackupInfo, "Download"));
-            settings.Items.Add(Item("Журнал ошибок (для разработчика)", OpenWorkspaceErrorLog, "File"));
+            settings.Items.Add(Item("Резервные копии SQL Server", ShowServerBackupInfo, "Download", local: true));
+            settings.Items.Add(Item("Журнал ошибок (для разработчика)", OpenWorkspaceErrorLog, "File", local: true));
             top.Items.Add(settings);
             top.Items.Add(new Separator());
-            top.Items.Add(Item("О программе", ShowAbout));
+            top.Items.Add(Item("О программе", ShowAbout, local: true));
         }
 
         PreviewKeyDown += WorkspaceNavigationKeyDown;
@@ -125,6 +136,7 @@ public partial class MainWindow
 
     private void WorkspaceNavigationKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Handled || _startupClosed) return;
         if (e.Key == Key.P && Keyboard.Modifiers == ModifierKeys.Control)
         {
             RunNavigationAction("Найти везде", OpenGlobalSearch);
@@ -132,7 +144,7 @@ public partial class MainWindow
         }
         else if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
         {
-            RunNavigationAction("Как работать", OpenWorkspaceHelp);
+            RunLocalNavigationAction("Как работать", OpenWorkspaceHelp);
             e.Handled = true;
         }
         else if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None)
@@ -144,7 +156,13 @@ public partial class MainWindow
 
     private void RunNavigationAction(string title, Action action)
     {
-        if (_serverConn is null || _sqlConnectionString is null) return;
+        if (_serverConn is null || _sqlConnectionString is null || _startupClosed) return;
+        RunLocalNavigationAction(title, action);
+    }
+
+    private void RunLocalNavigationAction(string title, Action action)
+    {
+        if (_startupClosed) return;
         try { action(); }
         catch (Exception ex)
         {

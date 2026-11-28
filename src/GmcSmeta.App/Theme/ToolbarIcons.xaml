@@ -12,6 +12,8 @@
     <PathGeometry x:Key="GlyphChevronLeft" Figures="M11 6l-6 6 6 6M19 6l-6 6 6 6"/>
     <PathGeometry x:Key="GlyphSearch" Figures="M18 11A7 7 0 1 0 4 11A7 7 0 1 0 18 11 M20 20l-3.5-3.5"/>
     <PathGeometry x:Key="GlyphPlus" Figures="M12 5v14M5 12h14"/>
+    <!-- Exact Python theme.py row-plus geometry (aa6b34d). -->
+    <PathGeometry x:Key="GlyphRowPlus" Figures="M4 6h16M4 12h9M4 18h9 M18 14v6M15 17h6"/>
     <PathGeometry x:Key="GlyphX" Figures="M6 6l12 12M18 6 6 18"/>
     <PathGeometry x:Key="GlyphBook" Figures="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3 M9 7h6"/>
     <PathGeometry x:Key="GlyphAlert" Figures="M12 4 2.5 20h19z M12 10v4M12 17h.01"/>

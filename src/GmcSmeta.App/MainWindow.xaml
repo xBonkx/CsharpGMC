@@ -463,9 +463,9 @@
                                             </Canvas>
                                         </Viewbox>
                                     </MenuItem.Header>
-                                    <MenuItem Header="Письма" Click="Letters_Click"/>
-                                    <MenuItem Header="Учёт металла" Click="MetalRegister_Click"/>
-                                    <MenuItem Header="Склад металла" Click="MetalWarehouse_Click"/>
+                                    <MenuItem x:Name="LettersMenuItem" Header="Письма" Click="Letters_Click"/>
+                                    <MenuItem x:Name="MetalRegisterMenuItem" Header="Учёт металла" Click="MetalRegister_Click"/>
+                                    <MenuItem x:Name="MetalWarehouseMenuItem" Header="Склад металла" Click="MetalWarehouse_Click"/>
                                     <Separator/>
                                     <MenuItem x:Name="PtoModeToggle" Header="Режим ПТО (локальная настройка)" IsCheckable="True" Click="PtoMode_Click"/>
                                     <MenuItem x:Name="PtoMenuItem" Header="Исполнительная документация (АОСР / ПТО)" Click="Pto_Click" Visibility="Collapsed"/>
