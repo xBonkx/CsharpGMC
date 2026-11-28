@@ -69,13 +69,11 @@ public sealed class ProcurementRequestDialog : Window
             root.RowDefinitions.Add(new RowDefinition
             { Height = i == 3 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
         Content = root;
-        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var heading = new StackPanel();
+        heading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         heading.Children.Add(ProcurementDialogChrome.Heading("Заявка поставщику"));
-        heading.Children.Add(new TextBlock
-        {
-            Text = document.ObjectName + " · " + document.Title,
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
-        });
+        heading.Children.Add(DynamicFormLayout.Secondary(document.ObjectName + " · " + document.Title,
+            "LayoutFormLabelFieldGap"));
         root.Children.Add(heading);
 
         var form = new WrapPanel { Margin = ProcurementDialogChrome.SectionGap };
@@ -85,8 +83,9 @@ public sealed class ProcurementRequestDialog : Window
             {
                 Width = width, Margin = new Thickness(0, 0, 12, 5)
             };
-            wrapper.Children.Add(new TextBlock { Text = caption, Margin = new Thickness(0, 0, 0, 4) });
-            control.MinHeight = 30;
+            wrapper.Children.Add(DynamicFormLayout.Secondary(caption, "LayoutDialogListItemGap"));
+            DynamicFormLayout.Field(control);
+            System.Windows.Automation.AutomationProperties.SetName(control, caption);
             wrapper.Children.Add(control);
             return wrapper;
         }
@@ -112,7 +111,8 @@ public sealed class ProcurementRequestDialog : Window
         Grid.SetRow(form, 1);
         root.Children.Add(form);
 
-        var options = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var options = new WrapPanel();
+        options.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormGroupSeparatorGap");
         _onlyNew = new CheckBox { Content = "Только ещё не заказанное",
             ToolTip = "Строки со статусом «Заказано», «Оплачено», «На складе»… в заявку не попадут",
             IsChecked = true, Margin = new Thickness(0, 0, 14, 8) };
@@ -139,6 +139,8 @@ public sealed class ProcurementRequestDialog : Window
             ItemsSource = _display, AutoGenerateColumns = false,
             CanUserAddRows = false, CanUserDeleteRows = false,
             MinRowHeight = 27, GridLinesVisibility = DataGridGridLinesVisibility.All,
+            SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended,
+            ClipboardCopyMode = DataGridClipboardCopyMode.ExcludeHeader,
             HeadersVisibility = DataGridHeadersVisibility.Column
         };
         void Col(string title, string property, int width, bool readOnly)
@@ -178,24 +180,22 @@ public sealed class ProcurementRequestDialog : Window
         root.Children.Add(_grid);
 
         var footer = new DockPanel { Margin = ProcurementDialogChrome.FooterGap };
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right
         };
         _make = new Button
         {
             Content = "Сформировать заявку (Excel)",
-            MinWidth = 210, Height = 32,
-            Margin = new Thickness(6, 0, 0, 0)
+            MinWidth = 210
         };
         _make.Click += Make;
         buttons.Children.Add(_make);
         var cancel = new Button
         {
-            Content = "Закрыть", MinWidth = 90, Height = 32,
-            Margin = new Thickness(8, 0, 0, 0)
+            Content = "Закрыть", MinWidth = 90
         };
-        cancel.Click += (_, _) => DialogResult = false;
+        _make.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
         ProcurementDialogChrome.Buttons(_make, cancel, "ProcurementRequestPrimary");
         _make.SetResourceReference(ContentControl.ContentTemplateProperty, "IconLabelExcel");
         buttons.Children.Add(cancel);
