@@ -576,7 +576,7 @@ public partial class StagesDialog : Window
                 using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
                 if (SqlServerDatabase.Revision(snapshotConnection) != revision)
                     throw new InvalidOperationException("Этапы изменились. Обновите окно.");
-                var data = SqlServerStages.ReadStageMoney(_connectionString, stageId);
+                var data = SqlServerStages.ReadStageMoney(snapshotConnection, stageId);
                 if (SqlServerDatabase.Revision(snapshotConnection) != revision)
                     throw new InvalidOperationException("Данные этапа изменились при чтении.");
                 return data;
@@ -609,8 +609,8 @@ public partial class StagesDialog : Window
                 using var snapshotConnection = SqlServerDatabase.Open(_connectionString);
                 if (SqlServerDatabase.Revision(snapshotConnection) != revision)
                     throw new InvalidOperationException("Этапы изменились. Обновите окно.");
-                var stage = SqlServerStages.ReadStageMoney(_connectionString, stageId);
-                var systems = SqlServerStages.ReadStageSystems(_connectionString, stageId);
+                var stage = SqlServerStages.ReadStageMoney(snapshotConnection, stageId);
+                var systems = SqlServerStages.ReadStageSystems(snapshotConnection, stageId);
                 if (SqlServerDatabase.Revision(snapshotConnection) != revision)
                     throw new InvalidOperationException("Данные этапа изменились при чтении.");
                 return (Stage: stage, Systems: systems);

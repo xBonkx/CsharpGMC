@@ -37,6 +37,12 @@ public static partial class SqlServerStages
     public static StageMoneyInfo ReadStageMoney(string connectionString, long stageId)
     {
         using var conn = SqlServerDatabase.Open(connectionString);
+        return ReadStageMoney(conn, stageId);
+    }
+
+    /// <summary>Reuse the caller's guarded connection; owns only its read transaction.</summary>
+    public static StageMoneyInfo ReadStageMoney(SqlConnection conn, long stageId)
+    {
         using var tx = conn.BeginTransaction(IsolationLevel.ReadCommitted);
         long fullId;
         bool rest, locked;
@@ -133,8 +139,15 @@ public static partial class SqlServerStages
     public static IReadOnlyList<StageSystemMoney> ReadStageSystems(string connectionString,
         long stageId)
     {
-        var list = new List<StageSystemMoney>();
         using var conn = SqlServerDatabase.Open(connectionString);
+        return ReadStageSystems(conn, stageId);
+    }
+
+    /// <summary>Read system amounts on the caller's guarded connection.</summary>
+    public static IReadOnlyList<StageSystemMoney> ReadStageSystems(SqlConnection conn,
+        long stageId)
+    {
+        var list = new List<StageSystemMoney>();
         using var cmd = new SqlCommand(
             "SELECT id,name,ISNULL(smr_amount,0) FROM dbo.systems " +
             "WHERE contract_id=@stage ORDER BY [order],id", conn);

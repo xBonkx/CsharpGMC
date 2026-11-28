@@ -702,11 +702,13 @@ public static partial class SqlServerStages
                 var srcId = Convert.ToInt64(r.GetValue(0), CultureInfo.InvariantCulture);
                 var qty = r.IsDBNull(3) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(3), CultureInfo.InvariantCulture));
                 var perStage = new decimal[stages.Count];
+                var stageFormulas = new string[stages.Count];
                 var taken = 0m;
                 for (var i = 0; i < stages.Count; i++)
                 {
                     perStage[i] = maps[i].GetValueOrDefault(srcId);
                     taken += perStage[i];
+                    stageFormulas[i] = formulas[stages[i].Id].GetValueOrDefault(srcId, "");
                 }
                 rows.Add(new StageTableRow(
                     Convert.ToInt64(r.GetValue(5), CultureInfo.InvariantCulture),
@@ -718,7 +720,7 @@ public static partial class SqlServerStages
                     r.IsDBNull(4) ? 0m : Money.FromDouble(Convert.ToDouble(r.GetValue(4), CultureInfo.InvariantCulture)),
                     perStage, qty - taken)
                 {
-                    StageFormulas = stages.Select(s => formulas[s.Id].GetValueOrDefault(srcId, "")).ToArray()
+                    StageFormulas = stageFormulas
                 });
             }
         }

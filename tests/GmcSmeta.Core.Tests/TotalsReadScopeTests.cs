@@ -58,4 +58,26 @@ public sealed class TotalsReadScopeTests
     {
         Assert.Null(Totals.ReadOne(null!, id));
     }
+
+    [Fact]
+    public void EmptyStageTotalsSelectionDoesNotReadDatabase()
+    {
+        Assert.Empty(Totals.ReadSelected(null!, Array.Empty<int>()));
+    }
+
+    [Fact]
+    public void InvalidStageTotalsSelectionFailsBeforeDatabaseRead()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Totals.ReadSelected(null!, new[] { 1, 0 }));
+    }
+
+    [Fact]
+    public void CancelledStageTotalsSelectionFailsBeforeDatabaseRead()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            Totals.ReadSelected(null!, new[] { 1 }, cancellation.Token));
+    }
 }

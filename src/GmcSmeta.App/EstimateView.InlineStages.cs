@@ -145,10 +145,11 @@ public partial class EstimateView
                     throw new InvalidOperationException("Это КП этапа. Режим распределения открывается в полном КП.");
                 var (stages, rows, rest) = SqlServerStages.ReadStageDistribution(conn, full);
 
-                // Totals.ReadOne scans all contracts and positions. Running it
-                // for each stage caused N full-DB scans on every cell edit.
-                // Calculate once and select only this full KP's stages.
-                var allTotals = Totals.ReadAll(conn)
+                // Scope the shared totals calculation to this KP's stage documents.
+                // The enclosing revision fence covers every bounded batch.
+                var stageIds = stages.Select(s => checked((int)s.Id));
+                if (rest is not null) stageIds = stageIds.Append(checked((int)rest.Id));
+                var allTotals = Totals.ReadSelected(conn, stageIds)
                     .ToDictionary(t => (long)t.Id, t => t.Total);
                 var totals = new Dictionary<long, decimal>();
                 foreach (var stage in stages)

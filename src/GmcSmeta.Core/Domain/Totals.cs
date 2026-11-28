@@ -58,6 +58,26 @@ public static partial class Totals
             : Calculate(TagRules.Load(conn), ReadContracts(conn), ReadSystems(conn),
                 ReadPositions(conn), ReadPositionCounts(conn));
 
+    /// <summary>Selected documents only; caller owns a revision fence across batches.</summary>
+    public static IReadOnlyList<ContractTotals> ReadSelected(
+        Microsoft.Data.SqlClient.SqlConnection conn, IEnumerable<int> contractIds,
+        CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        var ids = contractIds.Distinct().OrderBy(id => id).ToArray();
+        if (ids.Any(id => id <= 0))
+            throw new ArgumentOutOfRangeException(nameof(contractIds));
+        if (ids.Length == 0) return Array.Empty<ContractTotals>();
+        var result = new List<ContractTotals>(ids.Length);
+        foreach (var batch in ids.Chunk(ContractReadScope.BatchSize))
+        {
+            token.ThrowIfCancellationRequested();
+            result.AddRange(ReadSqlBatch(conn, new ContractReadScope(batch), out _, token: token));
+        }
+        token.ThrowIfCancellationRequested();
+        return result;
+    }
+
     internal static IReadOnlyList<ContractTotals> ReadSqlBatch(DbConnection conn,
         ContractReadScope? scope, out TagRules rules, int? rehearsalSchema = null,
         CancellationToken token = default)

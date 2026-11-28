@@ -150,4 +150,42 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("!map.TryAdd(srcId, qty)", sql);
         Assert.Contains("p.parent_id IS NULL AND p.out_of_kp=0", sql);
     }
+
+    [Fact]
+    public void InlineTotalsAreLimitedToStagesAndRemainderWithinRevisionFence()
+    {
+        var code = Source("GmcSmeta.App/EstimateView.InlineStages.cs");
+        Assert.Contains("Totals.ReadSelected(conn, stageIds)", code);
+        Assert.Contains("stageIds.Append(checked((int)rest.Id))", code);
+        Assert.DoesNotContain("Totals.ReadAll(conn)", code);
+        Assert.Contains("revisionBefore != SqlServerDatabase.Revision(conn)", code);
+        var sql = Source("GmcSmeta.Core/Domain/Totals.cs");
+        Assert.Contains("ids.Chunk(ContractReadScope.BatchSize)", sql);
+        Assert.Contains("ReadSqlBatch(conn, new ContractReadScope(batch), out _, token: token)", sql);
+    }
+
+    [Fact]
+    public void StageMoneyReadsReuseRevisionFenceConnection()
+    {
+        var inline = Source("GmcSmeta.App/EstimateView.InlineStages.Commands.cs");
+        Assert.Contains("SqlServerStages.ReadStageMoney(conn, id)", inline);
+        Assert.Contains("SqlServerStages.ReadStageSystems(conn, id)", inline);
+        Assert.DoesNotContain("ReadStageMoney(_sqlConnectionString", inline);
+        var dialog = Source("GmcSmeta.App/StagesDialog.xaml.cs");
+        Assert.Contains("SqlServerStages.ReadStageMoney(snapshotConnection, stageId)", dialog);
+        Assert.Contains("SqlServerStages.ReadStageSystems(snapshotConnection, stageId)", dialog);
+        var sql = Source("GmcSmeta.Core/Db/SqlServerStages.Money.cs");
+        Assert.Contains("return ReadStageMoney(conn, stageId);", sql);
+        Assert.Contains("return ReadStageSystems(conn, stageId);", sql);
+        Assert.Contains("conn.BeginTransaction(IsolationLevel.ReadCommitted)", sql);
+    }
+
+    [Fact]
+    public void StageFormulaArrayUsesSameStageOrderAsQuantities()
+    {
+        var sql = Source("GmcSmeta.Core/Db/SqlServerStages.cs");
+        Assert.Contains("var stageFormulas = new string[stages.Count];", sql);
+        Assert.Contains("stageFormulas[i] = formulas[stages[i].Id].GetValueOrDefault(srcId, \"\");", sql);
+        Assert.Contains("StageFormulas = stageFormulas", sql);
+    }
 }

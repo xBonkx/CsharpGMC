@@ -58,7 +58,7 @@ public partial class EstimateView
                         using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились. Обновите смету.");
-                        var result = SqlServerStages.ReadStageMoney(_sqlConnectionString, id);
+                        var result = SqlServerStages.ReadStageMoney(conn, id);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились при чтении.");
                         return result;
@@ -76,8 +76,8 @@ public partial class EstimateView
                         using var conn = SqlServerDatabase.Open(_sqlConnectionString);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились. Обновите смету.");
-                        var systemMoney = SqlServerStages.ReadStageMoney(_sqlConnectionString, id);
-                        var systems = SqlServerStages.ReadStageSystems(_sqlConnectionString, id);
+                        var systemMoney = SqlServerStages.ReadStageMoney(conn, id);
+                        var systems = SqlServerStages.ReadStageSystems(conn, id);
                         if (SqlServerDatabase.Revision(conn) != revision)
                             throw new InvalidOperationException("Этапы изменились при чтении.");
                         return (Money: systemMoney, Systems: systems);
