@@ -70,7 +70,7 @@
                                 <Setter TargetName="ListChrome" Property="Background" Value="#C9DBFB"/>
                                 <Setter Property="Foreground" Value="#0F172A"/>
                             </Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -120,7 +120,10 @@
                                 <Setter TargetName="CheckChrome" Property="BorderThickness" Value="2"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="CheckChrome" Property="Opacity" Value="0.55"/>
+                                <Setter TargetName="CheckMark" Property="Opacity" Value="0.8"/>
+                                <Setter TargetName="MixedMark" Property="Opacity" Value="0.8"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -699,6 +702,18 @@
                                 <Setter Property="Foreground" Value="#0F172A"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="SegmentBorder" Property="Background" Value="#F7F9FC"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="SegmentBorder" Property="Background" Value="#E8F0FE"/>
+                                <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="#94A3B8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -743,8 +758,18 @@
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="TabBorder" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="TabBorder" Property="Background" Value="#E8F0FE"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#94A3B8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -779,8 +804,18 @@
                                 <Setter Property="Foreground" Value="#1E40AF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="SubTabBorder" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="SubTabBorder" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="SubTabBorder" Property="Background" Value="#E8F0FE"/>
+                                <Setter TargetName="SubTabBorder" Property="BorderBrush" Value="#94A3B8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -820,7 +855,9 @@
                                 <Setter TargetName="TabSurface" Property="Background" Value="#D9E6FD"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="TabSurface" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="TabSurface" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1117,8 +1154,18 @@
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="FilterChrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="FilterChrome" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="FilterChrome" Property="Background" Value="#E8F0FE"/>
+                                <Setter TargetName="FilterChrome" Property="BorderBrush" Value="#94A3B8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -1163,8 +1210,18 @@
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="FilterSurface" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="FilterSurface" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="FilterSurface" Property="Background" Value="#E8F0FE"/>
+                                <Setter TargetName="FilterSurface" Property="BorderBrush" Value="#94A3B8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -1689,7 +1746,9 @@
                                 <Setter TargetName="DangerSurface" Property="Background" Value="#991B1B"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="DangerSurface" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="DangerSurface" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
