@@ -12,7 +12,12 @@ public partial class MainWindow
         if(!SqlWritesEnabled||_sqlConnectionString is null||doc.Kind!="main") return;
         try
         {
-            var snapshot=SqlServerWorkspace.DescribeContractTransfer(_sqlConnectionString,doc.Id);
+            if (_objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
+                CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc) ||
+                !DocumentMatchesServer(doc, captured.Revision)) return;
+            var snapshot=SqlServerWorkspace.DescribeContractTransfer(captured.Connection,doc.Id);
+            if (snapshot.Revision != captured.Revision)
+                throw new InvalidOperationException("Документ изменился. Обновите список.");
             if(snapshot.SourceId!=doc.ObjectId)
                 throw new InvalidOperationException("Карточка приложения изменилась. Обновите список.");
             var candidates=_objects.Where(o=>!o.Archived&&o.Id!=doc.ObjectId).OrderBy(o=>o.Name).ToList();
@@ -39,11 +44,13 @@ public partial class MainWindow
             confirm.Click+=(_,_)=>dialog.DialogResult=true;
             actions.Children.Add(cancel);actions.Children.Add(confirm);panel.Children.Add(actions);
             dialog.Content=panel;
-            if(dialog.ShowDialog()!=true||picker.SelectedItem is not ObjectRow target) return;
+            if(dialog.ShowDialog()!=true||picker.SelectedItem is not ObjectRow target ||
+                !ObjectMutationCurrent(parent, captured) || !DocumentLocallyCurrent(doc) ||
+                !_objects.Any(o => Equals(o, target))) return;
             foreach(var id in snapshot.DocumentIds)
                 if(id<=int.MaxValue&&_estimateCache.TryGetValue((int)id,out var cached)&&!cached.CanTransferDocument)
                     throw new InvalidOperationException("Сначала завершите открытое редактирование и сохранение документов.");
-            SqlServerWorkspace.TransferContract(_sqlConnectionString,doc.Id,snapshot.SourceId,target.Id,snapshot.DocumentIds,snapshot.Revision);
+            SqlServerWorkspace.TransferContract(captured.Connection,doc.Id,snapshot.SourceId,target.Id,snapshot.DocumentIds,snapshot.Revision);
             ReloadAndSelect(target.Id);
             // The revision changed; no obsolete cached view may be reused after transfer.
             OpenEstimate(doc.Id);

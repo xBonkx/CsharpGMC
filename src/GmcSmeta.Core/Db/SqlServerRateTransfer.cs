@@ -82,6 +82,9 @@ public static class SqlServerRateTransfer
         IReadOnlyDictionary<int, int> manual, IReadOnlySet<int> excluded, IReadOnlySet<int> allowZero,
         string expectedRevision)
     {
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        if (string.IsNullOrWhiteSpace(expectedRevision))
+            throw new InvalidOperationException("Нет подтверждённой ревизии предпросмотра.");
         var includeMaterials = fields.Any(f => f is RateFields.PurchasePrice or RateFields.Price);
         var fresh = ReadTransfer(connectionString, data.Source.Id, data.Target.Id, includeMaterials);
         if (!fresh.Equals(data))
@@ -99,6 +102,17 @@ public static class SqlServerRateTransfer
         if (rev is null) throw new InvalidOperationException("Отсутствует meta.rev.");
         if (!string.Equals(rev, expectedRevision, StringComparison.Ordinal))
             throw new InvalidOperationException("Данные изменены другим сотрудником. Сначала обнови смету.");
+
+        using (var guard = new SqlCommand(
+            "SELECT TOP(1) c.id FROM dbo.contracts c WITH (UPDLOCK,HOLDLOCK) " +
+            "JOIN dbo.objects o WITH (HOLDLOCK) ON o.id=c.object_id " +
+            "WHERE c.id=@id AND c.kind=N'kp' AND ISNULL(c.locked,0)=0 " +
+            "AND c.stage_of IS NULL AND ISNULL(c.stage_rest,0)=0 AND ISNULL(o.archived,0)=0", conn, tx))
+        {
+            guard.Parameters.Add("@id", SqlDbType.BigInt).Value = data.Target.Id;
+            if (guard.ExecuteScalar() is null)
+                throw new InvalidOperationException("Целевое КП заблокировано или находится в архиве.");
+        }
 
         var count = 0;
         foreach (var (positionId, changeList) in changes)
@@ -151,7 +165,9 @@ public static class SqlServerRateTransfer
                     set.Add("formulas=@formulas");
                     update.Parameters.Add("@formulas", SqlDbType.NVarChar, -1).Value = node.ToJsonString();
                 }
-                update.CommandText = $"UPDATE dbo.positions SET {string.Join(", ", set)} WHERE id=@id";
+                update.Parameters.Add("@target", SqlDbType.BigInt).Value = data.Target.Id;
+                update.CommandText = $"UPDATE dbo.positions SET {string.Join(", ", set)} WHERE id=@id " +
+                    "AND system_id IN (SELECT id FROM dbo.systems WHERE contract_id=@target)";
                 if (update.ExecuteNonQuery() != 1)
                     throw new DBConcurrencyException("Строка исчезла во время переноса.");
             }

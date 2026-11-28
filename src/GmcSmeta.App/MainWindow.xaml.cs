@@ -794,11 +794,19 @@ public partial class MainWindow : Window
             StatusText.Text = "Изменения разрешены только в GmcSmetaPilot_*.";
             return;
         }
+        if (doc.IsStage || doc.StageRest)
+        {
+            StatusText.Text = "Удаление этапов выполняется в режиме распределения этапов.";
+            return;
+        }
+        if (_objects.FirstOrDefault(row => row.Id == doc.ObjectId) is not { } parent ||
+            CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc)) return;
         SqlServerWorkspace.ContractDeleteInfo info;
-        string confirmedRevision;
+        var confirmedRevision = captured.Revision;
         try
         {
-            confirmedRevision = SqlServerDatabase.Revision(_serverConn!);
+            if (!DocumentMatchesServer(doc, confirmedRevision))
+                throw new InvalidOperationException("Документ изменился. Обновите список.");
             info = SqlServerWorkspace.DescribeContractForDelete(_serverConn!, null, doc.Id);
             if (string.IsNullOrWhiteSpace(confirmedRevision) ||
                 confirmedRevision != SqlServerDatabase.Revision(_serverConn!))
@@ -816,10 +824,12 @@ public partial class MainWindow : Window
                 MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         if (info.Details.Count > 0 &&
             new ConfirmDeleteDialog(info.Title, info.Details, "документ") { Owner = this }.ShowDialog() != true) return;
+        if (!ObjectMutationCurrent(parent, captured) || !DocumentLocallyCurrent(doc) ||
+            !CanStartDocumentMutation(doc)) return;
         try
         {
             SqlServerWorkspace.DeleteContract(
-                _sqlConnectionString!, doc.Id, confirmedRevision);
+                captured.Connection, doc.Id, confirmedRevision);
         }
         catch (Exception ex)
         {
@@ -1226,11 +1236,12 @@ public partial class MainWindow : Window
             menu.Items.Add(new Separator());
             if (doc.Kind == "kp")
             {
-                var editable = parent is { Archived: false } && !doc.Locked && !doc.StageRest;
+                var editable = parent is { Archived: false } && !doc.Locked && !doc.IsStage && !doc.StageRest;
                 var make = ContextMenuIcons.Create("Оформить как приложение…", "Check", editable);
                 make.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc, makeContract: true));
                 menu.Items.Add(make);
-                var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate");
+                var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate",
+                    parent is { Archived: false } && !doc.StageRest);
                 copy.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id));
                 menu.Items.Add(copy);
                 var rates = ContextMenuIcons.Create("Скопировать расценки…", "Copy", editable);
@@ -1295,13 +1306,14 @@ public partial class MainWindow : Window
             link.Click += (_, _) => RunDocumentCommand(() => CreateGmcsLink(doc));
             menu.Items.Add(link);
             // C# also exposes properties directly from the navigation tree.
-            var props = ContextMenuIcons.Create("Свойства документа…", "Edit");
+            var props = ContextMenuIcons.Create("Свойства документа…", "Edit",
+                parent is { Archived: false } && !doc.Locked && !doc.IsStage && !doc.StageRest);
             props.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc));
             menu.Items.Add(props);
             menu.Items.Add(new Separator());
             var delete = ContextMenuIcons.Create(
                 doc.Kind switch { "main" => "Удалить приложение…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
-                "Trash", danger: true);
+                "Trash", !doc.IsStage && !doc.StageRest, danger: true);
             delete.Click += (_, _) => RunDocumentCommand(() => DeleteSqlServerContractFlow(doc));
             menu.Items.Add(delete);
         }

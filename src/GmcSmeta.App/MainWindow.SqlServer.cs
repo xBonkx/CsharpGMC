@@ -80,15 +80,18 @@ public partial class MainWindow
             if (obj.Archived)
                 throw new InvalidOperationException("Архивный объект нельзя изменять.");
 
-            var revision = SqlServerDatabase.Revision(_serverConn);
+            if (CaptureObjectMutation(obj) is not { } captured) return;
+            var revision = captured.Revision;
             var metadata = Workspace.ReadObjectDocumentMetadata(_serverConn, objectId);
             var contracts = metadata.Select(d => (Id: (long)d.Id,
                 Title: d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title, d.Kind)).ToList();
             var agreement = baseId is null && copyFrom is null ? AgreementPresentation.Resolve(metadata) : null;
             var sourceIdForCompany = baseId ?? copyFrom;
             var source = sourceIdForCompany is long id ? metadata.FirstOrDefault(d => d.Id == id && (baseId is null || !d.IsStage)) : null;
-            if (sourceIdForCompany is not null && source is null)
-                throw new InvalidOperationException("Исходный документ больше недоступен. Обновите список.");
+            if (sourceIdForCompany is not null && (source is null ||
+                !_docs.Any(d => Equals(DocumentMetadata(d), DocumentMetadata(source))) ||
+                source.StageRest || (baseId is not null && source.Kind != "main")))
+                throw new InvalidOperationException("Исходный документ изменился или больше недоступен. Обновите список.");
             var defaultCompany = sourceIdForCompany is not null ? source?.CompanyId ?? 0L : SqlServerWorkspace.LastCompanyId(_serverConn, objectId);
             var baseCompanies = metadata.Where(d => !d.IsStage && (d.Kind is "main" or "kp"))
                 .ToDictionary(d => (long)d.Id, d => d.CompanyId);
@@ -103,7 +106,9 @@ public partial class MainWindow
                 agreement: agreement, baseCompanies: baseCompanies)
                 { Owner = this };
             dialog.ConfigureAgreements(SqlServerAgreements.Read(_serverConn, objectId));
-            if (dialog.ShowDialog() != true) return;
+            if (revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Данные изменились во время чтения договоров.");
+            if (dialog.ShowDialog() != true || !ObjectMutationCurrent(obj, captured)) return;
             if (dialog.ImportExcelRequested)
             {
                 await ImportExcelForObjectAsync(objectId, newDocumentsOnly: true);
@@ -113,9 +118,11 @@ public partial class MainWindow
 
             var data = new SqlServerWorkspace.NewContractData(value.Kind, value.Number, value.Date,
                 value.Name, value.CompanyId, value.BaseContractId) { AgreementId = value.AgreementId, AnnexNumber = value.AnnexNumber };
+            if (value.CopyFrom is long chosen && !metadata.Any(d => d.Id == chosen && !d.StageRest))
+                throw new InvalidOperationException("Источник копии не принадлежит выбранной карточке.");
             var created = value.CopyFrom is long sourceId
-                ? SqlServerWorkspace.CopyContract(_sqlConnectionString, sourceId, data, revision)
-                : SqlServerWorkspace.CreateEmptyContract(_sqlConnectionString, objectId, data, revision);
+                ? SqlServerWorkspace.CopyContract(captured.Connection, sourceId, data, revision)
+                : SqlServerWorkspace.CreateEmptyContract(captured.Connection, objectId, data, revision);
             ReloadAndSelect(objectId);
             OpenEstimate(checked((int)created));
         }
@@ -318,7 +325,11 @@ public partial class MainWindow
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
-            var dialog = new RateTransferDialog(_sqlConnectionString, doc.Id, doc.Title) { Owner = this };
+            if (!SqlWritesEnabled || doc.Kind != "kp" || doc.Locked || doc.IsStage || doc.StageRest ||
+                _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
+                CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc) ||
+                !DocumentMatchesServer(doc, captured.Revision)) return;
+            var dialog = new RateTransferDialog(captured.Connection, doc.Id, doc.Title) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.ResultData is not { } result) return;
 
             ReloadAndSelect(doc.ObjectId);
@@ -354,7 +365,11 @@ public partial class MainWindow
                 throw new InvalidOperationException("Архивный объект нельзя изменять.");
 
             // Ревизия читается до диалога: правка другим сотрудником во время набора отвергается.
-            var revision = SqlServerDatabase.Revision(_serverConn);
+            if (_objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
+                CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc)) return;
+            var revision = captured.Revision;
+            if (!DocumentMatchesServer(doc, revision))
+                throw new InvalidOperationException("Документ изменился. Обновите список.");
             var info = SqlServerWorkspace.ReadContract(_serverConn, doc.Id);
             if (info.Locked || info.StageOf is not null)
             {
@@ -377,11 +392,15 @@ public partial class MainWindow
             var dialog = new ContractDialog(objectName, info, companies,
                 tags, mains, makeContract, agreement) { Owner = this };
             dialog.ConfigureAgreements(SqlServerAgreements.Read(_serverConn,doc.ObjectId),SqlServerAgreements.DocumentAgreementId(_serverConn,doc.Id),SqlServerAgreements.AnnexNumber(_serverConn,doc.Id));
-            if (dialog.ShowDialog() != true || dialog.Result is not { } value) return;
+            if (revision != SqlServerDatabase.Revision(_serverConn))
+                throw new InvalidOperationException("Данные изменились во время чтения договоров.");
+            if (dialog.ShowDialog() != true || dialog.Result is not { } value ||
+                !ObjectMutationCurrent(parent, captured) || !DocumentLocallyCurrent(doc) ||
+                !CanStartDocumentMutation(doc)) return;
 
             // Python: make_contract при выборе «КП» превращает документ в договор.
             var kind = makeContract && value.Kind == "kp" ? "main" : value.Kind;
-            var changed = SqlServerWorkspace.UpdateContract(_sqlConnectionString, doc.Id,
+            var changed = SqlServerWorkspace.UpdateContract(captured.Connection, doc.Id,
                 new ContractProperties(kind, value.Number, value.Date, value.Name, value.CompanyId,
                     value.BaseContractId, value.VatRate, value.Note, value.Form) { AgreementId = value.AgreementId, AnnexNumber = value.AnnexNumber }, revision);
 

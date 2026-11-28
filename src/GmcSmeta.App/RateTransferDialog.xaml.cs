@@ -123,6 +123,7 @@ public partial class RateTransferDialog : Window
     private void Invalidate()
     {
         _data = null;
+        _revision = "";
         _manual.Clear();
         _excluded.Clear();
         _allowZero.Clear();
@@ -156,8 +157,14 @@ public partial class RateTransferDialog : Window
         if (sourceId is null) return;
         try
         {
-            _data = SqlServerRateTransfer.ReadTransfer(_connectionString, sourceId.Value, _targetId,
+            using var conn = SqlServerDatabase.Open(_connectionString);
+            var revision = SqlServerDatabase.Revision(conn);
+            var data = SqlServerRateTransfer.ReadTransfer(_connectionString, sourceId.Value, _targetId,
                 MaterialsCheck.IsChecked == true);
+            if (string.IsNullOrWhiteSpace(revision) || revision != SqlServerDatabase.Revision(conn))
+                throw new InvalidOperationException("Данные изменились при проверке. Повторите предпросмотр.");
+            _data = data;
+            _revision = revision;
         }
         catch (InvalidOperationException error)
         {
@@ -169,7 +176,6 @@ public partial class RateTransferDialog : Window
             InfoText.Text = "Не удалось прочитать КП. Повторите проверку.";
             return;
         }
-        _revision = null;
         RefreshRows();
     }
 
@@ -317,22 +323,25 @@ public partial class RateTransferDialog : Window
 
     private void Apply_Click(object sender, RoutedEventArgs e)
     {
-        if (_data is null) return;
+        if (_data is not { } data || string.IsNullOrWhiteSpace(_revision)) return;
+        var revision = _revision;
         var replace = OverwriteCheck.IsChecked == true || _allowZero.Count > 0;
         if (replace && MessageBox.Show(this,
                 "Заполненные цены, отмеченные в предпросмотре, будут заменены. Продолжить?",
                 "Подтвердить замену цен", MessageBoxButton.YesNo, MessageBoxImage.Question,
                 MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (!ReferenceEquals(_data, data) || _revision != revision) return;
         try
         {
-            var result = SqlServerRateTransfer.ApplyTransfer(_connectionString, _data, _fields,
-                OverwriteCheck.IsChecked == true, _manual, _excluded, _allowZero, ServerRevision());
+            var result = SqlServerRateTransfer.ApplyTransfer(_connectionString, data, _fields,
+                OverwriteCheck.IsChecked == true, _manual, _excluded, _allowZero, revision);
             ResultData = result;
         }
-        catch (InvalidOperationException error)
+        catch (Exception error)
         {
             Invalidate();
-            MessageBox.Show(this, error.Message, "Перенос расценок",
+            MessageBox.Show(this, "Перенос не подтверждён: " + error.Message +
+                "\nПроверьте смету перед повтором.", "Перенос расценок",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -341,10 +350,4 @@ public partial class RateTransferDialog : Window
 
     private string _revision = "";
 
-    private string ServerRevision()
-    {
-        if (_revision.Length > 0) return _revision;
-        using var conn = SqlServerDatabase.Open(_connectionString);
-        return _revision = SqlServerDatabase.Revision(conn);
-    }
-}
+ }
