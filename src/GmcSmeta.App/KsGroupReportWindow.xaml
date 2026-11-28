@@ -23,7 +23,7 @@
                 <TextBlock x:Name="TitleText" Text="Общая КС-3"
                            FontSize="{StaticResource UiH1Size}" FontWeight="Bold"
                            Foreground="#1E293B" TextWrapping="Wrap"/>
-                <TextBlock x:Name="SubtitleText" Foreground="#64748B" Margin="0,5,0,0"
+                <TextBlock x:Name="SubtitleText" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,5,0,0"
                            TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             </StackPanel>
@@ -49,7 +49,7 @@
         </Border>
         <UniformGrid Grid.Row="2" Columns="5" Margin="0,0,0,9">
             <Border Style="{StaticResource PythonTile}" Margin="0,0,8,0">
-                <StackPanel><TextBlock Text="КС-2 в группе" Style="{StaticResource PythonTileLabel}" Foreground="#64748B" TextWrapping="Wrap"/>
+                <StackPanel><TextBlock Text="КС-2 в группе" Style="{StaticResource PythonTileLabel}" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
                     <TextBlock x:Name="CountText" FontSize="{StaticResource UiH2Size}" FontWeight="Bold" TextWrapping="Wrap"/></StackPanel>
             </Border>
             <Border Style="{StaticResource PythonTile}" Background="#EAF2FF"
@@ -134,8 +134,8 @@
         </Grid>
         <DockPanel Grid.Row="4" Margin="2,10,2,0">
             <TextBlock x:Name="StatusText" Text="Загрузка из SQL Server…"
-                       Foreground="#64748B" TextWrapping="Wrap"/>
-            <TextBlock DockPanel.Dock="Right" x:Name="VatText" Foreground="#64748B"
+                       Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
+            <TextBlock DockPanel.Dock="Right" x:Name="VatText" Foreground="{StaticResource UiMutedTextBrush}"
                        HorizontalAlignment="Right"/>
         </DockPanel>
     </Grid>
