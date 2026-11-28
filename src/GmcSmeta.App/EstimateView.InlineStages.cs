@@ -283,6 +283,18 @@ public partial class EstimateView
                 warning.Setters.Add(new Setter(TextBlock.ForegroundProperty, StageBrush("#DC2626")));
                 style.Triggers.Add(warning);
             }
+            // Selection wins over stage tint and overrun text; the focused
+            // cell retains the common overlay without changing its geometry.
+            var selected = new DataTrigger
+            {
+                Binding = new Binding(nameof(DataGridCell.IsSelected))
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridCell), 1)
+                },
+                Value = true
+            };
+            selected.Setters.Add(new Setter(TextBlock.ForegroundProperty, FindResource("GridSelectionTextBrush")));
+            style.Triggers.Add(selected);
             // DataGridBoundColumn coerces any OneWay binding to read-only,
             // even when IsReadOnly=false. A template column keeps the snapshot
             // immutable while the existing CellEditEnding reads the editor text.
@@ -291,7 +303,7 @@ public partial class EstimateView
             display.SetBinding(TextBlock.TextProperty,
                 new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay });
             var editor = new FrameworkElementFactory(typeof(TextBox));
-            editor.SetValue(FrameworkElement.StyleProperty, (Style)FindResource("EstimateMoneyEditor"));
+            editor.SetValue(FrameworkElement.StyleProperty, (Style)FindResource("EstimateStageEditor"));
             editor.SetBinding(TextBox.TextProperty,
                 new Binding($"StageDisplay[{i}]") { Mode = BindingMode.OneWay });
             var column = new DataGridTemplateColumn

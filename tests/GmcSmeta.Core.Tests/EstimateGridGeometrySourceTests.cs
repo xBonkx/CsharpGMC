@@ -131,4 +131,41 @@ public sealed class EstimateGridGeometrySourceTests
         Assert.Single(view.Descendants(p + "BooleanToVisibilityConverter")
             .Where(e => (string?)e.Attribute(xaml + "Key") == "OnlySystems"));
     }
+
+    [Fact]
+    public void EstimateEditorsKeepCellInsetAndStageTypography()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var view = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        XElement Style(string key) => Assert.Single(view.Descendants(p + "Style")
+            .Where(e => (string?)e.Attribute(x + "Key") == key));
+        string? Value(XElement element, string property) => (string?)Assert.Single(element.Elements(p + "Setter")
+            .Where(e => (string?)e.Attribute("Property") == property)).Attribute("Value");
+        var editor = Style("EstimateGridEditor");
+        Assert.Equal("0", Value(editor, "Margin"));
+        Assert.Equal("0", Value(editor, "Padding"));
+        foreach (var property in new[] { "FontWeight", "FontStyle" })
+            Assert.Equal("{Binding " + property + ", RelativeSource={RelativeSource AncestorType=DataGridCell}}", Value(editor, property));
+        foreach (var key in new[] { "Money", "CenterCell", "EstimateTextCell" })
+        {
+            Assert.Equal("0", Value(Style(key), "Margin"));
+            Assert.Equal("Center", Value(Style(key), "VerticalAlignment"));
+        }
+        Assert.Equal("{StaticResource EstimateTextCell}", (string?)Style("EstimateNoteDisplay").Attribute("BasedOn"));
+        Assert.Equal("{StaticResource EstimateMoneyEditor}", (string?)Style("EstimateStageEditor").Attribute("BasedOn"));
+        Assert.Equal("SemiBold", Value(Style("EstimateStageEditor"), "FontWeight"));
+        var stages = File.ReadAllText(Path.Combine(app, "EstimateView.InlineStages.cs"));
+        Assert.Contains("style.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.SemiBold))", stages);
+        Assert.Contains("(Style)FindResource(\"EstimateStageEditor\")", stages);
+        var name = Assert.Single(view.Descendants(p + "DataGridTemplateColumn")
+            .Where(e => (string?)e.Attribute("SortMemberPath") == "name"));
+        Assert.Equal((string?)Assert.Single(name.Descendants(p + "TextBlock")).Attribute("Margin"),
+                     (string?)Assert.Single(name.Descendants(p + "TextBox")).Attribute("Margin"));
+    }
 }

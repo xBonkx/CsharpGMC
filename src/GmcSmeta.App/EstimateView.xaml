@@ -93,6 +93,8 @@
             <Setter Property="Margin" Value="0"/>
         </Style>
         <Style x:Key="EstimateGridEditor" TargetType="TextBox" BasedOn="{StaticResource PythonGridEditor}">
+            <Setter Property="FontWeight" Value="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
+            <Setter Property="FontStyle" Value="{Binding FontStyle, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -103,6 +105,9 @@
         </Style>
         <Style x:Key="EstimateMoneyEditor" TargetType="TextBox" BasedOn="{StaticResource EstimateGridEditor}">
             <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style x:Key="EstimateStageEditor" TargetType="TextBox" BasedOn="{StaticResource EstimateMoneyEditor}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
         <!-- Python ui/common.py menu_header: grey caption inside a menu. -->
@@ -190,6 +195,15 @@
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style x:Key="EstimateNoteDisplay" TargetType="TextBlock" BasedOn="{StaticResource EstimateTextCell}">
+            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="Price" TargetType="TextBlock" BasedOn="{StaticResource Money}">
             <Style.Triggers>
@@ -283,11 +297,11 @@
                 <!-- Python: the current cell — a firm blue frame, like Excel's cell cursor
                      (QPen(QColor(C["accent"]), 2), r.adjusted(1, 1, -1, -1)). No fill. -->
                 <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
                 <Trigger Property="IsEditing" Value="True">
                     <Setter Property="Background" Value="#FFFFFF"/>
-                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -870,8 +884,7 @@
                     <DataGridTemplateColumn x:Name="NoteColumn" Header="Примечание" SortMemberPath="note" Width="170">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Note}" Foreground="#64748B"
-                                           TextTrimming="CharacterEllipsis"
+                                <TextBlock Text="{Binding Note}" Style="{StaticResource EstimateNoteDisplay}"
                                            ToolTip="{Binding Note}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
@@ -896,6 +909,10 @@
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding AreaManualFlag}" Value="True">
                                                     <Setter Property="Foreground" Value="#2563EB"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource GridSelectionTextBrush}"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
