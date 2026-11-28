@@ -25,7 +25,7 @@ public partial class MainWindow
         }
     }
 
-    internal void CreateGmcsLink(DocRow doc)
+    internal void CreateGmcsLink(DocRow doc, string? expectedRevision = null)
     {
         try
         {
@@ -33,6 +33,8 @@ public partial class MainWindow
                 _objects.FirstOrDefault(o => o.Id == doc.ObjectId) is not { } obj) return;
             var mode = CurrentMode;
             var revision = SqlServerDatabase.Revision(conn);
+            if (expectedRevision is not null && revision != expectedRevision)
+                throw new InvalidOperationException("Документ изменился. Обновите смету.");
             bool CurrentTarget() => ReferenceEquals(conn, _serverConn) && mode == CurrentMode &&
                 DocumentLocallyCurrent(doc) && _objects.Any(o => Equals(o, obj)) &&
                 CanStartDocumentMutation(doc) && DocumentMatchesServer(doc, revision) &&

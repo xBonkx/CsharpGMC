@@ -64,6 +64,31 @@ public partial class MainWindow
         _objects.Any(o => o.Id == objectId && !o.Archived) &&
         _docs.Any(d => d.Id == documentId && d.ObjectId == objectId && !d.StageRest);
 
+    internal void OpenEstimateObjectTool(EstimateView page, DocRow doc, string revision, bool orders)
+    {
+        try
+        {
+            if (!IsCurrentEstimatePage(doc.Id, doc.ObjectId, page) || !CanEditEstimateHeader(doc.Id, doc.ObjectId) ||
+                !CanStartDocumentMutation(doc) || !DocumentLocallyCurrent(doc) ||
+                _objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
+                CaptureObjectMutation(parent) is not { } captured || captured.Revision != revision ||
+                !DocumentMatchesServer(doc, revision))
+            {
+                StatusText.Text = "Документ изменился. Обновите смету перед открытием окна.";
+                return;
+            }
+            OpenObjectTool(parent, orders ? "Приказы" : "Допуск", (connection, obj) =>
+                orders
+                    ? new OrdersWindow(connection, obj.Id, (doc.Kind is "main" or "dop") && !doc.IsStage ? doc.Id : null)
+                    : new PeopleWindow(connection, obj.Id));
+        }
+        catch (Exception ex)
+        {
+            LogError(ex);
+            StatusText.Text = "Не удалось открыть окно: " + ex.Message;
+        }
+    }
+
     internal bool CanReceiveSystemCopy(DocRow target, int sourceId, int objectId) =>
         CanEditEstimateHeader(sourceId, objectId) && SystemCopySource.CanReceive(target, objectId) &&
         DocumentLocallyCurrent(target) && CanStartDocumentMutation(target);

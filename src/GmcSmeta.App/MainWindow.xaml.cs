@@ -551,8 +551,9 @@ public partial class MainWindow : Window
     /// Новое КП / договор / допсоглашение или копия документа — NewContractDialog Python.
     /// Пустое содержимое создаёт документ, «копия» повторяет выбранный документ со сметой.
     /// </summary>
-    private void NewContractFlow(int objectId, string kind = "kp", long? baseId = null, long? copyFrom = null) =>
-        NewSqlServerContractFlow(objectId, kind, baseId, copyFrom);
+    private void NewContractFlow(int objectId, string kind = "kp", long? baseId = null, long? copyFrom = null,
+        string? expectedRevision = null) =>
+        NewSqlServerContractFlow(objectId, kind, baseId, copyFrom, expectedRevision);
 
     /// <summary>
     /// Свойства документа — ContractDialog Python, с кнопки «Сделать договором» тип принудительно
@@ -562,19 +563,21 @@ public partial class MainWindow : Window
         EditSqlServerContractProperties(doc, makeContract);
 
     // Обёртки для редактора сметы (kp_editor «Действия» → документ целиком).
-    internal void OpenContractProperties(DocRow doc) => EditContractProperties(doc, false);
+    internal void OpenContractProperties(DocRow doc, string revision) =>
+        EditSqlServerContractProperties(doc, false, revision);
 
-    internal void MakeCurrentDocumentContract(DocRow doc) => EditContractProperties(doc, true);
+    internal void MakeCurrentDocumentContract(DocRow doc, string revision) =>
+        EditSqlServerContractProperties(doc, true, revision);
 
-    internal void CopyCurrentDocument(DocRow doc) =>
-        NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id);
+    internal void CopyCurrentDocument(DocRow doc, string revision) =>
+        NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id, expectedRevision: revision);
 
-    internal void CreateDopAgreement(DocRow doc) =>
-        NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id);
+    internal void CreateDopAgreement(DocRow doc, string revision) =>
+        NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id, expectedRevision: revision);
 
-    internal void DeleteCurrentDocument(DocRow doc) => DeleteSqlServerContractFlow(doc);
+    internal void DeleteCurrentDocument(DocRow doc, string revision) => DeleteSqlServerContractFlow(doc, revision);
 
-    internal void CompareCurrentDocument(DocRow doc) => OpenCompare(doc);
+    internal void CompareCurrentDocument(DocRow doc, string revision) => OpenCompare(doc, revision);
 
     /// <summary>Перечитать объекты и документы, перестроить дерево и выбрать объект — как refresh(("obj", id)) в Python.</summary>
     internal int SaveObjectProperties(ObjectProperties properties, int? id = null)
@@ -787,7 +790,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Удалить документ: вопросы и копия в корзину — kp_editor.delete_contract эталона.</summary>
-    private void DeleteSqlServerContractFlow(DocRow doc)
+    private void DeleteSqlServerContractFlow(DocRow doc, string? expectedRevision = null)
     {
         if (!SqlWritesEnabled)
         {
@@ -805,7 +808,8 @@ public partial class MainWindow : Window
         var confirmedRevision = captured.Revision;
         try
         {
-            if (!DocumentMatchesServer(doc, confirmedRevision))
+            if (!DocumentMatchesServer(doc, confirmedRevision) ||
+                (expectedRevision is not null && confirmedRevision != expectedRevision))
                 throw new InvalidOperationException("Документ изменился. Обновите список.");
             info = SqlServerWorkspace.DescribeContractForDelete(_serverConn!, null, doc.Id);
             if (string.IsNullOrWhiteSpace(confirmedRevision) ||

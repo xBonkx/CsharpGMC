@@ -38,4 +38,28 @@ public sealed class EstimateDocumentActionsSourceTests
         Assert.Contains("dialog.ShowDialog() != true || !CanChangeHeader(snapshot, revision, false)", spec);
         Assert.Contains("incoming, keys, keepOrder, revision", spec);
     }
+
+    [Fact]
+    public void LegacyDocumentCommandsKeepPublishedRevisionAcrossEntryPoints()
+    {
+        var header = Source("EstimateView.Header.cs");
+        foreach (var method in new[] { "OpenContractProperties", "CopyCurrentDocument",
+            "MakeCurrentDocumentContract", "CreateDopAgreement", "MoveCurrentContract",
+            "DeleteCurrentDocument", "CreateGmcsLink", "CompareCurrentDocument" })
+            Assert.Contains($"main.{method}(_doc, _publishedEstimateRevision);", header);
+        Assert.Contains("main.OpenEstimateObjectTool(this, _doc, _publishedEstimateRevision, orders: true)", header);
+        var main = Source("MainWindow.xaml.cs");
+        Assert.Contains("expectedRevision: revision", main);
+        Assert.Contains("confirmedRevision != expectedRevision", main);
+        var sql = Source("MainWindow.SqlServer.cs");
+        Assert.Contains("revision != expectedRevision", sql);
+        Assert.Contains("!CanStartDocumentMutation(source)", sql);
+        Assert.Contains("DocumentLocallyCurrent(d) && CanStartDocumentMutation(d)", sql);
+        Assert.Contains("captured.Revision != expectedRevision", Source("MainWindow.ContractTransfer.cs"));
+        Assert.Contains("revision != expectedRevision", Source("MainWindow.DocumentLinks.cs"));
+        var tools = Source("MainWindow.DocumentMutation.cs");
+        Assert.Contains("captured.Revision != revision", tools);
+        Assert.Contains("!DocumentMatchesServer(doc, revision)", tools);
+        Assert.Contains("ReferenceEquals(document, _doc)", Source("EstimateView.DocumentActions.cs"));
+    }
 }

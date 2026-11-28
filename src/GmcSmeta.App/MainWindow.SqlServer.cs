@@ -68,7 +68,8 @@ public partial class MainWindow
         return checked((int)SqlServerWorkspace.CreateObject(_sqlConnectionString, values, revision));
     }
 
-    private async void NewSqlServerContractFlow(int objectId, string kind, long? baseId, long? copyFrom)
+    private async void NewSqlServerContractFlow(int objectId, string kind, long? baseId, long? copyFrom,
+        string? expectedRevision = null)
     {
         if (_serverConn is null || _sqlConnectionString is null) return;
         var obj = _objects.FirstOrDefault(o => o.Id == objectId);
@@ -82,6 +83,8 @@ public partial class MainWindow
 
             if (CaptureObjectMutation(obj) is not { } captured) return;
             var revision = captured.Revision;
+            if (expectedRevision is not null && revision != expectedRevision)
+                throw new InvalidOperationException("Документ изменился. Обновите смету.");
             var metadata = Workspace.ReadObjectDocumentMetadata(_serverConn, objectId);
             var contracts = metadata.Select(d => (Id: (long)d.Id,
                 Title: d.Kind == "main" ? AgreementPresentation.FullAnnexTitle(d) : d.Title, d.Kind)).ToList();
@@ -90,7 +93,8 @@ public partial class MainWindow
             var source = sourceIdForCompany is long id ? metadata.FirstOrDefault(d => d.Id == id && (baseId is null || !d.IsStage)) : null;
             if (sourceIdForCompany is not null && (source is null ||
                 !_docs.Any(d => Equals(DocumentMetadata(d), DocumentMetadata(source))) ||
-                source.StageRest || (baseId is not null && source.Kind != "main")))
+                source.StageRest || (baseId is not null && source.Kind != "main") ||
+                !CanStartDocumentMutation(source)))
                 throw new InvalidOperationException("Исходный документ изменился или больше недоступен. Обновите список.");
             var defaultCompany = sourceIdForCompany is not null ? source?.CompanyId ?? 0L : SqlServerWorkspace.LastCompanyId(_serverConn, objectId);
             var baseCompanies = metadata.Where(d => !d.IsStage && (d.Kind is "main" or "kp"))
@@ -118,8 +122,11 @@ public partial class MainWindow
 
             var data = new SqlServerWorkspace.NewContractData(value.Kind, value.Number, value.Date,
                 value.Name, value.CompanyId, value.BaseContractId) { AgreementId = value.AgreementId, AnnexNumber = value.AnnexNumber };
-            if (value.CopyFrom is long chosen && !metadata.Any(d => d.Id == chosen && !d.StageRest))
-                throw new InvalidOperationException("Источник копии не принадлежит выбранной карточке.");
+            if (source is not null && (!DocumentLocallyCurrent(source) || !CanStartDocumentMutation(source)))
+                throw new InvalidOperationException("Исходный документ изменился или занят сохранением.");
+            if (value.CopyFrom is long chosen && !metadata.Any(d => d.Id == chosen && !d.StageRest &&
+                    DocumentLocallyCurrent(d) && CanStartDocumentMutation(d)))
+                throw new InvalidOperationException("Источник копии изменился или не принадлежит выбранной карточке.");
             var created = value.CopyFrom is long sourceId
                 ? SqlServerWorkspace.CopyContract(captured.Connection, sourceId, data, revision)
                 : SqlServerWorkspace.CreateEmptyContract(captured.Connection, objectId, data, revision);
@@ -270,11 +277,13 @@ public partial class MainWindow
     }
 
     /// <summary>Сравнить документ с другим КП/договором объекта (compare_view).</summary>
-    private void OpenCompare(DocRow doc)
+    private void OpenCompare(DocRow doc, string? expectedRevision = null)
     {
         try
         {
             if (_serverConn is null || _sqlConnectionString is null) return;
+            if (expectedRevision is not null && !DocumentMatchesServer(doc, expectedRevision))
+                throw new InvalidOperationException("Документ изменился. Обновите смету.");
             var docs = _docs.Where(d => d.ObjectId == doc.ObjectId)
                 .OrderBy(d => d.Order).ThenBy(d => d.Id)
                 .Select(d => (Id: (int)d.Id, d.Title)).ToList();
@@ -402,7 +411,7 @@ public partial class MainWindow
     /// Свойства документа в SQL Server-режиме — эталон _edit_document_properties:
     /// подписанные документы и этапы не открываются, НДС меняется вместе с организацией.
     /// </summary>
-    private void EditSqlServerContractProperties(DocRow doc, bool makeContract)
+    private void EditSqlServerContractProperties(DocRow doc, bool makeContract, string? expectedRevision = null)
     {
         if (_serverConn is null || _sqlConnectionString is null) return;
         try
@@ -416,7 +425,8 @@ public partial class MainWindow
             if (_objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
                 CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc)) return;
             var revision = captured.Revision;
-            if (!DocumentMatchesServer(doc, revision))
+            if (!DocumentMatchesServer(doc, revision) ||
+                (expectedRevision is not null && revision != expectedRevision))
                 throw new InvalidOperationException("Документ изменился. Обновите список.");
             var info = SqlServerWorkspace.ReadContract(_serverConn, doc.Id);
             if (info.Locked || info.StageOf is not null)

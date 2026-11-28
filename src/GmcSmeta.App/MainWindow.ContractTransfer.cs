@@ -7,7 +7,7 @@ namespace GmcSmeta.App;
 
 public partial class MainWindow
 {
-    internal void MoveCurrentContract(DocRow doc)
+    internal void MoveCurrentContract(DocRow doc, string? expectedRevision = null)
     {
         if(!SqlWritesEnabled||_sqlConnectionString is null||doc.Kind!="main") return;
         try
@@ -15,6 +15,8 @@ public partial class MainWindow
             if (_objects.FirstOrDefault(o => o.Id == doc.ObjectId && !o.Archived) is not { } parent ||
                 CaptureObjectMutation(parent) is not { } captured || !CanStartDocumentMutation(doc) ||
                 !DocumentMatchesServer(doc, captured.Revision)) return;
+            if (expectedRevision is not null && captured.Revision != expectedRevision)
+                throw new InvalidOperationException("Документ изменился. Обновите смету.");
             var snapshot=SqlServerWorkspace.DescribeContractTransfer(captured.Connection,doc.Id);
             if (snapshot.Revision != captured.Revision)
                 throw new InvalidOperationException("Документ изменился. Обновите список.");

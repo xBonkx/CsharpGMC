@@ -28,7 +28,7 @@ public partial class EstimateView
         if (_estimate is { } snapshot && !_doc.IsStage &&
             CanChangeHeader(snapshot, _serverRevision, false) &&
             Window.GetWindow(this) is MainWindow main)
-            main.OpenContractProperties(_doc);
+            main.OpenContractProperties(_doc, _publishedEstimateRevision);
     }
 
     // ---------------------------------------------------------------- фаза подготовки КП (sync_kp_phase)
@@ -211,44 +211,43 @@ public partial class EstimateView
     private void CopyContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null && _estimate is not null)
-            main.CopyCurrentDocument(_doc);
+            main.CopyCurrentDocument(_doc, _publishedEstimateRevision);
     }
 
     private void MakeContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
-            main.MakeCurrentDocumentContract(_doc);
+            main.MakeCurrentDocumentContract(_doc, _publishedEstimateRevision);
     }
 
     private void CreateDop_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
-            main.CreateDopAgreement(_doc);
+            main.CreateDopAgreement(_doc, _publishedEstimateRevision);
     }
 
     private void MoveContract_Click(object sender,RoutedEventArgs e)
     {
         if(Window.GetWindow(this) is MainWindow main && _doc.Kind=="main")
-            main.MoveCurrentContract(_doc);
+            main.MoveCurrentContract(_doc, _publishedEstimateRevision);
     }
 
     private void DeleteContract_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
-            main.DeleteCurrentDocument(_doc);
+            main.DeleteCurrentDocument(_doc, _publishedEstimateRevision);
     }
 
     private void ShowPeople_Click(object sender, RoutedEventArgs e)
     {
-        new PeopleWindow(_sqlConnectionString, _objectId) { Owner = Window.GetWindow(this) }.ShowDialog();
+        if (Window.GetWindow(this) is MainWindow main)
+            main.OpenEstimateObjectTool(this, _doc, _publishedEstimateRevision, orders: false);
     }
 
     private void ShowOrders_Click(object sender, RoutedEventArgs e)
     {
-        new OrdersWindow(_sqlConnectionString, _objectId, _contractId)
-        {
-            Owner = Window.GetWindow(this)
-        }.ShowDialog();
+        if (Window.GetWindow(this) is MainWindow main)
+            main.OpenEstimateObjectTool(this, _doc, _publishedEstimateRevision, orders: true);
     }
 
     private void ShowHistory_Click(object sender, RoutedEventArgs e)
@@ -270,13 +269,13 @@ public partial class EstimateView
     private void SaveDocumentLink_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main)
-            main.CreateGmcsLink(_doc);
+            main.CreateGmcsLink(_doc, _publishedEstimateRevision);
     }
 
     private void CompareDocs_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is MainWindow main && _doc is not null)
-            main.CompareCurrentDocument(_doc);
+            main.CompareCurrentDocument(_doc, _publishedEstimateRevision);
     }
 
     // ---------------------------------------------------------------- блокировка (toggle_lock)

@@ -21,11 +21,13 @@ public partial class EstimateView
             Window.GetWindow(this) is not MainWindow main || _detached) return;
 
         var revision = _serverRevision;
+        var document = _doc;
         var selection = EstimateGrid.SelectedItems.OfType<EditableEstimateRow>().ToArray();
         var primary = EstimateGrid.SelectedItem;
         var stageMode = _inlineStagesOn;
         bool Current() => !_detached && IsLoaded && IsEnabled &&
             ReferenceEquals(snapshot, _estimate) && revision == _serverRevision &&
+            ReferenceEquals(document, _doc) &&
             main.IsCurrentEstimatePage(_contractId, _objectId, this);
         bool Settled() => Current() && CanTransferDocument && !_serverConflict &&
             !string.IsNullOrWhiteSpace(revision) && revision == _publishedEstimateRevision;
