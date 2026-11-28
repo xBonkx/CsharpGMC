@@ -46,5 +46,9 @@ public sealed class ProcurementReadLifecycleTests
         var guard = loader.IndexOf("generation != _reloadGeneration", projection, StringComparison.Ordinal);
         var publish = loader.IndexOf("_allRows = items;", StringComparison.Ordinal);
         Assert.True(projection >= 0 && guard > projection && publish > guard);
+        Assert.Contains("if (accepted.Day != DateTime.Today)", loader);
+        var sql = File.ReadAllText(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerProcurement.cs"));
+        Assert.Contains("for (var attempt = 0; attempt < 2; attempt++)", sql);
+        Assert.Contains("if (!CanReuseBuySnapshot(revision, confirmed, day, DateTime.Today)) continue;", sql);
     }
 }

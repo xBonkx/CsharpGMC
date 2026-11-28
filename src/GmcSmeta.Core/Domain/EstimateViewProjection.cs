@@ -60,7 +60,7 @@ public static class EstimateViewProjection
     public static IReadOnlyList<EstimateRow> Apply(
         IReadOnlyList<EstimateRow> rows, string? query = null,
         bool noPriceOnly = false, string sort = DocumentOrder, bool flat = false,
-        IReadOnlyDictionary<int, int>? frozenOrder = null)
+        IReadOnlyDictionary<int, int>? frozenOrder = null, EstimateSearchIndex? searchIndex = null)
     {
         ArgumentNullException.ThrowIfNull(rows);
         if (!IsValidSort(sort))
@@ -72,7 +72,7 @@ public static class EstimateViewProjection
             sort == DocumentOrder && !flat)
             return rows;
 
-        var searchResult = EstimateFilter.Apply(rows, query ?? "");
+        var searchResult = EstimateSearchIndex.Apply(rows, query, searchIndex);
         // In ordinary document order the filter already returns the original
         // ordered rows, including ancestors and components. Avoid hashing and
         // scanning the full document a second time.

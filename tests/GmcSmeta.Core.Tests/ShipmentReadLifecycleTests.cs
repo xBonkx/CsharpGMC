@@ -36,7 +36,7 @@ public sealed class ShipmentReadLifecycleTests
         Assert.Contains("requiredReadback ? null : new CancellationTokenSource()", loader);
         Assert.Contains("if (_quantityBusy || _ordinaryShipmentCancellation is not", loader);
         Assert.Contains("_resumeShipmentId = _activeShipmentReadId;", loader);
-        Assert.Contains("requestedId: _resumeShipmentId, requiredReadback: false", loader);
+        Assert.Contains("requestedId: _resumeShipmentId, reuseObject: true, requiredReadback: false", loader);
         Assert.Contains("token.IsCancellationRequested || generation != _loadGeneration", loader);
         Assert.Contains("SqlServerDatabase.RevisionAsync(conn, token)", loader);
         Assert.Contains("SqlServerShipments.IssuableRows(conn, _objectId, token: token)", loader);
@@ -48,5 +48,9 @@ public sealed class ShipmentReadLifecycleTests
         Assert.Contains("unmatched.Remove(row.PositionId);", loader);
         Assert.Contains("lines.Where(l => unmatched.Contains(l.PositionId))", loader);
         Assert.DoesNotContain("rows.Select(r => r.PositionId).ToHashSet()", loader);
+        Assert.Contains("var counts = CountShipmentRows(rows, token);", loader);
+        Assert.Contains("var documentTitles = obj.DocumentTitles;", loader);
+        Assert.Contains("cached is not null && cached.Revision == revision", loader);
+        Assert.Contains("UpdateSummary(snapshot.LineCount, snapshot.Counts);", pane);
     }
 }

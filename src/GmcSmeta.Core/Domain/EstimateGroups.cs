@@ -109,7 +109,7 @@ public static class EstimateGroups
     public static IReadOnlyList<Section> BuildPrepared(Prepared prepared,
         string mode, string sort = EstimateViewProjection.DocumentOrder,
         string? query = null, bool missingOnly = false,
-        IReadOnlyDictionary<string, int>? frozen = null)
+        IReadOnlyDictionary<string, int>? frozen = null, EstimateSearchIndex? searchIndex = null)
     {
         ArgumentNullException.ThrowIfNull(prepared);
         if (mode is not (Same or Type))
@@ -118,7 +118,7 @@ public static class EstimateGroups
             throw new ArgumentOutOfRangeException(nameof(sort));
 
         var allowed = string.IsNullOrWhiteSpace(query) ? null
-            : EstimateFilter.Apply(prepared.Rows, query).Select(r => r.SortKey).ToHashSet();
+            : EstimateSearchIndex.Apply(prepared.Rows, query, searchIndex).Select(r => r.SortKey).ToHashSet();
         var groups = !missingOnly && allowed is null ? prepared.Groups
             : prepared.Groups.Where(g => !missingOnly || g.MissingPrice)
                 .Where(g => allowed is null ||

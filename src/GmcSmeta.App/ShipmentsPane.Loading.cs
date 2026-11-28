@@ -27,16 +27,17 @@ public partial class ShipmentsPane
     private void ResumeShipmentReadIfNeeded()
     {
         if (!IsLoaded || !IsVisible || _quantityBusy || _building || !_needsReloadAfterAttach) return;
-        _ = ReloadAsync(requestedId: _resumeShipmentId, requiredReadback: false);
+        _ = ReloadAsync(requestedId: _resumeShipmentId, reuseObject: true, requiredReadback: false);
     }
 
     private sealed record ObjectSnapshot(string Revision,
         List<SqlServerShipments.ShipmentInfo> Shipments,
         List<SqlServerShipments.ShipmentDocument> Documents,
-        List<SqlServerShipments.IssuableRow> Candidates);
+        List<SqlServerShipments.IssuableRow> Candidates,
+        IReadOnlyDictionary<long, string> DocumentTitles);
 
     private sealed record ShipmentSnapshot(ObjectSnapshot Object, long ShipmentId,
-        List<ShipmentPreviewRow> Rows, int LineCount);
+        List<ShipmentPreviewRow> Rows, int LineCount, ShipmentSummaryCounts Counts);
 
     // Only plain data leaves the worker. No WPF objects or control state is
     // read there; the displayed revision is assigned only after publishing.
@@ -75,7 +76,7 @@ public partial class ShipmentsPane
                 var byId = lines.ToDictionary(l => l.PositionId);
                 // Track only actual historical line IDs, not every candidate.
                 var unmatched = byId.Keys.ToHashSet();
-                var documentTitles = obj.Documents.ToDictionary(d => d.Id, d => d.Title);
+                var documentTitles = obj.DocumentTitles;
                 var multipleDocs = obj.Documents.Count > 1;
                 var editable = !current.Fixed || current.Id == editingFixedId;
                 foreach (var row in obj.Candidates)
@@ -104,11 +105,12 @@ public partial class ShipmentsPane
                     }
                 }
             }
+            var counts = CountShipmentRows(rows, token);
             token.ThrowIfCancellationRequested();
             var confirmed = Revision();
             token.ThrowIfCancellationRequested();
             if (confirmed == revision)
-                return new ShipmentSnapshot(obj, current?.Id ?? 0, rows, lineCount);
+                return new ShipmentSnapshot(obj, current?.Id ?? 0, rows, lineCount, counts);
             cached = null; // retry once, including all object-level data
         }
         throw new InvalidOperationException("Данные выдачи изменились при чтении. Обновите ведомости.");
@@ -123,7 +125,9 @@ public partial class ShipmentsPane
             SqlServerShipments.DocumentsOf(conn, _objectId, token);
         var candidates = shipments.Count == 0 ? new List<SqlServerShipments.IssuableRow>() :
             SqlServerShipments.IssuableRows(conn, _objectId, token: token);
-        return new ObjectSnapshot(revision, shipments, documents, candidates);
+        token.ThrowIfCancellationRequested();
+        return new ObjectSnapshot(revision, shipments, documents, candidates,
+            documents.ToDictionary(d => d.Id, d => d.Title));
     }
 
     private async Task ReloadAsync(bool preserveStatus = false, long? requestedId = null,
@@ -147,7 +151,7 @@ public partial class ShipmentsPane
         var previousMessage = FooterText.Text;
         var gridState = targetId == _shipmentId && _revision.Length > 0 ? CaptureGridState() : null;
         var editingFixedId = _editingFixedId;
-        var cached = reuseObject ? _objectSnapshot : null;
+        var cached = reuseObject || allowUnchanged ? _objectSnapshot : null;
         var reusableRevision = allowUnchanged && CanReuseShipmentSnapshot(
             _objectSnapshot?.Revision, _revision, _revision, _shipmentId, targetId,
             !_shipmentSnapshotMayReuse || _needsReloadAfterAttach || _quantityBusy ||

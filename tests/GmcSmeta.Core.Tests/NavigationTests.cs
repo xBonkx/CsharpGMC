@@ -149,4 +149,25 @@ public class NavigationTests
     [InlineData("", "")]
     public void DateLabel_MatchesPython(string input, string expected) =>
         Assert.Equal(expected, Navigation.ShortDate(input, 2026));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("ВЕНТ")]
+    [InlineData("ВЕНТ альфа")]
+    [InlineData("альфа бета")]
+    [InlineData("альфа")]
+    [InlineData("пустой")]
+    [InlineData("завершённый")]
+    public void SearchScratchBufferPreservesScopeAndSingleDocumentMatching(string query)
+    {
+        var docs = new[] { Doc(1, 1, "kp") with { Name = "альфа" },
+            Doc(2, 1, "kp") with { Name = "бета" }, Docs[1], Docs[3] };
+        foreach (var mode in new[] { NavigationMode.Kp, NavigationMode.Contracts, NavigationMode.Archive })
+        {
+            var index = new NavigationSearchIndex(Navigation.Select(Objects, docs, mode));
+            var expected = Navigation.Select(Objects, docs, mode, query).Select(g => g.Object.Id).OrderBy(id => id);
+            Assert.Equal(expected, index.Match(query).OrderBy(id => id));
+            Assert.Equal(expected, index.Match(query).OrderBy(id => id));
+        }
+    }
 }

@@ -307,7 +307,7 @@ public partial class ShipmentsPane : UserControl
         view.Filter = RowVisible;
         LinesGrid.ItemsSource = view;
         if (gridState is not null) RestoreGridState(gridState);
-        UpdateSummary(snapshot.LineCount);
+        UpdateSummary(snapshot.LineCount, snapshot.Counts);
         UpdateShipmentSteps(current);
         FooterText.Text = IsEditingFixed
             ? "Изменяете выданную ведомость — правки сразу проводятся в закупках."
@@ -353,18 +353,9 @@ public partial class ShipmentsPane : UserControl
         };
     }
 
-    private void UpdateSummary(int lineCount)
+    private void UpdateSummary(int lineCount, ShipmentSummaryCounts? prepared = null)
     {
-        var over = 0;
-        var planned = 0;
-        var done = 0;
-        foreach (var row in _rows)
-        {
-            if (row.StockOverrun) over++;
-            if (!row.Planned) continue;
-            planned++;
-            if (row.FullyIssued) done++;
-        }
+        var (over, planned, done) = prepared ?? CountShipmentRows(_rows);
         LinesTile.Text = ShipmentCardText.PositionCount(lineCount);
         OverTile.Text = over == 0 ? "нет" : ShipmentCardText.PositionCount(over);
         StockWarningText.Text = over == 0 ? "" :

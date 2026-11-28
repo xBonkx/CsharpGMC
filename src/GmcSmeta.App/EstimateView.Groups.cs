@@ -32,7 +32,7 @@ public partial class EstimateView
             _preparedGroups = EstimateGroups.Prepare(_estimate.Rows);
         var sections = EstimateGroups.BuildPrepared(_preparedGroups, _temporaryGroupMode,
             _temporarySort, EstimateSearch.Text, _noPriceTemporaryView,
-            _frozenGroupedOrder);
+            _frozenGroupedOrder, SearchIndexFor(_estimate.Rows));
         // Expand all uses this very projection; do not build groups twice.
         if (expandAllGroups)
             foreach (var group in sections.SelectMany(section => section.Groups))
@@ -51,9 +51,10 @@ public partial class EstimateView
         void ShowPosition(EstimateRow source, int depth)
         {
             var original = byId[source.Id];
-            original.DisplayNum = showPositionNumbers
+            var number = showPositionNumbers
                 ? original.Num : index.SectionName(source.SystemId, original.Num);
-            original.DisplayIndentLevel = depth;
+            if (original.DisplayNum != number) original.DisplayNum = number;
+            if (original.DisplayIndentLevel != depth) original.DisplayIndentLevel = depth;
             projected.Add(original);
         }
 

@@ -132,15 +132,24 @@ public sealed class NavigationSearchIndex
         var words = string.IsNullOrWhiteSpace(search) ? Array.Empty<string>() :
             search.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var result = new HashSet<int>();
+        // Reuse a single scratch buffer for the whole query, not one array
+        // and closures per object. Preserve one-document matching semantics.
+        var unmatched = new string[words.Length];
         foreach (var entry in _entries)
         {
-            // All unmatched words must belong to ONE document, exactly as
-            // Navigation.Select; do not concatenate different documents.
-            var unmatched = words.Where(word =>
-                !entry.Name.Contains(word, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (unmatched.Length == 0 || entry.DocumentTips.Any(tip => unmatched.All(word =>
-                tip.Contains(word, StringComparison.OrdinalIgnoreCase))))
+            var count = 0;
+            foreach (var word in words)
+                if (!entry.Name.Contains(word, StringComparison.OrdinalIgnoreCase))
+                    unmatched[count++] = word;
+            if (count == 0) { result.Add(entry.Id); continue; }
+            foreach (var tip in entry.DocumentTips)
+            {
+                var i = 0;
+                while (i < count && tip.Contains(unmatched[i], StringComparison.OrdinalIgnoreCase)) i++;
+                if (i != count) continue;
                 result.Add(entry.Id);
+                break;
+            }
         }
         return result;
     }

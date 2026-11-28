@@ -257,44 +257,52 @@ public static partial class SqlServerProcurement
         string Revision() => token.CanBeCanceled
             ? SqlServerDatabase.RevisionAsync(conn, token).GetAwaiter().GetResult()
             : SqlServerDatabase.Revision(conn);
-        var revision = Revision();
-        token.ThrowIfCancellationRequested();
-        if (string.IsNullOrEmpty(revision))
-            throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
-
-        var day = DateTime.Today;
-        if (CanReuseBuySnapshot(publishedRevision, revision, publishedDay, day))
-            return null;
-
-        IReadOnlyList<BuyRow> rows;
-        IReadOnlyList<SystemChoice> systems;
-        bool editable;
-        const string writeScope = "SELECT CASE WHEN c.locked=0 AND ISNULL(c.stage_rest,0)=0 " +
-            "AND ISNULL(o.archived,0)=0 THEN 1 ELSE 0 END " +
-            "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id";
-        using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery + ";\n" + writeScope, conn))
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
-            using var registration = SqlReadCancellation.Register(cmd, token);
-            using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
-            rows = ReadBuyRows(reader, day, token);
+            var revision = Revision();
             token.ThrowIfCancellationRequested();
-            if (!reader.NextResult())
-                throw new InvalidOperationException("Не получен список систем закупок.");
-            systems = ReadSystemChoices(reader, token);
-            if (!reader.NextResult() || !reader.Read())
-                throw new InvalidOperationException("Документ закупок не найден.");
-            editable = SqlFlag.Read(reader, 0);
+            if (string.IsNullOrEmpty(revision))
+                throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
+
+            var day = DateTime.Today;
+            if (attempt == 0 && CanReuseBuySnapshot(publishedRevision, revision, publishedDay, day) &&
+                day == DateTime.Today)
+                return null;
+
+            IReadOnlyList<BuyRow> rows;
+            IReadOnlyList<SystemChoice> systems;
+            bool editable;
+            const string writeScope = "SELECT CASE WHEN c.locked=0 AND ISNULL(c.stage_rest,0)=0 " +
+                "AND ISNULL(o.archived,0)=0 THEN 1 ELSE 0 END " +
+                "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE c.id=@id";
+            using (var cmd = new SqlCommand(BuyRowsQuery() + ";\n" + SystemChoicesQuery + ";\n" + writeScope, conn))
+            {
+                cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = contractId;
+                using var registration = SqlReadCancellation.Register(cmd, token);
+                using var reader = SqlReadCancellation.ExecuteReader(cmd, token);
+                rows = ReadBuyRows(reader, day, token);
+                token.ThrowIfCancellationRequested();
+                if (!reader.NextResult())
+                    throw new InvalidOperationException("Не получен список систем закупок.");
+                systems = ReadSystemChoices(reader, token);
+                token.ThrowIfCancellationRequested();
+                if (!reader.NextResult() || !reader.Read())
+                    throw new InvalidOperationException("Документ закупок не найден.");
+                editable = SqlFlag.Read(reader, 0);
+            }
+            token.ThrowIfCancellationRequested();
+            var confirmed = Revision();
+            token.ThrowIfCancellationRequested();
+            // Retry read-only work once on the same connection. Never publish
+            // a mixture of revisions or due-date flags from yesterday.
+            if (!CanReuseBuySnapshot(revision, confirmed, day, DateTime.Today)) continue;
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            return new BuySnapshot(rows, systems, revision, day)
+            {
+                CanWrite = editable && SqlSchemaCompatibility.IsWritablePilot(builder.InitialCatalog, builder.DataSource)
+            };
         }
-        token.ThrowIfCancellationRequested();
-        if (Revision() != revision)
-            throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
-        token.ThrowIfCancellationRequested();
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        return new BuySnapshot(rows, systems, revision, day)
-        {
-            CanWrite = editable && SqlSchemaCompatibility.IsWritablePilot(builder.InitialCatalog, builder.DataSource)
-        };
+        throw new InvalidOperationException("Данные изменились при чтении закупок. Обновите таблицу.");
     }
 
     /// <summary>

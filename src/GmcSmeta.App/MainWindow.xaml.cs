@@ -297,9 +297,10 @@ public partial class MainWindow : Window
     private void RestoreNavigationSearchExpansion()
     {
         if (_searchExpansionSnapshot is null) return;
-        foreach (var (node, wasExpanded) in _searchExpansionSnapshot)
+        var snapshot = _searchExpansionSnapshot;
+        _searchExpansionSnapshot = null; // Expansion can lazily create children.
+        foreach (var (node, wasExpanded) in snapshot)
             node.IsExpanded = wasExpanded;
-        _searchExpansionSnapshot = null;
     }
 
     // Python Nav: 16 DIP per level, 7 DIP vertical padding.
@@ -408,6 +409,9 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(node, header.DisplayName);
         node.IsExpanded = entry.Children.Count > 0 || opened?.Contains(NodeKey(node)) == true;
         _documentNodes[entry.Document.Id] = node;
+        // A collapsed object's documents may first be created by search.
+        // Capture their initial state before any search-time user expansion.
+        _searchExpansionSnapshot?.TryAdd(node, node.IsExpanded);
         foreach (var child in entry.Children) node.Items.Add(DocumentNode(child, opened, depth + 1, shortTitle));
         return node;
     }

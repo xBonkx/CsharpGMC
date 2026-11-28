@@ -110,6 +110,8 @@ public partial class ProcurementPane
             var accepted = snapshot;
             var items = await Task.Run(() => PrepareBuyRows(accepted, token), token);
             if (token.IsCancellationRequested || generation != _reloadGeneration || !IsLoaded) return false;
+            if (accepted.Day != DateTime.Today)
+                throw new InvalidOperationException("Дата изменилась во время загрузки. Обновите закупки.");
             if (BuyGrid.ItemsSource is ListCollectionView { IsEditingItem: true })
                 throw new InvalidOperationException("Завершите редактирование строки и обновите закупки.");
             _applyingBuySnapshot = true;

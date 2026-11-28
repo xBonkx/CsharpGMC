@@ -204,6 +204,7 @@ public partial class EstimateView : UserControl
     private void SetDocument(EstimateDocument est)
     {
         _estimate = est;
+        if (!ReferenceEquals(_estimateSearchIndex?.Rows, est.Rows)) _estimateSearchIndex = null;
         InvalidateCostSummary();
         InvalidateCostTotals();
         CancelMaterialsRead(); // a new authoritative estimate supersedes a clean in-flight read
@@ -685,7 +686,7 @@ public partial class EstimateView : UserControl
         // SQL-loaded rows. SortKey and position IDs remain unchanged.
         var projected = EstimateViewProjection.Apply(
             _estimate.Rows, EstimateSearch.Text, _noPriceTemporaryView,
-            _temporarySort, _flatTemporaryView, _frozenTemporaryOrder);
+            _temporarySort, _flatTemporaryView, _frozenTemporaryOrder, SearchIndexFor(_estimate.Rows));
         // Preserve the visible order of existing rows after saving a price
         // (Python _view_key). A manual view change explicitly resets ranks.
         if (_temporarySort != EstimateViewProjection.DocumentOrder)

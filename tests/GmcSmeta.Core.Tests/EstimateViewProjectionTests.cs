@@ -389,4 +389,48 @@ public sealed class EstimateViewProjectionTests
         var view = EstimateViewProjection.Apply(rows, sort: EstimateViewProjection.ByQuantity);
         Assert.Equal(new[] { 0, 2, 3, 1 }, view.Select(x => x.SortKey));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("в1")]
+    [InlineData("КОМПЛЕКТ")]
+    [InlineData("В10")]
+    [InlineData("В 10")]
+    [InlineData("В2")]
+    [InlineData("не найдено")]
+    public void PreparedSearchPreservesAllProjectionModes(string query)
+    {
+        var rows = Example();
+        var index = new EstimateSearchIndex(rows);
+        Assert.Equal(EstimateFilter.Apply(rows, query), index.Match(query));
+        Assert.Same(index.Match(query), index.Match(query));
+        foreach (var missing in new[] { false, true })
+        foreach (var flat in new[] { false, true })
+        foreach (var sort in new[] { EstimateViewProjection.DocumentOrder, EstimateViewProjection.ByName, EstimateViewProjection.ByPrice })
+            Assert.Equal(EstimateViewProjection.Apply(rows, query, missing, sort, flat),
+                EstimateViewProjection.Apply(rows, query, missing, sort, flat, searchIndex: index));
+        foreach (var mode in new[] { EstimateGroups.Same, EstimateGroups.Type })
+        {
+            var prepared = EstimateGroups.Prepare(rows);
+            var expected = EstimateGroups.BuildPrepared(prepared, mode, query: query);
+            var actual = EstimateGroups.BuildPrepared(prepared, mode, query: query, searchIndex: index);
+            Assert.Equal(expected.SelectMany(s => s.Groups).SelectMany(g => g.Members).Select(r => r.Id),
+                actual.SelectMany(s => s.Groups).SelectMany(g => g.Members).Select(r => r.Id));
+        }
+    }
+
+    [Fact]
+    public void SearchIndexRejectsOldSnapshotAndMatchesLargeHierarchy()
+    {
+        var rows = new List<EstimateRow> { Section(0, 10, "root") };
+        for (var i = 1; i <= 25000; i++)
+            rows.Add(Pos(i, i, 10, i % 2 == 0 ? "Клапан" : "Решётка", i));
+        var index = new EstimateSearchIndex(rows);
+        foreach (var query in new[] { "К", "Клап", "Клапан", "реш", "root", "", "не найдено" })
+            Assert.Equal(EstimateFilter.Apply(rows, query), index.Match(query));
+        var changed = rows.Select(r => r with { Name = "новый" }).ToArray();
+        Assert.Equal(EstimateViewProjection.Apply(changed, "новый"),
+            EstimateViewProjection.Apply(changed, "новый", searchIndex: index));
+    }
 }
