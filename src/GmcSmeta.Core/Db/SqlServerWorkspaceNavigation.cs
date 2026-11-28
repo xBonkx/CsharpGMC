@@ -189,13 +189,8 @@ public static class SqlServerWorkspaceNavigation
         $" (ID {id})" +
         (string.IsNullOrWhiteSpace(subject) ? "" : " — " + subject);
 
-    public static IReadOnlyList<CatalogEntry> Catalog(string connectionString, string? query, int skip = 0, int take = 200)
-    {
-        SqlServerWorkspace.RequirePilotDatabase(connectionString);
-        if (skip < 0 || take is < 1 or > 500) throw new ArgumentOutOfRangeException(nameof(take));
-        using var conn = SqlServerDatabase.Open(connectionString);
-        return ReadCatalogPage(conn, query, skip, take, includeUsageCount: true, token: default);
-    }
+    public static IReadOnlyList<CatalogEntry> Catalog(string connectionString, string? query, int skip = 0, int take = 200) =>
+        CatalogSnapshot(connectionString, query, skip, take).Rows;
 
     /// <summary>One guarded connection for the page and both revision checks.
     /// The picker does not need the usage count; management still displays it.</summary>
@@ -222,19 +217,25 @@ public static class SqlServerWorkspaceNavigation
         return (rows, before);
     }
 
+    // Resolve the stable catalog page before calculating its position-dependent
+    // projections. Preserve both prices from the same latest priced position.
+    internal static string CatalogPageSql(string[] words, bool includeUsageCount) =>
+        ";WITH catalog_page AS (SELECT c.id,c.name,c.unit FROM dbo.catalog_items c WHERE " +
+        MatchSql(["c.name"], words) +
+        " ORDER BY c.name,c.id OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY) " +
+        "SELECT c.id,c.name,c.unit,COALESCE(latest.price,0),COALESCE(latest.purchase_price,0)," +
+        (includeUsageCount ? "(SELECT COUNT_BIG(*) FROM dbo.positions p WHERE p.catalog_item_id=c.id) " : "CAST(0 AS bigint) ") +
+        "FROM catalog_page c OUTER APPLY " +
+        "(SELECT TOP (1) p.price,p.purchase_price FROM dbo.positions p " +
+        " WHERE p.catalog_item_id=c.id AND p.price>0 ORDER BY p.id DESC) latest " +
+        "ORDER BY c.name,c.id";
+
     private static IReadOnlyList<CatalogEntry> ReadCatalogPage(SqlConnection conn, string? query,
         int skip, int take, bool includeUsageCount, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var words = Words(query);
-        using var cmd = new SqlCommand(
-            "SELECT c.id,c.name,c.unit,COALESCE(latest.price,0),COALESCE(latest.purchase_price,0)," +
-            (includeUsageCount ? "(SELECT COUNT_BIG(*) FROM dbo.positions p WHERE p.catalog_item_id=c.id) " : "CAST(0 AS bigint) ") +
-            "FROM dbo.catalog_items c OUTER APPLY " +
-            "(SELECT TOP (1) p.price,p.purchase_price FROM dbo.positions p " +
-            " WHERE p.catalog_item_id=c.id AND p.price>0 ORDER BY p.id DESC) latest " +
-            "WHERE " + MatchSql(["c.name"], words) +
-            " ORDER BY c.name,c.id OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn) { CommandTimeout = 30 };
+        using var cmd = new SqlCommand(CatalogPageSql(words, includeUsageCount), conn) { CommandTimeout = 30 };
         AddWords(cmd, words);
         cmd.Parameters.Add("@skip", SqlDbType.Int).Value = skip;
         cmd.Parameters.Add("@take", SqlDbType.Int).Value = take;
@@ -293,11 +294,23 @@ public static class SqlServerWorkspaceNavigation
         return rows;
     }
 
-    public static IReadOnlyList<CompanyEntry> Companies(string connectionString)
+    public static IReadOnlyList<CompanyEntry> Companies(string connectionString) =>
+        ReadFreshReference(connectionString, ReadCompanies);
+
+    // Usage counts, current rules and mutable logo bytes depend on database
+    // state, not just reference IDs. Do not retain a process-wide cache.
+    private static IReadOnlyList<T> ReadFreshReference<T>(string connectionString,
+        Func<SqlConnection, IReadOnlyList<T>> read)
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         using var conn = SqlServerDatabase.Open(connectionString);
-        return ReadCompanies(conn);
+        var before = SqlServerDatabase.Revision(conn);
+        if (string.IsNullOrWhiteSpace(before))
+            throw new DBConcurrencyException("Ревизия справочника отсутствует.");
+        var rows = read(conn);
+        if (before != SqlServerDatabase.Revision(conn))
+            throw new DBConcurrencyException("Справочник изменён другим сотрудником. Повторите загрузку.");
+        return rows;
     }
 
     // Caller owns the already guarded connection and revision fence.
@@ -332,12 +345,8 @@ public static class SqlServerWorkspaceNavigation
             };
     }
 
-    public static IReadOnlyList<TagEntry> Tags(string connectionString)
-    {
-        SqlServerWorkspace.RequirePilotDatabase(connectionString);
-        using var conn = SqlServerDatabase.Open(connectionString);
-        return ReadTags(conn);
-    }
+    public static IReadOnlyList<TagEntry> Tags(string connectionString) =>
+        ReadFreshReference(connectionString, ReadTags);
 
     public static IReadOnlyList<TagEntry> ReadTags(SqlConnection conn)
     {
