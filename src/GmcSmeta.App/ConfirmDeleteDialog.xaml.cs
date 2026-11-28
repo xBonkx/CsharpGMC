@@ -53,14 +53,11 @@ public partial class ConfirmDeleteDialog : Window
         if (DeleteButton is not null) DeleteButton.IsEnabled = AnswerConfirmed;
     }
 
-    private void AnswerBox_KeyDown(object sender, KeyEventArgs e)
+    private void AnswerBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // returnPressed: Enter подтверждает только при правильном ответе.
-        if (e.Key == Key.Enter && AnswerConfirmed && DeleteButton.IsEnabled)
-        {
-            DialogResult = true;
+        // A correct answer enables Delete; submitting the text must not delete.
+        if (e.Key == Key.Enter)
             e.Handled = true;
-        }
     }
 
     private void Delete_Click(object sender, RoutedEventArgs e)
