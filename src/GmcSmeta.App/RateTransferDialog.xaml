@@ -33,7 +33,7 @@
                          Padding="32,5,32,5" AutomationProperties.Name="Поиск КП" ToolTip="Поиск КП"/>
                 
                 <Viewbox Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                <TextBlock Text="Поиск КП" Foreground="#94A3B8" Margin="32,0,32,0" VerticalAlignment="Center"
+                <TextBlock Text="Поиск КП" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" IsHitTestVisible="False">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -98,7 +98,7 @@
             <Button x:Name="ChooseButton" Style="{StaticResource PythonToolbarButton}" Content="Выбрать позицию…" Click="Choose_Click" IsEnabled="False" Margin="0,0,8,0"/>
             <Button x:Name="ZeroButton" Style="{StaticResource PythonToolbarButton}" Content="Заполнить нулевую цену" Click="Zero_Click" IsEnabled="False"/>
         </WrapPanel>
-        <TextBlock x:Name="InfoText" Grid.Row="5" Foreground="#64748B" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <TextBlock x:Name="InfoText" Grid.Row="5" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
         <Grid Grid.Row="6" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
