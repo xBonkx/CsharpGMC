@@ -1,5 +1,7 @@
 # Текущая работа GMC-Смета — 28.11.2026
 
+- 29.11.2026 — CTX-046.02 PARTIAL: archive year, estimate discount, transport and signed PDF keyboard routes corrected; 4 source tests added (not run). [Evidence](docs/CONTEXT_MENU_TODO_20261124.md). Бронь снята.
+
 - 29.11.2026 — PERF-047.02 PARTIAL: поиск людей и авто без повторной склейки строк, точный ID истории после экспорта, отказ без ревизии; source tests added, not run. [Evidence](docs/PERFORMANCE_TODO_20261124.md). Бронь снята.
 
 - 29.11.2026 — PERF-047.04 PARTIAL: certificate cancellation/write-refresh fence, exact history clicks, same private XLSX preview/archive; existing two-step VOR save remains. [Evidence](docs/PERFORMANCE_TODO_20261124.md#perf-pto-finish-20261129). Tests not run, reservation released.
