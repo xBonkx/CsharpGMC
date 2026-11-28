@@ -211,8 +211,9 @@ public static class TableColumnMenu
         {
             if (!_initialized || !IsLegacyCostKey(key)) return null;
             var entry = _entries.FirstOrDefault(e => e.Column == column);
-            return entry is not null && !entry.Excluded && entry.Width.IsAbsolute &&
-                !_prefs.Widths.ContainsKey(entry.Id) ? entry.Width.Value : null;
+            if (entry is null || entry.Excluded || !entry.Width.IsAbsolute) return null;
+            return _prefs.Widths.TryGetValue(entry.Id, out var manual) &&
+                double.IsFinite(manual) && manual is >= 36 and <= 2000 ? null : entry.Width.Value;
         }
 
         private double SummaryPreferred(DataGridColumn column)

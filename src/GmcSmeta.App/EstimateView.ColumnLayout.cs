@@ -45,8 +45,8 @@ public partial class EstimateView
         {
             if (!_uiSettingsReady || _uiSettings.ColumnWidths.Count > 0 ||
                 !EstimateGrid.IsLoaded || !EstimateGrid.IsVisible || _estimateHeaderResizeActive ||
-                _estimateFitQueued || HasActiveEstimateEdit()) return;
-            if (!EstimateMeasurementsCurrent()) RequestEstimateColumnFit();
+                _estimateFitQueued) return;
+            if (!EstimateMeasurementsCurrent() && !HasActiveEstimateEdit()) RequestEstimateColumnFit();
         };
         EstimateGrid.Unloaded += (_, _) =>
         {
@@ -148,14 +148,25 @@ public partial class EstimateView
             {
                 foreach (var column in numeric)
                 {
-                    var value = column.SortMemberPath switch
+                    string value;
+                    try
                     {
+                        value = column.SortMemberPath switch
+                        {
                         "number" => row.DisplayNum, "unit" => row.Unit, "qty" => row.QtyText,
                         "price" => row.DisplayPriceText, "sum" => row.DisplayAmountText,
                         "purchase" => row.PurchaseText, "work" => row.WorkDisplayText,
                         "workTotal" => row.DisplayWorkAmountText, "areaUnit" => row.AreaUnitDisplay,
-                        "areaTotal" => row.AreaTotalDisplay, _ => ""
-                    };
+                            "areaTotal" => row.AreaTotalDisplay, _ => ""
+                        };
+                    }
+                    catch (OverflowException)
+                    {
+                        // A pending optimistic numeric product can exceed
+                        // decimal before server validation. Layout must not
+                        // turn a bad input into an application crash.
+                        continue;
+                    }
                     widths[column] = Math.Max(widths[column], measure.Cell(value,
                         column == NumberColumn && row.IsExpandable ? 22 : 0));
                 }
