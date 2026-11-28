@@ -23,7 +23,7 @@ BenchmarkOptions options;
 try
 {
     options = BenchmarkOptions.Parse(args);
-    SqlServerWorkspace.RequirePilotDatabase(cs);
+    SqlDiagnostics.RequireIsolatedPilot(cs);
 }
 catch (Exception ex)
 {
@@ -48,8 +48,7 @@ IReadOnlyList<SqlDiagnosticResult> diagnostics = Array.Empty<SqlDiagnosticResult
 try
 {
     using var conn = SqlServerDatabase.Open(cs);
-    if (!conn.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("Unexpected database.");
+    SqlDiagnostics.RequireIsolatedCatalog(conn.Database);
     var revision = SqlServerDatabase.Revision(conn);
     if (string.IsNullOrWhiteSpace(revision))
         throw new InvalidOperationException("Missing revision.");

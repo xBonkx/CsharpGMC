@@ -190,15 +190,8 @@ public static class SqlServerDirector
         foreach (var batch in contractIds.Chunk(ContractBatchSize))
         {
             token.ThrowIfCancellationRequested();
-            using var read = new SqlCommand("", conn);
-            var names = new List<string>(batch.Length);
-            for (var i = 0; i < batch.Length; i++)
-            {
-                var name = "@cid" + i.ToString(CultureInfo.InvariantCulture);
-                names.Add(name);
-                read.Parameters.Add(name, SqlDbType.BigInt).Value = batch[i];
-            }
-            read.CommandText = ContractMetricsSql(string.Join(",", names), countLate);
+            using var read = CreateContractMetricsReadCommand(conn, batch, countLate);
+            using var timing = StartupTrace.Measure("director_contract_metrics");
             using var cancellation = SqlReadCancellation.Register(read, token);
             using var r = SqlReadCancellation.ExecuteReader(read, token);
             decimal Number(int index) => r.IsDBNull(index) ? 0m :
@@ -247,6 +240,22 @@ public static class SqlServerDirector
         }
         token.ThrowIfCancellationRequested();
         return result;
+    }
+
+    /// <summary>Exact production read command for a bounded, explicitly supplied contract scope.
+    /// Also used by the read-only Pilot diagnostics. Caller owns the connection and command.</summary>
+    public static SqlCommand CreateContractMetricsReadCommand(SqlConnection conn,
+        IReadOnlyList<long> contractIds, bool countLate)
+    {
+        if (contractIds.Count == 0 || contractIds.Count > ContractBatchSize ||
+            contractIds.Any(id => id <= 0) || contractIds.Distinct().Count() != contractIds.Count)
+            throw new ArgumentException("Invalid director contract scope.", nameof(contractIds));
+        var names = Enumerable.Range(0, contractIds.Count)
+            .Select(i => "@cid" + i.ToString(CultureInfo.InvariantCulture)).ToArray();
+        var command = new SqlCommand(ContractMetricsSql(string.Join(",", names), countLate), conn);
+        for (var i = 0; i < names.Length; i++)
+            command.Parameters.Add(names[i], SqlDbType.BigInt).Value = contractIds[i];
+        return command;
     }
 
     // The caller constructs the IN list exclusively from bound parameter names.

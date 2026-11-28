@@ -29,6 +29,7 @@
     <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkEvidence.cs" Link="RemoteSqlBenchmarkEvidence.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkComparison.cs" Link="RemoteSqlBenchmarkComparison.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\SqlDiagnostics.cs" Link="RemoteSqlDiagnostics.cs" />
+    <Compile Include="..\..\tools\RemoteSqlBench\SqlDiagnosticQueries.cs" Link="SqlDiagnosticQueries.cs" />
   </ItemGroup>
 
 </Project>

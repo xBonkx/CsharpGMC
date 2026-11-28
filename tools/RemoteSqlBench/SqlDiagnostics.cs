@@ -43,6 +43,32 @@ internal static class SqlDiagnostics
         ORDER BY t.name,st.stats_id,sc.stats_column_id;
         """;
 
+    internal const string IndexUsageSql = """
+        SELECT t.name AS table_name,i.index_id,i.name AS index_name,
+            u.user_seeks,u.user_scans,u.user_lookups,u.user_updates,
+            u.last_user_seek,u.last_user_scan,u.last_user_lookup,u.last_user_update
+        FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+        JOIN sys.indexes i ON i.object_id=t.object_id
+        LEFT JOIN sys.dm_db_index_usage_stats u ON u.database_id=DB_ID()
+            AND u.object_id=i.object_id AND u.index_id=i.index_id
+        WHERE s.name=N'dbo' AND t.name IN
+            (N'systems',N'positions',N'contracts',N'movements',N'procurement',
+             N'acts',N'act_lines',N'shipment_lines',N'spec_revisions')
+        ORDER BY t.name,i.index_id;
+        """;
+
+    internal const string StatisticsDetailsSql = """
+        SELECT t.name AS table_name,st.stats_id,st.name AS statistics_name,
+            dp.last_updated,dp.[rows],dp.rows_sampled,dp.steps,dp.modification_counter
+        FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+        JOIN sys.stats st ON st.object_id=t.object_id
+        OUTER APPLY sys.dm_db_stats_properties(t.object_id,st.stats_id) dp
+        WHERE s.name=N'dbo' AND t.name IN
+            (N'systems',N'positions',N'contracts',N'movements',N'procurement',
+             N'acts',N'act_lines',N'shipment_lines',N'spec_revisions')
+        ORDER BY t.name,st.stats_id;
+        """;
+
     // Independent correlated reference for the movement fields only. Same
     // subtraction, NULL fallback and SQL types as the production aggregate.
     internal const string MovementReferenceSql = """
@@ -56,10 +82,23 @@ internal static class SqlDiagnostics
         WHERE sy.contract_id=@id ORDER BY sy.[order],sy.id,p.[order],p.id;
         """;
 
+    internal static void RequireIsolatedPilot(string connectionString)
+    {
+        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        RequireIsolatedCatalog(new SqlConnectionStringBuilder(connectionString).InitialCatalog);
+    }
+
+    internal static void RequireIsolatedCatalog(string name)
+    {
+        if (!name.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("GmcSmetaPilot_Cutover", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Only isolated non-Cutover Pilot databases are allowed.");
+    }
+
     internal static IReadOnlyList<SqlDiagnosticResult> Collect(string connectionString,
         int contractId, string directory)
     {
-        SqlServerWorkspace.RequirePilotDatabase(connectionString);
+        RequireIsolatedPilot(connectionString);
         // Never return instrumented sessions to the normal connection pool.
         var cs = new SqlConnectionStringBuilder(connectionString) { Pooling = false }.ConnectionString;
         var results = new List<SqlDiagnosticResult>();
@@ -68,10 +107,10 @@ internal static class SqlDiagnostics
             try
             {
                 using var conn = SqlServerDatabase.Open(cs);
-                if (!conn.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("Unexpected database.");
+                RequireIsolatedCatalog(conn.Database);
                 var result = action(conn, Path.Combine(directory, file));
-                results.Add(new(name, result.Ok ? "OK" : "INCOMPLETE", result.Detail, file));
+                results.Add(new(name, result.Ok ? "OK" : "INCOMPLETE", result.Detail,
+                    File.Exists(Path.Combine(directory, file)) ? file : ""));
             }
             catch (Exception ex)
             {
@@ -82,13 +121,59 @@ internal static class SqlDiagnostics
         }
         Run("index_inventory", "indexes.json", (conn, path) => Inventory(conn, IndexInventorySql, path));
         Run("statistics_inventory", "statistics.json", (conn, path) => Inventory(conn, StatisticsInventorySql, path));
+        Run("index_usage", "index-usage.json", (conn, path) => Inventory(conn, IndexUsageSql, path));
+        Run("statistics_details", "statistics-details.json", (conn, path) => Inventory(conn, StatisticsDetailsSql, path));
+        Run("procurement_all_columns_parity", "procurement-all-columns.json", (conn, path) =>
+        {
+            var result = SqlDiagnosticQueries.CompareBuyRows(conn, contractId);
+            WriteJson(path, result);
+            return (result.Passed, $"rows={result.ActualRows}; mismatches={result.Mismatches}; stable={result.RevisionStable}");
+        });
         Run("procurement_movement_parity", "procurement-parity.json",
             (conn, path) => CompareMovements(conn, contractId, path));
         Run("procurement_io_time", "procurement-io-time.txt",
             (conn, path) => ReadIoTime(conn, contractId, path));
         Run("procurement_actual_plan", "procurement-actual-plan.sqlplan",
             (conn, path) => ReadActualPlan(conn, contractId, path));
+        // Each profile is independent, guarded, and outside timed iterations.
+        foreach (var countLate in new[] { false, true })
+        {
+            var label = countLate ? "contracts" : "kp";
+            foreach (var size in new[] { 10, 50, 200 })
+            {
+                var prefix = $"director-{label}-{size}";
+                Run(prefix + "-parity", prefix + "-parity.json", (conn, path) =>
+                {
+                    var ids = SqlDiagnosticQueries.DirectorScope(conn, countLate, size);
+                    if (ids.Length != size) return (false, $"requires {size}; available {ids.Length}");
+                    var parity = SqlDiagnosticQueries.CompareDirector(conn, ids, countLate);
+                    WriteJson(path, parity);
+                    return (parity.Passed, $"contracts={size}; rows={parity.ActualRows}; stable={parity.RevisionStable}");
+                });
+                Run(prefix + "-io", prefix + "-io-time.txt", (conn, path) =>
+                {
+                    var ids = SqlDiagnosticQueries.DirectorScope(conn, countLate, size);
+                    if (ids.Length != size) return (false, $"requires {size}; available {ids.Length}");
+                    return ReadIoTime(conn, () => DirectorCommand(conn, ids, countLate), path);
+                });
+                Run(prefix + "-plans", prefix + "-plans.json", (conn, path) =>
+                {
+                    var ids = SqlDiagnosticQueries.DirectorScope(conn, countLate, size);
+                    if (ids.Length != size) return (false, $"requires {size}; available {ids.Length}");
+                    var plans = ReadActualPlans(conn, () => DirectorCommand(conn, ids, countLate));
+                    WriteJson(path, plans);
+                    return (plans.Count == 3, $"plans={plans.Count}/3");
+                });
+            }
+        }
         return results;
+    }
+
+    private static SqlCommand DirectorCommand(SqlConnection conn, IReadOnlyList<long> ids, bool countLate)
+    {
+        var cmd = SqlServerDirector.CreateContractMetricsReadCommand(conn, ids, countLate);
+        cmd.CommandTimeout = 120;
+        return cmd;
     }
 
     private static (bool Ok, string Detail) Inventory(SqlConnection conn, string sql, string path)
@@ -172,7 +257,10 @@ internal static class SqlDiagnostics
         command.ExecuteNonQuery();
     }
 
-    private static (bool Ok, string Detail) ReadIoTime(SqlConnection conn, int id, string path)
+    private static (bool Ok, string Detail) ReadIoTime(SqlConnection conn, int id, string path) =>
+        ReadIoTime(conn, () => Command(conn, SqlServerProcurement.BuyRowsQuery(), id), path);
+
+    private static (bool Ok, string Detail) ReadIoTime(SqlConnection conn, Func<SqlCommand> create, string path)
     {
         var messages = new List<string>();
         // InfoMessage is raised by the provider while the results are drained.
@@ -188,7 +276,7 @@ internal static class SqlDiagnostics
         try
         {
             Enable(conn, "SET STATISTICS IO ON; SET STATISTICS TIME ON;");
-            using var command = Command(conn, SqlServerProcurement.BuyRowsQuery(), id);
+            using var command = create();
             using var reader = command.ExecuteReader();
             do
             {
@@ -214,12 +302,19 @@ internal static class SqlDiagnostics
 
     private static (bool Ok, string Detail) ReadActualPlan(SqlConnection conn, int id, string path)
     {
+        var plans = ReadActualPlans(conn, () => Command(conn, SqlServerProcurement.BuyRowsQuery(), id));
+        if (plans.Count != 1) return (false, $"Expected one actual plan, got {plans.Count}.");
+        File.WriteAllText(path, plans[0]);
+        return (true, "Actual plan collected; review operators manually.");
+    }
+
+    private static List<string> ReadActualPlans(SqlConnection conn, Func<SqlCommand> create)
+    {
         Enable(conn, "SET STATISTICS XML ON;");
-        using var command = Command(conn, SqlServerProcurement.BuyRowsQuery(), id);
+        using var command = create();
         using var reader = command.ExecuteReader();
-        string? plan = null;
-        while (reader.Read()) { /* drain the actual SELECT without recording row values */ }
-        while (reader.NextResult())
+        var plans = new List<string>();
+        do
         {
             while (reader.Read())
             {
@@ -228,12 +323,10 @@ internal static class SqlDiagnostics
                 var xml = value is System.Data.SqlTypes.SqlXml sqlXml ? sqlXml.Value :
                     Convert.ToString(value, CultureInfo.InvariantCulture);
                 if (xml is not null && xml.Contains("<ShowPlanXML", StringComparison.Ordinal))
-                    plan = xml;
+                    plans.Add(xml);
             }
-        }
-        if (plan is null) return (false, "Actual plan not returned.");
-        File.WriteAllText(path, plan);
-        return (true, "Actual plan collected; review operators manually.");
+        } while (reader.NextResult());
+        return plans;
     }
 
     private static void WriteJson(string path, object value) =>

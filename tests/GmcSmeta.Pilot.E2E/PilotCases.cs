@@ -25,6 +25,12 @@ internal static class PilotCases
             () => PilotConcurrencyReadCases.ThreeClients(p));
         p.RunCase("global-revision-invalidates-unrelated-buy-snapshot",
             () => PilotConcurrencyReadCases.GlobalRevision(p));
+        p.RunCase("legacy-global-revision-invalidates-caches-and-stale-write",
+            () => PilotSqlReadParityCases.LegacyRevision(p));
+        p.RunCase("guarded-schema-revalidation-on-pooled-and-fresh-opens",
+            () => PilotSqlReadParityCases.SchemaRevalidation(p));
+        p.RunCase("procurement-all-column-correlated-parity-large-fixtures",
+            () => PilotSqlReadParityCases.ProcurementLarge(p));
         p.RunCase("cancel-blocked-sql-revision-and-reopen",
             () => PilotConcurrencyReadCases.CancelBlockedRevision(p));
         p.RunCase("public-read-apis-pre-cancellation",

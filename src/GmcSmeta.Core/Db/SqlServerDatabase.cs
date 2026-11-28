@@ -36,7 +36,10 @@ public static partial class SqlServerDatabase
         {
             // Open itself may throw (login, timeout, network). Own the connection
             // until all validation has succeeded and ownership passes to the caller.
+            using var openTiming = StartupTrace.Measure("sql_guarded_open_transport");
             conn.Open();
+            openTiming?.Dispose();
+            using var validationTiming = StartupTrace.Measure("sql_guarded_open_validation");
             GmcSmeta.Core.Demo.DemoMode.VerifyDatabase(conn);
             SqlSchemaCompatibility.RejectProduction(conn.Database, builder.DataSource);
             if (SqlSchemaCompatibility.IsLocalTestCutover(conn.Database, builder.DataSource))
@@ -98,6 +101,7 @@ public static partial class SqlServerDatabase
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT [value] FROM dbo.meta WHERE [key] = N'rev'";
         var value = await cmd.ExecuteScalarAsync(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
         return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
     }
 
@@ -111,7 +115,10 @@ public static partial class SqlServerDatabase
         {
             // Open itself may throw (login, timeout, network). Own the connection
             // until all validation has succeeded and ownership passes to the caller.
+            using var openTiming = StartupTrace.MeasureElapsed("sql_guarded_open_transport");
             await conn.OpenAsync(token).ConfigureAwait(false);
+            openTiming?.Dispose();
+            using var validationTiming = StartupTrace.MeasureElapsed("sql_guarded_open_validation");
             await GmcSmeta.Core.Demo.DemoMode.VerifyDatabaseAsync(conn, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             SqlSchemaCompatibility.RejectProduction(conn.Database, builder.DataSource);

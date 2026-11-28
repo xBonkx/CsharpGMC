@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/GmcSmeta.Core/GmcSmeta.Core.csproj" />
+    <Compile Include="../../tools/RemoteSqlBench/SqlDiagnosticQueries.cs" Link="SqlDiagnosticQueries.cs" />
   </ItemGroup>
 </Project>

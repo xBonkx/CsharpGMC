@@ -1,5 +1,6 @@
 using GmcSmeta.Core.Db;
 using GmcSmeta.Core.Domain;
+using GmcSmeta.RemoteSqlBench;
 using Microsoft.Data.SqlClient;
 
 internal static class PilotDirectorMovementCases
@@ -68,6 +69,11 @@ internal static class PilotDirectorMovementCases
         PilotRunner.Execute(conn, "UPDATE dbo.objects SET archived=1 WHERE id=@id", ("@id", archived));
 
         var revision = SqlServerDatabase.Revision(conn);
+        PilotRunner.Check(SqlDiagnosticQueries.CompareBuyRows(conn, checked((int)main)).Passed,
+            "All mapped procurement columns differ from correlated reference");
+        PilotRunner.Check(SqlDiagnosticQueries.CompareDirector(conn, new[] { main, ds }, true).Passed &&
+            SqlDiagnosticQueries.CompareDirector(conn, new[] { latest }, false).Passed,
+            "Director grouped SQL differs from correlated reference in contracts or KP mode");
         var contracts = SqlServerDirector.DirectorRows(p.PilotConnection, "contracts");
         var row = contracts.Single(x => x.ObjectId == obj);
         // 1290 main material + 40 DS; issue 500 + 10 - 10 + 40.
