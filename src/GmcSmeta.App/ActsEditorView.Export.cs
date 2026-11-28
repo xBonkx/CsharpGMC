@@ -99,13 +99,19 @@ public partial class ActsEditorView
         Func<T, Stream, CancellationToken, (long BuildMs, long SaveMs)> render)
     {
         if (_exportInProgress) return;
+        // The SaveFileDialog pumps the dispatcher; reject the target captured before it.
+        if (!IsVisible || !IsCurrentActCommand(target))
+        {
+            SetStatus("Акт или данные изменились. Повторите экспорт.", true);
+            return;
+        }
         _exportInProgress = true;
         using var cancellation = new CancellationTokenSource();
         _actExportCancellation = cancellation;
         var token = cancellation.Token;
         SaveButton.IsEnabled = false;
-        var generation = _actLoadGeneration;
-        var attachment = _exportAttachmentGeneration;
+        var generation = target.ReadGeneration;
+        var attachment = target.AttachmentGeneration;
         bool IsSameView() => IsLoaded && IsVisible &&
             generation == _actLoadGeneration && attachment == _exportAttachmentGeneration;
         void RequireExportContext()

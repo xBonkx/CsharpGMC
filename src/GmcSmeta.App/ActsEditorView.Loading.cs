@@ -40,8 +40,7 @@ public partial class ActsEditorView
         {
             token.ThrowIfCancellationRequested();
             var before = Revision();
-            var acts = cachedActs is not null && !string.IsNullOrEmpty(cachedRevision) &&
-                string.Equals(before, cachedRevision, StringComparison.Ordinal)
+            var acts = cachedActs is not null && KsReadRevisionPolicy.IsStable(cachedRevision, before)
                 ? cachedActs : SqlServerActs.ActsOf(conn, contractId, token: token);
             var id = KsWorkspaceProjection.ResolveActId(acts, requestedId);
             ContractTotals? totals = null;
@@ -49,8 +48,8 @@ public partial class ActsEditorView
             if (id != 0)
             {
                 if (cachedContext is { Totals: not null, Rules: not null } common &&
-                    common.ConnectionString == connectionString && common.ContractId == contractId &&
-                    common.Revision == before && !string.IsNullOrWhiteSpace(before))
+                    KsReadRevisionPolicy.CanUseCachedContext(common.ConnectionString, common.ContractId,
+                        common.Revision, connectionString, contractId, before))
                 {
                     totals = common.Totals;
                     rules = common.Rules;

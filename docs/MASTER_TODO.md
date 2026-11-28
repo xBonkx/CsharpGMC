@@ -597,7 +597,7 @@ DEMO-08.01 / OFFICE-UPDATE-01.01 остаются PARTIAL: [launcher recovery, d
 | ID | P | Задача | Статус |
 |---|---|---|---|
 | ARCH-SIZE-01 | P1 | Полный инвентаризационный аудит файлов и логических классов | PARTIAL |
-| ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | PARTIAL |
+| ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | CODE READY |
 | ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | PARTIAL |
 
 - 29.11.2026: ARCH-SIZE-03.04 (XAML ресурсы) BLOCKED для дизайн-линии — source-тесты парсят EstimateView.xaml и утверждают ресурсы на месте; нужен координированный сплит с обновлением тестов. [Отчёт](DESIGN_PASS_20261129_CTX_MENUS_DIALOGS.md).

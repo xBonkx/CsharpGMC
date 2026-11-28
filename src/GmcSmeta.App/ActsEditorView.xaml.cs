@@ -275,19 +275,23 @@ public partial class ActsEditorView : UserControl
         return _revision;
     }
 
-    private sealed record ActCommandTarget(string ConnectionString, int ContractId, long ActId, string Revision);
+    private sealed record ActCommandTarget(string ConnectionString, int ContractId, long ActId, string Revision,
+        long ReadGeneration, long AttachmentGeneration);
 
     private ActCommandTarget? CaptureActCommand()
     {
         if (!IsLoaded || _building || ActWritePending || _loadingAct || _loadFailed ||
             _actId <= 0 || string.IsNullOrEmpty(_revision)) return null;
-        return new ActCommandTarget(_connectionString, _contractId, _actId, _revision);
+        return new ActCommandTarget(_connectionString, _contractId, _actId, _revision,
+            _actLoadGeneration, _exportAttachmentGeneration);
     }
 
     private bool IsCurrentActCommand(ActCommandTarget target) =>
         IsLoaded && !_building && !ActWritePending && !_loadingAct && !_loadFailed &&
         _connectionString == target.ConnectionString && _contractId == target.ContractId &&
-        _actId == target.ActId && _revision == target.Revision;
+        _actId == target.ActId && _revision == target.Revision &&
+        KsReadRevisionPolicy.IsSameGeneration(target.ReadGeneration, target.AttachmentGeneration,
+            _actLoadGeneration, _exportAttachmentGeneration);
 
     private void RequireCurrentActCommand(ActCommandTarget target)
     {
@@ -1088,21 +1092,14 @@ public partial class ActsEditorView : UserControl
         var revision = _revision;
         var actId = current.Id;
         var contractId = _contractId;
-        var linked = _sheet.Positions
-            .Where(p => (p.LineFormula ?? "").Contains('@'))
-            .Select(p => p.PositionId).ToHashSet();
-        var states = _sheet.Positions
-            .Where(p => !p.OutOfKp && !linked.Contains(p.PositionId))
-            .Select(p => (p.PositionId, Qty: ActQuantityPolicy.Remaining(p.QtyByKp, p.ClosedByOthers),
-                p.LineQty, p.Price))
-            .Where(s => Math.Abs(s.Qty - s.LineQty) > 0.000001m)
-            .ToList();
-        var restSum = states.Sum(s => s.Qty * s.Price);
+        var plan = KsClosePlan.AllRemaining(_sheet.Positions);
+        var edits = plan.Edits;
+        var restSum = plan.Amount;
         if (!Confirm("Сдать весь остаток",
                 $"Вписать в КС-2 №{current.Number} несданный остаток по договору?\n\n" +
-                $"Строк с остатком: {states.Count}, примерно {Money.Format(restSum)} ₽ по ценам сметы " +
+                $"Строк с остатком: {edits.Count}, примерно {Money.Format(restSum)} ₽ по ценам сметы " +
                 "(+ СМР, транспорт и ПНР, если остались)." +
-                (linked.Count > 0 ? "\nСтроки со ссылками пересчитаются по своим формулам." : "")))
+                (plan.HasLinked ? "\nСтроки со ссылками пересчитаются по своим формулам." : "")))
             return;
         if (!IsCurrentActCommand(target) || !ReferenceEquals(sheet, _sheet) || _signed || _contractLocked ||
             !string.IsNullOrEmpty(_details?.SectionAmountsJson) || _actId != actId ||
@@ -1111,13 +1108,8 @@ public partial class ActsEditorView : UserControl
             SetStatus("Данные или выбранная КС изменились. Повторите операцию.", true);
             return;
         }
-        var edits = states.Select(s => (s.PositionId, s.Qty)).ToList();
-        var otherSmr = _acts.Where(a => a.Id != current.Id).Sum(a => a.Smr);
-        var otherTr = _acts.Where(a => a.Id != current.Id).Sum(a => a.Transport);
-        var otherPnr = _acts.Where(a => a.Id != current.Id).Sum(a => a.Pnr);
-        decimal? smr = _isPosSmr ? null : Math.Max(0m, totals.Smr - otherSmr);
-        var tr = Math.Max(0m, totals.Transport - otherTr);
-        var pnr = Math.Max(0m, totals.Pnr - otherPnr);
+        var (smr, tr, pnr) = KsClosePlan.RemainingCharges(totals.Smr, totals.Transport, totals.Pnr,
+            _acts.Where(a => a.Id != current.Id).Select(a => (a.Smr, a.Transport, a.Pnr)), _isPosSmr);
         await SaveBatchAndChargesAsync(edits, smr, tr, pnr,
             $"Остатки вписаны в акт: строк {edits.Count}");
     }
@@ -1125,37 +1117,21 @@ public partial class ActsEditorView : UserControl
     /// <summary>«Закрыть разделы…» — галочки по системам, весь остаток раздела в акт.</summary>
     private async void CloseSections_Click(object sender, RoutedEventArgs e)
     {
+        var target = CaptureActCommand();
         var current = Current;
-        if (current is null || current.Signed || _sheet is null) return;
-        var tops = _sheet.Systems.Where(s => !s.IsSub).ToList();
-        var positionsByTop = new Dictionary<long, List<long>>();
-        var restByTop = new Dictionary<long, decimal>();
-        foreach (var top in tops)
-        {
-            var systemIds = new List<long> { top.SystemId };
-            systemIds.AddRange(_sheet.Systems
-                .Where(s => s.IsSub && s.ParentId == top.SystemId)
-                .Select(s => s.SystemId));
-            var positions = _sheet.Positions
-                .Where(p => systemIds.Contains(p.SystemId) && !p.OutOfKp)
-                .ToList();
-            positionsByTop[top.SystemId] = positions.Select(p => p.PositionId).ToList();
-            restByTop[top.SystemId] = positions
-                .Sum(p => ActQuantityPolicy.Remaining(p.QtyByKp, p.ClosedByOthers) * p.Price);
-        }
-
+        var sheet = _sheet;
+        if (target is null || current is null || current.Signed || _contractLocked || sheet is null) return;
+        var plan = KsClosePlan.Sections(sheet.Systems, sheet.Positions);
         var chosenTops = KsCloseSectionsDialog.Show(this, current.Number,
-            tops.Select(top => (top.SystemId, top.Label, restByTop.GetValueOrDefault(top.SystemId))));
+            plan.Options);
         if (chosenTops is null) return;
-        if (chosenTops.Count == 0)
+        if (chosenTops.Count == 0) return;
+        if (!IsCurrentActCommand(target) || !ReferenceEquals(sheet, _sheet) || _signed || _contractLocked)
+        {
+            SetStatus("Данные или выбранная КС изменились. Повторите операцию.", true);
             return;
-        var ids = chosenTops.SelectMany(t => positionsByTop.GetValueOrDefault(t) ?? new List<long>()).ToHashSet();
-        var byId = _sheet.Positions.ToDictionary(p => p.PositionId);
-        var edits = ids
-            .Select(id => (id, Qty: ActQuantityPolicy.Remaining(byId[id].QtyByKp, byId[id].ClosedByOthers)))
-            .Where(s => Math.Abs(s.Qty - byId[s.id].LineQty) > 0.000001m)
-            .Select(s => (s.id, s.Qty))
-            .ToList();
+        }
+        var edits = plan.EditsFor(chosenTops);
         if (edits.Count == 0)
         {
             SetStatus("Нечего добавлять: всё уже сдано или не выдано");
@@ -1168,7 +1144,7 @@ public partial class ActsEditorView : UserControl
     private async Task SaveBatchAsync(List<(long PositionId, decimal Qty)> edits, string doneMessage)
     {
         var target = CaptureActCommand();
-        if (target is null || edits.Count == 0) return;
+        if (target is null || edits.Count == 0 || _signed || _contractLocked) return;
         SetStatus($"Сохранение {edits.Count} строк…");
         try
         {
