@@ -54,18 +54,20 @@ internal sealed class SummarySystemPickerPopup
         StyleFor(_search, "PythonSearch");
         var searchGrid = new Grid();
         searchGrid.Children.Add(_search);
-        var hint = new TextBlock { Text = "Найти систему: В1, ВЕ, ДП…", Foreground = Brush("#64748B"),
+        var hint = new TextBlock { Text = "Найти систему: В1, ВЕ, ДП…", TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
             IsHitTestVisible = false };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
+        System.Windows.Automation.AutomationProperties.SetName(_search, "Найти систему");
         searchGrid.Children.Add(hint);
         searchBar.Children.Add(searchGrid);
         root.Children.Add(searchBar);
         clear.Click += (_, _) => { _search.Clear(); _search.Focus(); };
 
-        var footer = new DockPanel { Margin = new Thickness(0, 8, 0, 0), LastChildFill = true };
+        var footer = new StackPanel { Orientation = Orientation.Vertical };
+        footer.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFooterGap");
         DockPanel.SetDock(footer, Dock.Bottom);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal };
-        DockPanel.SetDock(actions, Dock.Right);
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var all = new Button { Content = "Все системы", MinHeight = 34,
             Margin = new Thickness(0, 0, 6, 0), ToolTip = "Снять все отметки — показать все системы" };
         StyleFor(all, "PythonToolbarButton");
@@ -73,10 +75,9 @@ internal sealed class SummarySystemPickerPopup
         StyleFor(done, "PythonToolbarPrimary");
         actions.Children.Add(all);
         actions.Children.Add(done);
-        footer.Children.Add(actions);
-        _count = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Foreground = Brush("#64748B"),
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 6, 0) };
+        _count = DynamicFormLayout.Secondary("", "LayoutFormGroupHeadingGap");
         footer.Children.Add(_count);
+        footer.Children.Add(actions);
         root.Children.Add(footer);
         done.Click += (_, _) => Close();
         all.Click += (_, _) => { _selected.Clear(); SyncAndPublish(); };
