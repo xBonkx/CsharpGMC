@@ -127,7 +127,7 @@ public sealed class GlobalSearchWindow : Window
 {
     private readonly string _connectionString;
     private readonly TextBox _input = new() { MinHeight = 34,
-        ToolTip = "Объект, КП, договор или позиция: несколько слов в любом порядке" };
+        ToolTip = "Объект, юридический договор, приложение, ДС, КП или позиция: несколько слов в любом порядке" };
     private readonly TextBlock _status = WorkspaceWindowUi.Hint("Начните печатать — поиск по всей базе");
     private readonly ListBox _results = new() { DisplayMemberPath = "Display" };
     private readonly DispatcherTimer _delay = new() { Interval = TimeSpan.FromMilliseconds(150) };
@@ -145,7 +145,7 @@ public sealed class GlobalSearchWindow : Window
         _input.SetResourceReference(FrameworkElement.StyleProperty, "PythonSearch");
         var panel = new DockPanel { Margin = new Thickness(18, 16, 18, 16) };
         Content = panel;
-        var search = ReferenceWindowUi.Search(_input,"Объект, КП, договор или позиция: «Махалина», «Ballu BSO», «№ 5»…");
+        var search = ReferenceWindowUi.Search(_input,"Объект, договор, приложение, ДС, КП или позиция: «Махалина», «Ballu BSO», «№ 5»…");
         DockPanel.SetDock(search, Dock.Top);
         panel.Children.Add(search);
         var resultStyle = new Style(typeof(ListBoxItem));

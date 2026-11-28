@@ -54,6 +54,52 @@ public sealed class WorkspaceNavigationTests
             SqlServerWorkspaceReferenceWrites.NormalizeRules("{\"erase_audit\":true}"));
     }
 
+    [Theory]
+    [InlineData(12, "Д-77", "28.11.2026", "Монтаж", "Договор № Д-77 от 28.11.2026 — Монтаж")]
+    [InlineData(14, "", "", "", "Договор без номера (ID 14)")]
+    public void LegalSearchCaptionPreservesIndependentNumber(long id, string number, string date, string subject, string expected) =>
+        Assert.Equal(expected, SqlServerWorkspaceNavigation.AgreementSearchTitle(id, number, date, subject));
+
+    [Fact]
+    public void LegalHitCarriesAgreementIdentityNotAnAnnex()
+    {
+        var hit = new SqlServerWorkspaceNavigation.SearchHit("agreement", 17, 0, 0, "Договор № Д-77", "Объект")
+            { AgreementId = 12345678901L };
+        Assert.Equal("Юридический договор", hit.KindTitle);
+        Assert.Equal(17, hit.ObjectId);
+        Assert.Equal(0, hit.ContractId);
+        Assert.Equal(12345678901L, hit.AgreementId);
+    }
+
+    [Fact]
+    public async Task GlobalSearchRejectsForbiddenDatabaseBeforeOpening()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() => SqlServerWorkspaceNavigation.SearchAsync(
+            "Server=localhost;Database=master;Integrated Security=true", "Договор"));
+    }
+
+    [Fact]
+    public void LegalSearchUsesExactIdAndActiveSchemaGuard()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "GmcSmeta.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        string Read(string path) => File.ReadAllText(Path.Combine(root!.FullName, path));
+        var sql = Read("src/GmcSmeta.Core/Db/SqlServerWorkspaceNavigation.cs");
+        Assert.Contains("if (legalEnabled)", sql);
+        Assert.Contains("a.archived=0 AND o.archived=0", sql);
+        Assert.Contains("AgreementId = id", sql);
+        Assert.Contains("SqlServerDatabase.OpenAsync(connectionString, cancellationToken)", sql);
+        var route = Read("src/GmcSmeta.App/MainWindow.Navigation.cs");
+        Assert.Contains("OpenAgreementCard(target, legalId);", route);
+        var page = Read("src/GmcSmeta.App/AgreementCardView.xaml.cs");
+        Assert.Contains("await LoadCard(_initialLegalId);", page);
+        var read = Read("src/GmcSmeta.Core/Db/SqlServerWorkspace.AgreementCard.cs");
+        Assert.Contains("if (legalId is > 0 && selected is null)", read);
+        Assert.True(read.IndexOf("var legalCompanies =", StringComparison.Ordinal) <
+            read.IndexOf("revision == SqlServerDatabase.Revision(conn)", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void SearchPresentationDoesNotChangeNavigationIds()
     {

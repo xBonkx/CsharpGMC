@@ -10,16 +10,18 @@ public partial class AgreementCardView : UserControl
 {
     private readonly string _connection;
     private readonly int _objectId;
+    private readonly long? _initialLegalId;
     private SqlServerWorkspace.AgreementCardSnapshot? _snapshot;
     private bool _saving;
     public event Action? BackRequested;
     public event Action? Saved;
     public event Action<DocRow>? EditDocumentRequested;
 
-    public AgreementCardView(string connection, int objectId)
+    public AgreementCardView(string connection, int objectId, long? legalId = null)
     {
         _connection = connection;
         _objectId = objectId;
+        _initialLegalId = legalId;
         InitializeComponent();
         Loaded += LoadOnce;
     }
@@ -27,11 +29,12 @@ public partial class AgreementCardView : UserControl
     private async void LoadOnce(object sender, RoutedEventArgs e)
     {
         Loaded -= LoadOnce;
-        await LoadCard(null);
+        await LoadCard(_initialLegalId);
     }
 
     private async Task LoadCard(long? legalId)
     {
+        Fields.IsEnabled = SaveButton.IsEnabled = false;
         StatusText.Text = "Загрузка реквизитов…";
         try
         {

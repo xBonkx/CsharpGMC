@@ -13,9 +13,11 @@ public static class SqlServerWorkspaceNavigation
     public sealed record SearchHit(string Kind, long ObjectId, long ContractId, long PositionId,
         string Title, string Context)
     {
+        public long? AgreementId { get; init; }
         public string KindTitle => Kind switch
         {
-            "object" => "Объект", "contract" => "КП / договор", _ => "Позиция"
+            "object" => "Объект", "agreement" => "Юридический договор",
+            "contract" => "КП / приложение / ДС", _ => "Позиция"
         };
         public string Display => Title + (Context.Length > 0 ? "   ·   " + Context : "");
     }
@@ -79,9 +81,8 @@ public static class SqlServerWorkspaceNavigation
     {
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         var words = Words(query);
-        var hits = new List<SearchHit>(180);
-        using var conn = new SqlConnection(connectionString);
-        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var hits = new List<SearchHit>(240);
+        using var conn = await SqlServerDatabase.OpenAsync(connectionString, cancellationToken).ConfigureAwait(false);
 
         using (var cmd = new SqlCommand(
             "SELECT TOP (60) id,name,archived FROM dbo.objects WHERE " +
@@ -99,10 +100,18 @@ public static class SqlServerWorkspaceNavigation
 
         if (words.Length == 0) return hits;
 
+        // The independent legal card is searchable even before its first annex.
+        // Legacy schemas never reference agreement tables or annex_number.
+        var legalEnabled = await AgreementSearchEnabledAsync(conn, cancellationToken).ConfigureAwait(false);
+        if (legalEnabled)
+            await ReadAgreementHitsAsync(conn, words, hits, cancellationToken).ConfigureAwait(false);
+
         using (var cmd = new SqlCommand(
-            "SELECT TOP (60) c.id,c.object_id,c.kind,c.name,c.number,c.[date],o.name " +
+            "SELECT TOP (60) c.id,c.object_id,c.kind,c.name,c.number,c.[date],o.name," +
+            (legalEnabled ? "COALESCE(c.annex_number,N'') " : "N'' ") +
             "FROM dbo.contracts c JOIN dbo.objects o ON o.id=c.object_id WHERE " +
-            MatchSql(["c.name", "c.number", "c.[date]", "o.name"], words) +
+            MatchSql(legalEnabled ? ["c.name", "c.number", "c.[date]", "o.name", "c.annex_number"] :
+                ["c.name", "c.number", "c.[date]", "o.name"], words) +
             " ORDER BY c.id DESC", conn) { CommandTimeout = 15 })
         {
             AddWords(cmd, words);
@@ -110,12 +119,15 @@ public static class SqlServerWorkspaceNavigation
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 var kind = reader.IsDBNull(2) ? "" : reader.GetString(2);
-                var caption = kind switch { "main" => "Договор", "dop" => "ДС", _ => "КП" };
+                var caption = kind switch { "main" => legalEnabled ? "Приложение" : "Договор", "dop" => "ДС", _ => "КП" };
                 var number = reader.IsDBNull(4) ? "" : reader.GetString(4);
                 var date = reader.IsDBNull(5) ? "" : reader.GetString(5);
                 var name = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                var annex = reader.GetString(7);
                 hits.Add(new SearchHit("contract", Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture), Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture), 0,
-                    caption + (number.Length > 0 ? " № " + number : "") +
+                    caption + (kind == "main" && legalEnabled
+                        ? (annex.Length > 0 ? " № " + annex : "") + (number.Length > 0 ? " · прежний № " + number : "")
+                        : (number.Length > 0 ? " № " + number : "")) +
                     (date.Length > 0 ? " от " + date : "") +
                     (name.Length > 0 ? " — " + name : ""),
                     reader.GetString(6)));
@@ -138,6 +150,42 @@ public static class SqlServerWorkspaceNavigation
         }
         return hits;
     }
+
+    private static async Task<bool> AgreementSearchEnabledAsync(SqlConnection conn, CancellationToken token)
+    {
+        using var cmd = new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'dbo.agreements',N'U') IS NOT NULL " +
+            "AND COL_LENGTH(N'dbo.contracts',N'agreement_id') IS NOT NULL " +
+            "AND COL_LENGTH(N'dbo.contracts',N'annex_number') IS NOT NULL THEN 1 ELSE 0 END", conn)
+            { CommandTimeout = 15 };
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync(token).ConfigureAwait(false),
+            CultureInfo.InvariantCulture) == 1;
+    }
+
+    private static async Task ReadAgreementHitsAsync(SqlConnection conn, string[] words,
+        List<SearchHit> hits, CancellationToken token)
+    {
+        using var cmd = new SqlCommand(
+            "SELECT TOP (60) a.id,a.object_id,a.number,CONVERT(nvarchar(10),a.agreement_date,104),a.subject,o.name " +
+            "FROM dbo.agreements a JOIN dbo.objects o ON o.id=a.object_id " +
+            "WHERE a.archived=0 AND o.archived=0 AND " +
+            MatchSql(["a.number", "CONVERT(nvarchar(10),a.agreement_date,104)", "a.subject",
+                "a.customer_full", "a.cust_org", "a.contractor_full", "o.name"], words) +
+            " ORDER BY a.id DESC", conn) { CommandTimeout = 15 };
+        AddWords(cmd, words);
+        using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
+        {
+            string S(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i);
+            var id = Convert.ToInt64(reader.GetValue(0), CultureInfo.InvariantCulture);
+            hits.Add(new SearchHit("agreement", Convert.ToInt64(reader.GetValue(1), CultureInfo.InvariantCulture),
+                0, 0, AgreementSearchTitle(id, S(2), S(3), S(4)), S(5)) { AgreementId = id });
+        }
+    }
+
+    public static string AgreementSearchTitle(long id, string number, string date, string subject) =>
+        (string.IsNullOrWhiteSpace(number) ? $"Договор без номера (ID {id})" : "Договор № " + number) +
+        (string.IsNullOrWhiteSpace(date) ? "" : " от " + date) +
+        (string.IsNullOrWhiteSpace(subject) ? "" : " — " + subject);
 
     public static IReadOnlyList<CatalogEntry> Catalog(string connectionString, string? query, int skip = 0, int take = 200)
     {

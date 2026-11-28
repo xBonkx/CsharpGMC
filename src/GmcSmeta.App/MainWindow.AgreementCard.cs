@@ -4,14 +4,14 @@ namespace GmcSmeta.App;
 
 public partial class MainWindow
 {
-    private void OpenAgreementCard(ObjectRow target)
+    private void OpenAgreementCard(ObjectRow target, long? legalId = null)
     {
         if (_sqlConnectionString is not { } connection || !SqlWritesEnabled || target.Archived) return;
         ActivateDocumentsWorkspace();
         EndPageRename();
         _selectedObject = target;
         _openDocumentId = null;
-        var page = new AgreementCardView(connection, target.Id);
+        var page = new AgreementCardView(connection, target.Id, legalId);
         page.BackRequested += () =>
         {
             if (ReferenceEquals(PageHost.Content, page)) ReloadAndSelect(target.Id);

@@ -166,9 +166,20 @@ public partial class MainWindow
             return;
         }
         ReloadNavigationData();
+        if (hit.Kind == "agreement")
+        {
+            var target = _objects.FirstOrDefault(o => o.Id == hit.ObjectId && !o.Archived);
+            if (target is null || hit.AgreementId is not long legalId || legalId <= 0 || !SqlWritesEnabled)
+            {
+                StatusText.Text = "Договор больше недоступен для открытия реквизитов";
+                return;
+            }
+            OpenAgreementCard(target, legalId);
+            return;
+        }
         if (hit.ContractId is < 1 or > int.MaxValue ||
             _docs.FirstOrDefault(d => d.Id == hit.ContractId) is not { } doc ||
-            !_objects.Any(o => o.Id == doc.ObjectId))
+            doc.ObjectId != hit.ObjectId || !_objects.Any(o => o.Id == doc.ObjectId))
         {
             StatusText.Text = "Документ больше недоступен";
             return;
