@@ -1,4 +1,4 @@
-<Window x:Class="GmcSmeta.App.ProcurementWindow"
+<Window x:Class="GmcSmeta.App.ProcurementWindow" MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}" MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Закупки — контроль оборудования" Width="1420" Height="760" MinWidth="1000" MinHeight="480"

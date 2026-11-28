@@ -1,4 +1,4 @@
-<Window x:Class="GmcSmeta.App.HistoryWindow" UseLayoutRounding="True" SnapsToDevicePixels="True"
+<Window x:Class="GmcSmeta.App.HistoryWindow" MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}" MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}" UseLayoutRounding="True" SnapsToDevicePixels="True"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:GmcSmeta.App"
@@ -7,7 +7,7 @@
         PreviewKeyDown="HistoryWindow_PreviewKeyDown"
         FontFamily="{StaticResource UiFontFamily}" FontSize="{StaticResource UiBodySize}"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Foreground="#0F172A">
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="{StaticResource LayoutDialogMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>

@@ -103,11 +103,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="ShipmentStepArrow" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#94A3B8"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="2,0"/>
-        </Style>
 
         <!-- ship_view.py: matching table headers and quantity cell feedback. -->
         <Style x:Key="ShipmentMarkHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource CompactCostHeader}">
