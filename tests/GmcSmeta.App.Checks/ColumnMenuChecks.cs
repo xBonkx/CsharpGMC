@@ -58,7 +58,22 @@ internal static class ColumnMenuChecks
             Require(again.Columns[3].Visibility == Visibility.Visible, "Explicit show lost on profile switch.");
             Click(Item(Menu(again), "Доп. маржа"), false);
             Require(CreateGrid("optional").Columns[3].Visibility == Visibility.Collapsed, "Explicit hide did not persist.");
-            Console.WriteLine("Column menu profile/visibility checks passed (no SQL).");
+            // Exercise the production reader against an isolated persisted profile,
+            // including width and order, not just visibility. Excluded mode slot stays fixed.
+            File.WriteAllText(Path.Combine(directory, "width-order.json"),
+                """{"Widths":{"cost#0":147,"legacy#0":182},"Order":["name#0","legacy#0","mode#0","cost#0"],"Shown":["legacy#0"]}""");
+            var sized = CreateGrid("width-order");
+            Require(sized.Columns[1].Width.IsAbsolute && sized.Columns[1].Width.Value == 147, "Saved cost width not restored.");
+            Require(sized.Columns[3].Width.IsAbsolute && sized.Columns[3].Width.Value == 182, "Saved legacy width not restored.");
+            Require(sized.Columns[3].DisplayIndex == 1 && sized.Columns[2].DisplayIndex == 2 &&
+                sized.Columns[1].DisplayIndex == 3, "Saved order or fixed mode slot not restored.");
+            TableColumnMenu.RefreshDynamic(sized, "another", ownHeaderMenu: true);
+            Require(sized.Columns[3].Visibility == Visibility.Collapsed && sized.Columns[1].DisplayIndex == 1,
+                "Width/order profile leaked into another table.");
+            TableColumnMenu.RefreshDynamic(sized, "width-order", ownHeaderMenu: true);
+            Require(sized.Columns[1].Width.Value == 147 && sized.Columns[1].DisplayIndex == 3,
+                "Width/order profile not restored after reuse.");
+            Console.WriteLine("Column menu profile/visibility/width/order checks passed (no SQL).");
         }
         finally
         {

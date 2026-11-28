@@ -191,14 +191,14 @@
                       ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
                       VirtualizingPanel.VirtualizationMode="Recycling">
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Карточка" Width="3*" MinWidth="180" HeaderStyle="{StaticResource DirectorObjectHeader}" SortMemberPath="DisplayObject">
+                    <DataGridTemplateColumn Header="Карточка" Width="2.8*" MinWidth="180" HeaderStyle="{StaticResource DirectorObjectHeader}" SortMemberPath="DisplayObject">
                         <DataGridTemplateColumn.CellTemplate><DataTemplate>
                             <DockPanel LastChildFill="True" ToolTip="{Binding WarningTip}">
                                 <!-- director_view.py uses the literal warning character, not an SVG. -->
                                 <TextBlock DockPanel.Dock="Left" Text="⚠" Margin="0,0,4,0"
                                            Visibility="{Binding Incomplete, Converter={StaticResource DirectorBoolVisibility}}"
                                            Style="{StaticResource DirectorObjectText}" AutomationProperties.Name="Неполные данные"/>
-                                <TextBlock Text="{Binding DisplayObject}" Style="{StaticResource DirectorObjectText}"/>
+                                <TextBlock Text="{Binding DisplayObject}" Style="{StaticResource DirectorObjectText}" ToolTip="{Binding DisplayObject}"/>
                             </DockPanel>
                         </DataTemplate></DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>

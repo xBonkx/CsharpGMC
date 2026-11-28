@@ -115,7 +115,7 @@ public sealed class DirectorAndCardVisualSourceTests
         var doc = XDocument.Parse(Source("DirectorView.xaml"));
         var grid = Named(doc, "DirectorGrid");
         var columns = grid.Element(W + "DataGrid.Columns")!.Elements().ToArray();
-        Assert.Equal(new[] { "3*", "1.3*", "1.5*", "1.6*", "1.0*", "1.2*", "1.3*", "1.3*", "1.2*", "1.1*" },
+        Assert.Equal(new[] { "2.8*", "1.3*", "1.5*", "1.6*", "1.0*", "1.2*", "1.3*", "1.3*", "1.2*", "1.1*" },
             columns.Select(e => (string?)e.Attribute("Width")).ToArray());
         Assert.Equal("Right", Value(Style(doc, "DirectorMoney"), "TextAlignment"));
         Assert.Equal("Center", Value(Style(doc, "DirectorCenter"), "TextAlignment"));

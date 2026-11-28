@@ -22,7 +22,11 @@ public sealed class SharedGlyphCatalogSourceTests
         var doc = Load("Theme/ToolbarIcons.xaml");
         var paths = doc.Descendants(W + "PathGeometry").ToDictionary(e => (string)e.Attribute(X + "Key")!);
         foreach (var geometry in paths.Values)
-            Assert.StartsWith("M", (string)geometry.Attribute("Figures")!);
+        {
+            var figures = (string)geometry.Attribute("Figures")!;
+            Assert.StartsWith("M", figures);
+            Assert.DoesNotContain("m", figures); // independent contour starts must be absolute M
+        }
         var templates = doc.Descendants(W + "DataTemplate").ToArray();
         Assert.True(templates.Length >= 37);
         foreach (var template in templates)
