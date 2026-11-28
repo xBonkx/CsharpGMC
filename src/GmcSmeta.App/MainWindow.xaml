@@ -63,7 +63,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#D9E6FD"/></Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/><Setter TargetName="Chrome" Property="Background" Value="Transparent"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -121,7 +121,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
                             <Trigger Property="IsSubmenuOpen" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E8F0FE"/><Setter TargetName="Chrome" Property="BorderBrush" Value="#BFD3FB"/></Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/><Setter TargetName="Chrome" Property="Background" Value="Transparent"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -307,6 +307,7 @@
         <!-- Python object_view.py NewCard: a dashed tile at the end of the same
              responsive WrapPanel, not a detached button below the grid. -->
         <Style x:Key="NewContractCardButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#2563EB"/>
             <Setter Property="FocusVisualStyle" Value="{StaticResource ButtonKeyboardFocusVisual}"/>
             <Setter Property="FontFamily" Value="{StaticResource UiFontFamily}"/>
             <Setter Property="FontSize" Value="{StaticResource UiBodySize}"/>
@@ -334,7 +335,8 @@
                                 <Setter Property="Background" Value="#F9FAFC"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="DashedOutline" Property="Stroke" Value="#94A3B8"/>
                                 <Setter Property="Cursor" Value="Arrow"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -351,11 +353,11 @@
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Viewbox Width="28" Height="28" Stretch="Uniform" IsHitTestVisible="False" HorizontalAlignment="Center">
                         <Canvas Width="24" Height="24">
-                            <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphPlus}" Stroke="#2563EB"/>
+                            <Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                         </Canvas>
                     </Viewbox>
                     <TextBlock Text="{Binding Caption}" FontSize="{StaticResource UiH2Size}" FontWeight="SemiBold"
-                               Foreground="#2563EB" TextAlignment="Center" Margin="0,8,0,0"/>
+                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" TextAlignment="Center" Margin="0,8,0,0"/>
                     <TextBlock Text="пустое или копия существующего"
                                Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiCaptionSize}"
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0"/>
