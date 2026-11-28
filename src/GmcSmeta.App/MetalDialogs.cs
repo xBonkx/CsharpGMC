@@ -9,7 +9,7 @@ namespace GmcSmeta.App;
 
 internal abstract class MetalFormDialog : Window
 {
-    private readonly Grid _grid = new() { Margin = new Thickness(15) };
+    private readonly Grid _grid = new();
     private int _nextRow;
 
     protected MetalFormDialog(string title, double width = 490)
@@ -18,14 +18,12 @@ internal abstract class MetalFormDialog : Window
         Width = width;
         SizeToContent = SizeToContent.Height;
         MinHeight = 200;
-        MaxHeight = 750;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WorkspaceWindowUi.ApplyChrome(this);
+        DynamicFormLayout.Apply(this);
         Background = System.Windows.Media.Brushes.White;
         _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(145) });
         _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1,GridUnitType.Star) });
-        Content = new ScrollViewer { Content = _grid, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        // Submit installs the scrolling body and pinned footer after all fields have been added.
     }
 
     protected void Add(string caption, Control input)
@@ -33,14 +31,15 @@ internal abstract class MetalFormDialog : Window
         _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var text = new TextBlock
         {
-            Text = caption, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0,0,9,9)
+            Text = caption, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap
         };
+        text.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormLabelMargin");
         Grid.SetRow(text,_nextRow);
         Grid.SetColumn(text,0);
         _grid.Children.Add(text);
-        input.Margin = new Thickness(0,0,0,9);
-        input.MinHeight = 32;
+        input.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");
+        DynamicFormLayout.Field(input);
+        System.Windows.Automation.AutomationProperties.SetName(input, caption);
         Grid.SetRow(input,_nextRow);
         Grid.SetColumn(input,1);
         _grid.Children.Add(input);
@@ -49,13 +48,13 @@ internal abstract class MetalFormDialog : Window
 
     protected void Submit(string caption, Func<bool> action)
     {
-        _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var button = new Button
         {
-            Content = caption, Padding = new Thickness(12,7,12,7),
-            HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 116
+            Content = caption, MinWidth = 116, IsDefault = true
         };
-        WorkspaceWindowUi.StyleButton(button, primary: true);
+        var cancel = new Button { Content = "Отмена", IsCancel = true, MinWidth = 100 };
+        cancel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogActionGap");
+        DynamicFormLayout.StyleActions(button, cancel);
         button.Click += (_, _) =>
         {
             try
@@ -67,10 +66,10 @@ internal abstract class MetalFormDialog : Window
                 MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
-        Grid.SetRow(button,_nextRow);
-        Grid.SetColumn(button,1);
-        _grid.Children.Add(button);
-        _nextRow++;
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        actions.Children.Add(cancel);
+        actions.Children.Add(button);
+        Content = DynamicFormLayout.WithFooter(_grid, actions);
     }
 
     protected static decimal ParseDecimal(string text, string field)
