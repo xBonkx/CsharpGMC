@@ -38,6 +38,6 @@ public sealed class EstimateNestedVisibilityTests
         Assert.Contains("EstimateNestedVisibility.ShowComponents", Read("EstimateView.Groups.cs"));
         var materials = Read("EstimateView.Materials.cs");
         Assert.Contains("StyleBlue(view.MaterialsGroupingButton, _materialsMode != \"kp\")", materials);
-        Assert.Contains("MaterialsGrid?.Items is IEditableCollectionView { IsEditingItem: true }", materials);
+        Assert.Contains("MaterialsGrid is { } grid && HasGridEdit(grid)", materials);
     }
 }

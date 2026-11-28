@@ -25,8 +25,22 @@ public sealed class EstimateDialogVisualTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         var grid = XDocument.Parse(Source(file)).Descendants()
             .Single(e => e.Name.LocalName == "DataGrid" && (string?)e.Attribute(x + "Name") == name);
-        Assert.Equal("27", (string?)grid.Attribute("MinRowHeight"));
+        // Дизайн-проход заменил литерал "27" ресурсом Theme/LayoutMetrics.xaml (=27); принимаем обе формы.
+        var minRowHeight = (string?)grid.Attribute("MinRowHeight");
+        Assert.True(
+            minRowHeight == "27" || minRowHeight == "{StaticResource LayoutDocumentRowMinHeight}",
+            $"MinRowHeight должен быть 27 или ресурсом LayoutDocumentRowMinHeight, фактически: {minRowHeight}");
         Assert.Equal("True", (string?)grid.Attribute("EnableRowVirtualization"));
+    }
+
+    [Fact]
+    public void LayoutDocumentRowMinHeightResourceStaysTwentySeven()
+    {
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var resource = XDocument.Parse(Source(Path.Combine("Theme", "LayoutMetrics.xaml")))
+            .Descendants()
+            .Single(e => (string?)e.Attribute(x + "Key") == "LayoutDocumentRowMinHeight");
+        Assert.Equal("27", (string?)resource);
     }
 
     [Fact]

@@ -56,7 +56,9 @@ public sealed class PassportWindowLifecycleTests
         Assert.True(code.IndexOf("if (collect) Collect();", StringComparison.Ordinal) <
             code.IndexOf("SetBusy(true);", StringComparison.Ordinal));
         Assert.Contains("await Task.Run(() => _sql.Save(p))", code);
-        Assert.Contains("await Task.Run(() => _sql.Delete(_objectId, p.Id, p.Revision))", code);
+        // Delete-снимок id/revision берётся до подтверждения и перепроверяется после диалога.
+        Assert.Contains("await Task.Run(() => _sql.Delete(_objectId, id, revision))", code);
+        Assert.Contains("!ReferenceEquals(_rows[index], p) || p.Id != id || p.Revision != revision", code);
         Assert.Contains("e.Cancel = true; // cancel synchronously", code);
         Assert.Contains("else if (!await SaveAsync()) return;", code);
         Assert.Contains("Dispatcher.BeginInvoke(new Action(Close))", code);

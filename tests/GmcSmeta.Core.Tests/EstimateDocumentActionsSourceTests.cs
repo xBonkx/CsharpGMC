@@ -19,7 +19,7 @@ public sealed class EstimateDocumentActionsSourceTests
         Assert.Contains("ReferenceEquals(snapshot, _estimate) && revision == _serverRevision", menu);
         Assert.Contains("main.IsCurrentEstimatePage(_contractId, _objectId, this)", menu);
         Assert.Contains("if (!item.IsEnabled || !allowed())", menu);
-        Assert.Contains("menu.IsOpen = false;\n                handler(s, args);", menu);
+        Assert.Contains("menu.IsOpen = false;\n                handler(s, args);", menu.Replace("\r\n", "\n"));
         Assert.Contains("SequenceEqual(selection, ReferenceEqualityComparer.Instance)", menu);
         Assert.DoesNotContain("ExtraActionsExpander", Source("EstimateView.xaml"));
     }

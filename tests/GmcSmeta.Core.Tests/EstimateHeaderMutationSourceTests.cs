@@ -42,7 +42,7 @@ public sealed class EstimateHeaderMutationSourceTests
         Assert.Contains("snapshot.Locked ? \"Снять блокировку сметы\"", code);
         Assert.Contains("var kp = ordinary && _isKp", code);
         Assert.Contains("var annex = ordinary && _doc.Kind == \"main\"", code);
-        Assert.Contains("DeleteContract_Click, \"Trash\", () => ordinary && Write(true)", code);
+        Assert.Contains("DeleteContract_Click, \"Trash\", () => ordinary && Write(false)", code);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class EstimateHeaderMutationSourceTests
     public void MetadataAndEstimateAreReconciledAtTheSameRevision()
     {
         var view = Source("GmcSmeta.App", "EstimateView.xaml.cs");
-        Assert.Contains("Workspace.ReadDocumentMetadata(read, _contractId)", view);
+        Assert.Contains("Workspace.ReadDocumentMetadata(read, _contractId, token)", view);
         Assert.Contains("Metadata: (DocRow?)metadata", view);
         Assert.Contains("if (!identityChanged) _doc = metadata;", view);
         Assert.Contains("if (identityChanged) IsEnabled = false;", view);

@@ -46,6 +46,6 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("TitleText.ToolTip = $\"{header.FullTitle}", editor);
         var ks = File.ReadAllText(Path.Combine(app, "ContractActsWorkspace.xaml.cs"));
         Assert.Contains("SumTotalCaption.Text = \"Сдано по смете\";", ks);
-        Assert.Contains("Totals.ReadOne(conn, contractId, token)", ks);
+        Assert.Contains("Totals.ReadOneWithRules(conn, contractId, token)", ks);
     }
 }

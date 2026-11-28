@@ -18,7 +18,7 @@ public sealed class EstimateHeaderCountSourceTests
         Assert.Single(view.Descendants().Where(e => (string?)e.Attribute(xaml + "Name") == "TitleText"));
         var code = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
         Assert.DoesNotContain("CountText.", code);
-        Assert.Contains("TitleText.ToolTip = $\"{est.Title}\\n\"", code);
+        Assert.Contains("TitleText.ToolTip = $\"{header.FullTitle}\\n\"", code);
         Assert.Contains("CountForm(est.Positions,", code);
         Assert.Contains("CountForm(est.Systems,", code);
     }

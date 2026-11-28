@@ -100,7 +100,7 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("old.IsSubsystem != candidate.IsSubsystem", code);
         Assert.Contains("SystemLabel) { IsSubsystem = IsSubsystem }", code);
         var sql = File.ReadAllText(Path.Combine(root.FullName, "src", "GmcSmeta.Core", "Db", "SqlServerShipments.cs"));
-        Assert.Contains("AS issued, p.parent_id, sy.parent_id", sql);
+        Assert.Contains("p.parent_id,sy.parent_id AS system_parent_id", sql);
         Assert.Contains("outOfKp, !r.IsDBNull(11)) { IsSubsystem = !r.IsDBNull(12) }", sql);
         Assert.Contains("ShipmentCardText.PositionCount(lineCount)", code);
         Assert.Contains("ShipmentCardText.PositionCount(over)", code);
@@ -109,8 +109,8 @@ public sealed class ShipmentTableVisualTests
         Assert.Contains("TotalTile.ToolTip =", code);
         // The transient status line must not retain a second, stale stock warning.
         // Both full load and incremental readback update the dedicated warning.
-        Assert.Contains("private void UpdateSummary(int lineCount)", code);
-        Assert.Contains("UpdateSummary(snapshot.LineCount);", code);
+        Assert.Contains("private void UpdateSummary(int lineCount,", code);
+        Assert.Contains("UpdateSummary(snapshot.LineCount, snapshot.Counts);", code);
         Assert.Contains("UpdateSummary(changes.Shipment.Lines);", code);
         Assert.DoesNotContain("превышают складской остаток", code);
         Assert.Contains("StockWarningText.Text = over == 0 ?", code);

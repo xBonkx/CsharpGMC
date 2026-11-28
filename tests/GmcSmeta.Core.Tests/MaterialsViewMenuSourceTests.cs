@@ -34,7 +34,7 @@ public sealed class MaterialsViewMenuSourceTests
         Assert.Contains("_inlineStageColumnKeys.SequenceEqual(keys)", stages);
         Assert.Contains("if (!keep[i]) continue;", stages);
         Assert.Contains("FillInlineStageCells(rows[i]);", stages);
-        Assert.Contains("StageAllocationPresentation.Summarize(data.Stages.Count,", stages);
+        Assert.Contains("StageAllocationPresentation.Summarize(stages.Count,", stages);
         var temporary = File.ReadAllText(Path.Combine(app, "EstimateView.TemporaryView.cs"));
         Assert.Contains("ApplyFilter(expandAllGroups: true);", temporary);
         Assert.DoesNotContain("EstimateGroups.Build(", temporary);

@@ -75,7 +75,7 @@
                                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="Hit" Property="Background" Value="#19000000"/></Trigger>
                                         <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hit" Property="BorderBrush" Value="#2563EB"/><Setter TargetName="Hit" Property="BorderThickness" Value="1"/></Trigger>
                                         <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="#1E40AF"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/></Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate></Setter.Value>
                             </Setter>
@@ -101,7 +101,7 @@
                                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Hit" Property="Background" Value="#10000000"/></Trigger>
                                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="Hit" Property="Background" Value="#19000000"/></Trigger>
                                         <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hit" Property="BorderBrush" Value="#2563EB"/><Setter TargetName="Hit" Property="BorderThickness" Value="1"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/></Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate></Setter.Value>
                             </Setter>

@@ -56,7 +56,9 @@ public sealed class EstimateContextSelectionSourceTests
         Assert.Contains("ordinaryAnchor && CopySourceSystem(selected) is not null", menu);
         Assert.Contains("selected is null || selected.IsVirtual || !_rows.Contains(selected)", cells);
         Assert.Contains("SystemCopySource.Resolve(selected.Source", cells);
-        Assert.Contains("!ReferenceEquals(CopySourceSystem(selected), source)", cells);
+        // Защита переехала в EstimateView.SystemCopy.cs (Current()) в положительной форме.
+        Assert.Contains("source is not null && ReferenceEquals(CopySourceSystem(selected), source)",
+            Source("EstimateView.SystemCopy.cs"));
     }
 
     [Fact]

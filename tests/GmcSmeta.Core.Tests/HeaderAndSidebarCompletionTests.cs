@@ -38,8 +38,12 @@ public sealed class HeaderAndSidebarCompletionTests
     [Fact]
     public void SidebarActionsUseContentWidthAndCommonHeight()
     {
-        var create = Named("MainWindow.xaml", "NewObjectButton");
-        var import = Named("MainWindow.xaml", "SidebarImportButton");
+        // Один разпарсенный документ: Named() парсит заново, Assert.Same на родителях не мог пройти никогда.
+        var doc = XDocument.Parse(Source("MainWindow.xaml"));
+        static XElement Btn(XDocument d, string name) =>
+            Assert.Single(d.Descendants().Where(e => (string?)e.Attribute(X + "Name") == name));
+        var create = Btn(doc, "NewObjectButton");
+        var import = Btn(doc, "SidebarImportButton");
         Assert.Same(create.Parent, import.Parent);
         var widths = create.Parent!.Element(W + "Grid.ColumnDefinitions")!.Elements().Select(e => (string?)e.Attribute("Width")).ToArray();
         Assert.Equal(new[] { "*", "6", "Auto" }, widths);

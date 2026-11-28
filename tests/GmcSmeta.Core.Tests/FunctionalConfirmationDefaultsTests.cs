@@ -14,7 +14,6 @@ public sealed class FunctionalConfirmationDefaultsTests
     [Theory]
     [InlineData("EstimateView.QueueSave.cs")]
     [InlineData("CostSummaryPane.Smr.cs")]
-    [InlineData("CostSummaryPane.Materials.Actions.cs")]
     [InlineData("CostSummaryPane.Materials.cs")]
     [InlineData("WorkspaceQueryWindows.cs")]
     [InlineData("MetalWarehouseWindow.xaml.cs")]

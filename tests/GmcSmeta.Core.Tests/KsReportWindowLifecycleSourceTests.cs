@@ -40,7 +40,7 @@ public sealed class KsReportWindowLifecycleSourceTests
     public void GroupOverviewCancelsQueuedReadAndPublication()
     {
         var code = ReadApp("KsGroupReportWindow.xaml.cs");
-        Assert.Contains("_connectionString,_contractId,_groupKey, token), token);", code);
+        Assert.Contains("_connectionString,_contractId,_groupKey, token, _expectedRevision), token);", code);
         Assert.Contains("token.ThrowIfCancellationRequested();\n                prepared.Publish();", code);
         Assert.Contains("await Task.Run(prepared.Dispose);", code);
         Assert.Contains("_lifetime.Cancel();", code);

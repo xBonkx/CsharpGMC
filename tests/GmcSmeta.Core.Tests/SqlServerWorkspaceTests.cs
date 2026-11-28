@@ -100,7 +100,7 @@ public sealed class SqlServerWorkspaceTests
         Assert.Equal("main",result.Kind);
         Assert.Null(result.BaseContractId);
         Assert.Equal(2147483648L,result.AgreementId);
-        Assert.Equal(" 2 ",result.AnnexNumber);
+        Assert.Equal("2",result.AnnexNumber); // 1ced9101: политика нормализует номер приложения (Trim)
     }
 
     [Fact]

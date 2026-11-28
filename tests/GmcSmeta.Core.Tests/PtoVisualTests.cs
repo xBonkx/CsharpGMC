@@ -14,9 +14,9 @@ public sealed class PtoVisualTests
     }
 
     [Theory]
-    [InlineData("PtoWindow.xaml","Create_Click,Edit_Click,Copy_Click,ObjectCard_Click,Certificates_Click,Templates_Click,Backup_Click,Restore_Click,Root_Click")]
-    [InlineData("PtoEditorWindow.xaml","Verify_Click,Preview_Click,Release_Click,History_Click,Save_Click,UseWorks_Click,KsVor_Click,ExternalVor_Click,Up_Click,Down_Click,AddFile_Click,ToggleFile_Click,FileProperties_Click,OpenFile_Click,FromLibrary_Click")]
-    public void PythonButtonsAreTextOnly(string file,string handlers)
+    [InlineData("PtoWindow.xaml","ObjectCard_Click,Certificates_Click,Templates_Click,Backup_Click,Restore_Click,Root_Click")]
+    [InlineData("PtoEditorWindow.xaml","Release_Click,History_Click,UseWorks_Click,KsVor_Click,ExternalVor_Click,ToggleFile_Click,FileProperties_Click,OpenFile_Click,FromLibrary_Click")]
+    public void PythonTextOnlyButtonsStayTextOnly(string file,string handlers)
     {
         var doc=XDocument.Parse(Source(file));
         foreach(var handler in handlers.Split(','))
@@ -24,6 +24,23 @@ public sealed class PtoVisualTests
             var b=Assert.Single(doc.Descendants().Where(n=>n.Name.LocalName=="Button" &&
                 (string?)n.Attribute("Click")==handler));
             Assert.Null(b.Attribute("ContentTemplate"));
+            Assert.Equal("{StaticResource PythonToolbarButton}",(string?)b.Attribute("Style"));
+        }
+    }
+
+    // 30c65449: сверено с Python pto/ui.py — одобренные команды носят иконки каталога (икон-паритет обязателен).
+    [Theory]
+    [InlineData("PtoWindow.xaml","Create_Click=IconLabelPlus,Edit_Click=IconLabelOpen,Copy_Click=IconLabelCopy")]
+    [InlineData("PtoEditorWindow.xaml","Verify_Click=IconLabelCheck,Preview_Click=IconLabelFile,Save_Click=IconLabelCheck,Up_Click=IconLabelArrowUp,Down_Click=IconLabelArrowDown,AddFile_Click=IconLabelPlus")]
+    public void ApprovedCatalogIconButtonsKeepTheirIcons(string file,string pairs)
+    {
+        var doc=XDocument.Parse(Source(file));
+        foreach(var pair in pairs.Split(','))
+        {
+            var parts=pair.Split('=');
+            var b=Assert.Single(doc.Descendants().Where(n=>n.Name.LocalName=="Button" &&
+                (string?)n.Attribute("Click")==parts[0]));
+            Assert.Equal("{StaticResource "+parts[1]+"}",(string?)b.Attribute("ContentTemplate"));
             Assert.Equal("{StaticResource PythonToolbarButton}",(string?)b.Attribute("Style"));
         }
     }

@@ -111,9 +111,16 @@ internal static class Program
             var cs = Environment.GetEnvironmentVariable("GMC_SMETA_SQL_CONNECTION");
             if (string.IsNullOrWhiteSpace(cs))
                 throw new InvalidOperationException("Set GMC_SMETA_SQL_CONNECTION to the synthetic pilot database.");
+            int seedContractId;
             using (var probe = SqlServerDatabase.Open(cs))
+            {
                 if (!probe.Database.StartsWith("GmcSmetaPilot_", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("WPF checks require a GmcSmetaPilot_* database.");
+                // Дым читает только метаданные: выбираем документ с максимумом позиций.
+                using var cmd = probe.CreateCommand();
+                cmd.CommandText = "SELECT TOP(1) s.contract_id FROM dbo.positions p JOIN dbo.systems s ON p.system_id=s.id GROUP BY s.contract_id ORDER BY COUNT(*) DESC";
+                seedContractId = Convert.ToInt32(cmd.ExecuteScalar());
+            }
 
             var window = new MainWindow();
             window.InitializeWorkspaceNavigation();
@@ -130,8 +137,23 @@ internal static class Program
             var tree = (TreeView)window.FindName("NavigationTree");
             if (tree.Items.Count == 0) throw new Exception("No SQL Server documents in navigation.");
 
-            var firstDocument = FindDocument(tree.Items) ?? throw new Exception("No SQL Server document to inspect.");
-            firstDocument.IsSelected = true;
+            // EstimateView грузит строки только в Loaded — окно должно быть показано,
+            // иначе страница никогда не привяжется к PresentationSource.
+            window.Show();
+            // Дерево навигации объектное (редизайн карточек): DocRow в тегах узлов больше нет —
+            // документ открываем через MainWindow.OpenEstimate по первому не-этапному DocRow.
+            var docsField = window.GetType().GetField("_docs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?? throw new Exception("Navigation document collection not found.");
+            var firstDocument = ((System.Collections.IEnumerable)docsField.GetValue(window)!)
+                .OfType<GmcSmeta.Core.Domain.DocRow>()
+                .FirstOrDefault(d => !d.IsStage && d.Id == seedContractId)
+                ?? ((System.Collections.IEnumerable)docsField.GetValue(window)!)
+                    .OfType<GmcSmeta.Core.Domain.DocRow>()
+                    .FirstOrDefault(d => !d.IsStage) ?? throw new Exception("No SQL Server document to inspect.");
+            typeof(MainWindow).GetMethod("OpenEstimate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+                null, new[] { typeof(int), typeof(int?), typeof(bool) }, null)!
+                .Invoke(window, new object[] { firstDocument.Id, null, false });
+            PumpUntil(() => host.Content is EstimateView, "estimate opening");
             if (host.Content is not EstimateView page)
                 throw new Exception("Document did not open in the SQL Server editor.");
             var grid = (DataGrid)page.FindName("EstimateGrid");

@@ -17,10 +17,11 @@ public sealed class DocumentMenuMutationSourceTests
         var helper = Source("GmcSmeta.App", "MainWindow.DocumentMutation.cs");
         Assert.Contains("Workspace.ReadDocumentMetadata(_serverConn, expected.Id)", helper);
         Assert.Contains("cached.CanTransferDocument", helper);
-        var main = Source("GmcSmeta.App", "MainWindow.xaml.cs");
-        Assert.Contains("!DocumentMatchesServer(doc, confirmedRevision)", main);
-        Assert.Contains("captured.Connection, doc.Id, confirmedRevision", main);
-        Assert.Contains("!doc.IsStage && !doc.StageRest", main);
+        // 32324fdf: поток удаления вынесен в MainWindow.Deletion.cs, ревизия фиксируется до подтверждения.
+        var deletion = Source("GmcSmeta.App", "MainWindow.Deletion.cs");
+        Assert.Contains("!DocumentMatchesServer(doc, captured.Revision)", deletion);
+        Assert.Contains("captured.Connection, doc.Id, captured.Revision", deletion);
+        Assert.Contains("doc.IsStage || doc.StageRest", deletion);
         var sql = Source("GmcSmeta.App", "MainWindow.SqlServer.cs");
         Assert.Contains("!ObjectMutationCurrent(obj, captured)", sql);
         Assert.Contains("!DocumentMatchesServer(doc, revision)", sql);

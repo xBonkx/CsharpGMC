@@ -193,23 +193,31 @@ internal static class VisualAuditChecks
         foreach (var key in new[] { "ReportGridReviewText", "ReportGridMuted", "CompactCostReview", "CompactCostMuted" })
             grid.Columns.Add(new DataGridTextColumn { Header = key, Binding = new Binding("Text"), Width = 160,
                 ElementStyle = (Style)Application.Current.FindResource(key) });
-        Layout(grid, 720, 180);
-        var row = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
-        Require(row is not null, "Report row was not realized");
-        var expected = (SolidColorBrush)Application.Current.FindResource("GridSelectionTextBrush");
-        foreach (var column in grid.Columns)
+        // Виртуализирующая панель не реализует строки на «отрывшемся» дереве (без PresentationSource)
+        // — нужен живой хост-окно, как в GridEditingChecks.
+        var host = new Window { Content = grid, Width = 740, Height = 220, ShowInTaskbar = false, ShowActivated = false };
+        host.Show();
+        try
         {
-            var text = (TextBlock)column.GetCellContent(row);
-            Require(text.ToolTip is string full && full == text.Text, "Full report value must remain accessible");
-            var normal = ((SolidColorBrush)text.Foreground).Color;
-            var cell = new DataGridCellInfo(grid.Items[0], column);
-            grid.SelectedCells.Add(cell);
             Layout(grid, 720, 180);
-            Require(((SolidColorBrush)text.Foreground).Color == expected.Color, "Selected report value must use grid selection foreground");
-            grid.SelectedCells.Remove(cell);
-            Layout(grid, 720, 180);
-            Require(((SolidColorBrush)text.Foreground).Color == normal, "Deselection must restore semantic foreground");
+            var row = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
+            Require(row is not null, "Report row was not realized");
+            var expected = (SolidColorBrush)Application.Current.FindResource("GridSelectionTextBrush");
+            foreach (var column in grid.Columns)
+            {
+                var text = (TextBlock)column.GetCellContent(row);
+                Require(text.ToolTip is string full && full == text.Text, "Full report value must remain accessible");
+                var normal = ((SolidColorBrush)text.Foreground).Color;
+                var cell = new DataGridCellInfo(grid.Items[0], column);
+                grid.SelectedCells.Add(cell);
+                Layout(grid, 720, 180);
+                Require(((SolidColorBrush)text.Foreground).Color == expected.Color, "Selected report value must use grid selection foreground");
+                grid.SelectedCells.Remove(cell);
+                Layout(grid, 720, 180);
+                Require(((SolidColorBrush)text.Foreground).Color == normal, "Deselection must restore semantic foreground");
+            }
         }
+        finally { host.Close(); }
     }
 
     private static void RunNavigationGlyphChecks()
@@ -616,24 +624,33 @@ internal static class VisualAuditChecks
         ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
         grid.Columns.Add(new DataGridTextColumn { Header = "Название", Width = 460, Binding = new Binding(".") });
         grid.Columns.Add(new DataGridTextColumn { Header = "Примечание", Width = 170, Binding = new Binding(".") });
-        Layout(grid, 420, 200);
-        var scroll = (ScrollViewer)grid.Template.FindName("DG_ScrollViewer", grid);
-        Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Visible &&
-            scroll.ComputedVerticalScrollBarVisibility == Visibility.Visible, "Narrow grid must expose both scrollbars.");
-        var presenter = (ScrollContentPresenter)scroll.Template.FindName("PART_ScrollContentPresenter", scroll);
-        var vertical = (ScrollBar)scroll.Template.FindName("PART_VerticalScrollBar", scroll);
-        var horizontal = (ScrollBar)scroll.Template.FindName("PART_HorizontalScrollBar", scroll);
-        var contentOrigin = presenter.TransformToAncestor(scroll).Transform(new Point());
-        var verticalOrigin = vertical.TransformToAncestor(scroll).Transform(new Point());
-        var horizontalOrigin = horizontal.TransformToAncestor(scroll).Transform(new Point());
-        Require(contentOrigin.X + presenter.ActualWidth <= verticalOrigin.X + 1 &&
-            contentOrigin.Y + presenter.ActualHeight <= horizontalOrigin.Y + 1,
-            "Scrollbars must reserve layout space outside the content viewport.");
-        Require(Math.Abs(vertical.ActualWidth - 11) < 1 &&
-            Math.Abs(horizontal.ActualHeight - 11) < 1, "Scrollbar thickness must remain 11 DIP.");
-        Layout(grid, 900, 200);
-        Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Collapsed,
-            "Horizontal scrollbar must disappear when both columns fit.");
+        // Шаблон DataGrid применяется только при живом PresentationSource — нужен хост-окно.
+        var host = new Window { Content = grid, Width = 440, Height = 220, ShowInTaskbar = false, ShowActivated = false };
+        host.Show();
+        try
+        {
+            Layout(grid, 420, 200);
+            var scroll = (ScrollViewer)grid.Template.FindName("DG_ScrollViewer", grid);
+            Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Visible &&
+                scroll.ComputedVerticalScrollBarVisibility == Visibility.Visible, "Narrow grid must expose both scrollbars.");
+            var presenter = (ScrollContentPresenter)scroll.Template.FindName("PART_ScrollContentPresenter", scroll);
+            var vertical = (ScrollBar)scroll.Template.FindName("PART_VerticalScrollBar", scroll);
+            var horizontal = (ScrollBar)scroll.Template.FindName("PART_HorizontalScrollBar", scroll);
+            var contentOrigin = presenter.TransformToAncestor(scroll).Transform(new Point());
+            var verticalOrigin = vertical.TransformToAncestor(scroll).Transform(new Point());
+            var horizontalOrigin = horizontal.TransformToAncestor(scroll).Transform(new Point());
+            Require(contentOrigin.X + presenter.ActualWidth <= verticalOrigin.X + 1 &&
+                contentOrigin.Y + presenter.ActualHeight <= horizontalOrigin.Y + 1,
+                "Scrollbars must reserve layout space outside the content viewport.");
+            Require(Math.Abs(vertical.ActualWidth - 11) < 1 &&
+                Math.Abs(horizontal.ActualHeight - 11) < 1, "Scrollbar thickness must remain 11 DIP.");
+            // Обе колонки (630 DIP) помещаются только при ширине больше 630 — расширяем хост.
+            host.Width = 920;
+            Layout(grid, 900, 200);
+            Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Collapsed,
+                "Horizontal scrollbar must disappear when both columns fit.");
+        }
+        finally { host.Close(); }
         Console.WriteLine("Estimate scrollbar viewport geometry checked (no SQL).");
     }
 

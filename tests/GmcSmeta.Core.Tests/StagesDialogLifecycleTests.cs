@@ -89,7 +89,10 @@ public sealed class StagesDialogLifecycleTests
         Assert.Contains("_inlineStageIds.ContainsKey(c)", menu);
         Assert.Contains("SetInlineStageColumnVisibility(column, checkItem.IsChecked)", menu);
         Assert.Contains("SetInlineStageColumnVisibility(column, true)", menu);
-        Assert.Contains("EstimateGrid.Columns.Where(c => !_inlineStageColumns.Contains(c))", menu);
+        // CTX-022: предпочтения базовых колонок снимает CaptureEstimateVisibilityPreferences,
+        // stage-колонки проходят через SetInlineStageColumnVisibility и не попадают в _uiSettings.
+        Assert.Contains("private void CaptureEstimateVisibilityPreferences()", menu);
+        Assert.Contains("_uiSettings.HiddenColumns = _defaultEstimateColumns.Where(c => c != PurchaseColumn &&", menu);
     }
 
     [Fact]
@@ -124,7 +127,9 @@ public sealed class StagesDialogLifecycleTests
         var trigger = xaml[selected..end];
         Assert.Contains("HeaderBorder", trigger);
         Assert.Contains("Foreground", trigger);
-        Assert.DoesNotContain("FontWeight", trigger);
+        // 3497de03: активный заголовок становится SemiBold (TargetName=PART_Header), потомки не затрагиваются.
+        Assert.Contains("TargetName=\"PART_Header\" Property=\"TextElement.FontWeight\" Value=\"SemiBold\"", trigger);
+        Assert.DoesNotContain("<Setter Property=\"FontWeight\"", trigger);
         Assert.DoesNotContain("FontSize", trigger);
     }
 

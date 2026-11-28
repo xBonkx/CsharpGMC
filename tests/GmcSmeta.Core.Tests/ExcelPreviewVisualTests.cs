@@ -35,7 +35,7 @@ public sealed class ExcelPreviewVisualTests
         Assert.Contains("ExcelPreviewUi.StatusStyle", source);
         Assert.Contains("TextWrapping.Wrap", source);
         Assert.Contains("new Binding(nameof(ExcelExistingDifference.SafeToApply))", source);
-        Assert.Contains("row.Apply = selected && row.SafeForBulk", source);
+        Assert.Contains("var apply = selected && row.SafeForBulk;", source);
         Assert.Contains("!_hasMissingFormulaCache", source);
         Assert.Contains("WithExplicitMapping(source.Ordinal, old.Id)", source);
         Assert.Contains("if (_closed || _busy || _hasMissingFormulaCache", source);

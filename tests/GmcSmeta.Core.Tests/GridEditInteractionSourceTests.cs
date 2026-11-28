@@ -65,7 +65,10 @@ public sealed class GridEditInteractionSourceTests
         var materials = Source("EstimateView.Materials.cs");
         Assert.Contains("if (text == (column switch", materials);
         Assert.Contains("=> row.Supplier", materials);
-        Assert.Contains("MaterialsGrid?.Items is not IEditableCollectionView { IsEditingItem: true }", materials);
+        // e4f7b4d5: проверка редактирования вынесена в общий хелпер HasGridEdit.
+        Assert.Contains("if (!force && (HasGridEdit(MaterialsGrid) || _materialsBusy)) return;", materials);
+        Assert.Contains("is System.ComponentModel.IEditableCollectionView { IsEditingItem: true }",
+            Source("EstimateView.xaml.cs"));
         Assert.Contains("MaterialsVisibleRows.SameReferences(existing, result)", materials);
         Assert.Contains("if (text == (column switch", Source("EstimateView.CostSummary.cs"));
         Assert.Contains("if (editor.Text == (column == \"cost\" ? row.CostRaw : row.SellRaw)) return;", Source("EstimateView.CostTotals.cs"));

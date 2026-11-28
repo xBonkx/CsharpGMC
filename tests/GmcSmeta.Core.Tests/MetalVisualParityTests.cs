@@ -40,11 +40,20 @@ public sealed class MetalVisualParityTests
     public void ExistingWarehouseCommandsRetainHandlersWithoutExtraIcons()
     {
         var doc=XDocument.Parse(Source("MetalWarehouseWindow.xaml"));
-        foreach(var handler in new[]{"Operation_Click","Import_Click","Export_Click","Refresh_Click","LotAdd_Click","LotPay_Click","LotReceive_Click"})
+        foreach(var handler in new[]{"Operation_Click","LotAdd_Click","LotPay_Click","LotReceive_Click"})
         {
             var b=Assert.Single(doc.Descendants().Where(n=>n.Name.LocalName=="Button" &&
                 (string?)n.Attribute("Click")==handler));
             Assert.Null(b.Attribute("ContentTemplate"));
+            Assert.Equal("{StaticResource PythonToolbarButton}",(string?)b.Attribute("Style"));
+        }
+        // 30c65449: сверено с Python ui/metal_warehouse.py — Import/Export/Refresh носят одобренные иконки каталога.
+        foreach(var (handler,icon) in new (string,string)[]{("Import_Click","IconLabelUpload"),
+            ("Export_Click","IconLabelDownload"),("Refresh_Click","IconLabelRefresh")})
+        {
+            var b=Assert.Single(doc.Descendants().Where(n=>n.Name.LocalName=="Button" &&
+                (string?)n.Attribute("Click")==handler));
+            Assert.Equal("{StaticResource "+icon+"}",(string?)b.Attribute("ContentTemplate"));
             Assert.Equal("{StaticResource PythonToolbarButton}",(string?)b.Attribute("Style"));
         }
         Assert.Contains("StockFilter_Changed",doc.ToString());

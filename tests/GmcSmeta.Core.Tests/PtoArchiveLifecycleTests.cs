@@ -63,7 +63,9 @@ public sealed class PtoArchiveLifecycleTests
         Assert.Contains("_source.Contracts(_scopeObjectId).ToLookup(c=>c.ObjectId)",code);
         Assert.Contains("items.AddRange(choices.Contracts[choice.Id]);",code);
         Assert.DoesNotContain("items.AddRange(_source.Contracts",code);
-        Assert.Contains("_source.Contracts(obj.Id).FirstOrDefault(c=>c.Id==contract.Id)",code);
+        // 0fc090bb: ревалидация после подтверждения — внутри ревизионного забора PtoSqlSource.Snapshot.
+        Assert.Contains("choices.Contracts[scopedObject.Id].FirstOrDefault(c=>c.Id==cid)",code);
+        Assert.Contains("SqlServerPtoContractContext.Read(conn,obj.Id).SingleOrDefault(c=>c.Id==contract.Id)",Source("PtoSqlSource.cs"));
         Assert.Contains("archive.Sql.Save(package);",code);
     }
 

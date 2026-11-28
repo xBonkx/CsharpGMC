@@ -28,7 +28,8 @@ public sealed class HistoryTrashVisualTests
         var source=AppSource("HistoryWindow.xaml.cs");
         Assert.Contains("SearchBox.Clear();",source);
         Assert.Contains("SearchBox.Focus();",source);
-        Assert.Contains("HistoryPresentation.MatchesWords(SearchBox.Text, row.SearchLine)",source);
+        Assert.Contains("var words = HistoryPresentation.SearchWords(SearchBox.Text);",source);
+        Assert.Contains("HistoryPresentation.MatchesSearchWords(words, row.SearchLine)",source);
         Assert.Contains("SearchBox.SelectAll();",source);
     }
 
@@ -53,9 +54,10 @@ public sealed class HistoryTrashVisualTests
         var xaml=AppSource("TrashWindow.xaml");
         Assert.Contains("ContentTemplate=\"{StaticResource IconLabelUndo}\"",xaml);
         Assert.Contains("Style=\"{StaticResource PythonToolbarButton}\" ContentTemplate=\"{StaticResource IconLabelTrash}\"",xaml);
-        Assert.Contains("Binding=\"{Binding DaysLeftText}\" Width=\"80\" ElementStyle=\"{StaticResource CompactCostText}\"",xaml);
+        Assert.Contains("Binding=\"{Binding DaysLeftText}\" Width=\"80\" ElementStyle=\"{StaticResource CompactCostCenter}\"",xaml);
         var source=AppSource("TrashWindow.xaml.cs");
         Assert.Contains("MessageBoxButton.YesNo",source);
-        Assert.Contains("if (_revision != revision || CurrentId() != id || _commitUncertain) return;",source);
+        Assert.Contains("_revision != revision || TrashGrid.SelectedItems.Count != 1 ||",source);
+        Assert.Contains("!ReferenceEquals(TrashGrid.SelectedItem, row) || _commitUncertain) return;",source);
     }
 }

@@ -79,7 +79,7 @@ public sealed class WorkspaceRefreshSourceTests
         var export = Source("ContractActsWorkspace.Export.cs");
         var workbook = Source("KsProgressWorkbook.cs");
         Assert.Contains("_summaryExportCancellation?.Cancel();", workspace);
-        Assert.Contains("if (_summaryExportCancellation is not null) return;", export);
+        Assert.Contains("if (_summaryExportCancellation is not null || _summaryCancellation is not null ||", export);
         Assert.Contains("var acts = _summaryActs.OrderBy", export);
         Assert.Contains("version == _summaryVersion", export);
         Assert.Contains("ReferenceEquals(summary, _summary)", export);
@@ -101,7 +101,7 @@ public sealed class WorkspaceRefreshSourceTests
         var code = Source("AllContractActsWindow.xaml.cs");
         Assert.Contains("if (!_initialized || _closed || _loading) return;", code);
         Assert.Contains("new KsOverviewSearchIndex(grouped)", code);
-        Assert.Contains("if (_closed || version != _requestVersion) return;", code);
+        Assert.Contains("if (token.IsCancellationRequested || _closed || version != _requestVersion) return;", code);
         Assert.Contains("_visibleGroups = null;", code);
         Assert.Contains("SameVisibleGroups(_visibleGroups, groups)", code);
         Assert.Contains("_visibleRows.ContainsKey(_selectedActId)", code);

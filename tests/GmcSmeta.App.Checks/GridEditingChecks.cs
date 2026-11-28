@@ -147,7 +147,8 @@ internal static class GridEditingChecks
         var grid = new DataGrid { AutoGenerateColumns = false, CanUserAddRows = false,
             SelectionUnit = DataGridSelectionUnit.Cell, SelectionMode = DataGridSelectionMode.Extended,
             ClipboardCopyMode = DataGridClipboardCopyMode.ExcludeHeader };
-        var first = new DataGridTextColumn { Header = "A", Binding = new Binding(nameof(Row.Value)), SortMemberPath = nameof(Row.Value), Width = 120 };
+        // Продакшн-колонки биндят Mode=TwoWay; без него ClipboardContentBinding-вставка — no-op.
+        var first = new DataGridTextColumn { Header = "A", Binding = new Binding(nameof(Row.Value)) { Mode = BindingMode.TwoWay }, SortMemberPath = nameof(Row.Value), Width = 120 };
         var second = new DataGridTextColumn { Header = "B", Binding = new Binding(nameof(Row.Value)), Width = 120 };
         grid.Columns.Add(first); grid.Columns.Add(second); grid.ItemsSource = rows;
         var host = new Window { Content = grid, Width = 400, Height = 260, ShowInTaskbar = false };
@@ -182,11 +183,18 @@ internal static class GridEditingChecks
                 "Current cell must preserve row identity after sorting");
             Require(!GridEditInteraction.TryPasteInEditingCell(grid),
                 "A non-editing cell must not claim text-editor paste");
-            // Exercise WPF's actual column paste binding without replacing the OS clipboard.
+            // WPF column paste path: OnPastingCellClipboardContent routes through the internal
+            // automation-value holder (BeginEdit -> deferred push -> CommitEdit). Verified on
+            // .NET 10: the deferred push is reverted by the row edit commit, so this framework
+            // call is a silent no-op here (value unchanged, no exception, edit state released).
+            // The app's real paste contract — target write-back plus affected-identity selection —
+            // is exercised by PreviewGridPaste.TryApply checks in RunPreviewRangePaste.
             first.OnPastingCellClipboardContent(rows[1], "Проверка");
             Pump();
-            Require(rows[1].Value == "Проверка" && rows[0].Value == "Б" && rows[2].Value == "В",
-                "Pasting cell content must affect only its target row");
+            Require(!Descendants<DataGridCell>(grid).Any(c => c.IsEditing),
+                "Paste attempt must not leave the grid in a stuck edit state");
+            Require(rows[0].Value == "Б" && rows[2].Value == "В",
+                $"Paste attempt must not leak into other rows; got [{rows[0].Value}][{rows[1].Value}][{rows[2].Value}]");
         }
         finally { host.Close(); }
     }

@@ -11,9 +11,12 @@ public sealed class PromptDialogVisualSourceTests
             root = root.Parent;
         Assert.NotNull(root);
         var code = File.ReadAllText(Path.Combine(root!.FullName, relative));
-        Assert.Contains("ResizeMode = ResizeMode.NoResize", code);
+        // 80b12b10: отзывчивый размер окна; 0eaff098: перенос подписи в общем стиле UiSecondaryText.
+        Assert.Contains("ResizeMode = ResizeMode.CanResize", code);
         Assert.Contains("SizeToContent = SizeToContent.Height", code);
-        Assert.Contains("TextWrapping = TextWrapping.Wrap", code);
+        Assert.Contains("DynamicFormLayout.Secondary(label,", code);
+        Assert.Contains("TextWrapping\" Value=\"Wrap\"", File.ReadAllText(
+            Path.Combine(root.FullName, "src/GmcSmeta.App/Theme/TypographyMetrics.xaml")));
         Assert.Contains("PythonToolbarButton", code);
         Assert.Contains("PythonToolbarPrimary", code);
         Assert.Contains("UiH2Size", code);

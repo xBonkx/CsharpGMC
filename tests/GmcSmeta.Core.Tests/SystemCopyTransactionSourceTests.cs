@@ -8,7 +8,7 @@ public sealed class SystemCopyTransactionSourceTests
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", project, path)))
             root = root.Parent;
         Assert.NotNull(root);
-        return File.ReadAllText(Path.Combine(root!.FullName, "src", project, path));
+        return File.ReadAllText(Path.Combine(root!.FullName, "src", project, path)).Replace("\r\n", "\n");
     }
 
     [Fact]

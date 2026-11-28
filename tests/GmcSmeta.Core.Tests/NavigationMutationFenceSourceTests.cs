@@ -19,8 +19,10 @@ public sealed class NavigationMutationFenceSourceTests
         Assert.Contains("revision != SqlServerDatabase.Revision(_serverConn)", code);
         Assert.Contains("target.Connection, obj.Id, !obj.Archived, target.Revision", code);
         Assert.Contains("target.Connection, obj.Id, dialog.Year, target.Revision", code);
-        Assert.Contains("target.Connection, obj.Id, confirmedRevision", code);
-        Assert.Contains("MessageBoxImage.Question, MessageBoxResult.No", code);
+        // 32324fdf: удаление карточки переехало в MainWindow.Deletion.cs с pre-confirmation ревизией.
+        var deletion = Source("MainWindow.Deletion.cs");
+        Assert.Contains("SqlServerWorkspace.DeleteObject(target.Connection, obj.Id, target.Revision, preview.DocumentIds)", deletion);
+        Assert.Contains("MessageBoxImage.Question, MessageBoxResult.No", deletion);
     }
 
     [Fact]
