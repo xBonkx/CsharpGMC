@@ -225,6 +225,9 @@ def load_capture(path):
         raise ValueError("capture dimensions/hash mismatch")
     validate_geometry(meta["resolution"], meta["dpi_x"], meta["monitor_bounds_px"],
                       meta["frame_bounds_px"], meta["dpi_y"])
+    l, t, r, b = meta["frame_bounds_px"]
+    if (r-l, b-t) != (meta["window_width_px"], meta["window_height_px"]):
+        raise ValueError("physical frame and PNG dimensions differ")
     if (meta["monitor_dpi_x"], meta["monitor_dpi_y"]) != (meta["dpi_x"], meta["dpi_y"]):
         raise ValueError("monitor and effective DPI mismatch")
     return meta

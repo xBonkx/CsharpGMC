@@ -104,3 +104,7 @@ METADATA_MATCH_NOT_VISUAL_ACCEPTANCE не является PASS или DONE.
 ### Шаблоны и содержимое ячеек
 
 Segment/ObjectTab/ObjectSubTab/PythonTabAction/PythonFilterChip/PythonFilterRadio/PythonSecondaryTab: значение Padding задаёт стиль, единственный Border применяет TemplateBinding; Presenter не получает дополнительного Margin, сохраняет Horizontal/VerticalContentAlignment. Значения 6/0, 16/7, 14/5, 12/5, 14/7 сохранены. Отступы между вкладками — отдельный trailing gap, не padding текста. Общие текстовые роли CompactCostText, TotalsArticleText, ReportGridReviewText/Muted/Center/Right/StrongRight: Margin=0, Padding=0, cell owns inset; PythonGridEditor также нулевой. Поиск с 30/32 DIP резервом и ComboBox с отдельной стрелкой — намеренные исключения. SidebarSplitter: 5 DIP отдельной колонки, внутри линия 1 DIP, обе скрываются при Ctrl+B; строка возврата Auto, без наложения на PageHost. Это не заменяет проверку остальных локальных шаблонов на реальных страницах.
+
+## Проверка готовности кода и реальные снимки
+
+Используйте `Invoke-LocalAcceptance.ps1 -RequireVisualCodeAcceptance` и `visual_capture.py` по [инструкции](DESIGN_PASS_20261128_WORKSPACE_QA.md). Отдельно проверяются реальные Windows monitor/DPI и совпадение fixture, SHA и размеров PNG. Метаданные состояния вводит оператор; скрипт не является автоматической приёмкой и не открывает БД. Синтетический `--visual-audit` не подменяет реальные снимки.

@@ -77,7 +77,7 @@ public sealed class SharedTypographyMetricsTests
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         var source = Source("MainWindow.xaml");
         var title = XDocument.Parse(source).Descendants().Single(e => (string?)e.Attribute(x + "Name") == "ObjectTitle");
-        Assert.Equal("{StaticResource UiWrappedHeading}", (string?)title.Attribute("Style"));
+        Assert.Equal("{StaticResource UiPageHeading}", (string?)title.Attribute("Style"));
         Assert.Equal("None", (string?)title.Attribute("TextTrimming"));
         Assert.DoesNotContain("FontSize=\"11.733333333333333\"", source);
     }

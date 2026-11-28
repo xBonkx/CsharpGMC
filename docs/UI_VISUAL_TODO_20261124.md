@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 — HOME-36/SPACE-22/STATUS-05/QA-12/QA-13/QA-14/QA-15/QA-16/QA-17/QA-18 CODE READY (3 workspace/layout IDs + 7 QA implementation IDs, no witnessed Windows PASS). Bounded card paging, short-screen totals, adaptive dialogs, real screen/DPI capture and paired metadata, offline grid regression/performance and strict Release QA code gate. Physical capture/build/test evidence remains pending. Design 235/253 CODE READY, 18 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_WORKSPACE_QA.md).
+
 28.11.2026 — ICON-01/ICON-02/ICON-09/ICON-12/ICON-13/ICON-14/SPACE-16/SPACE-17/SPACE-20/FONT-11 CODE READY: ten full canonical IDs. Shared icon pipeline and all 41 Python geometries verified by token comparison; XAML toolbar/resource audit, vector affordances, positive-gap tiles, documented negative/Hidden exceptions, root rendering defaults. New source/WPF tests not run; physical acceptance open. Design 225/253 CODE READY, 28 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_SHARED_CATALOG.md).
 
 28.11.2026 — estimate parity verification follow-up: cached views cannot overwrite the latest explicit purchase preference; added temporary-file and actual grid editor font checks, locked/active toolbar states, corrected fixture parameter type and obsolete focus source assertion. Tests not run. Canonical design statuses unchanged. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).
