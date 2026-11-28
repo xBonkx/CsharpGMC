@@ -880,11 +880,12 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
-    private void AddDocumentFileMenu(ContextMenu menu, DocRow doc)
+    private void AddDocumentFileMenu(ContextMenu menu, DocRow doc, Func<bool>? menuTarget = null)
     {
         var connection = _sqlConnectionString;
         bool ValidTarget() => connection is not null && connection == _sqlConnectionString &&
-            _docs.Any(current => current.Id == doc.Id && current.Kind == doc.Kind);
+            menuTarget?.Invoke() != false &&
+            _docs.Any(current => current.Id == doc.Id && Equals(current, doc));
         if (doc.Kind is "main" or "dop")
         {
             var signed = ContextMenuIcons.Create("Подписанный PDF", "Check");
@@ -1094,8 +1095,9 @@ public partial class MainWindow : Window
             ? NavigationTree.SelectedItem as TreeViewItem
             : NavigationNodeUnderMouse();
         var menu = new ContextMenu();
+        var menuMode = CurrentMode;
         var create = ContextMenuIcons.Create(NavigationModeCaptions.For(CurrentMode).Create + "…", "FolderPlus");
-        create.Click += (_, _) => EditObjectProperties(null);
+        create.Click += (_, _) => { if (SqlWritesEnabled && CurrentMode == menuMode) EditObjectProperties(null); };
         menu.Items.Add(create);
         // Global history and trash already live in the main menu (Python).
         // Keep only target-specific commands here.
@@ -1110,8 +1112,11 @@ public partial class MainWindow : Window
                 var item = ContextMenuIcons.Create(title, glyph, enabled, shortcut, danger);
                 item.Click += (_, _) =>
                 {
-                    if (!SqlWritesEnabled || _objects.FirstOrDefault(obj => obj.Id == selected.Id) is not { } fresh ||
-                        fresh.Archived != selected.Archived)
+                    if (!SqlWritesEnabled || CurrentMode != menuMode ||
+                        !_objectNodes.TryGetValue(selected.Id, out var currentNode) ||
+                        !ReferenceEquals(currentNode, target) ||
+                        _objects.FirstOrDefault(obj => obj.Id == selected.Id) is not { } fresh ||
+                        !Equals(fresh, selected))
                     {
                         StatusText.Text = "Объект изменился. Обновите список и повторите команду.";
                         return;
@@ -1140,42 +1145,51 @@ public partial class MainWindow : Window
         }
         else if (target is { Tag: DocRow doc })
         {
+            bool ValidDocumentTarget() => SqlWritesEnabled && CurrentMode == menuMode &&
+                _documentNodes.TryGetValue(doc.Id, out var currentNode) &&
+                ReferenceEquals(currentNode, target) &&
+                _docs.Any(current => current.Id == doc.Id && Equals(current, doc));
+            void RunDocumentCommand(Action action)
+            {
+                if (ValidDocumentTarget()) action();
+                else StatusText.Text = "Документ изменился. Обновите список и откройте меню снова.";
+            }
             menu.Items.Add(new Separator());
             if (doc.Kind == "kp")
             {
                 var make = ContextMenuIcons.Create("Оформить как приложение…", "Check");
-                make.Click += (_, _) => EditContractProperties(doc, makeContract: true);
+                make.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc, makeContract: true));
                 menu.Items.Add(make);
                 var copy = ContextMenuIcons.Create("Создать копию КП (вариант)…", "Duplicate");
-                copy.Click += (_, _) => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id);
+                copy.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, doc.Kind, copyFrom: doc.Id));
                 menu.Items.Add(copy);
                 var rates = ContextMenuIcons.Create("Скопировать расценки…", "Copy");
-                rates.Click += (_, _) => TransferRates(doc);
+                rates.Click += (_, _) => RunDocumentCommand(() => TransferRates(doc));
                 menu.Items.Add(rates);
                 var stages = ContextMenuIcons.Create("Этапы (разбивка)…", "Stage");
-                stages.Click += (_, _) => OpenStages(doc);
+                stages.Click += (_, _) => RunDocumentCommand(() => OpenStages(doc));
                 menu.Items.Add(stages);
             }
             else if (doc.Kind == "main")
             {
                 var dop = ContextMenuIcons.Create("Создать допсоглашение…", "FilePlus");
-                dop.Click += (_, _) => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id);
+                dop.Click += (_, _) => RunDocumentCommand(() => NewContractFlow(doc.ObjectId, "dop", baseId: doc.Id));
                 menu.Items.Add(dop);
                 var move = ContextMenuIcons.Create("Перенести в другой договор / группу…", "FilePlus", SqlWritesEnabled);
-                move.Click += (_, _) => MoveCurrentContract(doc);
+                move.Click += (_, _) => RunDocumentCommand(() => MoveCurrentContract(doc));
                 menu.Items.Add(move);
             }
             menu.Items.Add(new Separator());
             var exportKp = ContextMenuIcons.Create("Сохранить в Excel / PDF…", "Download");
             var exportEstimate = new MenuItem { Header = "Сохранить смету в Excel…" };
-            exportEstimate.Click += (_, _) => ExportEstimate(doc);
+            exportEstimate.Click += (_, _) => RunDocumentCommand(() => ExportEstimate(doc));
             exportKp.Items.Add(exportEstimate);
             exportKp.Items.Add(new Separator());
             void AddKpExport(string label, bool pdf, bool internalPrices = false,
                 bool positional = false, bool vatLine = false)
             {
                 var command = new MenuItem { Header = label };
-                command.Click += (_, _) => ExportKpDocument(doc, internalPrices, positional, pdf, vatLine);
+                command.Click += (_, _) => RunDocumentCommand(() => ExportKpDocument(doc, internalPrices, positional, pdf, vatLine));
                 exportKp.Items.Add(command);
             }
             AddKpExport("КП / смета — Excel (как в Python)", pdf: false);
@@ -1190,35 +1204,35 @@ public partial class MainWindow : Window
             AddKpExport("Позиционная смета — PDF", pdf: true, positional: true);
             menu.Items.Add(exportKp);
             var compare = ContextMenuIcons.Create("Сравнить с другим документом…", "List");
-            compare.Click += (_, _) => OpenCompare(doc);
+            compare.Click += (_, _) => RunDocumentCommand(() => OpenCompare(doc));
             menu.Items.Add(compare);
             var documentHistory = ContextMenuIcons.Create("История изменений…", "History");
-            documentHistory.Click += (_, _) => OpenHistory(doc.Id);
+            documentHistory.Click += (_, _) => RunDocumentCommand(() => OpenHistory(doc.Id));
             menu.Items.Add(documentHistory);
             menu.Items.Add(new Separator());
             var procurement = ContextMenuIcons.Create("Закупки (контроль оборудования)…", "List");
-            procurement.Click += (_, _) => OpenProcurement(doc);
+            procurement.Click += (_, _) => RunDocumentCommand(() => OpenProcurement(doc));
             menu.Items.Add(procurement);
             var shipping = ContextMenuIcons.Create("Выдача на объект…", "Upload");
-            shipping.Click += (_, _) => OpenShipments(doc);
+            shipping.Click += (_, _) => RunDocumentCommand(() => OpenShipments(doc));
             menu.Items.Add(shipping);
             var acts = ContextMenuIcons.Create("КС-2 (акты)…", "File");
-            acts.Click += (_, _) => OpenActs(doc);
+            acts.Click += (_, _) => RunDocumentCommand(() => OpenActs(doc));
             menu.Items.Add(acts);
             menu.Items.Add(new Separator());
-            AddDocumentFileMenu(menu, doc);
+            AddDocumentFileMenu(menu, doc, ValidDocumentTarget);
             var link = ContextMenuIcons.Create("Создать ссылку .gmcs…", "FilePlus");
-            link.Click += (_, _) => CreateGmcsLink(doc);
+            link.Click += (_, _) => RunDocumentCommand(() => CreateGmcsLink(doc));
             menu.Items.Add(link);
             // C# also exposes properties directly from the navigation tree.
             var props = ContextMenuIcons.Create("Свойства документа…", "Edit");
-            props.Click += (_, _) => EditContractProperties(doc);
+            props.Click += (_, _) => RunDocumentCommand(() => EditContractProperties(doc));
             menu.Items.Add(props);
             menu.Items.Add(new Separator());
             var delete = ContextMenuIcons.Create(
                 doc.Kind switch { "main" => "Удалить приложение…", "dop" => "Удалить допсоглашение…", _ => "Удалить КП…" },
                 "Trash", danger: true);
-            delete.Click += (_, _) => DeleteSqlServerContractFlow(doc);
+            delete.Click += (_, _) => RunDocumentCommand(() => DeleteSqlServerContractFlow(doc));
             menu.Items.Add(delete);
         }
 
@@ -1236,7 +1250,9 @@ public partial class MainWindow : Window
         for (DependencyObject? node = NavigationTree.InputHitTest(point) as DependencyObject;
              node is not null && node != NavigationTree;)
         {
-            if (node is TreeViewItem item) return item;
+            if (node is Border { Name: "HeaderBorder", TemplatedParent: TreeViewItem item }) return item;
+            // A container also owns the expanded children area. Only its header is a row target.
+            if (node is TreeViewItem) return null;
             node = node is System.Windows.Media.Visual || node is System.Windows.Media.Media3D.Visual3D
                 ? System.Windows.Media.VisualTreeHelper.GetParent(node)
                 : LogicalTreeHelper.GetParent(node);

@@ -1033,7 +1033,12 @@ public partial class EstimateView
         {
             var item = ContextMenuIcons.Create("Очистить " + clear.Label, "X",
                 !MaterialsLocked || clear.Field is not ("price" or "cost_price"), "Backspace");
-            item.Click += async (_, _) => await ClearMaterialsAsync(clear.Field, clear.Label, clearIds, revision);
+            item.Click += async (_, _) =>
+            {
+                if (CanExecute() && MaterialsClearIds(clear.Field).SequenceEqual(clearIds))
+                    await ClearMaterialsAsync(clear.Field, clear.Label, clearIds, revision);
+                else SetStatus("Выбор или данные изменились. Откройте меню снова.", true);
+            };
             menu.Items.Add(item);
         }
         if (ids.Count > 0)
@@ -1082,6 +1087,8 @@ public partial class EstimateView
 
     private async Task ClearMaterialsAsync(string field, string label, long[] ids, string revision)
     {
+        var contractId = _contractId;
+        var connectionString = _sqlConnectionString;
         if (!MaterialsSnapshotReady || revision != _materialsRevision || ids.Length == 0 ||
             !MaterialsClearIds(field).SequenceEqual(ids) || (field is "price" or "cost_price") && MaterialsLocked ||
             !MaterialsGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
@@ -1097,11 +1104,12 @@ public partial class EstimateView
             if (MessageBox.Show(Window.GetWindow(this), $"Очистить {label} у {ids.Length} позиций?",
                     "Очистка материалов", MessageBoxButton.YesNo, MessageBoxImage.Warning,
                     MessageBoxResult.No) != MessageBoxResult.Yes) return;
-            if (_materialsRevision != revision || !MaterialsClearIds(field).SequenceEqual(ids) ||
+            if (contractId != _contractId || connectionString != _sqlConnectionString ||
+                _materialsRevision != revision || !MaterialsClearIds(field).SequenceEqual(ids) ||
                 (field is "price" or "cost_price") && MaterialsLocked) return;
             _materialsRevision = "";
             var result = await Task.Run(() => SqlServerCostOperations.ClearMaterialCells(
-                _sqlConnectionString, _contractId, ids, field, revision));
+                connectionString, contractId, ids, field, revision));
             SetStatus($"Очищено: {result.Changed}; пропущено: {result.Skipped}.", false);
             await LoadMaterialsAsync(force: true);
             _ = ReloadDocumentAsync();
