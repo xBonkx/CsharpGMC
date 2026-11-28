@@ -5,11 +5,21 @@ param(
     [Parameter(Mandatory)][string]$PythonCapture,
     [Parameter(Mandatory)][string]$CSharpCapture,
     [Parameter(Mandatory)][string]$Out,
+    [string]$DiffOut,
+    [int[]]$Region,
     [string]$Python = "python"
 )
 $ErrorActionPreference = "Stop"
 if (Test-Path -LiteralPath $Out) { throw "Evidence output already exists." }
-$result = & $Python (Join-Path $PSScriptRoot "visual_capture.py") pair $PythonCapture $CSharpCapture
+if ($Region -and (-not $DiffOut -or $Region.Count -ne 4)) { throw "Region requires DiffOut and four integers (X Y W H)." }
+$script = Join-Path $PSScriptRoot "visual_capture.py"
+if ($DiffOut) {
+    $arguments = @("diff", $PythonCapture, $CSharpCapture, "--out", $DiffOut)
+    if ($Region) { $arguments += "--region"; $arguments += $Region }
+    $result = & $Python $script @arguments
+} else {
+    $result = & $Python $script pair $PythonCapture $CSharpCapture
+}
 if ($LASTEXITCODE -ne 0) { throw "Visual pair rejected ($LASTEXITCODE)." }
 # CreateNew prevents concurrent overwrite of witnessed evidence.
 $full = [System.IO.Path]::GetFullPath($Out)
