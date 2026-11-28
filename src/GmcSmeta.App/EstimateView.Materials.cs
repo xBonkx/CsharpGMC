@@ -91,9 +91,11 @@ public partial class EstimateView
     private bool _materialsLoading;
     private int _materialsLoadVersion;
     private CancellationTokenSource? _materialsLoadCancellation;
+    private DispatcherTimer? _materialsSearchDebounce;
+    private bool _materialsSearchDirty;
     private bool _materialsBusy;
     private string _materialsRevision = "";
-    private bool MaterialsSnapshotReady => !_materialsLoading && !_materialsBusy &&
+    private bool MaterialsSnapshotReady => !_materialsLoading && !_materialsBusy && !_materialsSearchDirty &&
         !_detached && !string.IsNullOrWhiteSpace(_materialsRevision) && _materialsRevision == _serverRevision && !_serverConflict &&
         System.Threading.Volatile.Read(ref _pendingWrites) == 0;
 
@@ -109,6 +111,7 @@ public partial class EstimateView
     // ------------------------------------------------------------------ load
     private void CancelMaterialsRead()
     {
+        _materialsSearchDebounce?.Stop();
         // A materials mutation owns its forced readback until it completes.
         if (_materialsBusy || !_materialsLoading) return;
         ++_materialsLoadVersion;
@@ -155,6 +158,7 @@ public partial class EstimateView
             if (snapshot.data is null)
             {
                 _materialsRevision = snapshot.revision;
+                if (_materialsSearchDirty) MaterialsApplyViewFilter();
                 StartupTrace.Mark("embedded_materials_revision_hit");
                 return;
             }
@@ -467,6 +471,8 @@ public partial class EstimateView
     private void MaterialsApplyViewFilter()
     {
         if (MaterialsGrid is null || _materialsUpdatingSystemFilter) return;
+        _materialsSearchDebounce?.Stop();
+        _materialsSearchDirty = false;
         var grid = MaterialsGrid;
         var result = _materialsVisibleRows.Filter(MaterialsSearch?.Text,
             MaterialsNoCostToggle?.IsChecked == true,
@@ -477,7 +483,18 @@ public partial class EstimateView
         if (grid.ItemsSource is ObservableCollection<MaterialsRow> existing &&
             MaterialsVisibleRows.SameReferences(existing, result))
             return;
+        // A search/filter changes membership, not the identity of surviving
+        // rows. Restore only those exact references; never select a deleted row.
+        var selected = grid.SelectionUnit != DataGridSelectionUnit.Cell
+            ? grid.SelectedItems.OfType<MaterialsRow>().ToArray() : Array.Empty<MaterialsRow>();
+        var current = grid.CurrentCell;
+        var visible = result.ToHashSet();
         grid.ItemsSource = new ObservableCollection<MaterialsRow>(result);
+        foreach (var row in selected)
+            if (visible.Contains(row) && !grid.SelectedItems.Contains(row)) grid.SelectedItems.Add(row);
+        if (current.Item is MaterialsRow item && visible.Contains(item) &&
+            current.Column is { Visibility: Visibility.Visible } column && grid.Columns.Contains(column))
+            grid.CurrentCell = new DataGridCellInfo(item, column);
     }
 
     private void MaterialsSyncFilters((decimal Rev, decimal Cost, decimal Cov, int Missing, int NoPrice) counts)
@@ -898,8 +915,24 @@ public partial class EstimateView
             MaterialsApplyViewFilter();
     }
 
-    private void MaterialsSearch_TextChanged(object sender, TextChangedEventArgs e) =>
-        MaterialsApplyViewFilter();
+    private void MaterialsSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_materialsData is null || _detached) return;
+        _materialsSearchDirty = true;
+        if (_visibleEstimateMode != "materials") return;
+        if (_materialsSearchDebounce is null)
+        {
+            _materialsSearchDebounce = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(150) };
+            _materialsSearchDebounce.Tick += (_, _) =>
+            {
+                if (_detached || _visibleEstimateMode != "materials") { _materialsSearchDebounce.Stop(); return; }
+                if (_materialsLoading || _materialsBusy || HasGridEdit(MaterialsGrid)) return;
+                MaterialsApplyViewFilter();
+            };
+        }
+        _materialsSearchDebounce.Stop();
+        _materialsSearchDebounce.Start();
+    }
 
     private void MaterialsSystemFilter_Changed(object sender, SelectionChangedEventArgs e) =>
         MaterialsApplyViewFilter();

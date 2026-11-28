@@ -16,9 +16,13 @@ public partial class CostSummaryPane
     private MaterialOptions? _lastMaterialOptions;
     private object? _lastMaterialSource;
     private CultureInfo? _lastMaterialCulture;
+    private System.Windows.Threading.DispatcherTimer? _materialSearchDebounce;
+    private bool _materialSearchDirty;
+    private bool MaterialSearchPending => _materialSearchDirty;
 
     private void ResetMaterialProjection()
     {
+        _materialSearchDebounce?.Stop();
         _materialGroups.Clear();
         _lastMaterialOptions = null;
         _lastMaterialSource = null;
@@ -30,7 +34,26 @@ public partial class CostSummaryPane
 
     private void MaterialsView_Changed(object sender, RoutedEventArgs e) => ReloadMaterialView();
 
-    private void MaterialsSearch_Changed(object sender, TextChangedEventArgs e) => ReloadMaterialView();
+    private void MaterialsSearch_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (!_attached || _summaryData is null) return;
+        _materialSearchDirty = true;
+        if (CostTabs.SelectedIndex != 0) return;
+        if (_materialSearchDebounce is null)
+        {
+            _materialSearchDebounce = new System.Windows.Threading.DispatcherTimer(
+                System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(150) };
+            _materialSearchDebounce.Tick += (_, _) =>
+            {
+                if (!_attached || CostTabs.SelectedIndex != 0) { _materialSearchDebounce.Stop(); return; }
+                if (_operationActive || _loadingCosts || MaterialsGrid.Items is
+                    System.ComponentModel.IEditableCollectionView { IsEditingItem: true }) return;
+                ReloadMaterialView();
+            };
+        }
+        _materialSearchDebounce.Stop();
+        _materialSearchDebounce.Start();
+    }
 
     /// <summary>
     /// Empty systems, supplier sections, equal-material groups and Python ordering.
@@ -38,9 +61,11 @@ public partial class CostSummaryPane
     /// </summary>
     private void ReloadMaterialView()
     {
+        _materialSearchDebounce?.Stop();
         if (_summaryData is null || MaterialsGrid is null ||
-            CostViewMode is null || CostSortMode is null)
+            CostViewMode is null || CostSortMode is null || !_attached || CostTabs.SelectedIndex != 0)
             return;
+        _materialSearchDirty = false;
         var options = CaptureMaterialOptions();
         if (_lastMaterialOptions == options && Equals(_lastMaterialCulture, CultureInfo.CurrentCulture) &&
             _lastMaterialSource is not null && ReferenceEquals(MaterialsGrid.ItemsSource, _lastMaterialSource)) return;

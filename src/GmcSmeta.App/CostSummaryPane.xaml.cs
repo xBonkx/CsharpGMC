@@ -74,7 +74,7 @@ public partial class CostSummaryPane : UserControl
     private long _operationAttachment;
     private bool _needsReloadAfterAttach = true;
     private bool CanUseSnapshot => _attached && !_loadingCosts && !_operationActive && _revision.Length > 0 &&
-        _publishedCostTab == CostTabs.SelectedIndex;
+        _publishedCostTab == CostTabs.SelectedIndex && (CostTabs.SelectedIndex != 0 || !MaterialSearchPending);
     private ObservableCollection<CostSummaryPreviewRow> _allRows = new();
     private List<CostSummaryRow> _summaryRows = new();
     private CostMissingPriceIndex _missingPrices = new(Array.Empty<CostSummaryRow>());
@@ -121,31 +121,38 @@ public partial class CostSummaryPane : UserControl
         var input = editor.Text.Trim();
         var positionId = row.IsTransport ? 0L : row.Id;
         var contractField = row.IsTransport && field == "purchase_price" ? "transport_cost" : field;
+        var baseline = _cachedCostSnapshot is { } confirmed && confirmed.Revision == _revision &&
+            ReferenceEquals(confirmed.Summary, _summaryData) ? confirmed : null;
         using var operation = BeginCostOperation();
         if (operation is null) return;
         SetStatus("Сохранение…");
         try
         {
+            string committed;
             if (field == "supplier")
-            {
-                await Task.Run(() => SqlServerCostSummary.SetSupplier(
+                committed = await Task.Run(() => SqlServerCostSummary.SetSupplierWithRevision(
                     _connectionString, _contractId, positionId, input, ServerRevision()));
-                _revision = "";
-                SetStatus("Поставщик сохранён");
-                await ReloadAsync();
-                return;
-            }
-            var result = await Task.Run(() => SqlServerCostSummary.SaveSummaryCell(
-                _connectionString, _contractId, positionId, contractField, input, ServerRevision()));
-            if (!result.Saved)
+            else
             {
-                SetStatus("Ошибка: " + result.Error);
-                return;
+                var result = await Task.Run(() => SqlServerCostSummary.SaveSummaryCell(
+                    _connectionString, _contractId, positionId, contractField, input, ServerRevision()));
+                if (!result.Saved)
+                {
+                    SetStatus("Ошибка: " + result.Error);
+                    return;
+                }
+                committed = result.Revision;
             }
-            _revision = result.Revision;
-            SetStatus(row.IsTransport
+            _revision = committed;
+            SetStatus(field == "supplier" ? "Поставщик сохранён" : row.IsTransport
                 ? "Транспорт сохранён, итоги пересчитаны"
                 : "Сохранено. Вернуть — Ctrl+Z в смете");
+            var delta = baseline is not null && positionId > 0 &&
+                SqlServerCostSummary.SupportsCostRowDelta(contractField)
+                ? new CostDeltaRequest(baseline, positionId, contractField, committed) : null;
+            // A rejected narrow read falls back to the full confirmed snapshot.
+            await ReloadAsync(delta: delta);
+            return;
         }
         catch (Exception ex)
         {
@@ -195,6 +202,7 @@ public partial class CostSummaryPane : UserControl
     private void CostTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, CostTabs) || !_attached || _restoringCostTab) return;
+        _materialSearchDebounce?.Stop(); // preserve dirty search for the next materials activation
         if (_loadingCosts) return; // the worker checks the selected tab again before publishing
         if (_operationActive)
         {
@@ -264,6 +272,8 @@ public partial class CostSummaryPane : UserControl
     {
         if (FilterNoPrice is null || FilterNoCost is null || FilterNowSell is null ||
             FilterNowCost is null || FilterCountText is null || SummaryGrid is null) return;
+        if (_attached && CostTabs.SelectedIndex != 2) return;
+        using var timing = StartupTrace.Measure("cost_summary_filter_bind");
         var selected = (FilterNoPrice.IsChecked == true ? CostMissingPrice.MaterialPrice : CostMissingPrice.None)
             | (FilterNoCost.IsChecked == true ? CostMissingPrice.MaterialCost : CostMissingPrice.None)
             | (FilterNowSell.IsChecked == true ? CostMissingPrice.WorkSell : CostMissingPrice.None)
@@ -294,8 +304,11 @@ public partial class CostSummaryPane : UserControl
         CostMissingPriceIndex MissingPrices, List<CostSummaryPreviewRow>? Materials,
         List<CostSummaryPreviewRow>? WorkRows, MaterialOptions MaterialOptions, string Culture);
 
+    private sealed record CostDeltaRequest(CostLoadSnapshot Baseline, long PositionId, string Field, string Revision);
+
     private static CostLoadSnapshot ReadCostSnapshot(string connectionString, int contractId,
-        MaterialOptions materialOptions, int activeTab, CostLoadSnapshot? cached, CancellationToken token)
+        MaterialOptions materialOptions, int activeTab, CostLoadSnapshot? cached, CostDeltaRequest? delta,
+        CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var conn = SqlServerDatabase.OpenAsync(connectionString, token).GetAwaiter().GetResult();
@@ -312,7 +325,16 @@ public partial class CostSummaryPane : UserControl
             CostTotalsData? totals = same?.Totals;
             using (StartupTrace.Measure("cost_snapshot_financial"))
             {
-                if (same is not null) summary = same.Summary;
+                var patched = delta is not null && delta.Revision == before &&
+                    delta.Baseline.Culture == CultureInfo.CurrentCulture.Name
+                    ? SqlServerCostSummary.ReadChangedCostRow(conn, contractId, delta.Baseline.Summary,
+                        delta.PositionId, delta.Field, delta.Revision, token) : null;
+                if (patched is not null)
+                {
+                    summary = patched;
+                    StartupTrace.Mark("cost_targeted_row_readback_hit");
+                }
+                else if (same is not null) summary = same.Summary;
                 else if (activeTab == 3)
                     (summary, totals) = SqlServerCostTotals.SummaryAndTotals(conn, contractId, token);
                 else summary = SqlServerCostSummary.Summary(conn, contractId, token);
@@ -366,7 +388,7 @@ public partial class CostSummaryPane : UserControl
         throw new InvalidOperationException("Себестоимость изменилась во время чтения. Повторите загрузку.");
     }
 
-    private async Task ReloadAsync(bool allowReuse = false)
+    private async Task ReloadAsync(bool allowReuse = false, CostDeltaRequest? delta = null)
     {
         if (!_attached) return;
         using var operationTiming = StartupTrace.BeginOperation();
@@ -392,7 +414,7 @@ public partial class CostSummaryPane : UserControl
         {
             var materialOptions = CaptureMaterialOptions();
             var data = await Task.Run(() => ReadCostSnapshot(_connectionString, _contractId, materialOptions,
-                activeTab, cached, token), token);
+                activeTab, cached, delta, token), token);
             if (token.IsCancellationRequested || !_attached || generation != _loadGeneration) return;
             if (CostTabs.SelectedIndex != activeTab)
             {
@@ -423,6 +445,7 @@ public partial class CostSummaryPane : UserControl
                         _lastMaterialOptions = data.MaterialOptions;
                         _lastMaterialSource = data.Materials;
                         _lastMaterialCulture = CultureInfo.CurrentCulture;
+                        _materialSearchDirty = false;
                     }
                     else ReloadMaterialView();
                     break;

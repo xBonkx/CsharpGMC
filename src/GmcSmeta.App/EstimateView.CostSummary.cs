@@ -133,12 +133,14 @@ public partial class EstimateView
     private readonly HashSet<string> _collapsedSummarySuppliers = new(StringComparer.Ordinal);
     private readonly HashSet<long> _summarySelectedSystems = new();
     private List<(long Id, string Label)> _summarySystemOptions = new();
+    private DispatcherTimer? _summarySearchDebounce;
+    private bool _summarySearchDirty;
     private bool _summaryBusy;
     private bool _summaryLoading;
     private int _summaryLoadVersion;
     private CancellationTokenSource? _summaryLoadCancellation;
     private string _summaryRevision = "";
-    private bool SummarySnapshotReady => !_detached && !_summaryLoading && !_summaryBusy &&
+    private bool SummarySnapshotReady => !_detached && !_summaryLoading && !_summaryBusy && !_summarySearchDirty &&
         !_serverConflict && Volatile.Read(ref _pendingWrites) == 0 &&
         !string.IsNullOrWhiteSpace(_summaryRevision) && _summaryRevision == _serverRevision;
     private List<MenuItem> _summaryMissingItems = new();
@@ -162,6 +164,7 @@ public partial class EstimateView
     {
         // Only read requests are cancelled here. The write queue and its
         // mandatory estimate readback have a separate lifetime.
+        _summarySearchDebounce?.Stop();
         _summaryLoadVersion++;
         var cancellation = _summaryLoadCancellation;
         _summaryLoadCancellation = null;
@@ -238,6 +241,7 @@ public partial class EstimateView
             if (snapshot.Data is null)
             {
                 _summaryRevision = snapshot.Revision;
+                if (_summarySearchDirty) SummaryRebuild();
                 StartupTrace.Mark("embedded_summary_revision_hit");
                 return;
             }
@@ -321,8 +325,10 @@ public partial class EstimateView
     // ------------------------------------------------------------------ build
     private void SummaryRebuild()
     {
+        _summarySearchDebounce?.Stop();
         var data = _costSummaryData;
         if (data is null || SummaryGrid is null) return;
+        _summarySearchDirty = false;
         using var timing = StartupTrace.Measure("embedded_summary_filter_group_format");
         var recs = SummaryRecs;
         var chosen = SummaryMissingSelected();
@@ -700,7 +706,24 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ toolbar events
-    internal void SummarySearch_TextChanged(object sender, TextChangedEventArgs e) => SummaryRebuild();
+    internal void SummarySearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_costSummaryData is null || _detached) return;
+        _summarySearchDirty = true;
+        if (_visibleEstimateMode != "summary") return;
+        if (_summarySearchDebounce is null)
+        {
+            _summarySearchDebounce = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(150) };
+            _summarySearchDebounce.Tick += (_, _) =>
+            {
+                if (_detached || _visibleEstimateMode != "summary") { _summarySearchDebounce.Stop(); return; }
+                if (_summaryLoading || _summaryBusy || HasGridEdit(SummaryGrid)) return;
+                SummaryRebuild();
+            };
+        }
+        _summarySearchDebounce.Stop();
+        _summarySearchDebounce.Start();
+    }
 
     internal void ClearSummarySearch_Click(object sender, RoutedEventArgs e)
     {
