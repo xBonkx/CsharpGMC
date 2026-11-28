@@ -120,7 +120,7 @@
 
         <!-- Python ui/common.py menu_header: grey caption inside a menu. -->
         <Style x:Key="EstimateMenuHeader" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="FontSize" Value="{StaticResource UiSummaryCaptionSize}"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="14,6,14,2"/>
@@ -173,7 +173,7 @@
                                 <Setter TargetName="MenuGlyph" Property="Stroke" Value="#DC2626"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="#94A3B8"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                                 <Setter TargetName="MenuGlyph" Property="Stroke" Value="#94A3B8"/>
                                 <Setter TargetName="ItemChrome" Property="Background" Value="Transparent"/>
                             </Trigger>
@@ -205,7 +205,7 @@
             <Setter Property="Margin" Value="0"/>
         </Style>
         <Style x:Key="EstimateNoteDisplay" TargetType="TextBlock" BasedOn="{StaticResource EstimateTextCell}">
-            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}" Value="True">
@@ -385,7 +385,7 @@
                     <Setter Property="FontWeight" Value="SemiBold"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSub}" Value="True">
-                    <Setter Property="Foreground" Value="#64748B"/>
+                    <Setter Property="Foreground" Value="{StaticResource UiMutedTextBrush}"/>
                     <Setter Property="FontStyle" Value="Italic"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding OutOfKp}" Value="True">
@@ -985,7 +985,7 @@
                 <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,0,0,0"
                         Style="{StaticResource DocumentFlatTool}" MinHeight="30"
                         Content="Скрыть итоги" ContentTemplate="{StaticResource IconLabelArrowDown}"
-                        Foreground="#64748B" Click="ToggleTotals_Click"
+                        Foreground="{StaticResource UiMutedTextBrush}" Click="ToggleTotals_Click"
                         ToolTip="Свернуть итоги в одну строку — таблице больше места"/>
                 <Grid>
                     <TextBlock x:Name="TotalsSummary" Visibility="Collapsed" TextWrapping="Wrap"
