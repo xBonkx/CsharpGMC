@@ -1,5 +1,8 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 ChatGPT/main — проход всех 14 оставшихся визуальных ID: TOT-11 и FONT-13 CODE READY; 12 PARTIAL. Summary width effective-metrics fit, adaptive dynamic forms, legacy totals frame/extended cell copy, SMR silent restore + Pilot tests, Python heading/weight comparison, 34 icon labels × 3 sizes WPF fixture, physical QA matrix and maintained replacement audit wrappers. FullRow batch command semantics preserved. No Windows build/tests, SQL Pilot execution or real captures; no production DB, schema, finance or release changes. [Отчёт](DESIGN_PASS_20261128_ALL_REMAINING.md).
+
+
 28.11.2026 — FONT-10 CODE READY: all 46 XAML audited, disabled caption contrast and selected-disabled templates corrected, completed shipment/procurement colors and regression tests updated; ten shared WPF state cases authored, not run. SPACE-11 receives direct border nesting audit evidence only. Design 239/253 CODE READY, 14 PARTIAL; +1. [Evidence](DESIGN_PASS_20261128_DISABLED_CONTRAST.md).
 
 28.11.2026 — NAV-20/SPACE-14/FONT-12 CODE READY: actual navigation mode/tree fixture, 46 XAML/211 rows audit, intentional spacer exceptions, pinned dynamic form actions and whole-app numeric font guard. Tests authored, not run; physical acceptance remains pending. Design 238/253 CODE READY, 15 PARTIAL; +3. [Evidence](DESIGN_PASS_20261128_GRID_ROWS_NAVIGATION_TYPOGRAPHY.md).
