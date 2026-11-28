@@ -29,10 +29,8 @@ public sealed class PtoVorWindow : Window
         _path=path;
         Title="Импорт ВОР из Excel · явное сопоставление";
         Width=1000;Height=720;MinWidth=670;MinHeight=460;
-        SetResourceReference(FontFamilyProperty,"UiFontFamily");
-        SetResourceReference(FontSizeProperty,"UiBodySize");
         WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        WorkspaceWindowUi.ApplyChrome(this);
+        DynamicFormLayout.Apply(this);
         _preview.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
         _preview.SetResourceReference(DataGrid.RowStyleProperty,"PythonTableRow");
         _preview.AutoGeneratingColumn += (_, e) =>
@@ -59,8 +57,9 @@ public sealed class PtoVorWindow : Window
         void Add(string title,Control field)
         {
             var s=new StackPanel{Margin=new Thickness(0,0,14,3)};
-            s.Children.Add(new TextBlock{Text=title,Foreground=System.Windows.Media.Brushes.SlateGray,Margin=new Thickness(0,0,0,3)});
-            field.MinHeight=32;
+            s.Children.Add(DynamicFormLayout.Secondary(title, "LayoutFormGroupHeadingGap"));
+            DynamicFormLayout.Field(field);
+            System.Windows.Automation.AutomationProperties.SetName(field, title);
             s.Children.Add(field);grid.Children.Add(s);
         }
         Add("Лист",_sheets);Add("Первая строка",_first);Add("Имя (номер)",_name);
