@@ -198,7 +198,7 @@ public sealed class DirectorAndCardVisualSourceTests
         Assert.Equal("{StaticResource UiMutedTextBrush}", (string?)crumb.Attribute("Foreground"));
         Assert.Equal("{StaticResource UiH1Size}", (string?)heading.Attribute("FontSize"));
         Assert.Equal("24", shared.Descendants().Single(e => (string?)e.Attribute(X + "Key") == "UiH1Size").Value);
-        Assert.Equal("{StaticResource UiWrappedHeading}", (string?)heading.Attribute("Style"));
+        Assert.Equal("{StaticResource UiPageHeading}", (string?)heading.Attribute("Style"));
         Assert.Equal("Bottom", (string?)Named(doc, "ExportButton").Attribute("VerticalAlignment"));
         Assert.Equal("24,18,24,14", Metric("LayoutPageMargin"));
         var icons = XDocument.Parse(Source("Theme/ToolbarIcons.xaml"));
