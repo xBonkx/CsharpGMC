@@ -25,6 +25,18 @@ public partial class EstimateView
     private static readonly List<CopiedRow> ClipboardRows = new();
     private static bool ClipboardIsOurs;
     private static string? ClipboardTextAtCopy;
+    private static string? ClipboardTokenAtCopy;
+    private const string ClipboardOwnerFormat = "GmcSmeta.EstimateRows.v1";
+
+    // Read text and our private ownership marker from the same clipboard object.
+    // Excel and other applications can copy identical visible text without
+    // acquiring the private marker of the original GMC copy.
+    private static (string? Text, string? Token) ReadRowsClipboard()
+    {
+        var data = Clipboard.GetDataObject();
+        return (data?.GetData(DataFormats.UnicodeText) as string,
+            data?.GetData(ClipboardOwnerFormat, false) as string);
+    }
 
     /// <summary>Выделенные строки в порядке экрана: верхняя приносит комплектующие,
     /// отдельно выделенная комплектующая берётся сама, выделенный раздел — все его строки.</summary>
@@ -60,14 +72,24 @@ public partial class EstimateView
         var exported = string.Join("\n", lines);
         try
         {
-            Clipboard.SetText(exported);
+            var token = Guid.NewGuid().ToString("N");
+            var data = new DataObject();
+            data.SetData(DataFormats.UnicodeText, exported);
+            data.SetData(ClipboardOwnerFormat, token, false);
+            Clipboard.SetDataObject(data, true);
             ClipboardTextAtCopy = exported;
+            ClipboardTokenAtCopy = token;
         }
         catch
         {
             // An inaccessible OS clipboard must not be mistaken for a fresh
             // internal copy of an unrelated workbook.
             ClipboardTextAtCopy = null;
+            ClipboardTokenAtCopy = null;
+            ClipboardIsOurs = false;
+            ClipboardRows.Clear();
+            SetStatus("Буфер Windows временно занят. Повтори копирование.", true);
+            return;
         }
         SetStatus($"Скопировано строк: {picked.Count}. Вставить — выделите строку (можно в другом КП) и Ctrl+V", false);
     }
@@ -88,15 +110,15 @@ public partial class EstimateView
         }
         // The user can copy from Excel after an internal copy. Compare the
         // actual Windows clipboard, not just our stale in-process flag.
-        string? systemText = null;
-        try { if (Clipboard.ContainsText()) systemText = Clipboard.GetText(); }
+        string? systemText, clipboardToken;
+        try { (systemText, clipboardToken) = ReadRowsClipboard(); }
         catch (System.Runtime.InteropServices.ExternalException)
         {
             SetStatus("Буфер Windows временно занят. Повтори вставку.", true);
             return;
         }
         var isInternal = EstimateClipboardPolicy.IsOwned(
-            ClipboardIsOurs, ClipboardTextAtCopy, systemText);
+            ClipboardIsOurs, ClipboardTextAtCopy, systemText, ClipboardTokenAtCopy, clipboardToken);
         if (!isInternal) ClipboardIsOurs = false;
         if (systemText is not null && !isInternal)
         {
@@ -256,14 +278,15 @@ public partial class EstimateView
         }
         // Recheck at execution, not just when the context menu was opened.
         // Read once so the validated text is exactly the text passed to the parser.
-        string? systemText;
-        try { systemText = Clipboard.ContainsText() ? Clipboard.GetText() : null; }
+        string? systemText, clipboardToken;
+        try { (systemText, clipboardToken) = ReadRowsClipboard(); }
         catch (System.Runtime.InteropServices.ExternalException)
         {
             SetStatus("Буфер Windows временно занят. Повтори замену.", true);
             return;
         }
-        if (!EstimateClipboardPolicy.IsExternalText(ClipboardIsOurs, ClipboardTextAtCopy, systemText))
+        if (!EstimateClipboardPolicy.IsExternalText(ClipboardIsOurs, ClipboardTextAtCopy,
+                systemText, ClipboardTokenAtCopy, clipboardToken))
         {
             SetStatus("Сначала скопируйте в Excel строки (например, из счёта), потом выделите строки КП " +
                 "и нажмите Ctrl+Shift+V", true);
