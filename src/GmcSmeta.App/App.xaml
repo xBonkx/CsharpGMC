@@ -635,7 +635,11 @@
                             </Setter>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="PrimaryBorder" Property="Background" Value="#1E40AF"/></Trigger>
-                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="PrimaryBorder" Property="Background" Value="#A9BEEA"/><Setter TargetName="PrimaryBorder" Property="BorderBrush" Value="#A9BEEA"/></Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="PrimaryBorder" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="PrimaryBorder" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value></Setter>
@@ -967,8 +971,9 @@
                                 <Setter TargetName="PrimaryChrome" Property="Background" Value="#1B4FC9"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="PrimaryChrome" Property="Background" Value="#A9BEEA"/>
-                                <Setter TargetName="PrimaryChrome" Property="BorderBrush" Value="#A9BEEA"/>
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="PrimaryChrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="PrimaryChrome" Property="BorderBrush" Value="#E4E8EF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -993,7 +998,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#EA580C"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#C2410C"/></Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Background" Value="#FDBA74"/><Setter TargetName="Chrome" Property="BorderBrush" Value="#FDBA74"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="Chrome" Property="Background" Value="#F7F9FC"/>
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#E4E8EF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
