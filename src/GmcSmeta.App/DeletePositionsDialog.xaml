@@ -104,17 +104,14 @@
                 <StackPanel>
                     <TextBlock Text="Выбранные позиции" Foreground="{StaticResource UiMutedTextBrush}" FontSize="{StaticResource UiTotalDetailSize}"
                                FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <ScrollViewer MaxHeight="142" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="NamesList">
+                    <ItemsControl x:Name="NamesList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding}" TextWrapping="Wrap"
                                                Margin="0,2,5,2" ToolTip="{Binding}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
             <Border Margin="24,12,24,0" Background="#FFF7ED" CornerRadius="8" Padding="12,10">
