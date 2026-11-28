@@ -1,18 +1,19 @@
-# 28.11.2026 — Auxiliary design, icons and interactive catalog
+# 28.11.2026 — Auxiliary design and interactive catalog (final corrected scope)
 
-Ten scoped CODE READY changes (not ten independent canonical IDs):
+Ten scoped implementation changes CODE READY, not ten independent canonical IDs:
+1. PТО list search grows naturally; status selector auto width within 155–240 and full text tooltip.
+2. PТО editor status selector uses shared min height, flexible width and full tooltip.
+3. Letter attachment move arrows use shared vector with unchanged 32-DIP hit target and accessible name.
+4. Letter sender and recipient fields grow from 110 to 240 DIP with scroll, instead of fixed height.
+5. Letter attachment role selector can grow 180–320 DIP and exposes complete text.
+6. Passport form label column adapts to width, catalogue and section selectors expose full text.
+7. Metal stock category and search use natural height; label/category stay grouped, search wraps separately.
+8. Metal journal search has a leading search icon, matching inset, accessible name and natural height.
+9. People history selector no longer requires fixed 475 DIP, exposes complete selected label.
+10. People company selector uses shared minimum height and full name tooltip.
 
-1. PТО list search and status filter grow to shared font minimum.
-2. PТО list six archive/document actions get semantic vector icons.
-3. PТО editor eight package/history/file actions get vector icons.
-4. Letter attachment actions use original Python paperclip and shared open/edit/check/list.
-5. Letter attachment movement buttons use existing vector arrows, keep 32-DIP hit targets and accessible captions.
-6. Passport archive, system list, save, catalogue and add/delete point actions get shared vectors.
-7. Metal stock category and search use natural font height; accessible search name.
-8. Metal journal search uses matching leading search icon and reserved text inset, plus natural height and accessible name.
-9. Metal operation/lot buttons receive semantic vectors; tags and handlers unchanged.
-10. People company picker uses shared minimum height; bounded multiline footer intentionally retained.
+Also: real interactive --icon-catalog for normal/disabled/checked/unchecked/hover/pressed/keyboard focus; actual input, not a simulated screenshot. Original app.ico verified by blob SHA and project wiring source test. NAV-17/ICON-15 CODE READY, Windows acceptance pending.
 
-Also added a genuinely interactive WPF icon catalog in the offline checks executable (--icon-catalog), with normal/disabled/checked/unchecked/hover/pressed/keyboard-focus states via actual mouse and keyboard interaction; static PNG output remains separate. Original app icon matching Python blob already verified in preceding pass; new source check covers XAML and project resource wiring. NAV-17 and ICON-15 code-ready; physical Windows acceptance remains. Other broad IDs stay PARTIAL rather than inflating counts.
+Correction after comparing gmcsmeta main smeta/letters/ui.py, passports/ui.py, pto/ui.py and ui/metal_warehouse.py: text-only commands must stay text-only. Reverted the newly added speculative caption icons and unused templates from a6ec37a; kept previously approved icon choices and accessible vector arrows. Updated obsolete OfficeDocumentVisualTests assertion to distinguish prior production icons from text-only commands (the preceding AuxiliaryWindowPolishSourceTests explicitly requires some of those icons). Width/height bounds are WPF adaptations, not pixel-exact Qt claims.
 
-48 guarded substitutions; name/handler/tag/binding attribute sets preserved for edited XAML; referenced shared icon templates verified against dictionary. Added 18 source-test cases, not run. Chosen semantic icons in auxiliary windows are WPF adaptations except Python paperclip and previously shared SVG; not an assertion of exact Python command-icon parity. No .NET/Windows/WPF execution, SQL, database, calculations, release or production data changes.
+Protected XAML names/handlers/tags unchanged; new 17 source cases not run (six field heights, two arrow cases, five text-only commands, two multiline fields, one wrap and one app icon). No Windows/.NET build, real WPF, SQL, database, formulas or release changes. Canonical 203/253 CODE READY, 50 PARTIAL.

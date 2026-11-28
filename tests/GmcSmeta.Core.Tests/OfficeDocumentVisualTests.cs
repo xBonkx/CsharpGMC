@@ -23,14 +23,31 @@ public sealed class OfficeDocumentVisualTests
     [InlineData("LettersWindow.xaml","New_Click,Open_Click,Copy_Click,Root_Click,Backup_Click,Restore_Click,AttachExisting_Click")]
     [InlineData("LetterEditorWindow.xaml","Save_Click,Preview_Click,Build_Click,Sent_Click,AutoNumber_Click,Object_Click,Company_Click,FileAdd_Click,FileOpen_Click,FileRename_Click,FileToggle_Click,FileUp_Click,FileDown_Click")]
     [InlineData("PassportsWindow.xaml","Add_Click,Batch_Click,Duplicate_Click,Delete_Click,Root_Click,Save_Click,ExportSelected_Click,ExportAll_Click,AddPoint_Click,DeletePoint_Click")]
-    public void PythonTextCommandsHaveNoInventedIcons(string file,string handlers)
+    public void OfficeCommandsRetainApprovedIconOrTextRoles(string file,string handlers)
     {
         var doc=Read(file);
         foreach(var handler in handlers.Split(','))
         {
             var button=Assert.Single(doc.Descendants().Where(n=>n.Name.LocalName=="Button" &&
                 (string?)n.Attribute("Click")==handler));
-            Assert.Null(button.Attribute("ContentTemplate"));
+            var expected = (file, handler) switch
+            {
+                ("LettersWindow.xaml", "New_Click") => "IconLabelPlus",
+                ("LettersWindow.xaml", "Open_Click" or "Root_Click") => "IconLabelOpen",
+                ("LettersWindow.xaml", "Copy_Click") => "IconLabelCopy",
+                ("LetterEditorWindow.xaml", "Save_Click") => "IconLabelCheck",
+                ("LetterEditorWindow.xaml", "Preview_Click") => "IconLabelFile",
+                ("LetterEditorWindow.xaml", "Build_Click") => "IconLabelDownload",
+                ("LetterEditorWindow.xaml", "FileUp_Click") => "IconOnlyArrowUp",
+                ("LetterEditorWindow.xaml", "FileDown_Click") => "IconOnlyArrowDown",
+                ("PassportsWindow.xaml", "Add_Click") => "IconLabelPlus",
+                ("PassportsWindow.xaml", "Duplicate_Click") => "IconLabelCopy",
+                ("PassportsWindow.xaml", "Delete_Click") => "IconLabelTrash",
+                ("PassportsWindow.xaml", "ExportSelected_Click" or "ExportAll_Click") => "IconLabelDownload",
+                _ => null
+            };
+            Assert.Equal(expected is null ? null : "{StaticResource " + expected + "}",
+                (string?)button.Attribute("ContentTemplate"));
             Assert.Equal("{StaticResource PythonToolbarButton}",(string?)button.Attribute("Style"));
         }
     }

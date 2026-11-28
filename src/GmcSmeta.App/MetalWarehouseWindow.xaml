@@ -54,7 +54,7 @@
     <DockPanel Margin="14">
         <StackPanel DockPanel.Dock="Top">
             <WrapPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <Button Style="{StaticResource PythonToolbarButton}" Content="Провести операцию…" ContentTemplate="{StaticResource IconLabelFilePlus}" Click="Operation_Click" Padding="13,7" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource PythonToolbarButton}" Content="Провести операцию…" Click="Operation_Click" Padding="13,7" Margin="0,0,8,0"/>
                 <Button Style="{StaticResource PythonToolbarButton}" x:Name="OpeningButton" Content="Перенести остатки из Excel…" ContentTemplate="{StaticResource IconLabelUpload}" Click="Import_Click" Padding="12,7" Margin="0,0,8,0"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Учёт металла (Excel)…" ContentTemplate="{StaticResource IconLabelList}" Click="Register_Click" Padding="12,7" Margin="0,0,8,0"/>
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Отчёт Excel…" ContentTemplate="{StaticResource IconLabelDownload}" Click="Export_Click" Padding="12,7" Margin="0,0,8,0"/>
@@ -104,7 +104,8 @@
                             </StackPanel>
                         </Border>
                     </UniformGrid>
-                    <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,6">
+                    <WrapPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,6">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <TextBlock Text="Категория:" VerticalAlignment="Center" Margin="0,0,7,0"/>
                         <ComboBox x:Name="StockCategory" Width="205" MinHeight="{StaticResource LayoutFieldMinHeight}" SelectedIndex="0" SelectionChanged="StockFilter_Changed" Margin="0,0,14,0">
                             <ComboBoxItem Content="Металл в бухтах" Tag="Бухты"/>
@@ -112,7 +113,8 @@
                             <ComboBoxItem Content="Листовой металл" Tag="Листы"/>
                             <ComboBoxItem Content="Все материалы" Tag=""/>
                         </ComboBox>
-                        <Grid Width="270">
+                        </StackPanel>
+                        <Grid Width="270" Margin="0,0,0,4">
                             <TextBox x:Name="StockSearch" Style="{StaticResource PythonSearch}" AutomationProperties.Name="Поиск материала или толщины" Background="White"
                                      BorderBrush="#D0D7E2" Padding="32,5,10,5" VerticalContentAlignment="Center"
                                      ToolTip="Найти материал или толщину" TextChanged="StockFilter_Changed"/>
@@ -127,7 +129,7 @@
                                 </Style></TextBlock.Style>
                             </TextBlock>
                         </Grid>
-                    </StackPanel>
+                    </WrapPanel>
                     <DataGrid local:TableColumnMenu.Key="metal-stock" local:TableColumnMenu.Protect="Материал" x:Name="StockGrid" Grid.Row="2" ColumnHeaderHeight="42" SelectionChanged="StockGrid_SelectionChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="95" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
@@ -174,10 +176,10 @@
                         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel MinWidth="150">
                             <TextBlock Text="Быстрые действия" FontWeight="SemiBold" Margin="0,0,0,7"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Приход металла" ContentTemplate="{StaticResource IconLabelArrowDown}" Tag="Приход" Click="QuickOperation_Click" Margin="0,0,0,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Резерв под объект" ContentTemplate="{StaticResource IconLabelBuilding}" Tag="Резерв" Click="QuickOperation_Click" Margin="0,0,0,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Выдача на объект" ContentTemplate="{StaticResource IconLabelArrowUp}" Tag="Выдача" Click="QuickOperation_Click" Margin="0,0,0,6"/>
-                            <Button Style="{StaticResource PythonToolbarButton}" Content="Перемещение" ContentTemplate="{StaticResource IconLabelArrowForward}" Tag="Перемещение" Click="QuickOperation_Click"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Приход металла" Tag="Приход" Click="QuickOperation_Click" Margin="0,0,0,6"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Резерв под объект" Tag="Резерв" Click="QuickOperation_Click" Margin="0,0,0,6"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Выдача на объект" Tag="Выдача" Click="QuickOperation_Click" Margin="0,0,0,6"/>
+                            <Button Style="{StaticResource PythonToolbarButton}" Content="Перемещение" Tag="Перемещение" Click="QuickOperation_Click"/>
                         </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -242,9 +244,9 @@
             <TabItem Header="Закупки и хранение">
                 <DockPanel Margin="9">
                     <WrapPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить партию…" ContentTemplate="{StaticResource IconLabelPlus}" Click="LotAdd_Click" Padding="12,6" Margin="0,0,8,0"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Отметить оплату" ContentTemplate="{StaticResource IconLabelCheck}" Click="LotPay_Click" Padding="12,6" Margin="0,0,8,0"/>
-                        <Button Style="{StaticResource PythonToolbarButton}" Content="Забрать с хранения…" ContentTemplate="{StaticResource IconLabelDownload}" Click="LotReceive_Click" Padding="12,6"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить партию…" Click="LotAdd_Click" Padding="12,6" Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Отметить оплату" Click="LotPay_Click" Padding="12,6" Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource PythonToolbarButton}" Content="Забрать с хранения…" Click="LotReceive_Click" Padding="12,6"/>
                     </WrapPanel>
                     <DataGrid local:TableColumnMenu.Key="metal-lots" x:Name="LotsGrid">
                         <DataGrid.Columns>

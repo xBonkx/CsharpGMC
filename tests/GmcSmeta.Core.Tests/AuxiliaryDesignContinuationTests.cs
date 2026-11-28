@@ -31,24 +31,52 @@ public sealed class AuxiliaryDesignContinuationTests
     }
 
     [Theory]
-    [InlineData("PtoWindow.xaml", "Backup_Click", "IconLabelDownload")]
-    [InlineData("PtoWindow.xaml", "Restore_Click", "IconLabelUpload")]
-    [InlineData("PtoEditorWindow.xaml", "History_Click", "IconLabelHistory")]
-    [InlineData("PtoEditorWindow.xaml", "FileProperties_Click", "IconLabelSettings")]
-    [InlineData("LetterEditorWindow.xaml", "FileAdd_Click", "IconLabelClip")]
-    [InlineData("LetterEditorWindow.xaml", "FileUp_Click", "IconOnlyArrowUp")]
-    [InlineData("LetterEditorWindow.xaml", "FileDown_Click", "IconOnlyArrowDown")]
-    [InlineData("PassportsWindow.xaml", "AddPoint_Click", "IconLabelPlus")]
-    [InlineData("PassportsWindow.xaml", "DeletePoint_Click", "IconLabelTrash")]
-    [InlineData("MetalWarehouseWindow.xaml", "Operation_Click", "IconLabelFilePlus")]
-    [InlineData("MetalWarehouseWindow.xaml", "LotPay_Click", "IconLabelCheck")]
-    public void ToolbarIconDoesNotReplaceCommand(string file, string handler, string template)
+    [InlineData("FileUp_Click", "IconOnlyArrowUp", "Выше")]
+    [InlineData("FileDown_Click", "IconOnlyArrowDown", "Ниже")]
+    public void LetterMovementUsesVectorWithAccessibleTarget(string handler, string template, string label)
+    {
+        var button = Assert.Single(XDocument.Parse(Source("LetterEditorWindow.xaml")).Descendants(W + "Button")
+            .Where(e => (string?)e.Attribute("Click") == handler));
+        Assert.Equal("{StaticResource " + template + "}", (string?)button.Attribute("ContentTemplate"));
+        Assert.Equal(label, (string?)button.Attribute("AutomationProperties.Name"));
+        Assert.Equal("32", (string?)button.Attribute("Width"));
+    }
+
+    [Theory]
+    [InlineData("PtoWindow.xaml", "Backup_Click")]
+    [InlineData("PtoEditorWindow.xaml", "History_Click")]
+    [InlineData("LetterEditorWindow.xaml", "FileAdd_Click")]
+    [InlineData("PassportsWindow.xaml", "AddPoint_Click")]
+    [InlineData("MetalWarehouseWindow.xaml", "Operation_Click")]
+    public void PythonTextOnlyCommandsStayTextOnly(string file, string handler)
     {
         var button = Assert.Single(XDocument.Parse(Source(file)).Descendants(W + "Button")
             .Where(e => (string?)e.Attribute("Click") == handler));
-        Assert.Equal("{StaticResource " + template + "}", (string?)button.Attribute("ContentTemplate"));
-        var icons = XDocument.Parse(Source("Theme/ToolbarIcons.xaml"));
-        Assert.Single(icons.Descendants().Where(e => (string?)e.Attribute(X + "Key") == template));
+        Assert.Null(button.Attribute("ContentTemplate"));
+    }
+
+    [Theory]
+    [InlineData("SenderBox")]
+    [InlineData("RecipientBox")]
+    public void LetterAddressFieldsGrowWithinBounds(string name)
+    {
+        var field = Assert.Single(XDocument.Parse(Source("LetterEditorWindow.xaml")).Descendants()
+            .Where(e => (string?)e.Attribute(X + "Name") == name));
+        Assert.Null(field.Attribute("Height"));
+        Assert.Equal("110", (string?)field.Attribute("MinHeight"));
+        Assert.Equal("240", (string?)field.Attribute("MaxHeight"));
+        Assert.Equal("Auto", (string?)field.Attribute("VerticalScrollBarVisibility"));
+    }
+
+    [Fact]
+    public void StockCategoryAndSearchWrapAsGroups()
+    {
+        var doc = XDocument.Parse(Source("MetalWarehouseWindow.xaml"));
+        var category = Assert.Single(doc.Descendants().Where(e => (string?)e.Attribute(X + "Name") == "StockCategory"));
+        var search = Assert.Single(doc.Descendants().Where(e => (string?)e.Attribute(X + "Name") == "StockSearch"));
+        Assert.Equal(W + "StackPanel", category.Parent!.Name);
+        Assert.Equal(W + "WrapPanel", category.Parent.Parent!.Name);
+        Assert.Same(category.Parent.Parent, search.Parent!.Parent);
     }
 
     [Fact]

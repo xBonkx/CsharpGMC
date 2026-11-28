@@ -19,7 +19,7 @@
             </DockPanel>
             <WrapPanel x:Name="HistoryPanel" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,7">
                 <TextBlock Text="Галочки как в списке:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#64748B"/>
-                <ComboBox x:Name="HistoryBox" MinWidth="420" Width="475" DisplayMemberPath="Label"
+                <ComboBox x:Name="HistoryBox" MinWidth="240" MaxWidth="475" MinHeight="{StaticResource LayoutFieldMinHeight}" DisplayMemberPath="Label" ToolTip="{Binding SelectedItem.Label, RelativeSource={RelativeSource Self}}"
                           SelectionChanged="History_Changed"/>
                 <Button Content="Открыть файл" ContentTemplate="{StaticResource IconLabelOpen}" Style="{StaticResource PythonToolbarButton}" Click="OpenHistory_Click" Padding="10,6" Margin="8,0,0,0"/>
             </WrapPanel>
@@ -72,7 +72,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="От организации:" VerticalAlignment="Top" Margin="0,8,8,0"/>
                 <ComboBox Grid.Column="1" x:Name="CompanyBox" DisplayMemberPath="Name"
-                          Margin="0,0,18,0" MinHeight="{StaticResource LayoutFieldMinHeight}"/>
+                          Margin="0,0,18,0" MinHeight="{StaticResource LayoutFieldMinHeight}" ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
                 <TextBlock Grid.Column="2" Text="Текст письма:" VerticalAlignment="Top" Margin="0,8,8,0"/>
                 <TextBox Grid.Column="3" x:Name="IntroBox" Height="54" Padding="6" AcceptsReturn="True"
                          TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
