@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="GmcSmeta.App.EstimateView"
+<UserControl x:Class="GmcSmeta.App.EstimateView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:GmcSmeta.App"
@@ -685,7 +685,7 @@
         <local:SummaryTableFrame x:Name="EstimateTablePanel" Grid.Row="4" Background="White" BorderBrush="#E4E8EF" BorderThickness="1"
                 CornerRadius="12" Margin="24,8,24,0">
             <DockPanel>
-                <Button x:Name="BottomAddRowButton" DockPanel.Dock="Bottom" Content="Добавить строку" ContentTemplate="{StaticResource IconLabelRowPlus}"
+                <Button x:Name="BottomAddRowButton" DockPanel.Dock="Bottom" Content="Добавить строку"
                         Click="AddRow_Click" IsEnabled="{Binding IsEnabled, ElementName=AddRowButton}"
                         Foreground="#2563EB" BorderThickness="0" Background="Transparent"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" FontWeight="SemiBold"
