@@ -192,7 +192,9 @@ public sealed class EstimateTypographyAndToolsSourceTests
         Assert.Equal("White", Value(checkedTrigger, "Foreground"));
         var phase = Named(doc, "PhaseButton");
         Assert.Equal("{StaticResource DocumentPhaseTool}", (string?)phase.Attribute("Style"));
-        Assert.Equal("{StaticResource GlyphHistory}", (string?)Assert.Single(phase.Descendants(W + "Path")).Attribute("Data"));
+        Assert.Equal("{StaticResource GlyphHistory}", (string?)Named(doc, "PhaseGlyph").Attribute("Data"));
+        Assert.Contains(phase.Descendants(W + "Path"), p => (string?)p.Attribute("Data") == "{StaticResource GlyphChevronDown}");
+        Assert.Contains("GlyphCheck", Source("EstimateView.Header.cs"));
         Assert.Contains("PhaseButtonText.Text", Source("EstimateView.Header.cs"));
         Assert.Equal("10,6", Value(Key(doc, "DocumentPhaseTool"), "Padding"));
         var copy = Named(doc, "TransferRatesButton");

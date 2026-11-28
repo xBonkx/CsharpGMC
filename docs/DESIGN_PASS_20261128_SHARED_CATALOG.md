@@ -1,0 +1,17 @@
+# 28.11.2026 — shared glyph, spacing and rendering design completion
+
+Ten canonical IDs (not subtasks):
+- ICON-01 — Shared SvgGlyphViewbox/SvgGlyphPath and VectorGlyph for dynamic menus/search; 42 caption/icon-only templates share geometry pipeline.
+- ICON-02 — All 41 Python theme.py SVG entries matched by tokenized paths; restored Wrench/Clip/More and corrected materials contour.
+- ICON-09 — Shared 18-DIP caption glyph, 12-DIP arrows, compact row targets 22x24; search clear26/letter move32/split24 retained; decoration noninteractive.
+- ICON-12 — Phase, summary expand and procurement/status/check header pseudo-icons rendered as vector; textual warning/legend and keyboard explanations deliberately retained for Python parity.
+- ICON-13 — Reviewed application XAML toolbar captions/templates; cost materials filters, retry, add/empty state, phase-sent state receive semantic glyphs; explicit text-only dialog commands retained.
+- ICON-14 — More is one shared path instead of separate contour controls; report/action captions audited for duplicate glyph prefixes; all template references guarded.
+- SPACE-16 — Replaced compensating negative KS/director tile margins with EqualGapTilePanel; sole negative auxiliary-tab seam explicitly documented; source audit rejects negative local margins.
+- SPACE-17 — EqualGapTilePanel measures card content, not effects, 10-DIP gap; no negative compensation, offline shadow/no-shadow equal bounds fixture.
+- SPACE-20 — Collapsed cards do not consume slots/height; XAML Hidden reviewed, only intentional tree leaf alignment reserve; source audit and offline collapse fixture.
+- FONT-11 — All Window subclasses receive shared Display/ClearType, layout rounding and snap defaults; local/style/binding and Ideal/Grayscale popup exceptions preserved.
+
+Evidence: inspected all application XAML files in batches at starting revision 228a1008; static literal command/header/pseudo-icon, negative margins and Hidden scan. Python smeta/ui/theme.py, kp_editor.py, cost_view.py, object_view.py, ks_view.py; 41 original geometry entries compared by tokenized source paths, normalizing initial relative m and converting rect/circle/ellipse into equivalent arcs. All 41 normalized comparisons passed in connector script after restoring original open materials contour. Wrench was a missing referenced resource. WPF-specific extra glyphs and user-approved calculator role remain explicit adaptations. Source tests enumerate all application XAML at test execution; guard resource references, duplicate glyph prefixes, negative margin and hidden exceptions, cost actions and rendering defaults. Existing source fixtures updated. Offline WPF fixture checks tile gaps with/without shadow and collapsed cards, and default/explicit rendering settings.
+
+Intentional exceptions: director warning literal follows Python; warnings in explanatory text/exports and keyboard guidance remain text. Procurement header internal identifier unchanged for existing field mapping; displayed header vector. Tree leaf expander retains indentation reserve. Auxiliary selected-tab seam overlaps one DIP to avoid duplicate stroke. Small row hit targets 22x24 DIP, compact split24 and search26 differentiated from glyph size. New tile panel uses equal widths, 10-DIP gaps and natural height; visual shadow overlap and physical hit targets still need Windows acceptance. No .NET/WPF/xUnit execution. No SQL, DB, calculation or release changes. Canonical code ready 225/253, partial 28.

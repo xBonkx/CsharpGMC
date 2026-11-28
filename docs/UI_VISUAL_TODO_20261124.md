@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 — ICON-01/ICON-02/ICON-09/ICON-12/ICON-13/ICON-14/SPACE-16/SPACE-17/SPACE-20/FONT-11 CODE READY: ten full canonical IDs. Shared icon pipeline and all 41 Python geometries verified by token comparison; XAML toolbar/resource audit, vector affordances, positive-gap tiles, documented negative/Hidden exceptions, root rendering defaults. New source/WPF tests not run; physical acceptance open. Design 225/253 CODE READY, 28 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_SHARED_CATALOG.md).
+
 28.11.2026 — estimate parity verification follow-up: cached views cannot overwrite the latest explicit purchase preference; added temporary-file and actual grid editor font checks, locked/active toolbar states, corrected fixture parameter type and obsolete focus source assertion. Tests not run. Canonical design statuses unchanged. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).
 
 28.11.2026 — HDR-01/HDR-02/HDR-03/HDR-20/BAR-03/BAR-16/GRID-11/GRID-15/GRID-16/FONT-03 CODE READY: ten canonical IDs, not subtasks. Estimate header one-line metadata and adaptive action layout; legal/full title policy; signed/permission catalog visibility; work/purchase preference parity; deterministic numbers and table font/zoom roles. Source and WPF fixture authored, not run; physical Windows/Python acceptance remains. Design 215/253 CODE READY, 38 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).

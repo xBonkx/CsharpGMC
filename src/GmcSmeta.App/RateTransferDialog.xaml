@@ -76,7 +76,16 @@
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" RowHeaderWidth="0"
                   SelectionMode="Single" SelectionUnit="FullRow" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" Style="{StaticResource DocumentTable}">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="✓" Binding="{Binding Included, Mode=TwoWay}" Width="34"/>
+                <DataGridCheckBoxColumn Header="Выбор" Binding="{Binding Included, Mode=TwoWay}" Width="34">
+                    <DataGridCheckBoxColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="14" Height="14"
+                                     ToolTip="Включить строку в перенос" AutomationProperties.Name="Выбор строк">
+                                <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphCheck}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridColumnHeader}}"/></Canvas>
+                            </Viewbox>
+                        </DataTemplate>
+                    </DataGridCheckBoxColumn.HeaderTemplate>
+                </DataGridCheckBoxColumn>
                 <DataGridTextColumn Header="Позиция из источника" Binding="{Binding SourceLabel}" Width="*" MinWidth="140" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Позиция в смете" Binding="{Binding TargetLabel}" Width="*" MinWidth="140" IsReadOnly="True" ElementStyle="{StaticResource CompactCostText}" HeaderStyle="{StaticResource KsTextHeader}"/>
                 <DataGridTextColumn Header="Цена сейчас" Binding="{Binding CurrentPrice}" Width="138" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ReportGridBeforeHeader}"/>

@@ -58,9 +58,9 @@
                         <ComboBoxItem Tag="markup" Content="По наценке"/>
                         <ComboBoxItem Tag="color" Content="По цвету"/>
                     </ComboBox>
-                    <CheckBox x:Name="MaterialMissingCost" Content="Без закупа" Margin="0,0,7,0"
+                    <CheckBox x:Name="MaterialMissingCost" Content="Без закупа" ContentTemplate="{StaticResource IconLabelAlert}" Margin="0,0,7,0"
                               VerticalAlignment="Center" Checked="MaterialsView_Changed" Unchecked="MaterialsView_Changed"/>
-                    <CheckBox x:Name="MaterialMissingPrice" Content="Без цены" Margin="0,0,8,0"
+                    <CheckBox x:Name="MaterialMissingPrice" Content="Без цены" ContentTemplate="{StaticResource IconLabelAlert}" Margin="0,0,8,0"
                               VerticalAlignment="Center" Checked="MaterialsView_Changed" Unchecked="MaterialsView_Changed"/>
                     <Grid Width="200">
                     <TextBox x:Name="MaterialSearch" Style="{StaticResource PythonSearch}" Padding="32,5,32,5"

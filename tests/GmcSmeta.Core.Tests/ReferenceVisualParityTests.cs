@@ -19,7 +19,8 @@ public sealed class ReferenceVisualParityTests
         Assert.Contains("\"IconOnlyX\"",source);
         Assert.Contains("Source=input",source);
         Assert.Contains("input.Clear();input.Focus();",source);
-        Assert.Contains("IsHitTestVisible=false",source);
+        Assert.Contains("VectorGlyph.Create",source);
+        Assert.Contains("IsHitTestVisible = false",Source("VectorGlyph.cs"));
         Assert.Contains("ReferenceWindowUi.Search(_input",Source("WorkspaceQueryWindows.cs"));
         Assert.Contains("ReferenceWindowUi.Search(_filter",Source("WorkspaceQueryWindows.cs"));
         Assert.Contains("ReferenceWindowUi.Search(_filter",Source("CatalogPickerWindow.cs"));

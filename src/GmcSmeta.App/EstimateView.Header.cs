@@ -40,6 +40,7 @@ public partial class EstimateView
         if (!visible) return;
         var (phase, number) = PhaseInfo(_estimate!.KpPhase);
         PhaseButtonText.Text = $"{number} · {phase.Split(" · ")[0]}";
+        PhaseGlyph.Data = (System.Windows.Media.Geometry)FindResource(_estimate!.KpPhase == "sent" ? "GlyphCheck" : "GlyphHistory");
         PhaseButton.ToolTip = $"Подготовка КП: {phase}\nНажмите, чтобы выбрать этап подготовки";
         PhaseButton.IsEnabled = !_estimate.Locked && !_doc.StageRest;
     }

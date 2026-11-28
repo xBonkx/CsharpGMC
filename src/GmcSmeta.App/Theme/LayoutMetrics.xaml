@@ -76,6 +76,7 @@
     <Thickness x:Key="LayoutObjectSubTabPadding">14,5</Thickness>
     <Thickness x:Key="LayoutFilterChipPadding">12,5</Thickness>
     <sys:Double x:Key="LayoutSidebarSplitterWidth">5</sys:Double>
+    <!-- Intentional one-DIP selected-tab seam overlap: avoids double border, not content padding. -->
     <Thickness x:Key="LayoutAuxTabPaneOverlap">0,-1,0,0</Thickness>
     <Thickness x:Key="LayoutAuxTabPageMargin">12</Thickness>
     <Thickness x:Key="LayoutAuxActionGap">0,0,6,6</Thickness>

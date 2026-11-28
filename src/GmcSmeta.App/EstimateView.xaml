@@ -518,8 +518,8 @@
                     <Button x:Name="PhaseButton" Style="{StaticResource DocumentPhaseTool}"
                             Click="Phase_Click" Visibility="Collapsed" Margin="8,0,6,6" MinWidth="0"
                             ToolTip="Подготовка КП. Нажмите, чтобы передать на следующий этап">
-                        <StackPanel Orientation="Horizontal">
-                            <Viewbox Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0" IsHitTestVisible="False"><Canvas Width="24" Height="24"><Path x:Name="PhaseGlyph" Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphHistory}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ContentControl}}}"/></Canvas></Viewbox>
                              <TextBlock x:Name="PhaseButtonText" Text="Этап" VerticalAlignment="Center"/>
                              <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="12" Height="12" Margin="4,0,0,0">
                                  <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/></Canvas>

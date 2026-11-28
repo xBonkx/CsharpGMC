@@ -86,7 +86,7 @@
                         <TextBlock x:Name="SummaryMissingText" Text="Без цен" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ToggleButton>
-                <Button x:Name="SummaryMissingArrow" Width="24" MinWidth="0" MinHeight="0" Padding="0"
+                <Button x:Name="SummaryMissingArrow" Width="24" MinWidth="24" MinHeight="32" Padding="0"
                         Content="Варианты фильтра" AutomationProperties.Name="Выбрать пропуски цен"
                         Click="SummaryMissingMenu_Click" ToolTip="Какие пропуски цен искать">
                     <Button.Style>

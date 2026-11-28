@@ -450,6 +450,17 @@
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
+                    <!-- Preserve the header identifier used by Field()/column preferences. -->
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Статус" VerticalAlignment="Center"/>
+                                <Viewbox Style="{StaticResource SvgGlyphViewbox}" Width="12" Height="12" Margin="4,0,0,0">
+                                    <Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphChevronDown}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridColumnHeader}}"/></Canvas>
+                                </Viewbox>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource ProcurementBadge}"
