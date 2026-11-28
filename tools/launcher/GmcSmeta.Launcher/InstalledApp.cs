@@ -17,9 +17,9 @@ internal sealed partial record InstalledApp
     public string? ManifestHash { get; init; }
     public string? SkipRelease { get; init; }
 
-    public static InstalledApp? Load(AppPaths paths) => Read(paths.Apps, paths.StateFile);
+    public static InstalledApp? Load(AppPaths paths) => Read(paths.Apps, paths.StateFile, allowDemoSeed: paths.IsDemo);
 
-    internal static InstalledApp? Read(string apps, string stateFile, bool requireExe = true)
+    internal static InstalledApp? Read(string apps, string stateFile, bool requireExe = true, bool allowDemoSeed = false)
     {
         try
         {
@@ -48,8 +48,10 @@ internal sealed partial record InstalledApp
             var folder = Path.GetFileName(directory);
             var suffixed = folder.StartsWith(expected + "-", StringComparison.OrdinalIgnoreCase) &&
                 folder.Length == expected.Length + 7 && folder[(expected.Length + 1)..].All(char.IsAsciiDigit);
+            var demoSeed = allowDemoSeed && version == "0.0.0" && flavor == "sc" &&
+                DemoReleasePolicy.IsSeedFolder(folder);
             if (!Same(Path.GetDirectoryName(directory), root) ||
-                !(Same(folder, expected) || suffixed) ||
+                !(Same(folder, expected) || suffixed || demoSeed) ||
                 !Same(exe, Path.Combine(directory, "GMC-Smeta-Next.exe")) ||
                 (requireExe && !File.Exists(exe)) ||
                 (System.IO.Directory.Exists(directory) && IsReparse(directory)) ||
@@ -65,6 +67,8 @@ internal sealed partial record InstalledApp
                 if (!int.TryParse(schemaText, out var number) || number <= 0) return null;
                 schema = number;
             }
+            if (demoSeed && (!string.IsNullOrEmpty(sha) || !string.IsNullOrEmpty(manifest) ||
+                schema.HasValue || !string.IsNullOrEmpty(skip))) return null;
             if ((!string.IsNullOrEmpty(sha) && !PackageIntegrity.IsHash(sha)) ||
                 (!string.IsNullOrEmpty(manifest) && !PackageIntegrity.IsHash(manifest)) ||
                 (!string.IsNullOrEmpty(skip) && !AppVersion.CanOfferRelease(null, skip)) ||
@@ -83,11 +87,11 @@ internal sealed partial record InstalledApp
         }
     }
 
-    public void Save(AppPaths paths) => Publish(paths.Apps, paths.StateFile, paths.PreviousStateFile);
+    public void Save(AppPaths paths) => Publish(paths.Apps, paths.StateFile, paths.PreviousStateFile, paths.IsDemo);
 
-    internal void Publish(string apps, string stateFile, string previousStateFile)
+    internal void Publish(string apps, string stateFile, string previousStateFile, bool allowDemoSeed = false)
     {
-        var old = Read(apps, stateFile);
+        var old = Read(apps, stateFile, allowDemoSeed: allowDemoSeed);
         // Keep the previous pointer before switching. If either write fails,
         // the old current pointer remains usable. Never remove its files.
         if (old is not null && !Same(old.Exe, Exe)) old.Write(previousStateFile);

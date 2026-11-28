@@ -45,7 +45,7 @@ internal static class DemoLauncher
                                 "Проверяем контрольную сумму, поддержку DEMO и открытие сметы.");
                             journal.Write("Установка кандидата", release.Version + " · скачивание, SHA-256, распаковка");
                             installed = new AppInstaller(releases, paths, ui).Install(release,
-                                directory => CheckCandidate(directory, database, paths.Root, journal));
+                                directory => CheckCandidate(directory, release.Version, database, paths.Root, journal));
                             journal.Write("Обновление применено", installed.Version);
                         }
                         else journal.Write("Обновление не требуется", release.Version);
@@ -107,10 +107,11 @@ internal static class DemoLauncher
         DemoReleasePolicy.RequireCapability(File.Exists(marker) ? File.ReadAllText(marker) : null);
     }
 
-    private static void CheckCandidate(string directory, string database, string launcherRoot, DemoUpdateJournal journal)
+    private static void CheckCandidate(string directory, string version, string database, string launcherRoot, DemoUpdateJournal journal)
     {
         journal.Write("Проверка совместимости", "DEMO capability и схема");
         RequireCapability(directory); // Old releases may ignore --demo: never execute them.
+        DemoReleasePolicy.RequireCandidateMetadata(directory, version); // Reject mismatches before executing.
         var report = Path.Combine(Path.GetDirectoryName(launcherRoot)!, "smoke-error.txt");
         var freshReport = false;
         try { File.Delete(report); freshReport = true; }

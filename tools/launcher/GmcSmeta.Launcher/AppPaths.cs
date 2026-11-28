@@ -12,9 +12,12 @@ internal sealed class AppPaths
     public string StateFile { get; }
     public string PreviousStateFile => Path.Combine(Root, "previous-installed.txt");
 
-    private AppPaths(string root)
+    internal bool IsDemo { get; }
+
+    private AppPaths(string root, bool isDemo = false)
     {
         Root = root;
+        IsDemo = isDemo;
         Apps = Path.Combine(root, "apps");
         Downloads = Path.Combine(root, "cache");
         StateFile = Path.Combine(root, "installed.txt");
@@ -36,7 +39,7 @@ internal sealed class AppPaths
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(baseDir))
             throw new InvalidOperationException("Не найден локальный профиль Windows.");
-        var paths = new AppPaths(Path.Combine(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher"));
+        var paths = new AppPaths(Path.Combine(baseDir, "GMC-Smeta-Demo", "CSharp", database, "launcher"), isDemo: true);
         Directory.CreateDirectory(paths.Apps);
         Directory.CreateDirectory(paths.Downloads);
         return paths;
