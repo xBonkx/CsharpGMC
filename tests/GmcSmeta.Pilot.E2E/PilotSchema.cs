@@ -172,5 +172,95 @@ CREATE TABLE dbo.movements (
     created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 CREATE INDEX IX_pilot_movements_position ON dbo.movements(position_id,kind);
+-- Synthetic spec-revision surface for the navigation/spec-head readers (fixture gap
+-- exposed by batched-workspace-navigation-parity after e188c755); not a production migration.
+CREATE TABLE dbo.spec_revisions (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    contract_id bigint NOT NULL REFERENCES dbo.contracts(id),
+    created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    [user] nvarchar(64) NOT NULL DEFAULT N'',
+    [file] nvarchar(max) NOT NULL DEFAULT N'',
+    title nvarchar(255) NOT NULL DEFAULT N'',
+    total_before float NOT NULL DEFAULT 0,
+    total_after float NOT NULL DEFAULT 0,
+    data nvarchar(max) NOT NULL DEFAULT N''
+);
+-- Attachment surface for contract dumps and signed-contract guards.
+CREATE TABLE dbo.attachments (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    contract_id bigint NOT NULL REFERENCES dbo.contracts(id) ON DELETE CASCADE,
+    name nvarchar(255) NOT NULL DEFAULT N'',
+    path nvarchar(max) NOT NULL DEFAULT N'',
+    size bigint NOT NULL DEFAULT 0,
+    role nvarchar(32) NOT NULL DEFAULT N'',
+    is_primary bit NOT NULL DEFAULT 0,
+    note nvarchar(max) NOT NULL DEFAULT N'',
+    added_by nvarchar(64) NOT NULL DEFAULT N'',
+    added_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+-- Catalog price history and agreement surfaces referenced by workspace dumps.
+CREATE TABLE dbo.price_history (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    item_id bigint NOT NULL,
+    contract_id bigint NULL,
+    price float NOT NULL DEFAULT 0,
+    purchase_price float NULL,
+    [date] nvarchar(32) NOT NULL DEFAULT N'',
+    created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+CREATE TABLE dbo.agreements (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    object_id bigint NOT NULL REFERENCES dbo.objects(id),
+    number nvarchar(64) NOT NULL DEFAULT N'',
+    agreement_date date NULL,
+    company_id bigint NULL REFERENCES dbo.companies(id),
+    subject nvarchar(255) NOT NULL DEFAULT N'',
+    works_start date NULL, works_end date NULL,
+    customer_address nvarchar(255) NOT NULL DEFAULT N'',
+    contractor_full nvarchar(255) NOT NULL DEFAULT N'',
+    contractor_post nvarchar(64) NOT NULL DEFAULT N'',
+    contractor_name nvarchar(255) NOT NULL DEFAULT N'',
+    customer_full nvarchar(255) NOT NULL DEFAULT N'',
+    cust_org nvarchar(255) NOT NULL DEFAULT N'',
+    cust_post nvarchar(64) NOT NULL DEFAULT N'',
+    cust_name nvarchar(255) NOT NULL DEFAULT N'',
+    second_role nvarchar(64) NOT NULL DEFAULT N'',
+    second_org nvarchar(255) NOT NULL DEFAULT N'',
+    second_post nvarchar(64) NOT NULL DEFAULT N'',
+    second_name nvarchar(255) NOT NULL DEFAULT N'',
+    work_title nvarchar(255) NOT NULL DEFAULT N'',
+    archived bit NOT NULL DEFAULT 0,
+    created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+CREATE TABLE dbo.agreement_files (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    agreement_id bigint NOT NULL REFERENCES dbo.agreements(id) ON DELETE CASCADE,
+    role nvarchar(32) NOT NULL DEFAULT N'',
+    original_name nvarchar(255) NOT NULL DEFAULT N'',
+    file_address nvarchar(max) NOT NULL DEFAULT N'',
+    sha256 nvarchar(64) NOT NULL DEFAULT N'',
+    signed bit NOT NULL DEFAULT 0,
+    created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+CREATE TABLE dbo.access_lists (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    object_id bigint NOT NULL,
+    kind nvarchar(16) NOT NULL DEFAULT N'',
+    created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    [user] nvarchar(64) NOT NULL DEFAULT N'',
+    [file] nvarchar(max) NOT NULL DEFAULT N'',
+    [data] nvarchar(max) NOT NULL DEFAULT N''
+);
+-- Trash store itself: deleted dumps with their own snapshot discipline.
+CREATE TABLE dbo.trash (
+    id bigint IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    kind nvarchar(16) NOT NULL,
+    title nvarchar(max) NOT NULL DEFAULT N'',
+    object_name nvarchar(max) NOT NULL DEFAULT N'',
+    [rows] bigint NOT NULL DEFAULT 0,
+    deleted_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    deleted_by nvarchar(64) NOT NULL DEFAULT N'',
+    data nvarchar(max) NOT NULL
+);
 """;
 }

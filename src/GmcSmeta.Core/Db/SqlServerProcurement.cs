@@ -404,6 +404,11 @@ public static partial class SqlServerProcurement
     /// (создаётся по имени), этап, заявка/счёт, закупочная цена, срок, замена,
     /// примечание, «прямо на объект». Журнал procurement/update по каждой строке.
     /// </summary>
+    private sealed record ExistingProcurement(long Id, long? SupplierId, string Stage,
+        string OrderRef, string InvoiceRef, decimal? CostPrice, DateTime? DueDate,
+        string Replacement, string Note, bool Direct, string Source, DateTime? PaidDate,
+        string Responsible);
+
     public static SqlServerDatabase.SaveResult SetProc(string connectionString, int contractId,
         IReadOnlyList<long> positionIds, string? supplier, string? stage, string? orderRef,
         string? invoiceRef, decimal? costPrice, DateTime? dueDate, string? replacement,
@@ -479,6 +484,7 @@ public static partial class SqlServerProcurement
         foreach (var positionId in positionIds.Distinct())
         {
             var changes = new List<string>();
+            ExistingProcurement? existing = null;
             long? procurementId = null;
             using (var find = new SqlCommand(
                 "SELECT id, supplier_id, stage, order_ref, invoice_ref, cost_price, due_date, " +
@@ -488,19 +494,28 @@ public static partial class SqlServerProcurement
                 using var r = find.ExecuteReader();
                 if (r.Read())
                 {
-                    procurementId = SqlInteger.ReadInt64(r, 0);
-                    var same = (SupplierId: r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1),
-                        Stage: r.IsDBNull(2) ? "" : r.GetString(2),
-                        OrderRef: r.IsDBNull(3) ? "" : r.GetString(3),
-                        InvoiceRef: r.IsDBNull(4) ? "" : r.GetString(4),
-                        CostPrice: r.IsDBNull(5) ? (decimal?)null : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
-                        DueDate: r.IsDBNull(6) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(6), CultureInfo.InvariantCulture),
-                        Replacement: r.IsDBNull(7) ? "" : r.GetString(7),
-                        Note: r.IsDBNull(8) ? "" : r.GetString(8),
-                        Direct: !r.IsDBNull(9) && SqlFlag.Read(r, 9),
-                        Source: r.IsDBNull(10) ? "" : r.GetString(10),
-                        PaidDate: r.IsDBNull(11) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(11), CultureInfo.InvariantCulture),
-                        Responsible: r.IsDBNull(12) ? "" : r.GetString(12));
+                    // Строка читается целиком до закрытия reader: MARS выключен,
+                    // UPDATE на том же соединении должен идти после его закрытия.
+                    existing = new ExistingProcurement(
+                        SqlInteger.ReadInt64(r, 0),
+                        r.IsDBNull(1) ? (long?)null : SqlInteger.ReadInt64(r, 1),
+                        r.IsDBNull(2) ? "" : r.GetString(2),
+                        r.IsDBNull(3) ? "" : r.GetString(3),
+                        r.IsDBNull(4) ? "" : r.GetString(4),
+                        r.IsDBNull(5) ? (decimal?)null : Money.FromDouble(Convert.ToDouble(r.GetValue(5), CultureInfo.InvariantCulture)),
+                        r.IsDBNull(6) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(6), CultureInfo.InvariantCulture),
+                        r.IsDBNull(7) ? "" : r.GetString(7),
+                        r.IsDBNull(8) ? "" : r.GetString(8),
+                        !r.IsDBNull(9) && SqlFlag.Read(r, 9),
+                        r.IsDBNull(10) ? "" : r.GetString(10),
+                        r.IsDBNull(11) ? (DateTime?)null : Convert.ToDateTime(r.GetValue(11), CultureInfo.InvariantCulture),
+                        r.IsDBNull(12) ? "" : r.GetString(12));
+                }
+            }
+            var same = existing;
+            if (same is not null)
+            {
+                procurementId = same.Id;
                     if (supplier is not null && same.SupplierId != supplierId)
                         changes.Add($"поставщик → {supplier.Trim()}");
                     if (stage is not null && same.Stage != stage) changes.Add($"stage → {stage}");
@@ -557,7 +572,6 @@ public static partial class SqlServerProcurement
                     update.Parameters.AddWithValue("@id", procurementId.Value);
                     if (update.ExecuteNonQuery() != 1)
                         throw new DBConcurrencyException("Запись закупки изменилась во время сохранения.");
-                }
             }
             if (procurementId is null)
             {

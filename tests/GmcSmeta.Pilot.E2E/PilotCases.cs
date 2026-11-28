@@ -72,6 +72,10 @@ internal static class PilotCases
         p.RunCase("streamed-sql-totals-parity", () => PilotStreamedTotalsCases.Run(p));
         p.RunCase("batched-finance-director-parity", () => PilotFinanceBatchCases.Run(p));
         p.RunCase("director-movement-mode-parity", () => PilotDirectorMovementCases.Run(p));
+        // Завершающий кейс: удаляет LargeContract через корзину — после всех
+        // остальных сценариев, читающих fixture-объекты.
+        p.RunCase("bugf01-25-acceptance-undo-replace-trash-procurement",
+            () => PilotBugFAcceptanceCases.Run(p));
 
         p.Skip("full-production-v28-schema-and-migrations",
             "Only a synthetic v28 subset is available in this repository; " +
