@@ -120,6 +120,23 @@ internal static class PilotConcurrencyReadCases
         {
             PilotRunner.Check(!pending.Wait(TimeSpan.FromMilliseconds(250)),
                 "Revision read was not blocked by held lock");
+            // Independently observe the blocked session without reading SQL text or parameters.
+            // SQL Server permissions may prevent DMV visibility; report separately, never invent a wait.
+            using (var observer = p.Conn())
+            using (var request = new SqlCommand("SELECT wait_type,wait_time,blocking_session_id FROM sys.dm_exec_requests WHERE session_id=@id", observer))
+            {
+                request.Parameters.Add("@id", SqlDbType.Int).Value = cancellable.ServerProcessId;
+                try
+                {
+                    using var waiting = request.ExecuteReader();
+                    if (waiting.Read() && !waiting.IsDBNull(0) && waiting.GetString(0).StartsWith("LCK_M_", StringComparison.Ordinal) &&
+                        Convert.ToInt32(waiting.GetValue(2)) == blocker.ServerProcessId)
+                        p.MetricOne("blocked_revision_server_wait", 1, Convert.ToInt32(waiting.GetValue(1)),
+                            "Observed lock wait before cancellation; one sample, not total lock time");
+                    else p.Skip("blocked-revision-dmv-visibility", "Expected lock wait not visible; cancellation still checked independently");
+                }
+                catch (SqlException) { p.Skip("blocked-revision-dmv-visibility", "DMV unavailable; no wait measurement claimed"); }
+            }
             cancel.Cancel();
             // The command must finish while the blocking transaction still holds its lock.
             try

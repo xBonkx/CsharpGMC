@@ -240,11 +240,15 @@ public static partial class SqlServerDatabase
         var problem = ValidateCellInput(field, input, out var numeric, out var trimmed, out var value);
         if (problem is not null) return SaveResult.Fail(problem, expectedRevision);
 
+        using var operation = StartupTrace.BeginOperation();
         using var conn = Open(connectionString);
+        using var transactionTiming = StartupTrace.Measure("save_cell_serializable_transaction");
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         using var revCmd = new SqlCommand(
             "SELECT [value] FROM dbo.meta WITH (UPDLOCK, HOLDLOCK) WHERE [key] = N'rev'", conn, tx);
-        var currentRev = Convert.ToString(revCmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        string? currentRev;
+        using (StartupTrace.Measure("save_cell_revision_lock"))
+            currentRev = Convert.ToString(revCmd.ExecuteScalar(), CultureInfo.InvariantCulture);
         if (currentRev is null)
             return SaveResult.Fail("Нет метки ревизии в SQL Server.", expectedRevision);
         if (!string.Equals(currentRev, expectedRevision, StringComparison.Ordinal))
@@ -255,7 +259,7 @@ public static partial class SqlServerDatabase
         if (!saved.Saved) return saved;
         if (!changed)
         {
-            tx.Commit();
+            using (StartupTrace.Measure("save_cell_commit")) tx.Commit();
             return saved;
         }
         var identity = $"{Environment.UserName}@{Environment.MachineName}#{Environment.ProcessId}";
@@ -267,7 +271,7 @@ public static partial class SqlServerDatabase
             if (updateRev.ExecuteNonQuery() != 1)
                 throw new DBConcurrencyException("Пропала строка ревизии meta.rev.");
         }
-        tx.Commit();
+        using (StartupTrace.Measure("save_cell_commit")) tx.Commit();
         return new SaveResult(true, null, newRev);
     }
 

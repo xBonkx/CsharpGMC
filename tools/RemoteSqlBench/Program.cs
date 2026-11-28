@@ -169,15 +169,22 @@ File.WriteAllText(Path.Combine(directory, "evidence.json"),
     JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }));
 using (var csv = new StreamWriter(Path.Combine(directory, "samples.csv")))
 {
-    csv.WriteLine("case,contract_id,second_contract_id,iteration,status,rows,elapsed_ms,allocated_bytes,error_type");
+    csv.WriteLine("case,contract_id,second_contract_id,iteration,status,rows,elapsed_ms,allocated_bytes,error_type,cache_mode");
     foreach (var item in cases)
         foreach (var sample in item.Samples)
             csv.WriteLine(FormattableString.Invariant(
-                $"{item.Name},{contractId},{item.SecondContractId},{sample.Iteration},{sample.Status},{sample.Rows},{sample.ElapsedMs:F6},{sample.AllocatedBytes},{sample.ErrorType}"));
+                $"{item.Name},{contractId},{item.SecondContractId},{sample.Iteration},{sample.Status},{sample.Rows},{sample.ElapsedMs:R},{sample.AllocatedBytes},{sample.ErrorType},{CacheOf(item.Name)}"));
 }
 Console.WriteLine(databaseStable ? "Revision unchanged across run." : "UNCONFIRMED: revision changed or run failed.");
 Console.WriteLine("No WPF, write/COMMIT, cold cache or concurrency measurements in this read-only run.");
 return exitCode;
+
+static string CacheOf(string name) => name switch
+{
+    "guarded_open_warm_pool" => "warm_pool",
+    "guarded_open_nonpooled" => "nonpooled_login",
+    _ => "warm_process_existing_sql_cache"
+};
 
 static int CountPositions(SqlConnection c, int contractId)
 {

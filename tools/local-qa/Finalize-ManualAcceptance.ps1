@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 # Validate manually witnessed GUI+SQL cases without forging PASS.
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$RunDirectory)
+param([Parameter(Mandatory = $true)][string]$RunDirectory, [switch]$RequireFullAcceptance)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $dir = [IO.Path]::GetFullPath($RunDirectory)
@@ -43,7 +43,62 @@ foreach ($row in $rows) {
         $note = [string]$row.reason
     }
     else {
-        if ($auto.git_sha -eq 'UNAVAILABLE') { throw 'Cannot assert an acceptance result without exact Git HEAD.' }
+        if ($auto.git_sha -notmatch '^[0-9a-fA-F]{40,64}
+        if ([string]::IsNullOrWhiteSpace($row.actual)) { throw ('Missing observed result: ' + $id) }
+        $pieces = @(([string]$row.evidence).Split(';') | Where-Object { $_.Trim().Length -gt 0 })
+        if ($pieces.Count -lt 2) { throw ('Need at least screenshot and independent SQL readback: ' + $id) }
+        $hasImage = $false; $hasSql = $false
+        foreach ($piece in $pieces) {
+            if ([IO.Path]::IsPathRooted($piece)) { throw ('Evidence must be relative to run directory: ' + $id) }
+            $absolute = [IO.Path]::GetFullPath((Join-Path $dir $piece.Trim()))
+            if (-not $absolute.StartsWith($dir + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::OrdinalIgnoreCase)) {
+                throw ('Evidence escaped the isolated run directory: ' + $id)
+            }
+            if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) {
+                throw ('Evidence file not found: ' + $absolute)
+            }
+            if ($piece -match '(?i)\.png$') { $hasImage = $true }
+            if ($piece -match '(?i)\.(txt|log)$') { $hasSql = $true }
+        }
+        if (-not $hasImage -or -not $hasSql) {
+            throw ('Need PNG and SQL TXT/LOG proof: ' + $id)
+        }
+        if ($row.status -eq 'FAIL') {
+            if ($row.issue_url -notmatch '^https://github\.com/xBonkx/CsharpGMC/issues/\d+$') {
+                throw ('FAIL requires separate defect Issue URL: ' + $id)
+            }
+            $fail++
+        }
+        else {
+            if ($auto.windows -ne $true) { throw ('GUI PASS requires Windows environment: ' + $id) }
+            $pass++
+        }
+        $note = [string]$row.actual
+    }
+    $note = ($note -replace '[\r\n\|]', ' ').Trim()
+    $report.Add('| ' + $id + ' | ' + $row.severity + ' | ' + $row.status +
+        ' | ' + $note + ' | ' + ($row.issue_url -replace '\|','/') + ' |')
+}
+$report.Insert(4, ('**PASS=' + $pass + ' FAIL=' + $fail + ' SKIP=' + $skip + '**'))
+$final = Join-Path $dir 'manual-report.md'
+$report | Set-Content -LiteralPath $final -Encoding UTF8
+Write-Host ('Validated 25 distinct cases. PASS=' + $pass + ' FAIL=' + $fail + ' SKIP=' + $skip)
+if ($skip -gt 0 -or $fail -gt 0) {
+    Write-Host 'Full acceptance: NOT ACHIEVED. Do not close issue #55.'
+}
+Write-Host ('Report: ' + $final)
+if ($fail -gt 0) { exit 1 }
+if ($RequireFullAcceptance) {
+    if ($skip -gt 0) { exit 2 }
+    $required = @('git-head-and-status','fixture-generate-verify','fixture-reverify','dotnet-restore','dotnet-build','dotnet-test',
+        'wpf-offline','export-offline','procurement-export-offline','contract-export-offline','layout-performance-offline','pilot-e2e')
+    foreach ($id in $required) {
+        if (@($auto.results | Where-Object { $_.id -eq $id -and $_.status -eq 'PASS' }).Count -ne 1) { exit 2 }
+    }
+}
+exit 0
+ -or $auto.git_uncommitted -ne 'NO') { throw 'Acceptance requires exact clean Git HEAD.' }
         if ([string]::IsNullOrWhiteSpace($row.actual)) { throw ('Missing observed result: ' + $id) }
         $pieces = @(([string]$row.evidence).Split(';') | Where-Object { $_.Trim().Length -gt 0 })
         if ($pieces.Count -lt 2) { throw ('Need at least screenshot and independent SQL readback: ' + $id) }

@@ -79,6 +79,8 @@ internal static class BenchmarkStatistics
     {
         var completed = samples.Where(s => s.Iteration > 0 && s.Status == "OK").ToArray();
         if (completed.Length == 0) throw new ArgumentException("No completed measurements.");
+        if (completed.Any(s => !double.IsFinite(s.ElapsedMs) || s.ElapsedMs < 0 || s.AllocatedBytes < 0 || s.Rows is not >= 0))
+            throw new ArgumentException("Invalid completed measurement.");
         var times = completed.Select(s => s.ElapsedMs).Order().ToArray();
         var bytes = completed.Select(s => s.AllocatedBytes).Order().ToArray();
         var rows = completed[0].Rows;
@@ -87,6 +89,7 @@ internal static class BenchmarkStatistics
         var median = (times[(times.Length - 1) / 2] + times[times.Length / 2]) / 2d;
         return new BenchmarkSummary(times.Length, stable ? rows : null, stable,
             times[0], median, Nearest(.95), times.Length >= 100 ? Nearest(.99) : null,
-            times[^1], bytes[(bytes.Length - 1) / 2]);
+            times[^1], bytes[(bytes.Length - 1) / 2] +
+                (bytes[bytes.Length / 2] - bytes[(bytes.Length - 1) / 2]) / 2);
     }
 }

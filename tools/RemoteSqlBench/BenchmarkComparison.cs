@@ -41,7 +41,15 @@ internal sealed record BenchmarkComparisonRow(string Case, int? SecondContractId
     BenchmarkDelta? P50, BenchmarkDelta? P95, BenchmarkDelta? P99,
     long? BeforeMedianAllocatedBytes, long? AfterMedianAllocatedBytes,
     BenchmarkResources? BaselineStart, BenchmarkResources? BaselineEnd,
-    BenchmarkResources? CurrentStart, BenchmarkResources? CurrentEnd);
+    BenchmarkResources? CurrentStart, BenchmarkResources? CurrentEnd)
+{
+    public string CacheMode => Case switch
+    {
+        "guarded_open_warm_pool" => "warm_pool",
+        "guarded_open_nonpooled" => "nonpooled_login",
+        _ => "warm_process_existing_sql_cache"
+    };
+}
 
 internal sealed record BenchmarkComparisonReport(string BaselineRunId, string CurrentRunId,
     string BaselineSha, string CurrentSha, string Dataset, string MachineProfile,

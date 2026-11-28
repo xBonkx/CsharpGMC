@@ -30,6 +30,7 @@
     <Compile Include="..\..\tools\RemoteSqlBench\BenchmarkComparison.cs" Link="RemoteSqlBenchmarkComparison.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\SqlDiagnostics.cs" Link="RemoteSqlDiagnostics.cs" />
     <Compile Include="..\..\tools\RemoteSqlBench\SqlDiagnosticQueries.cs" Link="SqlDiagnosticQueries.cs" />
+    <Compile Include="..\..\tools\RemoteSqlBench\SqlOperationProfile.cs" Link="SqlOperationProfile.cs" />
   </ItemGroup>
 
 </Project>

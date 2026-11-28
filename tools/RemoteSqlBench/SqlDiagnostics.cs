@@ -119,6 +119,8 @@ internal static class SqlDiagnostics
                 results.Add(new(name, "UNAVAILABLE", detail, ""));
             }
         }
+        Run("operation_profile", "sql-operation-profile.json", (conn, path) =>
+            SqlOperationProfile.Collect(conn, cs, path, contractId));
         Run("index_inventory", "indexes.json", (conn, path) => Inventory(conn, IndexInventorySql, path));
         Run("statistics_inventory", "statistics.json", (conn, path) => Inventory(conn, StatisticsInventorySql, path));
         Run("index_usage", "index-usage.json", (conn, path) => Inventory(conn, IndexUsageSql, path));
