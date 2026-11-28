@@ -85,8 +85,7 @@ public partial class EstimateView
     private List<MaterialsRow> _materialsBuilt = new();
     private MaterialsVisibleRows _materialsVisibleRows = new(Array.Empty<MaterialsRow>());
     private bool _materialsUpdatingSystemFilter;
-    private Dictionary<long, MatSortKey> _materialsFrozenKeys = new();
-    private (int ContractId, string Mode, string Sort)? _materialsFrozenDoc;
+    private readonly GmcSmeta.Core.Domain.MaterialsOrder _materialsOrder = new();
     private string _materialsMode = "kp";
     private string _materialsSort = "kp";
     private bool _materialsLoading;
@@ -502,64 +501,8 @@ public partial class EstimateView
     }
 
     // ------------------------------------------------------------------ sorting
-    private readonly record struct MatSortKey(int NullRank, decimal Num1, decimal Num2, string Text, int OrigIdx)
-        : IComparable<MatSortKey>
-    {
-        public int CompareTo(MatSortKey other)
-        {
-            if (NullRank != other.NullRank) return NullRank.CompareTo(other.NullRank);
-            if (Num1 != other.Num1) return Num1.CompareTo(other.Num1);
-            if (Num2 != other.Num2) return Num2.CompareTo(other.Num2);
-            var byText = string.Compare(Text, other.Text, StringComparison.CurrentCultureIgnoreCase);
-            if (byText != 0) return byText;
-            return OrigIdx.CompareTo(other.OrigIdx);
-        }
-    }
-
-    private MatSortKey MaterialsSortKey(CostMaterialsPosition p, int origIdx)
-    {
-        var cu = p.UnitCost;
-        var mk = cu is decimal unit && p.Price != 0m && unit != 0m ? (p.Price / unit - 1m) * 100m : (decimal?)null;
-        return _materialsSort switch
-        {
-            "name" => new MatSortKey(0, 0m, 0m, p.Name, origIdx),
-            "cost_up" => new MatSortKey(cu is null ? 1 : 0, cu ?? 0m, 0m, p.Name, origIdx),
-            "cost_down" => new MatSortKey(cu is null ? 1 : 0, -(cu ?? 0m), 0m, p.Name, origIdx),
-            "costsum" => new MatSortKey(cu is null ? 1 : 0, -(cu ?? 0m) * p.Qty, 0m, "", origIdx),
-            "markup" => new MatSortKey(mk is null ? 1 : 0, mk ?? 0m, 0m, "", origIdx),
-            "color" => new MatSortKey(0, MatColorRank(p.CostColor), 0m, "", origIdx),
-            _ => new MatSortKey(0, 0m, 0m, "", origIdx),
-        };
-    }
-
-    private static decimal MatColorRank(string color)
-    {
-        for (var i = 0; i < MatRowColors.Length; i++)
-            if (string.Equals(MatRowColors[i].Hex, color, StringComparison.OrdinalIgnoreCase))
-                return i;
-        return MatRowColors.Length;
-    }
-
-    /// <summary>Верхние строки в порядке экрана. Сортировка «один раз, как в Excel»: ключ
-    /// строки заморожен до смены вида, правленная строка не «перепрыгивает».</summary>
-    private List<CostMaterialsPosition> MaterialsOrderedTop(CostMaterialsData data)
-    {
-        var doc = (_contractId, _materialsMode, _materialsSort);
-        if (_materialsFrozenDoc != doc)
-        {
-            _materialsFrozenKeys.Clear();
-            _materialsFrozenDoc = doc;
-        }
-        var top = _materialsTop;
-        if (_materialsSort == "kp" && _materialsMode == "kp")
-            return top.ToList();
-        var indexed = top.Select((p, i) => (P: p, Idx: i)).ToList();
-        var keys = new Dictionary<long, MatSortKey>();
-        foreach (var (p, idx) in indexed)
-            keys[p.Id] = _materialsFrozenKeys.TryGetValue(p.Id, out var frozen)
-                ? frozen : _materialsFrozenKeys[p.Id] = MaterialsSortKey(p, idx);
-        return indexed.OrderBy(x => keys[x.P.Id]).Select(x => x.P).ToList();
-    }
+    private List<CostMaterialsPosition> MaterialsOrderedTop(CostMaterialsData data) =>
+        _materialsOrder.Order(_contractId, _materialsMode, _materialsSort, _materialsTop, MatRowColors);
 
     // ------------------------------------------------------------------ filtering
     private void MaterialsApplyViewFilter()
@@ -1015,8 +958,7 @@ public partial class EstimateView
     {
         // Python cost_view._set_view clears frozen keys even when the same
         // sort is chosen again. Ordinary edits/rebuilds still keep row order.
-        _materialsFrozenKeys.Clear();
-        _materialsFrozenDoc = null;
+        _materialsOrder.Reset();
         _materialsMode = mode;
         _materialsSort = sort;
         MaterialsRebuild();
@@ -1566,132 +1508,5 @@ public partial class EstimateView
         _uiSettings.MaterialsHintHidden = true;
         _uiSettings.Save();
         MaterialsHintBar.Visibility = Visibility.Collapsed;
-    }
-}
-
-/// <summary>Диалог наценки (cost_view.MarkupDialog): направление, коэффициент/%, только пустые, округление.</summary>
-public sealed class MaterialsMarkupDialog : Window
-{
-    private readonly RadioButton _toPrice;
-    private readonly RadioButton _toCost;
-    private readonly TextBox _factor;
-    private readonly TextBox _percent;
-    private readonly CheckBox _onlyEmpty;
-    private readonly CheckBox _round;
-    private bool _syncing;
-
-    public decimal Factor { get; private set; } = 1.44m;
-    public bool PriceFromCost { get; private set; } = true;
-    public bool OnlyEmpty { get; private set; }
-    public bool WholeRubles { get; private set; } = true;
-
-    public MaterialsMarkupDialog(int count)
-    {
-        Title = "Наценка";
-        Width = 560;
-        SizeToContent = SizeToContent.Height;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ShowInTaskbar = false;
-        Background = Brushes.White;
-        var root = new StackPanel { Margin = new Thickness(22, 18, 22, 16) };
-        root.Children.Add(new TextBlock
-        {
-            Text = $"Наценка для выделенных строк: {count}",
-            FontWeight = FontWeights.SemiBold, FontSize = 17, Margin = new Thickness(0, 0, 0, 12),
-        });
-        _toPrice = new RadioButton
-        {
-            Content = "Посчитать цену клиенту из закупа:  цена = закуп × коэффициент",
-            IsChecked = true, Margin = new Thickness(0, 0, 0, 6),
-        };
-        _toCost = new RadioButton
-        {
-            Content = "Посчитать закуп из цены клиенту:  закуп = цена ÷ коэффициент",
-            Margin = new Thickness(0, 0, 0, 10),
-        };
-        root.Children.Add(_toPrice);
-        root.Children.Add(_toCost);
-        var grid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _factor = new TextBox { Text = "1,44", Width = 110, HorizontalContentAlignment = HorizontalAlignment.Right };
-        _percent = new TextBox { Text = "44", Width = 110, HorizontalContentAlignment = HorizontalAlignment.Right };
-        _factor.TextChanged += FactorChanged;
-        _percent.TextChanged += PercentChanged;
-        var left = new StackPanel { Orientation = Orientation.Horizontal };
-        left.Children.Add(new TextBlock { Text = "Коэффициент   ", VerticalAlignment = VerticalAlignment.Center });
-        left.Children.Add(_factor);
-        var right = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 0, 0, 0) };
-        right.Children.Add(new TextBlock { Text = "или наценка, %   ", VerticalAlignment = VerticalAlignment.Center });
-        right.Children.Add(_percent);
-        Grid.SetColumn(left, 0);
-        Grid.SetColumn(right, 1);
-        grid.Children.Add(left);
-        grid.Children.Add(right);
-        root.Children.Add(grid);
-        _onlyEmpty = new CheckBox
-        {
-            Content = "Только там, где цена (или закуп) ещё не указана", Margin = new Thickness(0, 0, 0, 6),
-        };
-        _round = new CheckBox { Content = "Округлить цену до целых рублей", IsChecked = true };
-        root.Children.Add(_onlyEmpty);
-        root.Children.Add(_round);
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0),
-        };
-        var cancel = new Button { Content = "Отмена", Padding = new Thickness(12, 6, 12, 6) };
-        cancel.Click += (_, _) => DialogResult = false;
-        var apply = new Button
-        {
-            Content = "Применить", Padding = new Thickness(12, 6, 12, 6),
-            Margin = new Thickness(8, 0, 0, 0), IsDefault = true,
-        };
-        apply.Click += (_, _) => Apply();
-        row.Children.Add(cancel);
-        row.Children.Add(apply);
-        root.Children.Add(row);
-        Content = root;
-        Loaded += (_, _) => _factor.Focus();
-    }
-
-    private static decimal? Parse(string text) =>
-        NumberText.Parse(text);
-
-    private void FactorChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_syncing) return;
-        _syncing = true;
-        var v = Parse(_factor.Text);
-        if (v is decimal value)
-            _percent.Text = ((value - 1m) * 100m).ToString("0.###", CultureInfo.CurrentCulture);
-        _syncing = false;
-    }
-
-    private void PercentChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_syncing) return;
-        _syncing = true;
-        var v = Parse(_percent.Text);
-        if (v is decimal value)
-            _factor.Text = (1m + value / 100m).ToString("0.###", CultureInfo.CurrentCulture);
-        _syncing = false;
-    }
-
-    private void Apply()
-    {
-        var factor = Parse(_factor.Text);
-        if (factor is not decimal value || value <= 0.01m || value > 100m)
-        {
-            MessageBox.Show(this, "Коэффициент должен быть от 0,01 до 100.", "Наценка",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        Factor = value;
-        PriceFromCost = _toPrice.IsChecked == true;
-        OnlyEmpty = _onlyEmpty.IsChecked == true;
-        WholeRubles = _round.IsChecked == true;
-        DialogResult = true;
     }
 }

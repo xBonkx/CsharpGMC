@@ -1,5 +1,7 @@
 # Единый реестр замечаний GMC-Смета C#
 
+28.11.2026 ChatGPT/main (base 532b5e9) — ARCH-SIZE-05 PARTIAL: EstimateView.Materials.cs 1697→1512 physical lines; independent MaterialsMarkupDialog.cs 134 lines, Core MaterialsOrder.cs 77 lines. Dialog body moved verbatim; frozen-sort ownership extracted, original comparisons, palette order, effective unit cost, null handling, per-view reset and current row values retained. Nine domain test cases and existing source guard updated; static review only, no .NET/WPF execution. Logical EstimateView still large; no SQL, financial formulas, icons, DB/schema or release changes.
+
 28.11.2026 ChatGPT/main (base b279b6d) — AGR-08/11 PARTIAL: order-specific legal context reads active same-object explicit annex/DS mapping, or single active agreement for object-level launch, under global revision fence; no automatic first-document/first-company selection on legal schema. Ambiguous/missing mapping or missing contractor/signer blocks issuing new orders, existing history remains accessible; selected legal company by ID, no hardcoded signer fallback on legal path; legacy selection preserved. Exact document ID passed from estimate and revalidated before generating DOCX; technical site fields, admission lists and ventilation passports remain object-level. Six domain test scenarios and amended lifecycle guard, not run; real schema 28/32 Windows/Pilot order export, history and mixed agreement cases pending. No schema, DB, finance or release changes.
 
 28.11.2026 ChatGPT/main (base d50597b) — AGR-08/11 PARTIAL: new letter from explicit annex/DS reads active same-object legal agreement inside existing serializable Save context check, stores separate legal number/date and own annex/DS identity; new scoped draft defaults recipient from legal customer organization/full only, no fallback to another agreement; existing unattached draft attachment keeps entered recipient/body. Legacy and object-only paths unchanged, no sent/released snapshots or letter filtering/IDs changed. Missing/archived/cross-object mapping rejected. Seven offline/source test scenarios added, not run; real schema 28/32 Pilot letters, history/archive and two-client acceptance pending. No new schema, permission, DB, money or release changes.
@@ -786,7 +788,7 @@ PARITY-KS-FORMULA-01 закрыт после сверки вычислений �
 | ARCH-SIZE-02 | P1 | ActsEditorView.xaml.cs — разделение редактора КС | NOT STARTED |
 | ARCH-SIZE-03 | P1 | EstimateView.xaml и семейство EstimateView — декомпозиция интерфейса и логики | NOT STARTED |
 | ARCH-SIZE-04 | P1 | MainWindow.xaml.cs — навигация, команды и жизненный цикл | NOT STARTED |
-| ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | NOT STARTED |
+| ARCH-SIZE-05 | P1 | EstimateView.Materials.cs — выделение независимой логики материалов | PARTIAL |
 | ARCH-SIZE-06 | P2 | App.xaml — тематические словари ресурсов | NOT STARTED |
 | ARCH-SIZE-07 | P2 | SqlServerStages/Acts/Workspace — аудит границ ответственности | NOT STARTED |
 | ARCH-SIZE-08 | P2 | Автоматический отчёт и контроль роста исходников | NOT STARTED |

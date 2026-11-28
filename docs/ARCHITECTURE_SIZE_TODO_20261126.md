@@ -1,5 +1,7 @@
 # Аудит размера исходников и декомпозиции — 26.11.2026
 
+28.11.2026 ChatGPT/main (base 532b5e9) — ARCH-SIZE-05 PARTIAL: EstimateView.Materials.cs 1697→1512 physical lines; independent MaterialsMarkupDialog.cs 134 lines, Core MaterialsOrder.cs 77 lines. Dialog body moved verbatim; frozen-sort ownership extracted, original comparisons, palette order, effective unit cost, null handling, per-view reset and current row values retained. Nine domain test cases and existing source guard updated; static review only, no .NET/WPF execution. Logical EstimateView still large; no SQL, financial formulas, icons, DB/schema or release changes.
+
 Цель: не повторять монолитные файлы Python; улучшить сопровождаемость и снизить конфликты параллельных агентов, не изменяя функциональность. Это самостоятельная архитектурная очередь, не замена приоритету переноса Python/SQL. Правило обязательно для всех агентов через [AGENTS.md](../AGENTS.md).
 
 ## Подтверждённый исходный срез
@@ -37,7 +39,7 @@ EstimateView.xaml и семейство EstimateView: проверить виз�
 ### ARCH-SIZE-04 (P1) — NOT STARTED
 MainWindow.xaml.cs: оценить навигацию, загрузку, команды, жизненный цикл, подписки и работу с окнами; выносить самостоятельные координаторы/сервисы, не менять время жизни ресурсов и порядок инициализации. Приёмка: запуск, переключение договоров/объектов, импорт, закрытие, отсутствие утечек/дублирования обработчиков.
 
-### ARCH-SIZE-05 (P1) — NOT STARTED
+### ARCH-SIZE-05 (P1) — PARTIAL
 EstimateView.Materials.cs: выделить независимые операции и модели материалов, поискать смешение диалогов, UI и доменной логики. Приёмка: добавление/редактирование/удаление, формулы, вставка, группировка, отмена, сохранение, точный паритет.
 
 ### ARCH-SIZE-06 (P2) — NOT STARTED

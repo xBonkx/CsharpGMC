@@ -15,10 +15,12 @@ public sealed class MaterialsViewMenuSourceTests
         var end = code.IndexOf("private void MaterialsGrouping_Click(", start, StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
         var method = code[start..end];
-        Assert.Contains("_materialsFrozenKeys.Clear();", method);
-        Assert.Contains("_materialsFrozenDoc = null;", method);
+        Assert.Contains("_materialsOrder.Reset();", method);
         Assert.Contains("MaterialsRebuild();", method);
-        Assert.Contains("_materialsFrozenKeys.TryGetValue(p.Id, out var frozen)", code);
+        var order = File.ReadAllText(Path.Combine(root!.FullName, "src", "GmcSmeta.Core", "Domain", "MaterialsOrder.cs"));
+        Assert.Contains("_materialsFrozenKeys.TryGetValue(p.Id, out var frozen)", order);
+        Assert.Contains("_materialsFrozenDoc = null;", order);
+        Assert.Contains("_materialsOrder.Order(_contractId, _materialsMode, _materialsSort, _materialsTop, MatRowColors)", code);
         Assert.Contains("data.Positions.ToLookup(p => p.SystemId)", code);
         Assert.Contains("_materialsTop.ToLookup(p => p.SystemId)", code);
         Assert.Contains("MaterialsVisibleRows.SameReferences(existing, result)", code);
