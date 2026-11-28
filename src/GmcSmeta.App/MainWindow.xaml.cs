@@ -1008,12 +1008,21 @@ public partial class MainWindow : Window
     private void ToggleSidebar()
     {
         var hide = Sidebar.Visibility == Visibility.Visible;
-        if (hide) _sidebarWidth = SidebarColumn.ActualWidth;
+        var restoreFocus = hide
+            ? Sidebar.IsKeyboardFocusWithin || SidebarSplitter.IsKeyboardFocusWithin
+            : ShowSidebarButton.IsKeyboardFocusWithin;
+        if (hide && SidebarColumn.ActualWidth >= 270) _sidebarWidth = SidebarColumn.ActualWidth;
         SidebarColumn.MinWidth = hide ? 0 : 270;
-        SidebarColumn.Width = new GridLength(hide ? 0 : _sidebarWidth);
-        SplitterColumn.Width = new GridLength(hide ? 0 : 1);
+        SidebarColumn.Width = new GridLength(hide ? 0 : Math.Max(270, _sidebarWidth));
+        SplitterColumn.Width = new GridLength(hide ? 0 : (double)FindResource("LayoutSidebarSplitterWidth"));
         Sidebar.Visibility = SidebarSplitter.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
         ShowSidebarButton.Visibility = hide ? Visibility.Visible : Visibility.Collapsed;
+        // Transfer focus only if the hidden panel owned it. Do not steal focus from an editor.
+        if (restoreFocus)
+        {
+            if (hide) ShowSidebarButton.Focus();
+            else ObjectSearch.Focus();
+        }
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

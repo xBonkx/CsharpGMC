@@ -452,7 +452,7 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="300" MinWidth="270"/>
-                <ColumnDefinition x:Name="SplitterColumn" Width="1"/>
+                <ColumnDefinition x:Name="SplitterColumn" Width="{Binding Source={StaticResource LayoutSidebarSplitterWidth}}"/>
                 <ColumnDefinition Width="*" MinWidth="420"/>
             </Grid.ColumnDefinitions>
             <Border x:Name="Sidebar" Background="#FBFCFE" BorderThickness="0" Padding="{StaticResource LayoutSidebarPadding}">
@@ -568,7 +568,7 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                 </DockPanel>
             </Border>
-            <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="5" Margin="-2,0,-2,0"
+            <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="{StaticResource LayoutSidebarSplitterWidth}"
                           Grid.ZIndex="2" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Background="Transparent"
                           AutomationProperties.Name="Изменить ширину панели объектов">
@@ -599,7 +599,7 @@
                 </TabControl>
                 <Grid x:Name="DocumentsWorkspaceSurface" Grid.Row="1">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Button x:Name="ShowSidebarButton" Style="{StaticResource PythonToolbarButton}" Content="Показать объекты" ContentTemplate="{StaticResource IconLabelMenu}" Visibility="Collapsed" HorizontalAlignment="Left"
+                <Button x:Name="ShowSidebarButton" Grid.Row="0" Style="{StaticResource PythonToolbarButton}" Content="Показать объекты" ContentTemplate="{StaticResource IconLabelMenu}" Visibility="Collapsed" HorizontalAlignment="Left"
                         MinWidth="148" MinHeight="30" Margin="{StaticResource LayoutShowSidebarMargin}" Click="ToggleSidebar_Click" ToolTip="Показать панель (Ctrl+B)"/>
                 <Grid x:Name="EmptyPage" Grid.Row="1" Visibility="Collapsed" Margin="16,0">
                     <Grid.RowDefinitions>

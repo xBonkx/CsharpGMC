@@ -19,6 +19,7 @@ internal static class VisualAuditChecks
         RunSharedGlyphCatalogChecks();
         RunDirectorTextLayoutChecks();
         RunSharedTypographyChecks();
+        RunSharedSpacingChecks();
         RunEstimateScrollLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
@@ -146,6 +147,47 @@ internal static class VisualAuditChecks
             tile.TextWrapping == TextWrapping.Wrap && tile.DesiredSize.Height > tile.FontSize,
             "Money tile text must grow rather than trim");
         Console.WriteLine("Shared typography roles and natural line heights checked (no SQL).");
+    }
+
+    private static void RunSharedSpacingChecks()
+    {
+        var fixtures = new (Control Control, string Key, string Chrome)[]
+        {
+            (new RadioButton { Content = "Режим" }, "Segment", "SegmentBorder"),
+            (new RadioButton { Content = "Договор" }, "ObjectTab", "TabBorder"),
+            (new RadioButton { Content = "Этап" }, "ObjectSubTab", "SubTabBorder"),
+            (new Button { Content = "Свойства" }, "PythonTabAction", "TabSurface"),
+            (new CheckBox { Content = "Без закупа" }, "PythonFilterChip", "FilterChrome"),
+            (new RadioButton { Content = "Все" }, "PythonFilterRadio", "FilterSurface"),
+            (new TabItem { Header = "Материалы" }, "PythonSecondaryTab", "TabUnderline"),
+        };
+        var requested = new Thickness(11, 3, 5, 7);
+        foreach (var (control, key, chromeName) in fixtures)
+        {
+            control.Style = (Style)Application.Current.FindResource(key);
+            control.Padding = requested;
+            control.HorizontalContentAlignment = HorizontalAlignment.Left;
+            control.VerticalContentAlignment = VerticalAlignment.Bottom;
+            Layout(control, 240, 64);
+            var border = control.Template.FindName(chromeName, control) as Border;
+            Require(border is not null && border.Padding == requested,
+                key + ": template must honor padding exactly once");
+            Require(border!.Child is ContentPresenter presenter &&
+                presenter.HorizontalAlignment == HorizontalAlignment.Left &&
+                presenter.VerticalAlignment == VerticalAlignment.Bottom,
+                key + ": content alignment must honor the control");
+        }
+        foreach (var key in new[] { "CompactCostText", "TotalsArticleText", "ReportGridReviewText",
+                     "ReportGridMuted", "ReportGridCenter", "ReportGridRight", "ReportGridStrongRight" })
+        {
+            var text = new TextBlock { Text = "123 456 789,00", Style = (Style)Application.Current.FindResource(key) };
+            Require(text.Margin == new Thickness(0) && text.Padding == new Thickness(0),
+                key + ": cell chrome owns inset");
+        }
+        var editor = new TextBox { Style = (Style)Application.Current.FindResource("PythonGridEditor") };
+        Require(editor.Margin == new Thickness(0) && editor.Padding == new Thickness(0),
+            "Editing must not duplicate cell inset");
+        Console.WriteLine("Shared template padding, content alignment and cell insets checked (no SQL).");
     }
 
     private static void RunDirectorTextLayoutChecks()

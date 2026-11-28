@@ -181,8 +181,9 @@ public sealed class EstimateTypographyAndToolsSourceTests
         var chrome = Assert.Single(tabStyle.Descendants(W + "Border"));
         Assert.Equal("1", (string?)chrome.Attribute("BorderThickness"));
         Assert.Equal("9", (string?)chrome.Attribute("CornerRadius"));
-        Assert.Equal("16,7", (string?)chrome.Attribute("Padding"));
-        Assert.Equal("0,0,6,6", (string?)chrome.Attribute("Margin"));
+        Assert.Equal("{TemplateBinding Padding}", (string?)chrome.Attribute("Padding"));
+        Assert.Equal("{StaticResource LayoutObjectTabPadding}", Value(tabStyle, "Padding"));
+        Assert.Equal("{StaticResource LayoutAuxActionGap}", (string?)chrome.Attribute("Margin"));
         var checkedTrigger = Assert.Single(tabStyle.Descendants(W + "Trigger").Where(e => (string?)e.Attribute("Property") == "IsChecked"));
         Assert.Equal(new[] { "#3B74F0", "#2158D8" }, checkedTrigger.Descendants(W + "GradientStop")
             .Select(e => (string?)e.Attribute("Color")).ToArray());

@@ -72,6 +72,11 @@
     <Thickness x:Key="LayoutCellPadding">4,3,4,3</Thickness>
     <!-- QTabBar: 14/7 padding, pane overlaps the tab strip by one DIP. -->
     <Thickness x:Key="LayoutAuxTabHeaderPadding">14,7</Thickness>
+    <Thickness x:Key="LayoutSegmentPadding">6,0</Thickness>
+    <Thickness x:Key="LayoutObjectTabPadding">16,7</Thickness>
+    <Thickness x:Key="LayoutObjectSubTabPadding">14,5</Thickness>
+    <Thickness x:Key="LayoutFilterChipPadding">12,5</Thickness>
+    <sys:Double x:Key="LayoutSidebarSplitterWidth">5</sys:Double>
     <Thickness x:Key="LayoutAuxTabPaneOverlap">0,-1,0,0</Thickness>
     <Thickness x:Key="LayoutAuxTabPageMargin">12</Thickness>
     <Thickness x:Key="LayoutAuxActionGap">0,0,6,6</Thickness>
