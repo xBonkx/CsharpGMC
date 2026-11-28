@@ -56,7 +56,7 @@ public partial class ContractDialog
             else Apply();
         };
         LegalAgreementPanel.Visibility = SelectedKind() == "main" ? Visibility.Visible : Visibility.Collapsed;
-        if(selectedId.HasValue) LegalAgreementCombo.SelectedValue=selectedId.Value;
-        else if (cards.Count == 1) LegalAgreementCombo.SelectedIndex = 0;
+        if (selectedId.HasValue) LegalAgreementCombo.SelectedValue = selectedId.Value;
+        else LegalAgreementCombo.SelectedIndex = -1;
     }
 }

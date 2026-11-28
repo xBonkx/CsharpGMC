@@ -245,6 +245,15 @@ public partial class ContractDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        if (SelectedKind() == "main" && !_preserveLegacyLegalMetadata &&
+            LegalAgreementPanel.Visibility == Visibility.Visible &&
+            LegalAgreementCombo.SelectedValue is not long)
+        {
+            MessageBox.Show(this, "Выберите юридический договор для приложения.",
+                "Реквизиты", MessageBoxButton.OK, MessageBoxImage.Warning);
+            LegalAgreementCombo.Focus();
+            return;
+        }
         var date = DateBox.Text.Trim();
         if (!Documents.IsValidDocumentDate(date))
         {

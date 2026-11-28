@@ -121,9 +121,10 @@ public partial class AgreementCardView : UserControl
         _saving = true;
         Fields.IsEnabled = SaveButton.IsEnabled = false;
         StatusText.Text = "Сохранение…";
+        long? savedLegalId;
         try
         {
-            await Task.Run(() => SqlServerWorkspace.SaveAgreementCard(_connection, _objectId, properties, print, snapshot.Revision, legal));
+            savedLegalId = await Task.Run(() => SqlServerWorkspace.SaveAgreementCard(_connection, _objectId, properties, print, snapshot.Revision, legal));
         }
         catch (Exception ex)
         {
@@ -131,7 +132,14 @@ public partial class AgreementCardView : UserControl
             return;
         }
         finally { _saving = false; }
-        if (IsLoaded) Saved?.Invoke();
+        // Read the exact saved identity, including a newly inserted legal card.
+        if (!IsLoaded) return;
+        if (await LoadCard(savedLegalId))
+        {
+            if (IsLoaded) Saved?.Invoke();
+        }
+        else if (IsLoaded)
+            StatusText.Text = "Реквизиты сохранены, но перечитывание не удалось. Откройте карточку заново.";
     }
 
     private bool HasUnsavedChanges() => _snapshot is { } snapshot &&

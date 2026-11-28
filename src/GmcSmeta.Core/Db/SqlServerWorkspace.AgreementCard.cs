@@ -84,12 +84,14 @@ public static partial class SqlServerWorkspace
 
     // One transaction for ordinary card properties and all shared print fields.
     // No contract rows, local KS site parts, acts, or historical files are changed.
-    public static void SaveAgreementCard(string connectionString, int objectId,
+    public static long? SaveAgreementCard(string connectionString, int objectId,
         ObjectProperties properties, SqlServerKsRequisites.Values print, string expectedRevision, SqlServerAgreements.Values? legal = null)
     {
         RequirePilotDatabase(connectionString);
         var clean = ValidateObject(properties);
         ValidateSharedPrint(objectId, print);
+        if (legal is not null && legal.ObjectId != objectId)
+            throw new ArgumentException("Договор относится к другому объекту.");
         using var conn = SqlServerDatabase.Open(connectionString);
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         CheckRevision(conn, tx, expectedRevision);
@@ -100,34 +102,39 @@ public static partial class SqlServerWorkspace
             if (archived is null or DBNull || Convert.ToBoolean(archived, CultureInfo.InvariantCulture))
                 throw new InvalidOperationException("Карточка удалена или находится в архиве.");
         }
+        // Legal-card signatories must not overwrite object-level fallback values.
+        var legacyPrintFields = legal is null
+            ? "customer_full=@customer_full,cust_org=@cust_org,cust_post=@cust_post,cust_name=@cust_name," +
+              "second_role=@second_role,second_org=@second_org,second_post=@second_post,second_name=@second_name," +
+              "work_title=@work_title,works_start=@works_start,"
+            : "";
         using var update = new SqlCommand(
             "UPDATE dbo.objects SET name=@name,customer=@customer,address=@address,folder=@folder,note=@note,form=@form," +
-            "customer_full=@customer_full,site_full=@site_full,cust_org=@cust_org,cust_post=@cust_post,cust_name=@cust_name," +
-            "second_role=@second_role,second_org=@second_org,second_post=@second_post,second_name=@second_name," +
-            "work_title=@work_title,works_start=@works_start WHERE id=@id", conn, tx);
+            legacyPrintFields + "site_full=@site_full WHERE id=@id", conn, tx);
         AddObjectFields(update, clean);
         update.Parameters.Add("@id", SqlDbType.BigInt).Value = objectId;
         void Set(string key, string value) => update.Parameters.Add(key, SqlDbType.NVarChar, -1).Value = value.Trim();
-        Set("@customer_full", print.CustomerFull);
         Set("@site_full", print.SiteFull);
-        Set("@cust_org", print.CustomerOrganization);
-        Set("@cust_post", print.CustomerPosition);
-        Set("@cust_name", print.CustomerName);
-        Set("@second_role", print.SecondRole);
-        Set("@second_org", print.SecondOrganization);
-        Set("@second_post", print.SecondPosition);
-        Set("@second_name", print.SecondName);
-        Set("@work_title", print.WorkTitle);
-        Set("@works_start", print.WorksStart);
-        if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Карточка больше не существует.");
-        if (legal is not null)
+        if (legal is null)
         {
-            if (legal.ObjectId != objectId) throw new ArgumentException("Договор относится к другому объекту.");
-            SqlServerAgreements.Save(conn, tx, legal with { Print = print });
+            Set("@customer_full", print.CustomerFull);
+            Set("@cust_org", print.CustomerOrganization);
+            Set("@cust_post", print.CustomerPosition);
+            Set("@cust_name", print.CustomerName);
+            Set("@second_role", print.SecondRole);
+            Set("@second_org", print.SecondOrganization);
+            Set("@second_post", print.SecondPosition);
+            Set("@second_name", print.SecondName);
+            Set("@work_title", print.WorkTitle);
+            Set("@works_start", print.WorksStart);
         }
+        if (update.ExecuteNonQuery() != 1) throw new DBConcurrencyException("Карточка больше не существует.");
+        long? savedLegalId = legal is null
+            ? null : SqlServerAgreements.Save(conn, tx, legal with { Print = print });
         Log(conn, tx, "object", objectId, "ks_requisites", "Обновлены общие реквизиты карточки договора", null, objectId);
         BumpRevision(conn, tx);
         tx.Commit();
+        return savedLegalId;
     }
 
     public static void ValidateSharedPrint(long objectId, SqlServerKsRequisites.Values print)
