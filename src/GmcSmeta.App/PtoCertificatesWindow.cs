@@ -32,9 +32,7 @@ public sealed class PtoCertificatesWindow : Window
         Title=pick?"Выберите подтверждающий документ":"ПТО · Библиотека сертификатов";
         Width=1050;Height=650;MinWidth=680;MinHeight=420;
         WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        WorkspaceWindowUi.ApplyChrome(this);
-        SetResourceReference(FontFamilyProperty,"UiFontFamily");
-        SetResourceReference(FontSizeProperty,"UiBodySize");
+        DynamicFormLayout.Apply(this);
         _grid.SetResourceReference(FrameworkElement.StyleProperty, "DocumentTable");
         _grid.SetResourceReference(DataGrid.RowStyleProperty,"PythonTableRow");
         var panel=new DockPanel{Margin=new Thickness(12)};
@@ -59,7 +57,7 @@ public sealed class PtoCertificatesWindow : Window
         }
         Button("Обновить",RefreshAsync,"IconLabelRefresh");
         _search.Margin=new Thickness(0);
-        _search.Height=32;
+        DynamicFormLayout.Field(_search);
         _search.SetResourceReference(FrameworkElement.StyleProperty,"PythonSearch");
         _search.Background=System.Windows.Media.Brushes.White;
         _search.BorderBrush=new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD0,0xD7,0xE2));
