@@ -9,7 +9,8 @@ from xml.parsers import expat
 
 METRICS = {"Margin", "Padding", "FontSize", "FontWeight", "FontFamily", "Width", "Height",
            "MinWidth", "MinHeight", "MaxWidth", "MaxHeight", "StrokeThickness", "Stretch",
-           "ContentTemplate", "HorizontalContentAlignment", "VerticalContentAlignment"}
+           "ContentTemplate", "HorizontalContentAlignment", "VerticalContentAlignment",
+           "HorizontalAlignment", "VerticalAlignment", "TextWrapping", "TextTrimming"}
 FIELDS = ["file", "line", "kind", "element", "attribute", "value", "context", "status"]
 GRID_FIELDS = ("Style", "CellStyle", "RowStyle", "ColumnHeaderStyle", "HeaderStyle",
                "ElementStyle", "EditingElementStyle", "HorizontalContentAlignment",
@@ -20,8 +21,24 @@ UI_CREATION = re.compile(r"\bnew\s+(?:FrameworkElementFactory|Thickness|Grid|Doc
 ASSIGNMENT = re.compile(r"\b(?P<key>Margin|Padding|FontSize|FontFamily|FontWeight|Height|Width|"
                         r"MinWidth|MinHeight|MaxWidth|MaxHeight|Stretch|StrokeThickness|"
                         r"CellStyle|RowStyle|ColumnHeaderStyle|HeaderStyle|ElementStyle|"
-                        r"EditingElementStyle|HorizontalContentAlignment|TextAlignment)\s*=\s*(?P<value>[^;\r\n]{1,200})")
-PROPERTY_API = re.compile(r"\b(?:SetValue|SetBinding|ClearValue)\s*\([^;\r\n]{1,200}")
+                        r"EditingElementStyle|HorizontalContentAlignment|VerticalContentAlignment|"
+                        r"VerticalAlignment|TextAlignment|TextWrapping|TextTrimming)\s*=\s*(?P<value>[^;\r\n]{1,200})")
+PROPERTY_API = re.compile(r"\b(?:SetValue|SetBinding|ClearValue|SetResourceReference)\s*\([^;\r\n]{1,200}")
+FRAME_TAGS = {"Border", "SummaryTableFrame"}
+TEMPLATE_BOUNDARY = {"ControlTemplate", "DataTemplate", "ItemsPanelTemplate", "Popup", "ContextMenu"}
+
+def inset_candidate(attrs):
+    value = attrs.get("Padding", "")
+    if value.startswith(("{StaticResource ", "{DynamicResource ", "{Binding ")):
+        return value if "LayoutNoInset" not in value else ""
+    if value:
+        try:
+            return value if any(float(part.strip()) != 0 for part in value.split(",")) else ""
+        except ValueError:
+            return value
+    # A style may own its padding; do not pretend to resolve WPF precedence.
+    style = attrs.get("Style", "")
+    return "style: " + style if style else ""
 PAIR_FIELDS = ("database", "fixture_id", "object_id", "document_id", "data_fingerprint",
                "role", "permissions", "signed", "smr_mode", "columns_profile", "page", "state",
                "app_scale", "table_zoom", "dpi_x", "dpi_y", "window_width_px", "window_height_px")
@@ -53,8 +70,20 @@ def xaml_inventory(source, file):
                 role = "RESOURCE" if value.startswith(("{StaticResource ", "{DynamicResource ")) else "REVIEW"
                 rows.append(finding(file, line, "xaml-metric", tag, key, value, context, role))
         if tag == "Setter" and attrs.get("Property", "").rsplit(".", 1)[-1] in METRICS:
-            rows.append(finding(file, line, "xaml-setter", tag, attrs["Property"],
-                                attrs.get("Value", "(element value)"), context))
+            value = attrs.get("Value", "(element value)")
+            role = "RESOURCE" if value.startswith(("{StaticResource ", "{DynamicResource ")) else "REVIEW"
+            rows.append(finding(file, line, "xaml-setter", tag, attrs["Property"], value, context, role))
+        if tag in FRAME_TAGS and inset_candidate(attrs):
+            # Include indirect ancestors through layout panels; never combine
+            # independent template/popup visual trees as if their insets add up.
+            for parent_label, parent_tag, parent_attrs in reversed(stack):
+                if parent_tag in TEMPLATE_BOUNDARY:
+                    break
+                if parent_tag in FRAME_TAGS and inset_candidate(parent_attrs):
+                    rows.append(finding(file, line, "nested-frame-inset", tag, "Padding",
+                                        parent_label + ": " + inset_candidate(parent_attrs) + " -> " + inset_candidate(attrs),
+                                        context, "REVIEW_OWNERSHIP"))
+                    break
         if tag == "Path":
             parents = [(t, a) for _, t, a in stack]
             view = next((a for t, a in reversed(parents) if t == "Viewbox"), None)
@@ -104,7 +133,8 @@ def cs_inventory(source, file):
         for match in ASSIGNMENT.finditer(content):
             rows.append(finding(file, line, "cs-assignment", "C#", match["key"], match["value"], content))
         for match in PROPERTY_API.finditer(content):
-            rows.append(finding(file, line, "cs-property-api", "C#", "dependency-property", match.group(), content))
+            role = "RESOURCE" if match.group().startswith("SetResourceReference") else "REVIEW"
+            rows.append(finding(file, line, "cs-property-api", "C#", "dependency-property", match.group(), content, role))
     return rows
 
 
@@ -126,7 +156,15 @@ def inventory(root, output):
         writer = csv.DictWriter(stream, fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(rows)
-    return {"design_findings": len(rows), "design_parse_errors": sum(r["status"] == "ERROR" for r in rows)}
+    review = [r for r in rows if r["kind"] in {"nested-frame-inset", "xaml-setter", "xaml-metric", "cs-assignment", "cs-property-api"}
+              and r["status"] != "RESOURCE"]
+    with (output / "layout-review.csv").open("w", encoding="utf-8-sig", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(review)
+    return {"design_findings": len(rows), "layout_review_candidates": len(review),
+            "nested_frame_candidates": sum(r["kind"] == "nested-frame-inset" for r in rows),
+            "design_parse_errors": sum(r["status"] == "ERROR" for r in rows)}
 
 
 def validate_pair(before, after):
@@ -181,6 +219,12 @@ def self_test():
     rows = cs_inventory("var p = new StackPanel { Margin = new Thickness(8) };\n"
                         "factory.SetValue(Control.FontSizeProperty, 14);", "fixture.cs")
     assert {r["kind"] for r in rows} == {"cs-creation", "cs-assignment", "cs-property-api"}
+    nested = xaml_inventory('<Border Padding="12"><Grid><Border Padding="8"/><Border Padding="0"/>'
+                            '<DataTemplate><Border Padding="6"/></DataTemplate></Grid></Border>', "nested.xaml")
+    candidates = [r for r in nested if r["kind"] == "nested-frame-inset"]
+    assert len(candidates) == 1 and candidates[0]["status"] == "REVIEW_OWNERSHIP"
+    refs = cs_inventory('panel.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormFieldMargin");', "fixture.cs")
+    assert any(r["kind"] == "cs-property-api" and r["status"] == "RESOURCE" for r in refs)
     record = {key: "sample" for key in PAIR_FIELDS}
     record.update(database="GmcSmetaPilot_Visual", data_fingerprint="a" * 64, signed=False, sha="test", png="test.png",
                   dpi_x=96, dpi_y=96, app_scale=1, table_zoom=1, window_width_px=1920, window_height_px=1080)
