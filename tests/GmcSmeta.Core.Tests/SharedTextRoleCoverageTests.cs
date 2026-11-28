@@ -76,4 +76,17 @@ public sealed class SharedTextRoleCoverageTests
         Assert.Equal("{Binding}", (string?)text.Attribute("ToolTip"));
         Assert.Null(text.Attribute("TextTrimming"));
     }
+    [Theory]
+    [InlineData("ReferenceWindowUi.cs")]
+    [InlineData("AttachmentWindow.cs")]
+    [InlineData("WorkspaceReferenceWindows.cs")]
+    [InlineData("MetalRegisterWindow.cs")]
+    public void DynamicSecondaryLabelsDoNotUseLegacySlateGray(string file)
+    {
+        var source = File.ReadAllText(Path.Combine(AppDirectory(), file));
+        Assert.DoesNotContain("Brushes.SlateGray", source);
+        Assert.True(source.Contains("UiMutedTextBrush", StringComparison.Ordinal) ||
+            source.Contains("DynamicFormLayout.Secondary(", StringComparison.Ordinal));
+    }
+
 }
