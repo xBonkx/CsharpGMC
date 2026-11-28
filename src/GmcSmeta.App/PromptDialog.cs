@@ -55,26 +55,26 @@ public sealed class PromptDialog : Window
         footer.Child = actions;
         root.Children.Add(footer);
 
-        var form = new StackPanel { Margin = new Thickness(20, 18, 20, 18) };
+        var form = new StackPanel();
+        form.SetResourceReference(FrameworkElement.MarginProperty, "LayoutFormDialogMargin");
         var heading = new TextBlock
         {
-            Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
+            Text = title
         };
+        heading.SetResourceReference(StyleProperty, "UiHeadingText");
+        heading.SetResourceReference(FrameworkElement.MarginProperty, "LayoutDialogIntroGap");
         heading.SetResourceReference(TextBlock.FontSizeProperty, "UiH2Size");
         form.Children.Add(heading);
-        var caption = new TextBlock
-        {
-            Text = label, Foreground = Brush("#475569"), TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 6)
-        };
+        var caption = DynamicFormLayout.Secondary(label, "LayoutFormGroupHeadingGap");
         form.Children.Add(caption);
         Box = new TextBox
         {
-            Text = value, MinHeight = 34, Padding = new Thickness(10, 4, 10, 4),
+            Text = value,
             VerticalContentAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.NoWrap
         };
+        DynamicFormLayout.Field(Box);
+        Box.SetResourceReference(Control.PaddingProperty, "LayoutFieldPadding");
         AutomationProperties.SetName(Box, label);
         Box.KeyDown += (_, e) =>
         {
