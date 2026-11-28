@@ -54,6 +54,13 @@ internal static class Program
                 auditApp.Shutdown();
                 return 0;
             }
+            if (args.Length == 2 && args[0] == "--layout-performance-check")
+            {
+                var layoutApp = CreateApplication();
+                try { LayoutPerformanceChecks.Run(args[1]); }
+                finally { layoutApp.Shutdown(); }
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--offline-check")
             {
                 var offline = CreateApplication();

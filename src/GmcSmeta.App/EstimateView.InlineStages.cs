@@ -230,8 +230,18 @@ public partial class EstimateView
     private static readonly string[] StageInk =
     [ "#1D4ED8", "#15803D", "#7E22CE", "#B45309", "#0E7490", "#BE185D" ];
 
-    private static Brush StageBrush(string hex) =>
-        new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+    // The palette is shared by headers, cell styles and selection/card buttons.
+    // Freezing makes the cached brush safe to reuse without per-element
+    // change notifications; color and per-control state remain unchanged.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Brush> StageBrushes =
+        new(StringComparer.Ordinal);
+
+    private static Brush StageBrush(string hex) => StageBrushes.GetOrAdd(hex, static key =>
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(key));
+        brush.Freeze();
+        return brush;
+    });
 
     private static string ShortStageName(string name)
     {
