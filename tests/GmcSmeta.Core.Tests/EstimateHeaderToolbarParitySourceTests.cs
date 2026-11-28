@@ -24,7 +24,8 @@ public sealed class EstimateHeaderToolbarParitySourceTests
             row.Elements().Select(e => (string?)e.Attribute(x + "Name")).ToArray());
         var header = Named("DocumentHeaderLayout");
         Assert.Equal("420", (string?)header.Attribute("MinimumLeftWidth"));
-        Assert.Equal("{StaticResource LayoutPageHeaderPadding}", (string?)header.Parent!.Attribute("Padding"));
+        Assert.Equal("{StaticResource LayoutPageHeaderPadding}", (string?)header.Attribute("Margin"));
+        Assert.Equal("Grid", header.Parent!.Name.LocalName);
         Assert.Equal("{StaticResource LayoutHeaderTitleGap}", (string?)Named("TitleText").Parent!.Attribute("Margin"));
         Assert.Equal("{StaticResource UiValueSize}", (string?)Named("TitleText").Attribute("FontSize"));
         var metrics = XDocument.Parse(Source("Theme/LayoutMetrics.xaml"));

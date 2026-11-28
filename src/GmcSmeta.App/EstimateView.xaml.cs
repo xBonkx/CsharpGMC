@@ -1286,7 +1286,7 @@ public partial class EstimateView : UserControl
         ToggleTotalsButton.ToolTip = hidden
             ? "Показать плитки с итогами"
             : "Свернуть итоги в одну строку — таблице больше места";
-        TotalsFooterPanel.Padding = (Thickness)FindResource(hidden
+        TotalsFooterPanel.Margin = (Thickness)FindResource(hidden
             ? "LayoutDocumentFooterCompactPadding" : "LayoutDocumentFooterPadding");
         if (!hidden) LayoutTotalsCards();
         System.Windows.Automation.AutomationProperties.SetName(ToggleTotalsButton, description);

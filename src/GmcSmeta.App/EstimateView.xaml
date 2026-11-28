@@ -435,9 +435,9 @@
         <!-- Python kp_editor.py: Page background and 24/18 margin; no white header strip.
              Line 1: object crumb + chips «КП» / организация / замок; line 2: title + pencil.
              Buttons top-right: Отменить · Вернуть · Помощь · Действия · Сохранить в Excel / PDF. -->
-        <Border Grid.Row="0" Background="Transparent" BorderThickness="0"
-                Padding="{StaticResource LayoutPageHeaderPadding}">
-            <local:ResponsiveToolbarPanel x:Name="DocumentHeaderLayout" MinimumLeftWidth="420">
+        <local:ResponsiveToolbarPanel x:Name="DocumentHeaderLayout" Grid.Row="0"
+                                       Background="Transparent" Margin="{StaticResource LayoutPageHeaderPadding}"
+                                       MinimumLeftWidth="420">
                 <StackPanel VerticalAlignment="Top">
                     <local:DocumentCrumbPanel x:Name="DocumentCrumbRow" MinHeight="{StaticResource LayoutHeaderChipMinHeight}" ClipToBounds="True">
                         <TextBlock x:Name="SubtitleText" local:DocumentCrumbPanel.CanShrink="True" Margin="0,0,10,0" MaxWidth="300" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
@@ -498,8 +498,7 @@
                     <Button x:Name="ExportButton" Style="{StaticResource PythonToolbarPrimary}" Content="Сохранить в Excel / PDF" ContentTemplate="{StaticResource IconLabelDownload}" Click="ExportExcelPdf_Click"
                             ToolTip="Выгрузка сметы в Excel и PDF (Ctrl+E)" MinHeight="{StaticResource LayoutHeaderActionMinHeight}" VerticalAlignment="Center"/>
                 </WrapPanel>
-            </local:ResponsiveToolbarPanel>
-        </Border>
+        </local:ResponsiveToolbarPanel>
 
         <!-- Python parity: contract navigation differs from KP navigation. -->
         <Border Grid.Row="1" Background="#F4F6FA" Padding="{StaticResource LayoutDocumentTabsPadding}">
@@ -985,9 +984,8 @@
 
         <!-- Итоги: Python kp_editor tot_bar + 4 tiles (Материалы / Монтаж · СМР /
              Дополнительные расходы / ИТОГО с НДС) в один ряд. -->
-        <Border x:Name="TotalsFooterPanel" Grid.Row="5" Padding="{StaticResource LayoutDocumentFooterPadding}" Background="Transparent"
-                BorderThickness="0">
-            <DockPanel LastChildFill="True">
+        <DockPanel x:Name="TotalsFooterPanel" Grid.Row="5" Margin="{StaticResource LayoutDocumentFooterPadding}"
+                   Background="Transparent" LastChildFill="True">
                 <Button x:Name="ToggleTotalsButton" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="10,0,0,0"
                         Style="{StaticResource DocumentFlatTool}" MinHeight="30"
                         Content="Скрыть итоги" ContentTemplate="{StaticResource IconLabelArrowDown}"
@@ -1024,24 +1022,20 @@
                 <Border x:Name="ExpensesCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
                         <TextBlock Text="Дополнительные расходы" Style="{StaticResource CardCaption}"/>
-                        <Border x:Name="TransportCard" Margin="0,2,0,0">
-                            <Grid>
+                        <Grid x:Name="TransportCard" Margin="{StaticResource LayoutHeaderTitleGap}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="TransportCaption" Text="Транспорт, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBox x:Name="TransportEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"
                                          KeyDown="TotalsEdit_KeyDown" LostFocus="TransportEdit_Commit"
                                          ToolTip="Транспорт: сумма (Enter — сохранить)"/>
                             </Grid>
-                        </Border>
-                        <Border x:Name="PnrCard" Margin="0,2,0,0">
-                            <Grid>
+                        <Grid x:Name="PnrCard" Margin="{StaticResource LayoutHeaderTitleGap}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="Пусконаладка, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBox x:Name="PnrEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"
                                          KeyDown="TotalsEdit_KeyDown" LostFocus="PnrEdit_Commit"
                                          ToolTip="Пусконаладка: сумма (Enter — сохранить)"/>
                             </Grid>
-                        </Border>
                     </StackPanel>
                 </Border>
                 <Border x:Name="TotalCard" Style="{StaticResource PythonTileAccent}" MinWidth="0">
@@ -1059,7 +1053,6 @@
                     </local:EstimateTotalsCardsPanel>
                     </ScrollViewer>
                 </Grid>
-            </DockPanel>
-        </Border>
+        </DockPanel>
     </Grid>
 </UserControl>

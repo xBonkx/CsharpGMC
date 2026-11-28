@@ -63,6 +63,10 @@ public sealed class EstimateFooterSourceTests
         Assert.Equal("True", (string?)toggle.Parent!.Attribute("LastChildFill"));
         Assert.Equal("10,0,0,0", (string?)toggle.Attribute("Margin"));
         Assert.Equal("5", (string?)Named("TotalsFooterPanel").Attribute("Grid.Row"));
+        Assert.Equal(w + "DockPanel", Named("TotalsFooterPanel").Name);
+        Assert.Equal("{StaticResource LayoutDocumentFooterPadding}", (string?)Named("TotalsFooterPanel").Attribute("Margin"));
+        Assert.Equal(w + "Grid", Named("TransportCard").Name);
+        Assert.Equal(w + "Grid", Named("PnrCard").Name);
         Assert.Equal(4, cards.Elements(w + "Border").Count());
         Assert.All(cards.Elements(w + "Border"), card => Assert.Null(card.Attribute("Margin")));
         var metrics = XDocument.Load(Path.Combine(app, "Theme", "LayoutMetrics.xaml"));
@@ -78,6 +82,7 @@ public sealed class EstimateFooterSourceTests
         Assert.Equal(new[] { "#2563EB", "#4F46E5" }, accent.Descendants(w + "GradientStop")
             .Select(e => (string?)e.Attribute("Color")).ToArray());
         var code = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
+        Assert.Contains("TotalsFooterPanel.Margin = (Thickness)FindResource(hidden", code);
         Assert.Contains("LayoutDocumentFooterCompactPadding", code);
         Assert.Contains("if (!hidden) LayoutTotalsCards();", code);
         Assert.Contains("_uiSettings.TotalsHidden = hidden;", code);

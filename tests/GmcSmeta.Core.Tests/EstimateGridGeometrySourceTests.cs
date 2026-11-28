@@ -118,7 +118,7 @@ public sealed class EstimateGridGeometrySourceTests
         Assert.Equal(new[] { "Auto", "*" }, widths);
         var button = Assert.Single(grid.Elements(p + "Button"));
         Assert.Equal("0", (string?)button.Attribute("Grid.Column"));
-        Assert.Equal("16", (string?)button.Attribute("Width"));
+        Assert.Equal("22", (string?)button.Attribute("Width"));
         Assert.Equal("{Binding IsExpandable, Converter={StaticResource OnlySystems}}", (string?)button.Attribute("Visibility"));
         Assert.Equal("ToggleSection_Click", (string?)button.Attribute("Click"));
         var label = Assert.Single(grid.Elements(p + "TextBlock"));
