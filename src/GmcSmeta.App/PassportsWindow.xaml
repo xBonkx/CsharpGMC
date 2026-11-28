@@ -8,8 +8,8 @@
     <DockPanel Margin="12">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="Одна строка — одна система. Ctrl+V вставляет таблицу из Excel с выбранной ячейки. Фактические замеры не вычисляются автоматически."
-                       Foreground="#64748B" TextWrapping="Wrap"/>
-            <TextBlock x:Name="ArchiveLabel" Margin="0,4,0,8" Foreground="#64748B" TextWrapping="Wrap"/>
+                       Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ArchiveLabel" Margin="0,4,0,8" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap"/>
             <StackPanel x:Name="HeaderActions" IsEnabled="False">
             <WrapPanel Margin="0,0,0,4">
                 <Button Style="{StaticResource PythonToolbarButton}" Content="Выбрать архив…" Padding="11,6" Margin="0,0,7,5" Click="Root_Click"/>
@@ -85,14 +85,14 @@
                 </TabItem>
                 <TabItem Header="Оборудование">
                     <DockPanel Margin="12">
-                        <TextBlock DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#64748B" Margin="0,8,0,0"
+                        <TextBlock DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="{StaticResource UiMutedTextBrush}" Margin="0,8,0,0"
                                    Text="Модели и параметры запоминаются при сохранении. Подача вентилятора Е.1.1 рассчитывается из Е.2. Е.1.7 всегда остаётся пустой."/>
                         <StackPanel DockPanel.Dock="Bottom">
                             <Grid Margin="0,7,0,7">
                                 <TextBox x:Name="EquipmentNotes" MinHeight="32" Padding="10,5"
                                          AutomationProperties.Name="Примечания к оборудованию"
                                          ToolTip="Примечания к оборудованию"/>
-                                <TextBlock Text="Примечания к оборудованию" Foreground="#94A3B8" Margin="10,0,10,0"
+                                <TextBlock Text="Примечания к оборудованию" Foreground="{StaticResource UiMutedTextBrush}" Margin="10,0,10,0"
                                            VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -135,7 +135,7 @@
                         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Добавить точку" Padding="12,6" Margin="0,0,8,0" Click="AddPoint_Click"/>
                             <Button Style="{StaticResource PythonToolbarButton}" Content="Удалить точку" Padding="12,6" Margin="0,0,8,0" Click="DeletePoint_Click"/>
-                            <TextBlock Text="Вставка Excel: Ctrl+V с выбранной ячейки" Foreground="#64748B" VerticalAlignment="Center"/>
+                            <TextBlock Text="Вставка Excel: Ctrl+V с выбранной ячейки" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center"/>
                         </WrapPanel>
                         <DataGrid local:TableColumnMenu.Key="passport-points" x:Name="PointsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
                                   HeadersVisibility="Column" SelectionUnit="CellOrRowHeader"
