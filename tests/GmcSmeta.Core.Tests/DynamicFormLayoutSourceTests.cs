@@ -45,6 +45,24 @@ public sealed class DynamicFormLayoutSourceTests
         Assert.Contains("_smr.Visibility=_whole.Visibility=_onTotal?Visibility.Collapsed:Visibility.Visible", source);
     }
 
+    [Theory]
+    [InlineData("ActDiscountDialog.cs", "_save", "LayoutFormStackedFieldGap")]
+    [InlineData("EstimateDiscountDialog.cs", "_apply", "LayoutFormColumnGap")]
+    [InlineData("CostTransportDialog.cs", "save", "LayoutFormColumnGap")]
+    public void FinancialFormsUseResponsiveFieldAndActionRoles(string file, string action, string layoutKey)
+    {
+        var source = Source(file);
+        Assert.Contains("ResizeMode.CanResize", source);
+        Assert.Contains("DynamicFormLayout.Field(", source);
+        Assert.Contains("new WrapPanel", source);
+        Assert.Contains("DynamicFormLayout.StyleActions(" + action + ",", source);
+        Assert.Contains(layoutKey, source);
+        Assert.Contains("LayoutDialogActionGap", source);
+        Assert.Contains("AutomationProperties.SetName(", source);
+        Assert.Contains("HorizontalContentAlignment", source);
+        Assert.DoesNotContain("new Thickness(", source);
+    }
+
     [Fact]
     public void KsAdditionalAgreementFieldGrowsWithScroll()
     {
@@ -70,7 +88,7 @@ public sealed class DynamicFormLayoutSourceTests
     {
         var source = Source("DynamicFormLayout.cs");
         Assert.Contains("WorkspaceWindowUi.ApplyChrome(window)", source);
-        Assert.Contains("body.Margin = new Thickness(0)", source);
+        Assert.Contains("body.SetResourceReference(FrameworkElement.MarginProperty, \"LayoutNoInset\")", source);
         Assert.Contains("DockPanel.SetDock(footer, Dock.Bottom)", source);
         Assert.Contains("VerticalScrollBarVisibility = ScrollBarVisibility.Auto", source);
         Assert.Contains("AutomationProperties.SetName(control, caption)", source);
