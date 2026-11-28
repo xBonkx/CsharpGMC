@@ -48,7 +48,7 @@
         <local:SummaryTableFrame Background="White" CornerRadius="12" BorderThickness="1"
                                  Padding="{StaticResource LayoutTotalsTablePadding}" BorderBrush="#E4E8EF">
         <DataGrid local:TableColumnMenu.Key="estimate-totals" x:Name="TotalsGrid" AutoGenerateColumns="False" IsReadOnly="False"
-                  MinRowHeight="{StaticResource LayoutTotalsRowHeight}" FontSize="14"
+                  MinRowHeight="{StaticResource LayoutTotalsRowHeight}" FontSize="{StaticResource UiTotalsTableSize}"
                   CellStyle="{StaticResource TotalsArticleCell}" RowStyle="{StaticResource TotalsPageRow}" ColumnHeaderStyle="{StaticResource TotalsArticleHeader}"
                   SelectionMode="Single" SelectionUnit="Cell"
                   EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling"
