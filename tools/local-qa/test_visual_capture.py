@@ -38,6 +38,34 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             vc.png_bytes(2,1,b"")
 
+    def test_capture_rgb_roundtrip_and_crop(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "capture.png"
+            rgb = bytes([255,0,0, 0,255,0, 0,0,255, 255,255,255])
+            path.write_bytes(vc.rgb_png(2,2,rgb))
+            self.assertEqual(vc.read_capture_rgb(path), (2,2,rgb))
+            self.assertEqual(vc.crop_rgb(2,2,rgb,(1,0,1,2)), (1,2,bytes([0,255,0,255,255,255])))
+            with self.assertRaises(ValueError):
+                vc.crop_rgb(2,2,rgb,(1,1,2,2))
+            corrupt = bytearray(path.read_bytes())
+            corrupt[-5] ^= 1
+            path.write_bytes(corrupt)
+            with self.assertRaises(ValueError):
+                vc.read_capture_rgb(path)
+
+    def test_raster_difference_is_not_acceptance(self):
+        before = bytes([0]*12)
+        after = bytes([0,0,0, 5,0,0, 0,0,0, 0,0,7])
+        result, diff = vc.compare_rgb(2,2,before,after)
+        self.assertEqual(diff, after)
+        self.assertEqual(result["different_pixels"], 2)
+        self.assertEqual(result["difference_bounds_xywh"], [1,0,1,2])
+        self.assertEqual(result["mean_absolute_channel_difference_0_255"], 1)
+        self.assertEqual(result["status"], "RASTER_DIFFERENCE_NOT_VISUAL_ACCEPTANCE")
+        result, _ = vc.compare_rgb(2,2,before,before)
+        self.assertIsNone(result["difference_bounds_xywh"])
+        self.assertEqual(result["different_fraction"], 0)
+
     def test_refuse_nonpilot_cutover_and_unconfirmed(self):
         base = dict(page="estimate",state="normal",app_scale=1,sha="a"*40,
                     database="GmcSmetaPilot_Test",synthetic_fixture_confirmed=True,
