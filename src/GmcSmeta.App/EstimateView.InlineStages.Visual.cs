@@ -54,22 +54,26 @@ public partial class EstimateView
         {
             Text = name, FontWeight = FontWeights.SemiBold,
             Foreground = StageBrush("#334155"),
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextWrapping = TextWrapping.Wrap, ToolTip = name
         });
         body.Children.Add(heading);
-        body.Children.Add(new TextBlock
+        var amountText = new TextBlock
         {
             Text = amount, FontWeight = FontWeights.SemiBold,
-            Foreground = StageBrush("#0F172A"), FontSize = (double)FindResource("UiBodySize"),
-            Margin = new Thickness(0, 2, 0, 1),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-        body.Children.Add(new TextBlock
+            Foreground = StageBrush("#0F172A"),
+            TextWrapping = TextWrapping.Wrap, ToolTip = amount
+        };
+        amountText.SetResourceReference(TextBlock.FontSizeProperty, "UiBodySize");
+        amountText.SetResourceReference(FrameworkElement.MarginProperty, "LayoutStageCardValueGap");
+        body.Children.Add(amountText);
+        var statusText = new TextBlock
         {
-            Text = status, Foreground = warning ? StageBrush("#B91C1C") : (Brush)FindResource("UiMutedTextBrush"),
-            FontSize = (double)FindResource("UiCaptionSize"),
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
+            Text = status, TextWrapping = TextWrapping.Wrap, ToolTip = status
+        };
+        statusText.SetResourceReference(TextBlock.FontSizeProperty, "UiCaptionSize");
+        if (warning) statusText.Foreground = StageBrush("#B91C1C");
+        else statusText.SetResourceReference(TextBlock.ForegroundProperty, "UiMutedTextBrush");
+        body.Children.Add(statusText);
         var button = new Button
         {
             Style = (Style)FindResource("PythonToolbarButton"),
