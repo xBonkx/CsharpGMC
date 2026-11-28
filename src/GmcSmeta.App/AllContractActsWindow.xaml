@@ -20,7 +20,7 @@
         <DataTemplate DataType="{x:Type local:Ks2RowVm}">
             <StackPanel Margin="4,3">
                 <TextBlock Text="{Binding Title}" Foreground="#0F172A" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding Caption}" Foreground="#64748B" TextWrapping="Wrap" FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
+                <TextBlock Text="{Binding Caption}" Foreground="{StaticResource UiMutedTextBrush}" TextWrapping="Wrap" FontSize="{StaticResource UiCaptionSize}" Margin="0,2,0,0"/>
             </StackPanel>
         </DataTemplate>
         <Style TargetType="TreeViewItem">
@@ -35,7 +35,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,9">
-            <TextBlock x:Name="ScopeTitle" Foreground="#64748B" VerticalAlignment="Center"
+            <TextBlock x:Name="ScopeTitle" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center"
                        Margin="0,0,14,0" TextTrimming="CharacterEllipsis"
                        MaxWidth="420" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             <Button Content="Открыть выбранную КС-2" ContentTemplate="{StaticResource IconLabelFile}" Style="{StaticResource PythonToolbarMain}"
@@ -50,7 +50,7 @@
                          VerticalContentAlignment="Center" TextChanged="ActsSearch_Changed"
                          AutomationProperties.Name="Найти акт или приложение" ToolTip="Найти акт или приложение…"/>
                 <Viewbox Width="18" Height="18" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0"><Canvas Width="24" Height="24"><Path Style="{StaticResource SvgGlyphPath}" Data="{StaticResource GlyphSearch}" Stroke="#64748B"/></Canvas></Viewbox>
-                <TextBlock Text="Найти акт или приложение…" Foreground="#94A3B8" Margin="32,0,32,0"
+                <TextBlock Text="Найти акт или приложение…" Foreground="{StaticResource UiMutedTextBrush}" Margin="32,0,32,0"
                            VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -86,7 +86,7 @@
                 <ComboBoxItem Content="Черновики" Tag="draft"/>
                 <ComboBoxItem Content="Подписанные" Tag="signed"/>
             </ComboBox>
-            <TextBlock x:Name="OverviewStatus" Foreground="#64748B" VerticalAlignment="Center" Margin="14,0,0,0"
+            <TextBlock x:Name="OverviewStatus" Foreground="{StaticResource UiMutedTextBrush}" VerticalAlignment="Center" Margin="14,0,0,0"
                        TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
         </WrapPanel>
         <Grid Grid.Row="2">
