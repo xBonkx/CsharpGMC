@@ -117,6 +117,15 @@ internal static class AgreementAcceptance
         var secondLegal=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)obj)).LegalCards.Single(c=>c.Id!=id);
         var secondAnnex=SqlServerWorkspace.CreateEmptyContract(connection,obj,
             new("main",secondLegal.Number,secondLegal.Date,"Second legal annex",null,null){AgreementId=secondLegal.Id},Revision());
+        var beforeCardRead=Revision();
+        var firstCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)obj),id);
+        var secondCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)obj),secondLegal.Id);
+        var newCard=SqlServerWorkspace.ReadAgreementCard(connection,checked((int)obj),0);
+        if(!firstCard.Documents.Select(d=>(long)d.Document.Id).ToHashSet().SetEquals(new[]{document,ds}) ||
+            !secondCard.Documents.Select(d=>(long)d.Document.Id).ToHashSet().SetEquals(new[]{secondAnnex}) ||
+            newCard.Documents.Count!=0 || Revision()!=beforeCardRead)
+            throw new Exception("Legal card annex list leaked another agreement or modified data.");
+        Console.WriteLine("PASS legal card annex scope and new empty card.");
         var afterDirectorRevision=Revision();
         var directorAfter=SqlServerDirector.DirectorRows(connection,"contracts").Single(r=>r.ObjectId==obj);
         if(directorAfter.LegalScope is not {AgreementCount:2,LinkedDocumentCount:3,UnlinkedDocumentCount:0}||

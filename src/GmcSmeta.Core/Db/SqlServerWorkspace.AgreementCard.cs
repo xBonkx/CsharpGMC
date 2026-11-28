@@ -48,7 +48,13 @@ public static partial class SqlServerWorkspace
             var companies = Companies(conn).ToDictionary(c => c.Id, c => c.Name);
             string CompanyName(long? id) => id is long key && companies.TryGetValue(key, out var name) ? name : "";
             var company = CompanyName(agreement?.CompanyId);
+            // Legal identity is explicit, never inferred from number/date or
+            // the first agreement on the construction object. A new legal
+            // card has no annexes yet. Legacy object-wide behavior remains.
+            var legalDocumentIds = enabled && selected is not null
+                ? ReadAgreementDocumentIds(conn, objectId, selected.Id) : new HashSet<long>();
             var documents = metadata.Where(d => d.Kind is "main" or "dop")
+                .Where(d => !enabled || legalDocumentIds.Contains(d.Id))
                 .Select(d => new AgreementCardDocument(d, CompanyName(d.CompanyId))).ToArray();
             var tags = ObjectTags(conn, properties.Form);
             var signedPdf = selected is null ? "" : SqlServerAgreementFiles.Latest(conn, selected.Id);
@@ -57,6 +63,20 @@ public static partial class SqlServerWorkspace
                 return new(properties, print, agreement, company, tags, revision) { Documents = documents, SignedLegalPdf = signedPdf, LegalEnabled = enabled, LegalCards = cards, SelectedLegal = selected, LegalCompanies = legalCompanies };
         }
         throw new InvalidOperationException("Реквизиты изменились во время чтения. Откройте страницу заново.");
+    }
+
+    private static HashSet<long> ReadAgreementDocumentIds(SqlConnection conn, long objectId, long legalId)
+    {
+        using var cmd = new SqlCommand(
+            "SELECT c.id FROM dbo.contracts c JOIN dbo.agreements a ON a.id=c.agreement_id " +
+            "WHERE c.object_id=@object AND a.object_id=@object AND a.id=@legal AND a.archived=0 " +
+            "AND c.kind IN (N'main',N'dop')", conn);
+        cmd.Parameters.Add("@object", SqlDbType.BigInt).Value = objectId;
+        cmd.Parameters.Add("@legal", SqlDbType.BigInt).Value = legalId;
+        using var reader = cmd.ExecuteReader();
+        var ids = new HashSet<long>();
+        while (reader.Read()) ids.Add(SqlInteger.ReadInt64(reader, 0));
+        return ids;
     }
 
     // One transaction for ordinary card properties and all shared print fields.

@@ -58,7 +58,7 @@ public partial class AgreementCardView : UserControl
             SourceGrid.ItemsSource = snapshot.Documents;
             SourceExpander.IsExpanded = agreement is null;
             SourceExpander.Visibility = snapshot.Documents.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-            if (snapshot.Documents.Count == 0)
+            if (snapshot.Documents.Count == 0 && !snapshot.LegalEnabled)
                 AgreementText.Text = "Приложений пока нет. Самостоятельные юридические реквизиты карточки ещё не поддерживаются.";
             NameBox.Text = p.Name;
             CustomerBox.Text = p.Customer;
