@@ -103,6 +103,7 @@ internal sealed class ProcurementShopOrderPreview : Window
         Column("Ед.", nameof(PrintRow.Unit), 60);
         Column("Кол-во", nameof(PrintRow.Quantity), 100);
         Column("Примечание", nameof(PrintRow.Note), 220);
+        PreviewGridPaste.Install<PrintRow>(_grid, nameof(PrintRow.Name), nameof(PrintRow.Unit), nameof(PrintRow.Quantity), nameof(PrintRow.Note));
         TableColumnMenu.SetProtect(_grid, "Наименование|Ед.|Кол-во");
         TableColumnMenu.SetKey(_grid, "procurement-shop-preview");
         Grid.SetRow(_grid, 2);
