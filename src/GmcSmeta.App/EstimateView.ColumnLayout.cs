@@ -95,7 +95,9 @@ public partial class EstimateView
         // WPF's horizontal viewport is measured in DIPs for the DataGrid.
         // Keep 2 DIP for rounding/grid chrome, as in Python common.setup_columns.
         var viewport = scroll?.ViewportWidth ?? 0;
-        if (!double.IsFinite(viewport) || viewport < 300) return;
+        // A very narrow viewport still uses the readable minima rather than
+        // keeping a stale wide layout from before the sidebar was opened.
+        if (!double.IsFinite(viewport) || viewport <= 0) return;
         var visible = _defaultEstimateColumns.Where(c => c.Visibility == Visibility.Visible).ToList();
         if (visible.Count == 0) return;
 

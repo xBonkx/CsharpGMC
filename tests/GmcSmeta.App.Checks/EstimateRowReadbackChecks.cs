@@ -75,9 +75,57 @@ internal static class EstimateRowReadbackChecks
         first.FillArea();
         if (changed.Count != 0) throw new Exception("Repeated clean readback emitted notifications.");
         CheckMissingWorkPrice(first.Source);
+        CheckMissingGroupPrices(first.Source);
+        CheckNameIndent(first.Source);
         CheckStagePresentation(rows);
         CheckParsedNumericText(first.Source);
         Console.WriteLine("Estimate formatted readback and area notifications OK (25000 rows).");
+    }
+
+    private static void CheckMissingGroupPrices(EstimateRow source)
+    {
+        var mixed = new EditableEstimateRow(source with { Price = 0m, WorkPrice = null })
+        {
+            GroupMemberIds = new long[] { 1, 2 }, GroupHasNoPrice = true
+        };
+        mixed.PriceText = "разные";
+        mixed.WorkText = "разные";
+        if (!mixed.HasNoPrice || mixed.DisplayPriceText != "разные" ||
+            mixed.HasNoWorkPrice || mixed.WorkDisplayText != "разные")
+            throw new Exception("Mixed group prices must keep their label and missing-member warning.");
+        var empty = new EditableEstimateRow(source with { Price = 0m, WorkPrice = 0m })
+        {
+            GroupMemberIds = new long[] { 1, 2 }, GroupHasNoPrice = true
+        };
+        if (!empty.HasNoPrice || empty.DisplayPriceText != "—" ||
+            !empty.HasNoWorkPrice || empty.WorkDisplayText != "—")
+            throw new Exception("Zero group prices must show warning dashes.");
+        var ordinary = new EditableEstimateRow(source with { Price = 0m, WorkPrice = null });
+        if (!ordinary.HasNoPrice || ordinary.DisplayPriceText != "—" ||
+            !ordinary.HasNoWorkPrice || ordinary.WorkDisplayText != "—")
+            throw new Exception("Missing ordinary prices must remain warning dashes.");
+        ordinary.PriceText = "100";
+        ordinary.WorkText = "12";
+        if (ordinary.HasNoPrice || ordinary.HasNoWorkPrice ||
+            ordinary.DisplayPriceText != "100" || ordinary.WorkDisplayText != "12")
+            throw new Exception("Typing a price must clear the missing-price presentation.");
+    }
+
+    private static void CheckNameIndent(EstimateRow source)
+    {
+        var system = new EditableEstimateRow(source with { Kind = RowKind.System, Level = 0 });
+        var row = new EditableEstimateRow(source with { Level = 1 });
+        var nestedSystem = new EditableEstimateRow(source with { Kind = RowKind.System, Level = 1 });
+        var nestedRow = new EditableEstimateRow(source with { Level = 2 });
+        if (system.NameIndentLevel != 0 || row.NameIndentLevel != 0 ||
+            nestedSystem.NameIndentLevel != 1 || nestedRow.NameIndentLevel != 1)
+            throw new Exception("Position name must align with its owning section.");
+        nestedRow.DisplayIndentLevel = 0;
+        if (nestedRow.NameIndentLevel != 0 || nestedRow.Level != 2)
+            throw new Exception("Flat projection must not alter structural indentation.");
+        nestedRow.DisplayIndentLevel = 2;
+        if (nestedRow.NameIndentLevel != 1)
+            throw new Exception("Restored projection lost indentation.");
     }
 
     private static void CheckParsedNumericText(EstimateRow source)

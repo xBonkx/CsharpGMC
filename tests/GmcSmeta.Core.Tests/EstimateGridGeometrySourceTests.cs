@@ -168,4 +168,77 @@ public sealed class EstimateGridGeometrySourceTests
         Assert.Equal((string?)Assert.Single(name.Descendants(p + "TextBlock")).Attribute("Margin"),
                      (string?)Assert.Single(name.Descendants(p + "TextBox")).Attribute("Margin"));
     }
+
+    [Fact]
+    public void EstimateColumnDefaultsAndViewportPolicyKeepPythonWidthsAndNoteFlex()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        var app = Path.Combine(root!.FullName, "src", "GmcSmeta.App");
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var view = XDocument.Load(Path.Combine(app, "EstimateView.xaml"));
+        var grid = view.Descendants(p + "DataGrid").Single(e => (string?)e.Attribute(x + "Name") == "EstimateGrid");
+        var columns = grid.Element(p + "DataGrid.Columns")!.Elements().ToDictionary(e => (string)e.Attribute("SortMemberPath")!);
+        foreach (var (key, width) in new[] { ("number", "64"), ("name", "460"), ("basis", "150"),
+                     ("unit", "64"), ("qty", "80"), ("price", "118"), ("sum", "130"), ("purchase", "110"),
+                     ("note", "170"), ("work", "118"), ("workTotal", "130"), ("areaUnit", "90"), ("areaTotal", "90") })
+            Assert.Equal(width, (string?)columns[key].Attribute("Width"));
+        Assert.Equal("False", (string?)grid.Attribute("CanUserResizeRows"));
+        Assert.Equal("Auto", (string?)grid.Attribute("ScrollViewer.HorizontalScrollBarVisibility"));
+        Assert.Equal("Auto", (string?)grid.Attribute("ScrollViewer.VerticalScrollBarVisibility"));
+        Assert.Equal("True", (string?)grid.Attribute("ScrollViewer.CanContentScroll"));
+        var fit = File.ReadAllText(Path.Combine(app, "EstimateView.ColumnLayout.cs"));
+        Assert.Contains("scroll?.ViewportWidth", fit);
+        Assert.Contains("viewport <= 0", fit);
+        Assert.Contains("column == NoteColumn ? EstimateColumnLayout.Role.Note", fit);
+        Assert.Contains("EstimateColumnLayout.Fit(inputs, available, manual)", fit);
+        Assert.Contains("if (_applyingEstimateOrder) return;", fit);
+        var row = File.ReadAllText(Path.Combine(app, "EditableEstimateRow.cs"));
+        Assert.Contains("Math.Max(IsSub ? 1 : 0, DisplayIndentLevel - 1)", row);
+        Assert.Contains("OnPropertyChanged(nameof(NameIndentLevel));", row);
+        Assert.Contains("Math.Max(0, level) * 14", File.ReadAllText(Path.Combine(app, "LevelIndentConverter.cs")));
+    }
+
+    [Fact]
+    public void MissingPriceFillsEntireCellButSelectionAndEditingWin()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "src", "GmcSmeta.App", "App.xaml")))
+            root = root.Parent;
+        Assert.NotNull(root);
+        XNamespace p = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var view = XDocument.Load(Path.Combine(root!.FullName, "src", "GmcSmeta.App", "EstimateView.xaml"));
+        XElement Style(string key) => view.Descendants(p + "Style").Single(e => (string?)e.Attribute(x + "Key") == key);
+        var cell = Style("EstimateCell");
+        Assert.Contains(cell.Descendants(p + "Border"), e => (string?)e.Attribute("Background") == "{TemplateBinding Background}" &&
+            (string?)e.Attribute("Padding") == "{TemplateBinding Padding}");
+        foreach (var (key, colors) in new[] { ("EstimatePriceCell", new[] { "#FDF0F0", "#FEE2E2" }),
+                     ("EstimateWorkPriceCell", new[] { "#FDF0F0" }) })
+        {
+            var triggers = Style(key).Descendants(p + "MultiDataTrigger").ToArray();
+            Assert.Equal(colors, triggers.Select(trigger => (string?)trigger.Elements(p + "Setter")
+                .Single(e => (string?)e.Attribute("Property") == "Background").Attribute("Value")).ToArray());
+            foreach (var trigger in triggers)
+            {
+                var conditions = trigger.Descendants(p + "Condition").ToArray();
+                foreach (var state in new[] { "IsSelected", "IsEditing" })
+                    Assert.Contains(conditions, e => (string?)e.Attribute("Binding") == "{Binding " + state + ", RelativeSource={RelativeSource Self}}" &&
+                        (string?)e.Attribute("Value") == "False");
+                Assert.DoesNotContain(conditions, e => ((string?)e.Attribute("Binding"))?.Contains("IsKeyboardFocusWithin") == true);
+            }
+        }
+        foreach (var key in new[] { "Price", "WorkPrice" })
+        {
+            var style = Style(key);
+            Assert.Equal("{StaticResource Money}", (string?)style.Attribute("BasedOn"));
+            Assert.Contains(style.Descendants(p + "Setter"), e => (string?)e.Attribute("Property") == "Foreground" &&
+                (string?)e.Attribute("Value") == "#DC2626");
+        }
+        Assert.Contains(Style("Money").Elements(p + "Setter"), e => (string?)e.Attribute("Property") == "TextAlignment" &&
+            (string?)e.Attribute("Value") == "Right");
+    }
 }

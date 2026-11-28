@@ -326,10 +326,21 @@
                         <Condition Binding="{Binding IsGroup}" Value="False"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="False"/>
                         <Condition Binding="{Binding IsEditing, RelativeSource={RelativeSource Self}}" Value="False"/>
-                        <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource Self}}" Value="False"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="#FDF0F0"/>
                     <Setter Property="ToolTip" Value="Цена не указана. Двойной щелчок — ввести цену."/>
+                </MultiDataTrigger>
+                <!-- Python group header: a missing member is a warning, not a replacement
+                     for the mixed-price caption. The selected/editing state still wins. -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasNoPrice}" Value="True"/>
+                        <Condition Binding="{Binding IsGroup}" Value="True"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="False"/>
+                        <Condition Binding="{Binding IsEditing, RelativeSource={RelativeSource Self}}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="#FEE2E2"/>
+                    <Setter Property="ToolTip" Value="В группе есть позиции без цены. Введите общую цену или раскройте группу."/>
                 </MultiDataTrigger>
             </Style.Triggers>
         </Style>
@@ -339,9 +350,9 @@
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding HasNoWorkPrice}" Value="True"/>
+                        <Condition Binding="{Binding IsGroup}" Value="False"/>
                         <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="False"/>
                         <Condition Binding="{Binding IsEditing, RelativeSource={RelativeSource Self}}" Value="False"/>
-                        <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource Self}}" Value="False"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="#FDF0F0"/>
                     <Setter Property="ToolTip" Value="Цена работы не указана — двойной щелчок, чтобы вписать"/>
@@ -739,7 +750,7 @@
                       HeadersVisibility="Column" GridLinesVisibility="None"
                        UseLayoutRounding="True" SnapsToDevicePixels="True"
                       EnableColumnVirtualization="True"
-                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
                       RowHeaderWidth="0" SelectionMode="Extended" SelectionUnit="FullRow"
                       RowStyle="{StaticResource EstimateRow}"
                       CellStyle="{StaticResource EstimateCell}"

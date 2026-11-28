@@ -17,6 +17,7 @@ internal static class VisualAuditChecks
     {
         RunNavigationGlyphChecks();
         RunDirectorTextLayoutChecks();
+        RunEstimateScrollLayoutChecks();
         var panel = new ResponsiveToolbarPanel();
         var left = new WrapPanel();
         var right = new WrapPanel();
@@ -95,6 +96,40 @@ internal static class VisualAuditChecks
         Require(money.DesiredSize.Height > money.FontSize * 2 && money.TextTrimming == TextTrimming.None,
             "Long money text must occupy additional lines without ellipsis.");
         Console.WriteLine("Director long headers and amounts measured (no SQL).");
+    }
+
+    private static void RunEstimateScrollLayoutChecks()
+    {
+        // Use the real DataGrid/ScrollViewer theme with synthetic rows only.
+        var grid = new DataGrid
+        {
+            AutoGenerateColumns = false, CanUserAddRows = false,
+            RowHeaderWidth = 0, MinRowHeight = 27,
+            ItemsSource = Enumerable.Range(1, 40).Select(i => i.ToString()).ToArray()
+        };
+        ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+        grid.Columns.Add(new DataGridTextColumn { Header = "Название", Width = 460, Binding = new Binding(".") });
+        grid.Columns.Add(new DataGridTextColumn { Header = "Примечание", Width = 170, Binding = new Binding(".") });
+        Layout(grid, 420, 200);
+        var scroll = (ScrollViewer)grid.Template.FindName("DG_ScrollViewer", grid);
+        Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Visible &&
+            scroll.ComputedVerticalScrollBarVisibility == Visibility.Visible, "Narrow grid must expose both scrollbars.");
+        var presenter = (ScrollContentPresenter)scroll.Template.FindName("PART_ScrollContentPresenter", scroll);
+        var vertical = (ScrollBar)scroll.Template.FindName("PART_VerticalScrollBar", scroll);
+        var horizontal = (ScrollBar)scroll.Template.FindName("PART_HorizontalScrollBar", scroll);
+        var contentOrigin = presenter.TransformToAncestor(scroll).Transform(new Point());
+        var verticalOrigin = vertical.TransformToAncestor(scroll).Transform(new Point());
+        var horizontalOrigin = horizontal.TransformToAncestor(scroll).Transform(new Point());
+        Require(contentOrigin.X + presenter.ActualWidth <= verticalOrigin.X + 1 &&
+            contentOrigin.Y + presenter.ActualHeight <= horizontalOrigin.Y + 1,
+            "Scrollbars must reserve layout space outside the content viewport.");
+        Require(Math.Abs(vertical.ActualWidth - 11) < 1 &&
+            Math.Abs(horizontal.ActualHeight - 11) < 1, "Scrollbar thickness must remain 11 DIP.");
+        Layout(grid, 900, 200);
+        Require(scroll.ComputedHorizontalScrollBarVisibility == Visibility.Collapsed,
+            "Horizontal scrollbar must disappear when both columns fit.");
+        Console.WriteLine("Estimate scrollbar viewport geometry checked (no SQL).");
     }
 
     internal static void Export(string directory)

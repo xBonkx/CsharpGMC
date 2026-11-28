@@ -298,13 +298,15 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
 
     // Python kp_editor._fill_pos: money(p.price) if p.price else "—" — a missing price is a dash,
     // never "0,00"; the group label «разные» passes through untouched.
-    public string DisplayPriceText => HasNoPrice ? "—" : _price;
+    public string DisplayPriceText => IsSystem || IsSub ? "" :
+        string.IsNullOrWhiteSpace(_price) || _parsedPrice.Get(_price) == 0m ? "—" : _price;
 
     // Python: money(p.amount) — «0,00» is shown, only комплектующие stay empty.
     public string DisplayAmountText => IsSub ? "" : N2(IsGroup || IsSystem ? Source.Amount : OptimisticAmount());
 
     // Python: money(p.work_price) if p.work_price else "—" (СМР «по поз.»); subs stay empty.
-    public bool HasNoWorkPrice => !IsSystem && !IsSub && !IsVirtual && !OutOfKp &&
+    public bool HasNoWorkPrice => !IsSystem && !IsSub &&
+        (IsGroup || (!IsVirtual && !OutOfKp)) &&
         (string.IsNullOrWhiteSpace(_work) || _parsedWork.Get(_work) == 0m);
 
     public string WorkDisplayText => IsSystem || IsSub || IsTypeHeader ? "" :
