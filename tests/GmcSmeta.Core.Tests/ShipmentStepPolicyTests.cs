@@ -53,7 +53,7 @@ public sealed class ShipmentStepPolicyTests
         }
         var style = Assert.Single(view.Descendants(p + "Style")
             .Where(e => (string?)e.Attribute(x + "Key") == "ShipmentExportButton"));
-        foreach (var color in new[] { "#FFF4EB", "#F97316", "#C2410C", "#FFE2C7", "#94A3B8", "#E4E8EF" })
+        foreach (var color in new[] { "#FFF4EB", "#F97316", "#C2410C", "#FFE2C7", "{StaticResource UiDisabledTextBrush}", "#E4E8EF" })
             Assert.Contains(color, style.ToString());
         Assert.Contains(style.Descendants(p + "Trigger"), e =>
             (string?)e.Attribute("Property") == "IsEnabled" && (string?)e.Attribute("Value") == "False");
