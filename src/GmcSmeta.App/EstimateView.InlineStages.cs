@@ -359,7 +359,7 @@ public partial class EstimateView
             InlineStagesCards.Children.Add(new TextBlock
             {
                 Text = "Этапов пока нет — нажмите «+ Этап»",
-                Foreground = StageBrush("#64748B"), Margin = new Thickness(3)
+                Foreground = (Brush)FindResource("UiMutedTextBrush"), Margin = new Thickness(3)
             });
         }
         var metrics = data.Metrics;
