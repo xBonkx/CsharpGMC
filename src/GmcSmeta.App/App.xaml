@@ -249,7 +249,7 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="ComboChrome" Property="Background" Value="#F7F9FC"/>
                                 <Setter TargetName="ComboChrome" Property="BorderBrush" Value="#E4E8EF"/>
-                                <Setter TargetName="DropArrow" Property="Stroke" Value="{StaticResource UiDisabledTextBrush}"/>
+                                <Setter TargetName="DropArrow" Property="Stroke" Value="{StaticResource UiDisabledAffordanceBrush}"/>
                                 <Setter Property="Foreground" Value="{StaticResource UiDisabledTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -518,10 +518,10 @@
                                                 </Grid>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledTextBrush}"/>
+                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledAffordanceBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledTextBrush}"/>
+                                                        <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource UiDisabledAffordanceBrush}"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
