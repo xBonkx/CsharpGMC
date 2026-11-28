@@ -38,7 +38,7 @@ public partial class ActsEditorView
         _rows?.Contains(row) == true && !row.IsSection && row.OutOfKp &&
         row.InAct && !_sharedExtraIds.Contains(row.PositionId);
 
-    private void AddExtraMoveCommands(ContextMenu menu, KsRowVm row, long actId, string revision)
+    private void AddExtraMoveCommands(ContextMenu menu, KsRowVm row, long actId, string revision, Func<bool> menuCurrent)
     {
         if (!CanMoveExtra(row, actId, revision) || _rows is null) return;
         var peers = _rows.Where(r => !r.IsSection && r.SystemId == row.SystemId &&
@@ -49,7 +49,7 @@ public partial class ActsEditorView
         void Add(string label, int direction, bool enabled = true)
         {
             var item = ContextMenuIcons.Create(label, direction < 0 ? "ArrowUp" : direction > 0 ? "ArrowDown" : "ArrowForward", enabled);
-            item.Click += async (_, _) => await MoveExtraFromMenuAsync(row, actId, revision, direction);
+            item.Click += async (_, _) => await MoveExtraFromMenuAsync(row, actId, revision, direction, menuCurrent);
             menu.Items.Add(item);
         }
         Add("Выше", -1, index > 0);
@@ -57,9 +57,9 @@ public partial class ActsEditorView
         Add("Переместить после позиции…", 0);
     }
 
-    private async Task MoveExtraFromMenuAsync(KsRowVm row, long actId, string revision, int direction)
+    private async Task MoveExtraFromMenuAsync(KsRowVm row, long actId, string revision, int direction, Func<bool> menuCurrent)
     {
-        if (!CanMoveExtra(row, actId, revision)) return;
+        if (!menuCurrent() || !CanMoveExtra(row, actId, revision)) return;
         long? anchorId = null;
         if (direction == 0)
         {
@@ -91,10 +91,10 @@ public partial class ActsEditorView
             anchorId = anchor.Id;
         }
 
-        if (!CanMoveExtra(row, actId, revision) ||
+        if (!menuCurrent() || !CanMoveExtra(row, actId, revision) ||
             !ActGrid.CommitEdit(DataGridEditingUnit.Cell, true) ||
             !ActGrid.CommitEdit(DataGridEditingUnit.Row, true) ||
-            !CanMoveExtra(row, actId, revision))
+            !menuCurrent() || !CanMoveExtra(row, actId, revision))
         {
             SetStatus("Данные изменились. Повторите команду после обновления КС.", true);
             return;

@@ -983,8 +983,11 @@ public partial class EstimateView
         if (ids.Length == 0) return;
         var revision = _materialsRevision;
         var contractId = _contractId;
-        bool CanExecute() => MaterialsSnapshotReady && contractId == _contractId &&
-            revision == _materialsRevision &&
+        var connection = _sqlConnectionString;
+        var selection = MaterialsGrid.SelectedItems.OfType<MaterialsRow>().ToArray();
+        bool CanExecute() => MaterialsSnapshotReady && !_detached && contractId == _contractId &&
+            connection == _sqlConnectionString && revision == _materialsRevision &&
+            MaterialsGrid.SelectedItems.OfType<MaterialsRow>().SequenceEqual(selection, ReferenceEqualityComparer.Instance) &&
             MaterialsSelectedIds().OrderBy(id => id).SequenceEqual(ids);
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
         FillMaterialsColorItems(menu.Items, CanExecute);
@@ -1207,7 +1210,6 @@ public partial class EstimateView
             return;
         }
         _materialsBusy = true;
-        _materialsBusy = true;
         try
         {
             var revision = _materialsRevision;
@@ -1218,8 +1220,8 @@ public partial class EstimateView
                 _sqlConnectionString, _contractId, ids, "cost_color", color, revision));
             _serverRevision = result.Revision;
             SetStatus(color.Length == 0
-                ? $"Цвет снят: {ids.Count} строк"
-                : $"Покрашено строк: {ids.Count}", false);
+                ? $"Цвет снят: {result.Changed} строк"
+                : $"Покрашено строк: {result.Changed}", false);
             await LoadMaterialsAsync(force: true);
         }
         catch (Exception ex)

@@ -16,7 +16,8 @@ public static partial class SqlServerStages
         SqlServerWorkspace.RequirePilotDatabase(connectionString);
         var ids = sourceIds.ToHashSet();
         if (fullId <= 0 || stageId <= 0 || ids.Count == 0 ||
-            ids.Any(id => id <= 0) || string.IsNullOrWhiteSpace(expectedRevision))
+            ids.Count != sourceIds.Count || ids.Any(id => id <= 0) ||
+            string.IsNullOrWhiteSpace(expectedRevision))
             return (SqlServerDatabase.SaveResult.Fail("Не выбран этап или позиции.", expectedRevision), 0);
 
         using var conn = SqlServerDatabase.Open(connectionString);

@@ -390,7 +390,8 @@ public partial class StagesDialog : Window
             var item = ContextMenuIcons.Create(rest is null ? "Создать документ «Остаток»" : "Открыть КП «Остаток»", rest is null ? "FilePlus" : "File");
             item.Click += (_, _) =>
             {
-                if (_quantityWriteBusy || revision != _revision) return;
+                if (_closed || _building || _quantityWriteBusy || revision != _revision ||
+                    !ReferenceEquals(rest, _restDocument)) return;
                 if (rest is null) CreateRest_Click(this, new RoutedEventArgs());
                 else OpenStage(rest.Id);
             };
@@ -462,14 +463,27 @@ public partial class StagesDialog : Window
 
     private void BuildStageRowsMenu()
     {
-        var ids = StagesGrid.SelectedItems.OfType<DataRowView>()
-            .Select(row => Convert.ToInt64(row.Row["SrcId"]))
-            .Distinct().ToArray();
+        var table = _table;
+        var rows = StagesGrid.SelectedItems.OfType<DataRowView>().ToArray();
+        if (table is null || rows.Length == 0 || rows.Length != StagesGrid.SelectedItems.Count ||
+            rows.Any(row => !ReferenceEquals(row.Row.Table, table))) return;
+        var ids = rows.Select(row => Convert.ToInt64(row.Row["SrcId"])).OrderBy(id => id).ToArray();
+        if (ids.Any(id => id <= 0) || ids.Distinct().Count() != ids.Length) return;
         var revision = _revision;
+        bool CanExecute() => !_closed && !_building && !_quantityWriteBusy &&
+            !string.IsNullOrWhiteSpace(revision) && _revision == revision &&
+            ReferenceEquals(_table, table) &&
+            StagesGrid.SelectedItems.Count == rows.Length &&
+            StagesGrid.SelectedItems.OfType<DataRowView>().All(row =>
+                rows.Any(captured => ReferenceEquals(captured.Row, row.Row)));
         void Add(string title, string glyph, RoutedEventHandler click, bool enabled = true)
         {
             var item = ContextMenuIcons.Create(title, glyph, enabled);
-            item.Click += click;
+            item.Click += (sender, args) =>
+            {
+                if (CanExecute()) click(sender, args);
+                else SetStatus("Выбор или данные изменились. Откройте меню снова.");
+            };
             StageMenu.Items.Add(item);
         }
         foreach (var stage in _cachedStages)
@@ -494,8 +508,10 @@ public partial class StagesDialog : Window
     private async void ChangeSelectedStageRowsAsync(long stageId, long[] ids,
         bool putRest, string revision)
     {
-        if (_building || _quantityWriteBusy || ids.Length == 0 ||
-            string.IsNullOrWhiteSpace(revision) || revision != _revision) return;
+        if (_closed || _building || _quantityWriteBusy || ids.Length == 0 ||
+            string.IsNullOrWhiteSpace(revision) || revision != _revision ||
+            !_cachedStages.Any(stage => stage.Id == stageId && !stage.Rest &&
+                !stage.Locked && stage.StageSum is null)) return;
         _quantityWriteBusy = true;
         IsEnabled = false;
         try

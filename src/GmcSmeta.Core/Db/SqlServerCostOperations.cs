@@ -335,6 +335,9 @@ WHERE sy.contract_id=@id AND p.purchase_price IS NULL
         using var tx = conn.BeginTransaction(IsolationLevel.Serializable);
         var rev = LockRevision(conn, tx, expectedRevision);
         var sources = Sources(conn, tx, contractId, ids);
+        if (field == "cost_color" && (ids.Any(id => id <= 0) ||
+            sources.Count != ids.Distinct().Count()))
+            throw new DBConcurrencyException("Не все выбранные позиции принадлежат текущей смете.");
         var changed = 0;
         foreach (var row in sources)
         {

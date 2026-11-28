@@ -934,12 +934,13 @@ public partial class ActsEditorView : UserControl
         var menuSheet = _sheet;
         var menuRevision = _revision;
         var menuRows = ActGrid.SelectedItems.OfType<KsRowVm>().ToArray();
-        bool CanExecute() => !_signed && !_contractLocked && !_loadingAct && !_loadFailed &&
+        bool CanRead() => IsLoaded && !_loadingAct && !_loadFailed &&
             !_building && !ActWritePending && _actId == menuActId &&
             _contractId == menuContractId && _connectionString == menuConnection &&
             ReferenceEquals(_sheet, menuSheet) &&
             !string.IsNullOrWhiteSpace(menuRevision) && _revision == menuRevision &&
             ActGrid.SelectedItems.OfType<KsRowVm>().SequenceEqual(menuRows);
+        bool CanExecute() => CanRead() && !_signed && !_contractLocked;
         var rest = ContextMenuIcons.Create("Закрыть выделенное", "Check");
         rest.Click += (_, _) => { if (CanExecute()) FillRest_Click(sender, new RoutedEventArgs()); };
         var clear = ContextMenuIcons.Create("Убрать выделенное", "X", danger: true);
@@ -959,6 +960,7 @@ public partial class ActsEditorView : UserControl
                 var item = new MenuItem { Header = header };
                 item.Click += (_, _) =>
                 {
+                    if (!CanRead()) return;
                     try { Clipboard.SetText(value); }
                     catch (System.Runtime.InteropServices.ExternalException ex)
                     { SetStatus("Не удалось скопировать: " + ex.Message, true); }
@@ -981,10 +983,10 @@ public partial class ActsEditorView : UserControl
             edit.Click += (_, _) =>
             {
                 if (CanExecute() && _rows?.Contains(hit) == true)
-                    EditExtraDialog(hit.PositionId);
+                    EditExtraDialog(hit.PositionId, CanExecute);
             };
             menu.Items.Add(edit);
-            AddExtraMoveCommands(menu, hit, menuActId, menuRevision);
+            AddExtraMoveCommands(menu, hit, menuActId, menuRevision, CanExecute);
         }
         menu.PlacementTarget = ActGrid;
         menu.Placement = e.CursorLeft < 0 && e.CursorTop < 0
@@ -1718,11 +1720,12 @@ public partial class ActsEditorView : UserControl
 
     /// <summary>«Изменить позицию вне сметы…» (acts.update_extra_line): общие с другими
     /// актами строки клонируются, подписанные документы не меняются.</summary>
-    private async void EditExtraDialog(long positionId)
+    private async void EditExtraDialog(long positionId, Func<bool>? menuCurrent = null)
     {
         var target = CaptureActCommand();
         var current = Current;
-        if (target is null || current is null || current.Signed || _sheet is null) return;
+        if (target is null || current is null || current.Signed || _contractLocked ||
+            _sheet is null || menuCurrent?.Invoke() == false) return;
         var line = _sheet.Positions.FirstOrDefault(p => p.PositionId == positionId);
         if (line is null || !line.OutOfKp) return;
         var dialog = new Window
@@ -1785,6 +1788,8 @@ public partial class ActsEditorView : UserControl
                 if (price < 0m)
                     throw new InvalidOperationException("Введите неотрицательную цену");
                 RequireCurrentActCommand(target);
+                if (_signed || _contractLocked || menuCurrent?.Invoke() == false)
+                    throw new InvalidOperationException("Выбор или состояние акта изменились. Откройте команду снова.");
                 // WPF controls may only be read on the dispatcher thread.
                 var name = nameBox.Text.Trim();
                 var unit = unitBox.Text.Trim();
