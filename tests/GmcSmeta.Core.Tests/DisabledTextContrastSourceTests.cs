@@ -66,4 +66,21 @@ public sealed class DisabledTextContrastSourceTests
         Assert.Contains(both.Elements(W + "Setter"), e => (string?)e.Attribute("TargetName") == chrome &&
             (string?)e.Attribute("Property") == "Background" && (string?)e.Attribute("Value") == "#E8F0FE");
     }
+    [Theory]
+    [InlineData("PrimaryButton", "PrimaryBorder")]
+    [InlineData("PythonToolbarPrimary", "PrimaryChrome")]
+    [InlineData("ProcurementRequestPrimary", "Chrome")]
+    [InlineData("DangerButton", "DangerSurface")]
+    public void DisabledPrimaryActionUsesNeutralReadablePalette(string key, string chrome)
+    {
+        var doc = XDocument.Load(Path.Combine(AppDirectory(), "App.xaml"));
+        var style = Assert.Single(doc.Descendants(W + "Style").Where(e => (string?)e.Attribute(X + "Key") == key));
+        var disabled = Assert.Single(style.Descendants(W + "Trigger").Where(e =>
+            (string?)e.Attribute("Property") == "IsEnabled" && (string?)e.Attribute("Value") == "False"));
+        Assert.Contains(disabled.Elements(W + "Setter"), e => (string?)e.Attribute("Property") == "Foreground" &&
+            (string?)e.Attribute("Value") == "{StaticResource UiDisabledTextBrush}");
+        Assert.Contains(disabled.Elements(W + "Setter"), e => (string?)e.Attribute("TargetName") == chrome &&
+            (string?)e.Attribute("Property") == "Background" && (string?)e.Attribute("Value") == "#F7F9FC");
+    }
+
 }
