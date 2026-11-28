@@ -9,6 +9,15 @@ namespace GmcSmeta.App;
 public sealed class ResponsiveToolbarPanel : Panel
 {
     private const double Gap = 10;
+    public static readonly DependencyProperty MinimumLeftWidthProperty = DependencyProperty.Register(
+        nameof(MinimumLeftWidth), typeof(double), typeof(ResponsiveToolbarPanel),
+        new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsMeasure),
+        value => value is double d && double.IsFinite(d) && d >= 0);
+    public double MinimumLeftWidth
+    {
+        get => (double)GetValue(MinimumLeftWidthProperty);
+        set => SetValue(MinimumLeftWidthProperty, value);
+    }
     private double _leftWidth;
     private double _rightWidth;
     private bool _stacked;
@@ -29,9 +38,12 @@ public sealed class ResponsiveToolbarPanel : Panel
         right.Measure(unconstrained);
         var leftPreferred = left.DesiredSize.Width;
         var rightPreferred = right.DesiredSize.Width;
-        var preferred = leftPreferred + Gap + rightPreferred;
+        var preferred = Math.Max(leftPreferred, MinimumLeftWidth) + Gap + rightPreferred;
         var width = double.IsInfinity(availableSize.Width) ? preferred : availableSize.Width;
-        _stacked = preferred > width;
+        // Header supplies a stable minimum, so a long document title or warning
+        // does not move the action group. The ordinary toolbar fits natural widths.
+        var requiredLeft = MinimumLeftWidth > 0 ? MinimumLeftWidth : leftPreferred;
+        _stacked = requiredLeft + Gap + rightPreferred > width + .01;
         _rightWidth = _stacked ? width : Math.Min(rightPreferred, width);
         _leftWidth = _stacked ? width : Math.Max(0, width - _rightWidth - Gap);
         left.Measure(new Size(_leftWidth, double.PositiveInfinity));

@@ -476,11 +476,11 @@ public partial class EstimateView
     private void ApplyEstimateZoom()
     {
         if (EstimateGrid is null) return;
-        var zoom = double.IsFinite(_uiSettings.TableZoom)
-            ? Math.Clamp(_uiSettings.TableZoom, 0.8, 1.8) : 1.0;
+        var zoom = EstimateVisualPolicy.NormalizeZoom(_uiSettings.TableZoom);
         var baseSize = (double)FindResource("UiBodySize");
         var headerRatio = (double)FindResource("UiEstimateHeaderZoomRatio");
-        EstimateGrid.FontSize = baseSize * zoom;
+        var font = EstimateVisualPolicy.TableFont(baseSize, headerRatio, zoom);
+        EstimateGrid.FontSize = font.Body;
         if (EstimateColumnsButton is not null)
         {
             EstimateColumnsButton.ToolTip = $"Какие столбцы показывать\nМасштаб таблицы: {Math.Round(zoom * 100)} % · Ctrl+колесо, Ctrl+0 — сброс";
@@ -492,7 +492,7 @@ public partial class EstimateView
         {
             BasedOn = baseHeader
         };
-        header.Setters.Add(new Setter(Control.FontSizeProperty, baseSize * headerRatio * zoom));
+        header.Setters.Add(new Setter(Control.FontSizeProperty, font.Header));
         EstimateGrid.ColumnHeaderStyle = header;
 
         // Python common.set_alignment: headers follow the delegate alignment.

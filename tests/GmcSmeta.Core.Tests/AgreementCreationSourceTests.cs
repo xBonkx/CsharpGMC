@@ -41,8 +41,9 @@ public sealed class AgreementCreationSourceTests
         Assert.Contains("ApplyAgreementDefaults()", preview);
         Assert.Contains("_annexCompany.SelectedIndex = -1;", preview);
         var editor = File.ReadAllText(Path.Combine(app, "EstimateView.xaml.cs"));
-        Assert.Contains("TitleText.Text = est.AnnexDisplayTitle ?? est.Title;", editor);
-        Assert.Contains("TitleText.ToolTip = $\"{est.Title}", editor);
+        Assert.Contains("EstimateVisualPolicy.HeaderText(est.Title, est.AnnexDisplayTitle,", editor);
+        Assert.Contains("TitleText.Text = header.Title;", editor);
+        Assert.Contains("TitleText.ToolTip = $\"{header.FullTitle}", editor);
         var ks = File.ReadAllText(Path.Combine(app, "ContractActsWorkspace.xaml.cs"));
         Assert.Contains("SumTotalCaption.Text = \"Сдано по смете\";", ks);
         Assert.Contains("Totals.ReadOne(conn, contractId, token)", ks);

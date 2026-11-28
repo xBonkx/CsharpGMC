@@ -13,7 +13,6 @@ namespace GmcSmeta.App;
 /// </summary>
 public sealed class EditableEstimateRow : INotifyPropertyChanged
 {
-    private static readonly CultureInfo Ru = CultureInfo.GetCultureInfo("ru-RU");
     private string _name;
     private string _unit;
     private string _qty;
@@ -68,10 +67,10 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         Source = row;
         _name = row.Name;
         _unit = row.Unit;
-        _qty = row.IsSystem ? "" : row.Qty.ToString("0.###", Ru);
-        _price = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
-        _purchase = row.IsSystem || row.IsSub ? "" : row.PurchasePrice?.ToString("N2", Ru) ?? "";
-        _work = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
+        _qty = row.IsSystem ? "" : EstimateVisualPolicy.Quantity(row.Qty);
+        _price = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.Price);
+        _purchase = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.PurchasePrice);
+        _work = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.WorkPrice);
         _note = row.Note;
         _basis = row.Basis;
     }
@@ -85,13 +84,13 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         Name = row.Name;
         Unit = row.Unit;
         if ((_dirtyText & DirtyText.Qty) != 0)
-            QtyText = row.IsSystem ? "" : row.Qty.ToString("0.###", Ru);
+            QtyText = row.IsSystem ? "" : EstimateVisualPolicy.Quantity(row.Qty);
         if ((_dirtyText & DirtyText.Price) != 0)
-            PriceText = row.IsSystem || row.IsSub ? "" : row.Price.ToString("N2", Ru);
+            PriceText = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.Price);
         if ((_dirtyText & DirtyText.Purchase) != 0)
-            PurchaseText = row.IsSystem || row.IsSub ? "" : row.PurchasePrice?.ToString("N2", Ru) ?? "";
+            PurchaseText = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.PurchasePrice);
         if ((_dirtyText & DirtyText.Work) != 0)
-            WorkText = row.IsSystem || row.IsSub ? "" : row.WorkPrice?.ToString("N2", Ru) ?? "";
+            WorkText = row.IsSystem || row.IsSub ? "" : EstimateVisualPolicy.Money(row.WorkPrice);
         _dirtyText = DirtyText.None;
         Note = row.Note;
         Basis = row.Basis;
@@ -319,7 +318,9 @@ public sealed class EditableEstimateRow : INotifyPropertyChanged
         return qty is not null && price is not null ? qty.Value * price.Value : Source.Amount;
     }
 
-    private static string N2(decimal v) => v.ToString("N2", Ru);
+    private static string N2(decimal v) => EstimateVisualPolicy.Money(v);
+
+    public string DisplayWorkAmountText => EstimateVisualPolicy.Money(DisplayWorkAmount);
 
     public bool HasNoPrice => IsGroup ? GroupHasNoPrice :
         !IsSystem && !IsSub &&

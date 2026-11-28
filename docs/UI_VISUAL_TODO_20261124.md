@@ -1,5 +1,7 @@
 # GMC-Смета C# — полный TODO визуального паритета (24.11.2026)
 
+28.11.2026 — HDR-01/HDR-02/HDR-03/HDR-20/BAR-03/BAR-16/GRID-11/GRID-15/GRID-16/FONT-03 CODE READY: ten canonical IDs, not subtasks. Estimate header one-line metadata and adaptive action layout; legal/full title policy; signed/permission catalog visibility; work/purchase preference parity; deterministic numbers and table font/zoom roles. Source and WPF fixture authored, not run; physical Windows/Python acceptance remains. Design 215/253 CODE READY, 38 PARTIAL; +10. [Evidence](DESIGN_PASS_20261128_ESTIMATE_PARITY.md).
+
 28.11.2026 — NAV-06 and FONT-01 CODE READY after source review: explicit accessible brand tab stop + one keyboard adorner and existing startup search focus; Qt _pick_font order in WPF resource, help/history typography, source guards and resolved-family offline diagnostic. Windows build/paired screenshots/physical focus not run. Design 205/253 CODE READY, 48 PARTIAL; +2. [Details](DESIGN_PASS_20261128_DYNAMIC_FORMS.md).
 
 28.11.2026 — 10 scoped CODE READY dynamic form design changes in seven dialogs: shared font/rendering, one inset/pinned actions, Python two-row markup, wrapping/scrolling, semantic KS money columns. 11 source cases and offline WPF fixture added, not run. Broad FONT/SPACE/GRID IDs remain PARTIAL; canonical count unchanged by this pass. [Details](DESIGN_PASS_20261128_DYNAMIC_FORMS.md).

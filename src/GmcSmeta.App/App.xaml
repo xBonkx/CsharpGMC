@@ -1221,6 +1221,7 @@
         <Style TargetType="DataGridCell" BasedOn="{StaticResource PythonGridCell}"/>
         <!-- Global TextBox padding (10,7) previously enlarged grid rows on edit. -->
         <Style x:Key="PythonGridEditor" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="FontFamily" Value="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             <Setter Property="FontSize" Value="{Binding FontSize, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             <!-- Cell chrome already supplies the inset; do not apply it twice in edit mode. -->
             <Setter Property="Padding" Value="0"/>

@@ -18,7 +18,8 @@ internal sealed class EstimateUiSettings
     public bool KsHintHidden { get; set; } = false;
     public bool KsListOpen { get; set; } = true;
     public bool KsTilesHidden { get; set; } = false;
-    public bool PurchaseVisible { get; set; }
+    // null = automatic; older true/false JSON values retain the explicit choice.
+    public bool? PurchaseVisible { get; set; }
     public bool AreaUnitVisible { get; set; } = false;
     public bool AreaTotalVisible { get; set; } = false;
     public bool BasisVisible { get; set; } = false;

@@ -95,6 +95,8 @@ public partial class EstimateView : UserControl
             ? index : (_rowViewIndex = new EstimateRowViewIndex(_rows));
     private readonly EstimateUiSettings _uiSettings = EstimateUiSettings.Load();
     private bool _uiSettingsReady;
+    private bool _purchaseAutoInitialized;
+    private bool _applyingPurchaseVisibility;
     private string _visibleEstimateMode = "estimate";
     private EstimateDocument? _estimate;
     private int _pendingWrites;
@@ -177,6 +179,8 @@ public partial class EstimateView : UserControl
         Loaded += (_, _) =>
         {
             _detached = false;
+            // Cached pages may be attached before shell selection is published.
+            Dispatcher.BeginInvoke(new Action(UpdateAddToolbarVisibility), DispatcherPriority.Loaded);
             if (_inlineStagesOn && (_inlineStagesData is null || _inlineStagesLoading))
                 _reloadAfterAttach = true;
             if (_searchPending) _estimateSearchTimer.Start();
@@ -254,24 +258,25 @@ public partial class EstimateView : UserControl
                     }
                 }), DispatcherPriority.Background);
         }
-        AddRowButton.IsEnabled = !est.Locked;
-        WorkColumn.Visibility = est.SmrMode == "pos" ? Visibility.Visible : Visibility.Collapsed;
-        WorkTotalColumn.Visibility = est.SmrMode == "pos" ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAddToolbarVisibility();
+        WorkColumn.Visibility = WorkTotalColumn.Visibility = EstimateVisualPolicy.ShowWorkColumns(est.SmrMode)
+            ? Visibility.Visible : Visibility.Collapsed;
+        ApplyPurchaseVisibility(est);
         ConfigureSpecialColumns();
         RequestEstimateColumnFit();
 
         // Keep the full legal title in the tooltip; use the current snapshot, not the cached navigation row.
-        var isAnnex = est.KindTitle == "Договор";
-        TitleText.Text = est.AnnexDisplayTitle ?? est.Title;
-        SubtitleText.Text = est.ObjectName;
-        DocumentKindText.Text = isAnnex ? "Приложение" : est.KindTitle;
-        CompanyText.Text = string.IsNullOrWhiteSpace(est.Company) ? "организация не указана" : est.Company;
-        CompanyChip.Visibility = string.IsNullOrWhiteSpace(est.Company)
-            ? Visibility.Collapsed : Visibility.Visible;
+        var header = EstimateVisualPolicy.HeaderText(est.Title, est.AnnexDisplayTitle,
+            est.ObjectName, est.KindTitle, est.Company);
+        TitleText.Text = header.Title;
+        SubtitleText.Text = header.Object;
+        DocumentKindText.Text = header.Kind;
+        CompanyText.Text = header.Company;
+        CompanyChip.Visibility = Visibility.Visible;
         LockChip.Visibility = est.Locked ? Visibility.Visible : Visibility.Collapsed;
         // Python has no separate counter row in the header. Keep the full
         // title and counts available without expanding or crowding the toolbar.
-        TitleText.ToolTip = $"{est.Title}\n" +
+        TitleText.ToolTip = $"{header.FullTitle}\n" +
             $"{est.Positions} {CountForm(est.Positions, "позиция", "позиции", "позиций")} · " +
             $"{est.Systems} {CountForm(est.Systems, "система", "системы", "систем")}";
         EditTitleButton.IsEnabled = !est.Locked;
@@ -1052,9 +1057,38 @@ public partial class EstimateView : UserControl
         _reloadTimer.Start();
     }
 
+    private void UpdateAddToolbarVisibility()
+    {
+        if (AddRowButton is null || AddActionGroup is null || CatalogAddButton is null) return;
+        var editable = !_detached && IsLoaded && Window.GetWindow(this) is MainWindow main &&
+            main.CanEditEstimateHeader(_contractId, _objectId);
+        var visible = _estimate is { } snapshot &&
+            EstimateVisualPolicy.ShowAddActions(snapshot.Locked, _doc.StageRest, editable);
+        AddActionGroup.Visibility = CatalogAddButton.Visibility = visible
+            ? Visibility.Visible : Visibility.Collapsed;
+        AddRowButton.IsEnabled = visible;
+    }
+
+    private void ApplyPurchaseVisibility(EstimateDocument? est)
+    {
+        if (PurchaseToggle is null || PurchaseColumn is null) return;
+        var first = est is not null && !_purchaseAutoInitialized;
+        var hasPurchase = first && est!.PositionsInOrder.Any(row => !row.IsSub && row.PurchasePrice.HasValue);
+        var show = EstimateVisualPolicy.ShowPurchase(_uiSettings.PurchaseVisible, hasPurchase,
+            first, PurchaseToggle.IsChecked == true);
+        _applyingPurchaseVisibility = true;
+        try
+        {
+            PurchaseToggle.IsChecked = show;
+            PurchaseColumn.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        }
+        finally { _applyingPurchaseVisibility = false; }
+        if (est is not null) _purchaseAutoInitialized = true;
+    }
+
     private void PurchaseToggle_Changed(object sender, RoutedEventArgs e)
     {
-        if (PurchaseColumn is null || PurchaseToggle is null) return;
+        if (PurchaseColumn is null || PurchaseToggle is null || _applyingPurchaseVisibility || !_uiSettingsReady) return;
         PurchaseColumn.Visibility = PurchaseToggle.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         _uiSettings.PurchaseVisible = PurchaseToggle.IsChecked == true;
         SaveEstimateUiSettings();
@@ -1105,7 +1139,11 @@ public partial class EstimateView : UserControl
                 { checkItem.IsChecked = column.Visibility == Visibility.Visible; return; }
                 if (SetInlineStageColumnVisibility(column, checkItem.IsChecked)) return;
                 column.Visibility = checkItem.IsChecked ? Visibility.Visible : Visibility.Collapsed;
-                if (ReferenceEquals(column, PurchaseColumn)) PurchaseToggle.IsChecked = checkItem.IsChecked;
+                if (ReferenceEquals(column, PurchaseColumn))
+                {
+                    _uiSettings.PurchaseVisible = checkItem.IsChecked;
+                    PurchaseToggle.IsChecked = checkItem.IsChecked;
+                }
                 if (ReferenceEquals(column, AreaUnitColumn)) _uiSettings.AreaUnitVisible = checkItem.IsChecked;
                 if (ReferenceEquals(column, AreaTotalColumn)) _uiSettings.AreaTotalVisible = checkItem.IsChecked;
                 if (ReferenceEquals(column, BasisColumn) && _estimate?.Form != "r4")
@@ -1127,7 +1165,11 @@ public partial class EstimateView : UserControl
                 item.IsChecked = true;
                 if (SetInlineStageColumnVisibility(column, true)) continue;
                 column.Visibility = Visibility.Visible;
-                if (column == PurchaseColumn) PurchaseToggle.IsChecked = true;
+                if (column == PurchaseColumn)
+                {
+                    _uiSettings.PurchaseVisible = true;
+                    PurchaseToggle.IsChecked = true;
+                }
                 if (column == AreaUnitColumn) _uiSettings.AreaUnitVisible = true;
                 if (column == AreaTotalColumn) _uiSettings.AreaTotalVisible = true;
                 if (column == BasisColumn && _estimate?.Form != "r4") _uiSettings.BasisVisible = true;
@@ -1244,8 +1286,7 @@ public partial class EstimateView : UserControl
             column.Visibility = hidden.Contains(column.Header?.ToString() ?? "")
                 ? Visibility.Collapsed : Visibility.Visible;
         }
-        PurchaseToggle.IsChecked = _uiSettings.PurchaseVisible;
-        PurchaseColumn.Visibility = _uiSettings.PurchaseVisible ? Visibility.Visible : Visibility.Collapsed;
+        ApplyPurchaseVisibility(null);
         SetTotalsHidden(_uiSettings.TotalsHidden);
     }
 
@@ -1262,7 +1303,7 @@ public partial class EstimateView : UserControl
                 c != WorkColumn && c != WorkTotalColumn && c != BasisColumn &&
                 c.Visibility != Visibility.Visible)
             .Select(c => c.Header?.ToString() ?? "").ToList();
-        _uiSettings.PurchaseVisible = PurchaseToggle.IsChecked == true;
+        // Preserve null (automatic) until the user actually chooses a purchase visibility.
         _uiSettings.AreaUnitVisible = AreaUnitColumn.Visibility == Visibility.Visible;
         _uiSettings.AreaTotalVisible = AreaTotalColumn.Visibility == Visibility.Visible;
         if (_estimate?.Form != "r4") _uiSettings.BasisVisible = BasisColumn.Visibility == Visibility.Visible;

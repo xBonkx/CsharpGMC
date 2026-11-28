@@ -26,8 +26,9 @@ public sealed class EstimateTypographyAndToolsSourceTests
             Key(XDocument.Parse(Source("App.xaml")), "UiFontFamily").Value);
         Assert.Equal("0.95", Key(XDocument.Parse(Source("Theme/TypographyMetrics.xaml")), "UiEstimateHeaderZoomRatio").Value);
         var code = Source("EstimateView.TemporaryView.cs");
-        Assert.Contains("EstimateGrid.FontSize = baseSize * zoom", code);
-        Assert.Contains("baseSize * headerRatio * zoom", code);
+        Assert.Contains("EstimateVisualPolicy.TableFont(baseSize, headerRatio, zoom)", code);
+        Assert.Contains("EstimateGrid.FontSize = font.Body", code);
+        Assert.Contains("new Setter(Control.FontSizeProperty, font.Header)", code);
         Assert.Contains("EstimateColumnsButton.ToolTip", code);
         Assert.Contains("Ctrl+0", code);
     }
@@ -170,7 +171,7 @@ public sealed class EstimateTypographyAndToolsSourceTests
         Assert.Equal("4,0,0,0", (string?)title.Attribute("Margin"));
         Assert.Equal("{StaticResource DocumentFlatTool}", (string?)Key(doc, "DocumentTitleEdit").Attribute("BasedOn"));
         Assert.Equal("96", Value(Key(doc, "DocumentMainTab"), "MinWidth"));
-        foreach (var (name, glyph) in new[] { ("EstimateModeTab", "List"), ("MaterialsModeTab", "Building"),
+        foreach (var (name, glyph) in new[] { ("EstimateModeTab", "List"), ("MaterialsModeTab", "Materials"),
                      ("ContractEstimateTab", "List"), ("ContractProcurementTab", "Download"),
                      ("ContractShipmentsTab", "Upload"), ("ContractActsTab", "File") })
         {

@@ -19,6 +19,7 @@ internal static class VisualAuditChecks
         RunSharedGlyphCatalogChecks();
         RunDirectorTextLayoutChecks();
         RunSharedTypographyChecks();
+        RunEstimateHeaderToolbarParityChecks();
         RunDynamicFormLayoutChecks();
         RunSharedSpacingChecks();
         RunEstimateScrollLayoutChecks();
@@ -178,6 +179,79 @@ internal static class VisualAuditChecks
             TextOptions.GetTextFormattingMode(window) == TextFormattingMode.Display &&
             window.UseLayoutRounding, "Dynamic window uses application typography");
         window.Close();
+    }
+
+    private static void RunEstimateHeaderToolbarParityChecks()
+    {
+        var row = new DocumentCrumbPanel { MinHeight = 20, ClipToBounds = true };
+        TextBlock Text(string text) => new()
+        {
+            Text = text, TextTrimming = TextTrimming.CharacterEllipsis,
+            FontSize = (double)Application.Current.FindResource("UiCaptionSize"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var crumb = Text(new string('О', 100)); crumb.MaxWidth = 300;
+        var company = Text(new string('К', 100)); company.MaxWidth = 180;
+        DocumentCrumbPanel.SetCanShrink(crumb, true);
+        DocumentCrumbPanel.SetCanShrink(company, true);
+        var status = Text("Не сходится с файлом");
+        status.Visibility = Visibility.Collapsed;
+        row.Children.Add(crumb);
+        row.Children.Add(Text("КП"));
+        row.Children.Add(company);
+        row.Children.Add(status);
+        var titles = new StackPanel();
+        titles.Children.Add(row);
+        titles.Children.Add(Text("Документ"));
+        var actions = new WrapPanel();
+        actions.Children.Add(new Button { Content = "Отменить", Width = 100, Height = 34 });
+        actions.Children.Add(new Button { Content = "Сохранить в Excel / PDF", Width = 210, Height = 34 });
+        var header = new ResponsiveToolbarPanel { MinimumLeftWidth = 420 };
+        header.Children.Add(titles);
+        header.Children.Add(actions);
+        Layout(header, 900, 150);
+        var titleY = LayoutInformation.GetLayoutSlot(titles).Top;
+        var rowHeight = row.DesiredSize.Height;
+        var actionY = LayoutInformation.GetLayoutSlot(actions).Top;
+        Require(titleY == 0 && actionY == 0, "Wide header must keep actions beside metadata");
+        status.Visibility = Visibility.Visible;
+        Layout(header, 900, 150);
+        Require(Math.Abs(row.DesiredSize.Height - rowHeight) < .1 &&
+                LayoutInformation.GetLayoutSlot(actions).Top == actionY,
+            "Warning must not change header rows or action alignment");
+        Layout(header, 520, 200);
+        Require(LayoutInformation.GetLayoutSlot(actions).Top >= titles.DesiredSize.Height - .1,
+            "Narrow header must move actions below the title");
+        foreach (UIElement child in row.Children)
+            Require(LayoutInformation.GetLayoutSlot(child).Right <= row.ActualWidth + .1,
+                "Crumb/status slot outside viewport");
+
+        var toolbar = new ResponsiveToolbarPanel();
+        var left = new WrapPanel();
+        var right = new WrapPanel();
+        Button Tool(string text, string template)
+        {
+            return new Button { Content = text, ContentTemplate = (DataTemplate)Application.Current.FindResource(template),
+                Style = (Style)Application.Current.FindResource("PythonToolbarButton"),
+                MinHeight = 34, Margin = new Thickness(0, 0, 6, 4) };
+        }
+        left.Children.Add(Tool("+ Строка", "IconLabelRowPlus"));
+        left.Children.Add(Tool("Из справочника", "IconLabelBook"));
+        left.Children.Add(Tool("Группировка", "IconLabelLayers"));
+        left.Children.Add(Tool("Сортировка", "IconLabelSort"));
+        right.Children.Add(Tool("Закуп", "IconLabelCalculator"));
+        right.Children.Add(Tool("Столбцы", "IconLabelList"));
+        right.Children.Add(new TextBox { Width = 170, MinHeight = 34 });
+        toolbar.Children.Add(left);
+        toolbar.Children.Add(right);
+        foreach (var scale in new[] { .9, 1.0, 1.1, 1.2 })
+        {
+            Layout(toolbar, 1920 / scale - 300 - 48, 120);
+            Require(LayoutInformation.GetLayoutSlot(right).Top == 0,
+                "Normal estimate toolbar must fit at 1920px/96dpi and app scale " + scale);
+        }
+        Layout(toolbar, 420, 160);
+        Require(LayoutInformation.GetLayoutSlot(right).Top > 0, "Narrow toolbar must wrap");
     }
 
     private static void RunSharedSpacingChecks()
