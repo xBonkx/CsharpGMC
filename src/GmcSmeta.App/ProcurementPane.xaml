@@ -381,7 +381,7 @@
                 </GroupStyle>
             </DataGrid.GroupStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="№" Binding="{Binding RowNumber}" Width="64" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="RowNumber" Header="№" Binding="{Binding RowNumber}" Width="64" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
                 <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="190" IsReadOnly="True" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -417,8 +417,8 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
-                <DataGridTextColumn Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="50" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Qty" Header="По смете" Binding="{Binding Qty}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
                 <DataGridTemplateColumn Header="Поставщик" Width="120" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -450,7 +450,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
+                <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="StatusLabel" local:TableColumnMenu.FitExtra="20" Header="Статус ▾" Width="130" HeaderStyle="{StaticResource ProcurementHeader}">
                     <!-- Preserve the header identifier used by Field()/column preferences. -->
                     <DataGridTemplateColumn.HeaderTemplate>
                         <DataTemplate>
@@ -484,7 +484,7 @@
                     <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding OrderCaption}" ToolTip="{Binding OrderCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding OrderRef, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Ожидаем" Width="86" HeaderStyle="{StaticResource ProcurementHeader}">
+                <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="ExpectedCaption" local:TableColumnMenu.FitExtra="20" Header="Ожидаем" Width="86" HeaderStyle="{StaticResource ProcurementHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate>
                         <Grid ToolTip="{Binding DueTooltip}" Background="Transparent">
                         <Border Background="{Binding DueBadge.Background}" BorderBrush="{Binding DueBadge.Border}">
@@ -504,10 +504,10 @@
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding DueDate, Mode=OneWay}" Style="{StaticResource CompactCostCenterEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Пришло" Binding="{Binding Received}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
-                <DataGridTextColumn Header="Выдано" Binding="{Binding Issued}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
-                <DataGridTextColumn Header="Дата выдачи" Binding="{Binding IssueDateText}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
-                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Received" Header="Пришло" Binding="{Binding Received}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Issued" Header="Выдано" Binding="{Binding Issued}" Width="72" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="IssueDateText" Header="Дата выдачи" Binding="{Binding IssueDateText}" Width="96" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="RemainingText" Header="Осталось" Binding="{Binding RemainingText}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource ProcurementHeader}"/>
                 <DataGridTemplateColumn Header="Примечание / замена" Width="200" MinWidth="100" HeaderStyle="{StaticResource ProcurementTextHeader}">
                     <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding NoteCaption}" ToolTip="{Binding NoteCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate><DataTemplate><TextBox Text="{Binding Note, Mode=OneWay}" Style="{StaticResource CompactCostEditor}"/></DataTemplate></DataGridTemplateColumn.CellEditingTemplate>
@@ -572,11 +572,11 @@
                 <Style TargetType="TextBox" BasedOn="{StaticResource CompactCostEditor}"/>
             </DataGrid.Resources>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Дата" Width="95"
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Date" Header="Дата" Width="95"
                                             Binding="{Binding Date, StringFormat={}{0:dd.MM.yyyy}}" HeaderStyle="{StaticResource CompactCostHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
                         <DataGridTextColumn Header="Операция" Width="165"
                                             Binding="{Binding KindLabel}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                        <DataGridTextColumn Header="Кол-во" Width="80"
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Qty" Header="Кол-во" Width="80"
                                             Binding="{Binding Qty, StringFormat={}{0:0.###}}" HeaderStyle="{StaticResource CompactCostMoneyHeader}" ElementStyle="{StaticResource CompactCostMoney}"/>
                         <DataGridTextColumn Header="Документ" Width="150"
                                             Binding="{Binding Document}" HeaderStyle="{StaticResource CompactCostTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>

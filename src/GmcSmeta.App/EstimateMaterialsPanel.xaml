@@ -180,7 +180,7 @@
             </Style>
         </DataGrid.Resources>
         <DataGrid.Columns>
-            <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="56"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Num" Header="№" Binding="{Binding Num}" Width="56"
                                 IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
             <DataGridTemplateColumn Header="Наименование" Width="*" MinWidth="220"
@@ -221,13 +221,13 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="48"
                                 IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-            <DataGridTextColumn Header="Кол-во" Binding="{Binding QtyText}" Width="64"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="QtyText" Header="Кол-во" Binding="{Binding QtyText}" Width="64"
                                 IsReadOnly="True" CellStyle="{StaticResource MaterialsCell}"
                                 ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-            <DataGridTemplateColumn Header="Цена клиенту" Width="112"
+            <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="PriceText" Header="Цена клиенту" Width="112"
                                     CellStyle="{StaticResource MaterialsCellBlue}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
@@ -242,10 +242,10 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Сумма клиенту" Binding="{Binding AmountText}" Width="124"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="AmountText" Header="Сумма клиенту" Binding="{Binding AmountText}" Width="124"
                                 IsReadOnly="True" CellStyle="{StaticResource MaterialsCellBlue}"
                                 ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
-            <DataGridTemplateColumn Header="Закуп за ед." Width="108"
+            <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="CostText" Header="Закуп за ед." Width="108"
                                     CellStyle="{StaticResource MaterialsCellOrange}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
@@ -274,10 +274,10 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Закуп сумма" Binding="{Binding CostSumText}" Width="118"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="CostSumText" Header="Закуп сумма" Binding="{Binding CostSumText}" Width="118"
                                 IsReadOnly="True" CellStyle="{StaticResource MaterialsCellOrange}"
                                 ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource CompactCostMoneyHeader}"/>
-            <DataGridTemplateColumn Header="Наценка, %" Width="96"
+            <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="MarkupText" Header="Наценка, %" Width="96"
                                     CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
@@ -303,7 +303,7 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellEditingTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Маржа" Binding="{Binding MarginText}" Width="108" IsReadOnly="True"
+            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="MarginText" Header="Маржа" Binding="{Binding MarginText}" Width="108" IsReadOnly="True"
                                 CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
                 <DataGridTextColumn.ElementStyle>
                     <Style TargetType="TextBlock" BasedOn="{StaticResource CompactCostMoney}">
@@ -316,7 +316,7 @@
                     </Style>
                 </DataGridTextColumn.ElementStyle>
             </DataGridTextColumn>
-            <DataGridTemplateColumn Header="Факт по счёту" Width="112"
+            <DataGridTemplateColumn local:TableColumnMenu.FitDisplayPath="FactText" Header="Факт по счёту" Width="112"
                                     CellStyle="{StaticResource MaterialsCell}" HeaderStyle="{StaticResource CompactCostMoneyHeader}">
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>

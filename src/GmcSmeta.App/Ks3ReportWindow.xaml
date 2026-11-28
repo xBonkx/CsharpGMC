@@ -76,7 +76,7 @@
                           RowStyle="{StaticResource KsReportRow}" AlternationCount="2" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" CanUserResizeRows="False">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Акт КС-2" Binding="{Binding Title}" Width="*" MinWidth="150" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                        <DataGridTextColumn Header="Без НДС, ₽" Binding="{Binding Net, StringFormat={}{0:N2}}"
+                        <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Net" Header="Без НДС, ₽" Binding="{Binding Net, StringFormat={}{0:N2}}"
                                             Width="190" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                     </DataGrid.Columns>
                 </DataGrid>

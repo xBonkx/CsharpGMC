@@ -94,14 +94,14 @@
                               RowStyle="{StaticResource KsReportRow}" AlternationCount="2"
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" CanUserResizeRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="КС-2" Binding="{Binding Number}" Width="110" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Number" Header="КС-2" Binding="{Binding Number}" Width="110" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
                             <DataGridTextColumn Header="Приложение / ДС" Binding="{Binding SourceName}" Width="*" MinWidth="150" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                            <DataGridTextColumn Header="Дата" Binding="{Binding Date, StringFormat=dd.MM.yyyy}" Width="110" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Без НДС, ₽" Binding="{Binding Ks3Net, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Date" Header="Дата" Binding="{Binding Date, StringFormat=dd.MM.yyyy}" Width="110" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Ks3Net" Header="Без НДС, ₽" Binding="{Binding Ks3Net, StringFormat=N2}"
                                                 Width="140" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="НДС, ₽" Binding="{Binding Vat, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Vat" Header="НДС, ₽" Binding="{Binding Vat, StringFormat=N2}"
                                                 Width="105" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="С НДС, ₽" Binding="{Binding Total, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Total" Header="С НДС, ₽" Binding="{Binding Total, StringFormat=N2}"
                                                 Width="140" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                         </DataGrid.Columns>
                     </DataGrid>
@@ -120,12 +120,12 @@
                               GridLinesVisibility="All" HorizontalGridLinesBrush="#E4E8EF" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel" CanUserResizeRows="False">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Номер группы" Binding="{Binding Key}" Width="140" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Дата" Binding="{Binding Date, StringFormat=dd.MM.yyyy}" Width="130" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Без НДС, ₽" Binding="{Binding Net, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Date" Header="Дата" Binding="{Binding Date, StringFormat=dd.MM.yyyy}" Width="130" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Net" Header="Без НДС, ₽" Binding="{Binding Net, StringFormat=N2}"
                                                 Width="175" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="НДС, ₽" Binding="{Binding Vat, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Vat" Header="НДС, ₽" Binding="{Binding Vat, StringFormat=N2}"
                                                 Width="140" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                            <DataGridTextColumn Header="С НДС, ₽" Binding="{Binding Gross, StringFormat=N2}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Gross" Header="С НДС, ₽" Binding="{Binding Gross, StringFormat=N2}"
                                                 Width="175" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                         </DataGrid.Columns>
                     </DataGrid>

@@ -233,26 +233,26 @@
                     </Style>
                 </DataGrid.RowStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="№" Binding="{Binding Num}" Width="64" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Num" Header="№" Binding="{Binding Num}" Width="64" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
                     <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="190" IsReadOnly="True"
                                         CellStyle="{StaticResource KsNameCell}" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                    <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="48" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="По смете" Binding="{Binding QtyByKp}" Width="80" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="QtyByKp" Header="По смете" Binding="{Binding QtyByKp}" Width="80" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="Сдано ранее" Binding="{Binding Before}" Width="92" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Before" Header="Сдано ранее" Binding="{Binding Before}" Width="92" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="В этом акте" Binding="{Binding Now}" Width="96"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Now" Header="В этом акте" Binding="{Binding Now}" Width="96"
                                         CellStyle="{StaticResource KsNowCell}" EditingElementStyle="{StaticResource CompactCostCenterEditor}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="Остаток" Binding="{Binding Left}" Width="80" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Left" Header="Остаток" Binding="{Binding Left}" Width="80" IsReadOnly="True"
                                         CellStyle="{StaticResource KsLeftCell}"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="Выдано на объект" Binding="{Binding Issued}" Width="132" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Issued" Header="Выдано на объект" Binding="{Binding Issued}" Width="132" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostCenter}" HeaderStyle="{StaticResource KsQuantityHeader}"/>
-                    <DataGridTextColumn Header="Цена" Binding="{Binding Price}" Width="100" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Price" Header="Цена" Binding="{Binding Price}" Width="100" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
-                    <DataGridTextColumn Header="Сумма в акте" Binding="{Binding Amount}" Width="120" IsReadOnly="True"
+                    <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Amount" Header="Сумма в акте" Binding="{Binding Amount}" Width="120" IsReadOnly="True"
                                         ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                 </DataGrid.Columns>
             </DataGrid>

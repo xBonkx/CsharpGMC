@@ -142,10 +142,10 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Акт" Binding="{Binding Title}" Width="140" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
                             <DataGridTextColumn Header="Приложение / ДС" Binding="{Binding Source}" Width="200" HeaderStyle="{StaticResource KsTextHeader}" ElementStyle="{StaticResource CompactCostText}"/>
-                            <DataGridTextColumn Header="Дата" Binding="{Binding Date}" Width="92" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Период" Binding="{Binding Period}" Width="190" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Строки" Binding="{Binding Count}" Width="65" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
-                            <DataGridTextColumn Header="Сумма, ₽" Binding="{Binding Amount}"
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Date" Header="Дата" Binding="{Binding Date}" Width="92" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Period" Header="Период" Binding="{Binding Period}" Width="190" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Count" Header="Строки" Binding="{Binding Count}" Width="65" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
+                            <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Amount" Header="Сумма, ₽" Binding="{Binding Amount}"
                                                 Width="130" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource KsMoneyHeader}"/>
                             <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="125" HeaderStyle="{StaticResource KsQuantityHeader}" ElementStyle="{StaticResource CompactCostCenter}"/>
                         </DataGrid.Columns>

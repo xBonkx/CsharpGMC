@@ -553,15 +553,15 @@
                     </DataTemplate></DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" MinWidth="240" IsReadOnly="True" ElementStyle="{StaticResource ShipmentNameText}" HeaderStyle="{StaticResource CompactCostTextHeader}"/>
-                <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="48" MinWidth="48" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
-                <DataGridTextColumn Header="По смете" Binding="{Binding ByEstimate}" Width="90" MinWidth="90" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
-                <DataGridTextColumn Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
-                <DataGridTextColumn Header="Есть на складе" Binding="{Binding StockText}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentStockHeader}"/>
-                <DataGridTextColumn x:Name="QtyColumn" Header="Выдать сейчас ✎"
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Unit" Header="Ед." Binding="{Binding Unit}" Width="48" MinWidth="48" IsReadOnly="True" ElementStyle="{StaticResource ShipmentUnitText}" HeaderStyle="{StaticResource CompactCostHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="ByEstimate" Header="По смете" Binding="{Binding ByEstimate}" Width="90" MinWidth="90" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="IssuedTotal" Header="Выдано раньше" Binding="{Binding IssuedTotal}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="StockText" Header="Есть на складе" Binding="{Binding StockText}" Width="125" MinWidth="125" IsReadOnly="True" ElementStyle="{StaticResource CompactCostMoney}" HeaderStyle="{StaticResource ShipmentStockHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="Qty" x:Name="QtyColumn" Header="Выдать сейчас ✎"
                                     Binding="{Binding Qty, Mode=TwoWay}" Width="140" MinWidth="140"
                                     ElementStyle="{StaticResource ShipmentNowText}" EditingElementStyle="{StaticResource CompactCostMoneyEditor}"
                                     CellStyle="{StaticResource ShipmentNowCell}" HeaderStyle="{StaticResource ShipmentNowHeader}"/>
-                <DataGridTextColumn Header="Останется выдать" Binding="{Binding LeftText}" Width="145" MinWidth="145" IsReadOnly="True" ElementStyle="{StaticResource ShipmentLeftText}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
+                <DataGridTextColumn local:TableColumnMenu.FitDisplayPath="LeftText" Header="Останется выдать" Binding="{Binding LeftText}" Width="145" MinWidth="145" IsReadOnly="True" ElementStyle="{StaticResource ShipmentLeftText}" HeaderStyle="{StaticResource ShipmentLeftHeader}"/>
             </DataGrid.Columns>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource PythonTableRow}"><Style.Triggers><DataTrigger Binding="{Binding InShipment}" Value="True"><Setter Property="Background" Value="#ECFDF3"/></DataTrigger><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource GridSelectionBrush}"/></Trigger></Style.Triggers></Style>

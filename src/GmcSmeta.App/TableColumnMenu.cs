@@ -48,6 +48,18 @@ public static class TableColumnMenu
     public static void SetDefaultHidden(DependencyObject target, bool value) => target.SetValue(DefaultHiddenProperty, value);
     public static bool GetDefaultHidden(DependencyObject target) => (bool)target.GetValue(DefaultHiddenProperty);
 
+    // Explicit simple display properties for content-aware document widths.
+    // These are view metadata only, never used to edit or bind the document.
+    public static readonly DependencyProperty FitDisplayPathProperty = DependencyProperty.RegisterAttached(
+        "FitDisplayPath", typeof(string), typeof(TableColumnMenu), new PropertyMetadata(""));
+    public static void SetFitDisplayPath(DependencyObject target, string value) => target.SetValue(FitDisplayPathProperty, value);
+    public static string GetFitDisplayPath(DependencyObject target) => (string)target.GetValue(FitDisplayPathProperty);
+    public static readonly DependencyProperty FitExtraProperty = DependencyProperty.RegisterAttached(
+        "FitExtra", typeof(double), typeof(TableColumnMenu), new PropertyMetadata(0d),
+        value => value is double d && double.IsFinite(d) && d >= 0);
+    public static void SetFitExtra(DependencyObject target, double value) => target.SetValue(FitExtraProperty, value);
+    public static double GetFitExtra(DependencyObject target) => (double)target.GetValue(FitExtraProperty);
+
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Layout> Layouts = new();
 
     // WPF smoke checks can use a temporary profile directory. Production always
@@ -197,6 +209,7 @@ public static class TableColumnMenu
         private Entry[] _entries = Array.Empty<Entry>();
         private SummaryColumnFit? _summaryFit;
         private LegacyCostColumnFit? _legacyCostFit;
+        private DocumentColumnFit? _documentFit;
 
         private static bool IsLegacyCostKey(string value) =>
             value is "cost-materials" or "smr-work" or "smr-expenses" or "cost-summary" or "cost-totals";
@@ -205,11 +218,18 @@ public static class TableColumnMenu
         {
             _summaryFit?.Request();
             _legacyCostFit?.Request();
+            _documentFit?.Request();
         }
 
         private double? LegacyCostPreferred(DataGridColumn column)
         {
-            if (!_initialized || !IsLegacyCostKey(key)) return null;
+            if (!IsLegacyCostKey(key)) return null;
+            return DocumentPreferred(column);
+        }
+
+        private double? DocumentPreferred(DataGridColumn column)
+        {
+            if (!_initialized) return null;
             var entry = _entries.FirstOrDefault(e => e.Column == column);
             if (entry is null || entry.Excluded || !entry.Width.IsAbsolute) return null;
             return _prefs.Widths.TryGetValue(entry.Id, out var manual) &&
@@ -254,6 +274,7 @@ public static class TableColumnMenu
             _resizeStart = null;
             if (_summaryFit is not null) _summaryFit.Suspended = false;
             if (_legacyCostFit is not null) _legacyCostFit.Suspended = false;
+            if (_documentFit is not null) _documentFit.Suspended = false;
             _entries = Array.Empty<Entry>();
             key = newKey;
             Initialize();
@@ -368,6 +389,11 @@ public static class TableColumnMenu
                 _legacyCostFit ??= new LegacyCostColumnFit(grid, LegacyCostPreferred);
                 _legacyCostFit.Invalidate();
             }
+            if (grid.Columns.Any(c => GetFitDisplayPath(c).Length > 0))
+            {
+                _documentFit ??= new DocumentColumnFit(grid, DocumentPreferred);
+                _documentFit.Invalidate();
+            }
         }
 
         private bool CanHide(DataGridColumn column) => column.Visibility != Visibility.Visible ||
@@ -458,6 +484,7 @@ public static class TableColumnMenu
                 foreach (var entry in _entries.Where(x => !x.Excluded)) entry.Column.Width = entry.Width;
                 Save(prefs => prefs.Widths.Clear());
                 _legacyCostFit?.Invalidate();
+                _documentFit?.Invalidate();
                 RequestSummaryFit();
             };
             menu.Items.Add(widths);
@@ -512,6 +539,7 @@ public static class TableColumnMenu
             _resizeStart = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
             if (_summaryFit is not null) _summaryFit.Suspended = true;
             if (_legacyCostFit is not null) _legacyCostFit.Suspended = true;
+            if (_documentFit is not null) _documentFit.Suspended = true;
         }
 
         internal void ResizeCompleted(object sender, DragCompletedEventArgs e)
@@ -528,6 +556,7 @@ public static class TableColumnMenu
             var before = _entries.Where(x => !x.Excluded).ToDictionary(x => x.Column, x => x.Column.Width);
             if (_summaryFit is not null) _summaryFit.Suspended = true;
             if (_legacyCostFit is not null) _legacyCostFit.Suspended = true;
+            if (_documentFit is not null) _documentFit.Suspended = true;
             CompleteResize(before);
         }
 
@@ -543,6 +572,7 @@ public static class TableColumnMenu
                 {
                     if (_resizeStart is null && _summaryFit is not null) _summaryFit.Suspended = false;
                     if (_resizeStart is null && _legacyCostFit is not null) _legacyCostFit.Suspended = false;
+                    if (_resizeStart is null && _documentFit is not null) _documentFit.Suspended = false;
                     RequestSummaryFit();
                 }
             }));
