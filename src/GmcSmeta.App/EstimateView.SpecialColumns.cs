@@ -33,5 +33,7 @@ public partial class EstimateView
             return;
         foreach (var row in _rows)
             row.FillArea();
+        _estimateMeasuredMinimums = null;
+        RequestEstimateColumnFit();
     }
 }
