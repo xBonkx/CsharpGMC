@@ -100,7 +100,7 @@ internal static class LayoutPerformanceChecks
                     viewer.CanContentScroll && grid.EnableRowVirtualization &&
                     grid.EnableColumnVirtualization;
                 if (!pass) failures++;
-                Write(area, requested, grid, phase, elapsed, counts.Rows, counts.Cells,
+                Write(area, requested, grid, viewer, phase, elapsed, counts.Rows, counts.Cells,
                     counts.Nodes, viewer?.VerticalOffset ?? 0, pass ? "PASS" : "FAIL");
             }
         }
@@ -146,8 +146,10 @@ internal static class LayoutPerformanceChecks
                         for (var i = 0; i < items.Count; i++)
                             if (cards.ItemContainerGenerator.ContainerFromIndex(i) is not null) realized++;
                         var counts = CountVisuals(cards);
-                        Write("object_cards", count + 1, cards, phase, elapsed, realized, 0,
-                            counts.Nodes, viewer.VerticalOffset, "MEASURED");
+                        var valid = realized > 0 && viewer.ViewportWidth > 0 && viewer.ViewportHeight > 0;
+                        if (!valid) failures++;
+                        Write("object_cards", count + 1, cards, viewer, phase, elapsed, realized, 0,
+                            counts.Nodes, viewer.VerticalOffset, valid ? "MEASURED" : "FAIL");
                     }
                     cards.ItemsSource = null;
                     Flush(host);
@@ -156,12 +158,12 @@ internal static class LayoutPerformanceChecks
             finally { host.Close(); }
         }
 
-        void Write(string name, int count, FrameworkElement element, string phase,
+        void Write(string name, int count, FrameworkElement element, ScrollViewer? viewer, string phase,
             double elapsed, int rows, int cells, int nodes, double offset, string status)
         {
             var dpi = VisualTreeHelper.GetDpi(element);
             output.WriteLine(FormattableString.Invariant(
-                $"{name},{count},{element.ActualWidth:F2},{element.ActualHeight:F2},{dpi.PixelsPerInchX:F2},{dpi.PixelsPerInchY:F2},{phase},{elapsed:F4},{rows},{cells},{nodes},{offset:F2},{status}"));
+                $"{name},{count},{viewer?.ViewportWidth ?? element.ActualWidth:F2},{viewer?.ViewportHeight ?? element.ActualHeight:F2},{dpi.PixelsPerInchX:F2},{dpi.PixelsPerInchY:F2},{phase},{elapsed:F4},{rows},{cells},{nodes},{offset:F2},{status}"));
             output.Flush();
         }
     }
