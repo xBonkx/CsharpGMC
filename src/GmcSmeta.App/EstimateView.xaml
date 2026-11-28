@@ -1022,14 +1022,14 @@
                 <Border x:Name="ExpensesCard" Style="{StaticResource Card}" MinHeight="70">
                     <StackPanel>
                         <TextBlock Text="Дополнительные расходы" Style="{StaticResource CardCaption}"/>
-                        <Grid x:Name="TransportCard" Margin="{StaticResource LayoutHeaderTitleGap}">
+                        <Grid x:Name="TransportCard" Margin="{StaticResource LayoutFooterFieldGap}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="TransportCaption" Text="Транспорт, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBox x:Name="TransportEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"
                                          KeyDown="TotalsEdit_KeyDown" LostFocus="TransportEdit_Commit"
                                          ToolTip="Транспорт: сумма (Enter — сохранить)"/>
                             </Grid>
-                        <Grid x:Name="PnrCard" Margin="{StaticResource LayoutHeaderTitleGap}">
+                        <Grid x:Name="PnrCard" Margin="{StaticResource LayoutFooterFieldGap}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="Пусконаладка, ₽" Style="{StaticResource PythonTileLabel}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBox x:Name="PnrEdit" Grid.Column="1" Style="{StaticResource PythonMoneyEdit}" MinWidth="80" MaxWidth="150" HorizontalAlignment="Stretch"

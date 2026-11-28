@@ -27,6 +27,7 @@
     <Thickness x:Key="LayoutDocumentFooterPadding">24,12,24,14</Thickness>
     <!-- Collapsed footer owns only one summary line, not full card spacing. -->
     <Thickness x:Key="LayoutDocumentFooterCompactPadding">24,6,24,8</Thickness>
+    <Thickness x:Key="LayoutFooterFieldGap">0,2,0,0</Thickness>
     <Thickness x:Key="LayoutNoInset">0</Thickness>
     <Thickness x:Key="LayoutFormFooterGap">0,10,0,0</Thickness>
     <Thickness x:Key="LayoutDialogMargin">22,18,22,16</Thickness>

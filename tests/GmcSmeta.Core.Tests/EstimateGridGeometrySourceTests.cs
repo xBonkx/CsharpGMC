@@ -195,6 +195,15 @@ public sealed class EstimateGridGeometrySourceTests
         Assert.Contains("viewport <= 0", fit);
         Assert.Contains("column == NoteColumn ? EstimateColumnLayout.Role.Note", fit);
         Assert.Contains("EstimateColumnLayout.Fit(inputs, available, manual)", fit);
+        Assert.Contains("var measured = manual ? null : EstimateMeasuredMinimums();", fit);
+        Assert.Contains("Math.Max(minimum, measured![column])", fit);
+        Assert.Contains("IsMeasuredIdentity(_estimateMeasuredSource, EstimateGrid.ItemsSource)", fit);
+        Assert.Contains("IsMeasuredIdentity(_estimateMeasuredRows, _rows)", fit);
+        Assert.Contains("EstimateMeasurementFont()", fit);
+        Assert.Contains("if (HasActiveEstimateEdit()) return;", fit);
+        Assert.Contains("row.DisplayAmountText", fit);
+        Assert.Contains("row.DisplayWorkAmountText", fit);
+        Assert.Contains("row.IsExpandable ? 22 : 0", fit);
         Assert.Contains("if (_applyingEstimateOrder) return;", fit);
         var row = File.ReadAllText(Path.Combine(app, "EditableEstimateRow.cs"));
         Assert.Contains("Math.Max(IsSub ? 1 : 0, DisplayIndentLevel - 1)", row);

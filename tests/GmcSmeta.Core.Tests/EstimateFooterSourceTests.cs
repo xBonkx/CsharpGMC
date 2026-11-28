@@ -67,12 +67,15 @@ public sealed class EstimateFooterSourceTests
         Assert.Equal("{StaticResource LayoutDocumentFooterPadding}", (string?)Named("TotalsFooterPanel").Attribute("Margin"));
         Assert.Equal(w + "Grid", Named("TransportCard").Name);
         Assert.Equal(w + "Grid", Named("PnrCard").Name);
+        Assert.Equal("{StaticResource LayoutFooterFieldGap}", (string?)Named("TransportCard").Attribute("Margin"));
+        Assert.Equal("{StaticResource LayoutFooterFieldGap}", (string?)Named("PnrCard").Attribute("Margin"));
         Assert.Equal(4, cards.Elements(w + "Border").Count());
         Assert.All(cards.Elements(w + "Border"), card => Assert.Null(card.Attribute("Margin")));
         var metrics = XDocument.Load(Path.Combine(app, "Theme", "LayoutMetrics.xaml"));
         string Metric(string name) => metrics.Descendants().Single(e => (string?)e.Attribute(xaml + "Key") == name).Value;
         Assert.Equal("24,12,24,14", Metric("LayoutDocumentFooterPadding"));
         Assert.Equal("24,6,24,8", Metric("LayoutDocumentFooterCompactPadding"));
+        Assert.Equal("0,2,0,0", Metric("LayoutFooterFieldGap"));
         Assert.Equal("16,11,16,11", Metric("LayoutTilePadding"));
         var shared = XDocument.Load(Path.Combine(app, "App.xaml"));
         var tile = shared.Descendants(w + "Style").Single(e => (string?)e.Attribute(xaml + "Key") == "PythonTile");
